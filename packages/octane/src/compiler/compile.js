@@ -3082,6 +3082,8 @@ function renderedHoistedVars(ctx, statements) {
  */
 function collectComponentLocals(componentNode) {
 	const locals = new Set();
+	const self = componentNode.metadata?.octaneMutableComponent?.self;
+	if (self) locals.add(self.name);
 	for (const p of componentNode.params || []) collectBindings(p, locals);
 	// `@{}` shape: body is a JSXCodeBlock with `.body` as the statement list.
 	// return-JSX shape: body is a BlockStatement (`{ … return <jsx> }`), also `.body`.
@@ -4931,8 +4933,10 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null, freeWr
 		) {
 			const newScope = new Set(scope);
 			for (const p of n.params || []) collectBindings(p, newScope);
-			// `function name(){}` introduces its own name into the body scope too.
-			if (n.id) collectBindings(n.id, newScope);
+			// A normalized variable declares its public name outside the body.
+			const binding = n.metadata?.octaneMutableComponent;
+			const self = binding ? binding.self : n.id;
+			if (self) collectBindings(self, newScope);
 			// A parameter pattern is not only a set of bindings: default
 			// initialisers and computed destructuring keys are EXPRESSIONS that run
 			// when the function is called, and they can reference anything the
@@ -6765,7 +6769,11 @@ function collectImmutableModuleFunctions(body) {
 			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
 				? statement.declaration
 				: statement;
-		if (declaration?.type === 'FunctionDeclaration' && declaration.id?.type === 'Identifier') {
+		if (
+			declaration?.type === 'FunctionDeclaration' &&
+			declaration.id?.type === 'Identifier' &&
+			!declaration.metadata?.octaneMutableComponent
+		) {
 			declared.set(declaration.id.name, declaration);
 		}
 	}
@@ -10235,13 +10243,9 @@ function singleHostComponentRoot(node) {
 	return returns === 1;
 }
 
-// Arrow-function component shape: `const X = (props) => @{…}` (and the `export`
-// variant). @tsrx/core parses the `@{…}` arrow body as a JSXCodeBlock, but the
-// rest of the compiler keys on FunctionDeclaration. Convert a single-declarator
-// `const X = (…) => @{…}` / `= function (…) @{…}` into an equivalent synthetic
-// FunctionDeclaration so ALL downstream machinery (detection, hookless
-// eligibility, emission, export handling, css scoping) works unchanged. Returns
-// null when the var-decl is not an arrow/function component.
+// Normalize a variable initialized with a template function to the declaration
+// shape used by the component compiler. The mutable form retains its authored
+// kind and private function name separately from the module binding.
 /** @param {any} varDecl @returns {any|null} */
 function arrowComponentToFunctionDecl(varDecl, preserveTypes = false) {
 	if (!varDecl || varDecl.type !== 'VariableDeclaration') return null;
@@ -10257,10 +10261,11 @@ function arrowComponentToFunctionDecl(varDecl, preserveTypes = false) {
 	) {
 		return null;
 	}
+	const mutable = varDecl.kind === 'let' || varDecl.kind === 'var';
 	let fn = init;
 	// `const X = function Name() @{…}` binds `Name` only inside the component,
 	// which the declaration binds as `X` alone.
-	if (init.id && init.id.name !== d.id.name) {
+	if (!mutable && init.id && init.id.name !== d.id.name) {
 		const binding = d.id.name;
 		const self = init.id.name;
 		const body = aliasComponentOwnName(init, binding, (where) =>
@@ -10272,6 +10277,15 @@ function arrowComponentToFunctionDecl(varDecl, preserveTypes = false) {
 		if (body !== init.body) fn = { ...init, body };
 	}
 	const declaration = componentFunctionDeclaration(d.id, fn, varDecl);
+	if (mutable) {
+		declaration.metadata = {
+			...declaration.metadata,
+			octaneMutableComponent: {
+				kind: varDecl.kind,
+				self: init.id ?? null,
+			},
+		};
+	}
 	if (preserveTypes) {
 		let wrapper = d.init;
 		while (wrapper.expression && !wrapper.typeAnnotation) wrapper = wrapper.expression;
@@ -10356,6 +10370,13 @@ function functionExpressionFromDeclaration(declaration, origin = declaration) {
 		: expression;
 }
 
+function componentInitializerExpression(fn, node) {
+	const mutable = node.metadata?.octaneMutableComponent;
+	// An inferred name must not become a private name that shadows the live
+	// module binding inside the body. A named expression keeps its own name.
+	return functionExpressionFromDeclaration(mutable ? { ...fn, id: mutable.self } : fn, node);
+}
+
 // Split a multi-declarator statement only when it contains a component. Keeping
 // each declarator in source order preserves initializer evaluation while letting
 // the component pipeline see the same canonical FunctionDeclaration shape as a
@@ -10365,7 +10386,7 @@ function splitArrowComponentDeclaration(varDecl, preserveTypes) {
 	if (
 		!varDecl ||
 		varDecl.type !== 'VariableDeclaration' ||
-		varDecl.kind !== 'const' ||
+		(varDecl.kind !== 'const' && varDecl.kind !== 'let' && varDecl.kind !== 'var') ||
 		!Array.isArray(varDecl.declarations) ||
 		varDecl.declarations.length < 2
 	)
@@ -11641,6 +11662,7 @@ function instrumentProfileComponents(ast, ctx) {
 			if (
 				declaration?.type === 'FunctionDeclaration' &&
 				declaration.id?.name &&
+				!declaration.metadata?.octaneMutableComponent &&
 				(functionProducesJsx(declaration) ||
 					ctx.profileComponentCandidates.has(declaration.id.name))
 			) {
@@ -13127,7 +13149,8 @@ function compileInternal(
 			if (
 				declaration?.type === 'FunctionDeclaration' &&
 				declaration.id != null &&
-				declaration.body != null
+				declaration.body != null &&
+				!declaration.metadata?.octaneMutableComponent
 			) {
 				candidates.push({ name: declaration.id.name, node: declaration });
 			} else if (declaration?.type === 'VariableDeclaration') {
@@ -13368,7 +13391,12 @@ function compileInternal(
 			compNode = node.declaration;
 		// A component's returned-JSX twin runs only for direct calls, never as a
 		// component.
-		if (compNode && compNode.id && compNode._octaneDirectCallTwin !== true) {
+		if (
+			compNode &&
+			compNode.id &&
+			compNode._octaneDirectCallTwin !== true &&
+			!compNode.metadata?.octaneMutableComponent
+		) {
 			ctx.componentInfo.set(compNode.id.name, {
 				eligible: false,
 				autoMemoSafe: false,
@@ -13928,6 +13956,7 @@ function compileInternal(
 			);
 			if (
 				(isComponentFunction(node) || isReturnJsxFunction(node)) &&
+				!node.metadata?.octaneMutableComponent &&
 				defaultNames.has(node.id.name)
 			)
 				hmrDefaultFunctions.add(node.id.name);
@@ -13973,7 +14002,8 @@ function compileInternal(
 			// `export function Foo() @{...}` → emit as `export const Foo = ...;`.
 			const c = node.declaration;
 			bodyNodes.push(...compileComponent({ ...c, export: true }, ctx, compileOpts).nodes);
-			if (hmrEnabled) hmrComponents.push({ name: c.id.name, exportKind: 'named' });
+			if (hmrEnabled && !c.metadata?.octaneMutableComponent)
+				hmrComponents.push({ name: c.id.name, exportKind: 'named' });
 		} else if (isReturnJsxFunction(node)) {
 			// `function Foo() { …hooks…; return <jsx>; }` — a plain return-JSX function.
 			bodyNodes.push(...compileReturnJsxFunction(node, ctx, {}).nodes);
@@ -14953,12 +14983,22 @@ function typedComponentInitializer(node, initializer, ctx) {
 	return replaceTsInner(init, unwrapTsExpr(init), initializer);
 }
 
+function componentVariableDeclaration(node, id, kind, initializer, ctx) {
+	if (ctx.typescriptWeb && node.metadata?.octaneTypeBinding)
+		id = node.metadata.octaneTypeBinding.id;
+	return inheritOriginLoc(
+		b.declaration(kind, [b.declarator(id, typedComponentInitializer(node, initializer, ctx))]),
+		node,
+	);
+}
+
 function compileServerComponent(node, ctx) {
 	const name = node.id.name;
 	rejectAsyncOrGenerator(node, name);
 
 	const isExported = !!(node.export || node.default);
 	const isDefault = !!node.default;
+	const mutable = node.metadata?.octaneMutableComponent;
 
 	// Scoped <style>: applyStyleScopes stamps scope classes + registers cssInjections.
 	// Capture this component's entries to emit injectStyle INSIDE the body (so the
@@ -15036,9 +15076,10 @@ function compileServerComponent(node, ctx) {
 	// returned-JSX twin is hoisted like the client's, because a direct call of
 	// its component can run while the module evaluates.
 	if (
-		node._octaneDirectCallTwin === true ||
-		componentReferencedAboveDeclaration(ctx, node, name) ||
-		isReassignedComponentDeclaration(node, ctx)
+		!mutable &&
+		(node._octaneDirectCallTwin === true ||
+			componentReferencedAboveDeclaration(ctx, node, name) ||
+			isReassignedComponentDeclaration(node, ctx))
 	) {
 		const declaration = isDefault ? b.export_default(fn) : isExported ? b.export(fn) : fn;
 		const nodes = [inheritOriginLoc(declaration, node)];
@@ -15073,7 +15114,7 @@ function compileServerComponent(node, ctx) {
 		return nodes;
 	}
 
-	let initializer = functionExpressionFromDeclaration(fn, node);
+	let initializer = componentInitializerExpression(fn, node);
 	if (node._octaneBindingView) {
 		initializer = markPure(
 			inheritOriginLoc(
@@ -15086,14 +15127,12 @@ function compileServerComponent(node, ctx) {
 			),
 		);
 	}
-	const declaration = inheritOriginLoc(
-		b.const(
-			ctx.typescriptWeb && node.metadata?.octaneTypeBinding
-				? node.metadata?.octaneTypeBinding.id
-				: name,
-			typedComponentInitializer(node, initializer, ctx),
-		),
+	const declaration = componentVariableDeclaration(
 		node,
+		name,
+		mutable?.kind ?? 'const',
+		initializer,
+		ctx,
 	);
 	const nodes = [
 		isExported && !isDefault ? inheritOriginLoc(b.export(declaration), node) : declaration,
@@ -15513,7 +15552,7 @@ function ssrCompileBodyWithMapTemps(
 				],
 				bindings: [],
 			}
-		: compiledBodyParams(node.params);
+		: compiledBodyParams(node);
 	// Private loop items feed only HTML concatenation, so their serialized tail
 	// needs no carrier. Other bodies can cross a component/value boundary, where
 	// the carrier distinguishes compiled HTML from authored text returns. This
@@ -18708,8 +18747,18 @@ function finalizeComponentInitializers(ctx, bodyNodes) {
 		if (calls.length === 0) continue;
 
 		const declarator = owner.declaration.declarations[0];
+		// An anonymous mutable initializer needs its inferred name when the
+		// side-effect wrapper moves it away from the declaration. A computed
+		// property gives it that name without introducing a private binding.
+		const init = owner.inferName
+			? b.member(
+					b.object([b.prop('init', b.literal(owner.name), declarator.init, true)]),
+					b.literal(owner.name),
+					true,
+				)
+			: declarator.init;
 		const initializer = inheritOriginLoc(
-			markPure(b.call(b.arrow([], b.sequence([...calls, declarator.init])))),
+			markPure(b.call(b.arrow([], b.sequence([...calls, init])))),
 			owner.origin,
 		);
 		replacements.set(owner.declaration, {
@@ -18840,10 +18889,11 @@ function isCompilerMemoImport(ctx, name) {
 function compileComponent(node, ctx, options) {
 	const name = node.id.name;
 	rejectAsyncOrGenerator(node, name);
-	recordProfileComponent(ctx, node, name);
+	const mutable = node.metadata?.octaneMutableComponent;
+	if (!mutable) recordProfileComponent(ctx, node, name);
 	const isExported = !!(node.export || node.default);
 	const isDefault = !!node.default;
-	const hmrWrap = !!(options && options.hmrWrap);
+	const hmrWrap = !mutable && !!(options && options.hmrWrap);
 	const returnedOutput = node.body?.type === 'JSXCodeBlock' && hasOwnValueReturn(node);
 	const owner =
 		ctx.componentEffectOwnership && isExported
@@ -18985,7 +19035,7 @@ function compileComponent(node, ctx, options) {
 	// Reassigned declarations use the same form: a named function expression
 	// would give own-body writes an immutable self binding instead of this module binding.
 	const referencedAboveDeclaration = componentReferencedAboveDeclaration(ctx, node, name);
-	if (referencedAboveDeclaration || isReassignedComponentDeclaration(node, ctx)) {
+	if (!mutable && (referencedAboveDeclaration || isReassignedComponentDeclaration(node, ctx))) {
 		if (owner !== null) {
 			for (const event of owner.delegatedEvents) ctx.unownedDelegatedEvents.add(event);
 			for (const event of owner.capturedEvents) ctx.unownedCapturedEvents.add(event);
@@ -19066,15 +19116,16 @@ function compileComponent(node, ctx, options) {
 	// The declaration form embeds the compiled function at EXPRESSION position
 	// (`const X = function X(…) {…}`), preserving the user-facing function-name
 	// identity by naming the inner FunctionExpression.
-	const fnExpr = functionExpressionFromDeclaration(fnNode);
-	const warmedFn = pendingWarm
-		? markPure(
-				inheritOriginLoc(
-					b.call(requireRuntimeForContext(ctx, 'markWarm'), fnExpr, pendingWarm),
-					node,
-				),
-			)
-		: fnExpr;
+	const fnExpr = componentInitializerExpression(fnNode, mutable ? node : fnNode);
+	const warmedFn =
+		pendingWarm && !mutable
+			? markPure(
+					inheritOriginLoc(
+						b.call(requireRuntimeForContext(ctx, 'markWarm'), fnExpr, pendingWarm),
+						node,
+					),
+				)
+			: fnExpr;
 	const abiFn =
 		hmrWrap && returnedOutput
 			? markPure(
@@ -19111,21 +19162,35 @@ function compileComponent(node, ctx, options) {
 			markPure(hydrationComponentInitializer(ctx, valueExpr, hydrationPlan)),
 			node,
 		);
-	const declKind = options && options.hmrMutable ? 'let' : 'const';
-	const declNode = inheritOriginLoc(
-		b.declaration(declKind, [
-			b.declarator(
-				ctx.typescriptWeb && node.metadata?.octaneTypeBinding
-					? node.metadata?.octaneTypeBinding.id
-					: b.id(name, node.id ?? node),
-				typedComponentInitializer(node, valueExpr, ctx),
-			),
-		]),
+	const declKind = mutable?.kind ?? (options && options.hmrMutable ? 'let' : 'const');
+	const declNode = componentVariableDeclaration(
 		node,
+		b.id(name, node.id ?? node),
+		declKind,
+		valueExpr,
+		ctx,
 	);
 	if (owner !== null) {
 		owner.declaration = declNode;
+		if (mutable && mutable.self === null) owner.inferName = true;
 		ctx.componentOwners.push(owner);
+	}
+	if (mutable) {
+		const nodes = [isExported ? inheritOriginLoc(b.export(declNode), node) : declNode];
+		// These stamps belong to the freshly initialized value. A later write
+		// may replace the exported binding before module-tail metadata runs.
+		if (pendingWarm)
+			nodes.push(
+				inheritOriginLoc(
+					b.stmt(b.call(requireRuntimeForContext(ctx, 'markWarm'), b.id(name), pendingWarm)),
+					node,
+				),
+			);
+		if (ctx.profile) {
+			ctx.profileRuntimeNeeded.add('__profileComponent');
+			nodes.push(profileRegistrationAst(name, profileComponentMetadata(ctx, node, name), node));
+		}
+		return { nodes };
 	}
 	if (isDefault) {
 		if (options && options.hmrMutable) {
@@ -20130,7 +20195,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// PROPS-FIRST convention: `(props, __s, __extra)`. The scope is the 2nd arg
 	// (a placeholder leads when there are no user params), so a plain function
 	// `App(props)` binds `props`, while compiled bodies still read `__s` by name.
-	const { params: fnParams, bindings: paramBindings } = compiledBodyParams(node.params ?? []);
+	const { params: fnParams, bindings: paramBindings } = compiledBodyParams(node);
 	ctx.currentAutoMemoOffset = prevAutoMemoOffset;
 	ctx.currentAutoMemoCacheName = prevAutoMemoCacheName;
 	ctx.currentAutoMemoCommittedName = prevAutoMemoCommittedName;
@@ -24669,9 +24734,27 @@ function collectFunctionScopeBindings(params, statements, into) {
 // on. The slice names no global, which a module may shadow
 // (`import { Array } from 'effect'`). A TypeScript `this` parameter types the
 // receiver and takes no argument.
-function compiledBodyParams(authored) {
+function compiledBodyParams(node) {
+	const authored = node.params ?? [];
 	const receiver = authored[0]?.type === 'Identifier' && authored[0].name === 'this' ? 1 : 0;
 	const own = authored.slice(receiver);
+	const self = node.metadata?.octaneMutableComponent?.self;
+	if (self && own.length > 1) {
+		const later = new Set();
+		for (let i = 1; i < own.length; i++) collectBindings(own[i], later);
+		// A later parameter can shadow the function expression name even
+		// during initialization of the earlier parameter.
+		if (later.has(self.name)) {
+			const runtimeArg = (name, index) => ({
+				...inheritOriginLoc(b.var(name, b.member(b.id('arguments'), b.literal(index), true)), node),
+				_octaneParamBinding: true,
+			});
+			return {
+				params: authored,
+				bindings: [runtimeArg('__s', 1), runtimeArg('__extra', 2)],
+			};
+		}
+	}
 	const first = own.length > 0 && own[0].type !== 'RestElement' ? own[0] : null;
 	const params = [
 		...authored.slice(0, receiver),
@@ -40680,12 +40763,25 @@ function splitDirectlyCalledComponents(ast) {
 			if (param.type !== 'Identifier' || param.name !== 'this') collectBindings(param, bound);
 		}
 		const args = [...bound];
+		const self = node.metadata?.octaneMutableComponent?.self;
+		const body = cloneAstNode(node.body);
 		const params = args.map((name) => inheritOriginLoc(b.id(name), node));
+		if (self && collectFreeIdentifiers(body, args).has(self.name)) {
+			let capture = `${twin}$self`;
+			while (used.has(capture)) capture += '$';
+			used.add(capture);
+			params.push(inheritOriginLoc(b.id(capture), self));
+			args.push(self.name);
+			const setup = body.body;
+			let at = 0;
+			while (at < setup.length && typeof setup[at].directive === 'string') at++;
+			setup.splice(at, 0, inheritOriginLoc(b.const(self.name, b.id(capture)), self));
+		}
 		// The two functions compile differently, so they must not share nodes:
 		// module-wide walks skip a node they have already visited, and later
 		// passes key facts by node identity.
 		const returned = returnedJsxFunction(
-			inheritOriginLoc(b.function_declaration(b.id(twin), params, cloneAstNode(node.body)), node),
+			inheritOriginLoc(b.function_declaration(b.id(twin), params, body), node),
 			(value) => value,
 		);
 		out.push({ ...returned, _octaneDirectCallTwin: true });
