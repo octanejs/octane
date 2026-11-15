@@ -107,10 +107,12 @@ export const inlineComponentForm = (
 		props={{ name: 'x' }}
 		hostClassName="status"
 		hostStyle={{ display: 'inline' }}
+		hostRole="img"
+		hostAriaLabel="Status"
 	/>
 );
 export const inlineChildrenForm = (
-	<OctaneCompatInline hostClassName="status" hostStyle={{ display: 'inline' }}>
+	<OctaneCompatInline hostClassName="status" hostStyle={{ display: 'inline' }} hostRole={undefined}>
 		<Greeting name="x" />
 	</OctaneCompatInline>
 );
@@ -119,6 +121,10 @@ export const inlineWrong = <OctaneCompatInline component={RawGreeting} props={{ 
 export const invalidHostStyle = (
 	// @ts-expect-error — the host style takes React style properties
 	<OctaneCompatInline component={RawGreeting} props={{ name: 'x' }} hostStyle="display:inline" />
+);
+export const invalidHostAriaLabel = (
+	// @ts-expect-error — the accessible name takes a string
+	<OctaneCompatInline component={RawGreeting} props={{ name: 'x' }} hostAriaLabel={42} />
 );
 // The tsrx-tsc view of a `.tsrx` export — `(props) => <octane element>` — is
 // equally accepted; the return type is deliberately unconstrained.
