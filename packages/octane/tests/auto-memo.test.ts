@@ -2969,6 +2969,53 @@ describe('Strong hookful lite edges', () => {
 	});
 });
 
+it.each([
+	['item', 'const label of rows; key label', 'label as string'],
+	['index', 'const row of rows; index label; key row', 'String(label)'],
+	['row setup', 'const row of rows; key row', 'row as string', "const label = 'row';"],
+])(
+	'updates @empty when the enclosing value shares the %s name',
+	(_name, header, text, setup = '') => {
+		const source = `
+			export function App(props) @{
+				const rows = props.rows;
+				const label = props.label;
+				<ul>
+					@for (${header}) { ${setup} <li>{${text}}</li> }
+					@empty { <li>{label as string}</li> }
+				</ul>
+			}`;
+		const load = (mode: 'client' | 'server') =>
+			loadCompiledFixtureSource(source, {
+				id: 'list-empty-shadow.tsrx',
+				mode,
+				compileOptions: { hmr: false, dev: false },
+			});
+		const props = { rows: [], label: 'initial' };
+		const { App } = load('client');
+		const container = document.createElement('div');
+		container.innerHTML = ServerRuntime.renderToString(load('server').App, props).html;
+		document.body.appendChild(container);
+		const empty = container.querySelector('li');
+		expect(empty?.textContent).toBe('initial');
+		const errors: unknown[] = [];
+		const root = hydrateRoot(container, App, props, {
+			onRecoverableError: (error) => errors.push(error),
+		});
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('li')).toBe(empty);
+			flushSync(() => root.render(App, { ...props, label: 'updated' }));
+			expect(container.querySelector('li')).toBe(empty);
+			expect(empty?.textContent).toBe('updated');
+			expect(errors).toEqual([]);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	},
+);
+
 describe('compiler-owned component-region memoization', () => {
 	it('keeps alternate Provider children distinct while retaining live form state', () => {
 		const client = loadCompiledFixtureSource(
