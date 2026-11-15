@@ -8353,10 +8353,12 @@ export function startTransition(fn: () => void | Promise<unknown>): void {
 }
 
 // flushSync — on the client this drains the update queue synchronously around
-// the callback; on the server a render IS synchronous and there is no queue,
-// so run the callback and return its result (mirrors startTransition above).
-export function flushSync<T>(fn: () => T): T {
-	return fn();
+// the callback. The server has no update queue, so only a supplied callback
+// runs and its result is returned.
+export function flushSync(fn?: null): undefined;
+export function flushSync<T>(fn: () => T): T;
+export function flushSync<T>(fn?: (() => T) | null): T | undefined {
+	return fn?.();
 }
 
 // Layout phases — the server has no layout. Queued work never runs, as with

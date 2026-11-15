@@ -3702,14 +3702,18 @@ function drainPassivesBeforeRender(): void {
 }
 
 /**
- * Runs `fn` and synchronously drains scheduled renders and insertion/layout work.
+ * Runs the optional callback and synchronously drains scheduled renders and
+ * insertion/layout work.
  * Newly queued passive effects retain Octane's post-paint scheduling. Bypasses the microtask-batched flush — used by the benchmark
  * timing rig to measure operation wall-clock without microtask coalescing. Also the
  * controlled-restore commit path: maybeFlushDiscrete flushes through here at the
  * outermost boundary of a discrete event that armed a controlled `value`/`checked`
  * restore, so the restore compares the DOM against freshly committed state.
  */
-export function flushSync<T>(fn: () => T): T {
+export function flushSync(fn?: null): undefined;
+export function flushSync<T>(fn: () => T): T;
+export function flushSync<T>(fn?: (() => T) | null): T | void {
+	const callback = fn ?? noop;
 	if (
 		process.env.NODE_ENV !== 'production' &&
 		(CURRENT_BLOCK !== null || EFFECT_BODY_DEPTH > 0 || REF_CALLBACK_DEPTH > 0)
@@ -3734,16 +3738,16 @@ export function flushSync<T>(fn: () => T): T {
 			'flushSync was called from a readLayout task. Its updates commit after the queued layout work, so that the remaining reads do not each lay out again.',
 		);
 	}
-	if (inFlush || queuePhase === 1) return nativeBatchHooks ? runNativeBatch(fn) : fn();
+	if (inFlush || queuePhase === 1) return nativeBatchHooks ? runNativeBatch(callback) : callback();
 	// A preparing view transition is skipped so the sync drain can commit now.
 	// A running animation survives; the urgent update changes the live DOM under it.
 	if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.interrupt();
 	const prevSync = syncFlush;
 	syncFlush = true;
-	let result: T;
+	let result: T | void;
 	try {
 		try {
-			result = nativeBatchHooks ? runNativeBatch(fn) : fn();
+			result = nativeBatchHooks ? runNativeBatch(callback) : callback();
 			// flushSync drains both priorities, including transitions waiting for their task.
 			if (TRANSITION_TASK_DRIVER) TRANSITION_TASK_DRIVER.adopt(true);
 			// `inFlush` guards only the DRAIN below, not fn(): a nested flushSync
