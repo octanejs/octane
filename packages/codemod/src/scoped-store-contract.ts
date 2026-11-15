@@ -414,8 +414,8 @@ function modulePlan(
 				ts.isExportDeclaration(s) &&
 				s.exportClause &&
 				ts.isNamedExports(s.exportClause) &&
-				s.exportClause.elements.length &&
-				s.exportClause.elements.every((item) => localExportBody(item, sf))
+				s.exportClause.elements.some((item) => !item.isTypeOnly) &&
+				s.exportClause.elements.every((item) => item.isTypeOnly || localExportBody(item, sf))
 			) {
 				for (const item of s.exportClause.elements) localExports.add(item);
 				continue;

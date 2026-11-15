@@ -751,6 +751,14 @@ it.each([
 	['parent-relative barrel', 'read(current)', false, true],
 	['same-file named export', 'read(current)', false, false, 'useForward(value)', 'useChannel'],
 	[
+		'same-file mixed type export',
+		'read(current)',
+		false,
+		false,
+		'useForward(value)',
+		'useChannel, type Options',
+	],
+	[
 		'same-file aliased export',
 		'read(current)',
 		false,
@@ -778,6 +786,7 @@ export function useSnapshot() { return 0; }`,
 				`import { use as read } from 'react';
 import { current } from '../renderer';
 import { valueOf } from '../state';
+type Options = { value: number };
 ${forwarding ? 'function useInner(value: number): number;' : ''}
 ${forwarding ? 'function useInner' : 'export function useChannel'}(value: number) {
 	const checked = valueOf(value);
@@ -802,15 +811,29 @@ export function useOptionalCall() { return (reading?.(1) as number); }
 export function useOptional() { return maybe(1); }`,
 			'app/src/asserted.tsx': view('useAsserted'),
 			'app/src/pane.tsx': view('useReading'),
+			'app/src/namespace.tsx': `import * as hooks from './helper';
+export function Pane() {
+	const first = hooks.useReading();
+	const second = hooks['useReading']();
+	return <><p>{String(first)}</p><p>{String(second)}</p></>;
+}`,
+			'app/src/optional-namespace.tsx': `import * as hooks from './helper';
+export function Pane() { const value = hooks.useReading?.(); return <p>{String(value)}</p>; }`,
 			'app/src/property.tsx': view('useProperty'),
 			'app/src/optional-call.tsx': view('useOptionalCall'),
 			'app/src/optional.tsx': view('useOptional'),
 		});
 		const run = (projectTypes) =>
 			runCodemod(
-				['asserted', 'pane', 'property', 'optional-call', 'optional'].map((name) =>
-					path.join(app, 'src', name + '.tsx'),
-				),
+				[
+					'asserted',
+					'namespace',
+					'optional-namespace',
+					'pane',
+					'property',
+					'optional-call',
+					'optional',
+				].map((name) => path.join(app, 'src', name + '.tsx')),
 				{
 					root: app,
 					strong: true,
@@ -829,6 +852,7 @@ export function useOptional() { return maybe(1); }`,
 			const result = await run(projectTypes);
 			expect(warnings(result)).toEqual([
 				['src/asserted.tsx', 'warning'],
+				['src/namespace.tsx', 'warning'],
 				['src/pane.tsx', 'warning'],
 			]);
 			expect(result.files.find((file) => file.file === 'src/pane.tsx')).toMatchObject({
