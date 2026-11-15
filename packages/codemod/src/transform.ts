@@ -7488,11 +7488,31 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		const last = statements[statements.length - 1];
 		if (!last || !ts.isReturnStatement(last) || !last.expression) return null;
 		const guard = statements.findIndex((s, i) => i < statements.length - 1 && guardReturn(s));
-		if (guard !== -1) return this.rewriteGuards(node, body, guard);
+		if (guard !== -1) {
+			const output = this.rewriteGuards(node, body, guard);
+			if (output !== null) return output;
+		}
+		const inner = skipParens(last.expression);
 		// A template body has one output; any other early `return <A />` would
 		// render through runtime descriptors, so the plain function stays.
-		if (returnsJsx(statements.slice(0, -1))) return null;
-		const inner = skipParens(last.expression);
+		const setupStatements = statements.slice(0, -1);
+		if (guard !== -1 || returnsJsx(setupStatements)) {
+			if (
+				this.options.localReactClass &&
+				isJsx(inner) &&
+				this.moduleComponent(node) &&
+				setupStatements.every(
+					(statement) =>
+						ts.isVariableStatement(statement) ||
+						(ts.isIfStatement(statement) &&
+							!statement.elseStatement &&
+							literalCondition(statement.expression) !== 'truthy'),
+				) &&
+				this.options.automaticReactJsx
+			)
+				this.checkReactClassOutput(inner, false, true);
+			return null;
+		}
 		let output = this.output(inner);
 		if (output === null) return null;
 		const head = this.head(node, body.getStart(this.sf));
@@ -7618,6 +7638,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	private checkReactClassOutput(
 		node: ts.JsxElement | ts.JsxSelfClosingElement | ts.JsxFragment,
 		conditional = false,
+		retained = false,
 	) {
 		if (!this.options.localReactClass) return;
 		if (!ts.isJsxFragment(node)) {
@@ -7627,11 +7648,12 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				this.reactRendererBodies.has(node)
 			)
 				return;
-			if (ts.isJsxSelfClosingElement(node)) return this.checkReactClassRoot(node, conditional);
+			if (ts.isJsxSelfClosingElement(node))
+				return this.checkReactClassRoot(node, conditional, retained);
 			const tag = node.openingElement.tagName;
 			const callee = this.callee(tag);
 			if (callee?.module !== 'react' && callee?.module !== 'octane')
-				return this.checkReactClassRoot(node, conditional);
+				return this.checkReactClassRoot(node, conditional, retained);
 			if (callee.name === 'Fragment') {
 				const member = ts.isPropertyAccessExpression(tag);
 				const reference = member ? tag.expression : tag;
@@ -7641,12 +7663,12 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					this.imports.get(declaration)?.typeOnly !== false ||
 					(member && callee.module === 'octane' && !ts.isNamespaceImport(declaration))
 				)
-					return this.checkReactClassRoot(node, conditional);
+					return this.checkReactClassRoot(node, conditional, retained);
 				const imp = ts.findAncestor(declaration, ts.isImportDeclaration);
-				if (!imp || imp.attributes) return this.checkReactClassRoot(node, conditional);
+				if (!imp || imp.attributes) return this.checkReactClassRoot(node, conditional, retained);
 			} else if (callee.name !== 'StrictMode') {
-				const fallback = callee.name === 'Suspense' && this.suspenseFallback(node);
-				if (!fallback) return this.checkReactClassRoot(node, conditional);
+				const fallback = !retained && callee.name === 'Suspense' && this.suspenseFallback(node);
+				if (!fallback) return this.checkReactClassRoot(node, conditional, retained);
 				if (ts.isJsxExpression(fallback) && fallback.expression) {
 					const expression = skipParens(fallback.expression);
 					if (isJsx(expression)) this.checkReactClassOutput(expression, true);
@@ -7654,13 +7676,14 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			}
 		}
 		for (const child of node.children) {
-			if (isJsx(child)) this.checkReactClassOutput(child, conditional);
+			if (isJsx(child)) this.checkReactClassOutput(child, conditional, retained);
 		}
 	}
 
 	private checkReactClassRoot(
 		node: ts.JsxElement | ts.JsxSelfClosingElement,
 		conditional: boolean,
+		retained: boolean,
 	) {
 		const check = this.options.localReactClass;
 		if (!check) return;
@@ -7677,13 +7700,56 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			severity,
 			tag,
 			severity === 'error'
-				? `The migration resolves \`${entry.module}\` to the imported React class \`${tag.text}\`, which this native template ${conditional ? 'can render' : 'renders'}. Keep this render in React or replace the class with an Octane function component.`
-				: `If this native template renders the imported React class \`${tag.text}\` resolved from \`${entry.module}\`, the call will fail. Verify the runtime import, keep the render in React, or replace the class with an Octane function component.`,
+				? `The migration resolves \`${entry.module}\` to the imported React class \`${tag.text}\`, ${retained ? 'which fails if Octane renders this output' : `which this native template ${conditional ? 'can render' : 'renders'}`}. Keep this render in React or replace the class with an Octane function component.`
+				: `If ${retained ? 'Octane' : 'this native template'} renders the imported React class \`${tag.text}\` resolved from \`${entry.module}\`, the call will fail. Verify the runtime import, keep the render in React, or replace the class with an Octane function component.`,
 		);
 	}
 
 	startsLine(node: ts.Node) {
 		return this.linePrefix(node).trim() === '';
+	}
+
+	/** A direct module component, without going through an arbitrary wrapper or callback. */
+	private moduleComponent(node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction) {
+		const parent = node.parent;
+		if (ts.isExportAssignment(parent)) return !parent.isExportEquals && parent.parent === this.sf;
+		let statement: ts.FunctionDeclaration | ts.VariableStatement;
+		let name: ts.Identifier | undefined;
+		if (ts.isFunctionDeclaration(node)) {
+			statement = node;
+			name = node.name;
+		} else {
+			if (
+				!ts.isVariableDeclaration(parent) ||
+				parent.initializer !== node ||
+				!ts.isIdentifier(parent.name) ||
+				!isComponentName(parent.name.text) ||
+				(ts.getCombinedNodeFlags(parent) & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
+				!ts.isVariableStatement(parent.parent.parent)
+			)
+				return false;
+			statement = parent.parent.parent;
+			name = parent.name;
+		}
+		if (statement.parent !== this.sf) return false;
+		if (statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword))
+			return true;
+		if (!name) return false;
+		const refs = renderUses(this.localUses(name));
+		return (
+			refs.some((ref) =>
+				ts.isExportSpecifier(ref.parent)
+					? !ref.parent.parent.parent.moduleSpecifier
+					: ts.isExportAssignment(ref.parent) && !ref.parent.isExportEquals,
+			) ||
+			(refs.length > 0 &&
+				refs.every(
+					(ref) =>
+						!ts.isExportAssignment(ref.parent) &&
+						!ts.isExportSpecifier(ref.parent) &&
+						componentTagOrExport(ref),
+				))
+		);
 	}
 
 	/**
