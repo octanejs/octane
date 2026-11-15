@@ -45,7 +45,7 @@ bundler plugin and `tsconfig` over to Octane and install the dependencies.
 | `event-object` | `e.nativeEvent`, `e.persist()`, `e.target` on a control, also through a component typed for one | `e`, removed, `e.currentTarget` |
 | `class-attribute` | `className` on an HTML element | `class` |
 | `legacy-root` | `ReactDOM.render(el, c)` | `createRoot(c).render(el)` |
-| `root-render` | `root.render(<App a={1} />)`, `hydrateRoot(c, createElement(App, p))` | `root.render(App, { a: 1 })`, `hydrateRoot(c, App, p)`: no generic element renderer |
+| `root-render` | `root.render(<App a={1} />)`, `hydrateRoot(c, createElement(App))` | `root.render(App, { a: 1 })`, `hydrateRoot(c, App)`: no generic element renderer. Factory calls with a config keep the element so the factory extracts its key and copies its props. |
 | `server-render` | `renderToString(<App />)` | `renderToString(App).html`: Octane returns `{ html, css }` |
 | `strict-mode` | `<StrictMode>…</StrictMode>` | its children (Octane's is a pass-through) |
 | `react-compat` | `<Toaster position="top-right" />` from a React package with no Octane port | `<ReactCompat><Toaster position="top-right" /></ReactCompat>`, rendered by React |
