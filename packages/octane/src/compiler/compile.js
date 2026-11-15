@@ -39909,7 +39909,7 @@ function lowerNullishComponentExits(ast, typescriptWeb) {
 // The lowering runs in every compiler mode (client, server, HMR) so SSR and
 // hydration share one DOM-range shape — same contract as
 // lowerNullishComponentExits above. The bundler mirrors the decision through
-// hasLowerableJsxReturnBranches for cross-module void-output classification.
+// createJsxReturnBranchClassifier for cross-module void-output classification.
 
 const JSX_RETURN_OUTPUT_TYPES = new Set(['JSXElement', 'JSXFragment', 'Element', 'Fragment']);
 
@@ -39993,13 +39993,14 @@ function containsHookCall(node, slotKeyed = false) {
 	return walk(node);
 }
 
-function isNullishReturnArg(argument) {
+function isNullishReturnArg(argument, moduleAnalysis) {
 	if (argument == null) return true;
 	const a = unwrapReturnParens(argument);
-	return (
-		(a.type === 'Literal' && a.value === null) ||
-		(a.type === 'Identifier' && a.name === 'undefined')
-	);
+	if (a.type === 'Literal') return a.value === null;
+	if (a.type !== 'Identifier' || a.name !== 'undefined') return false;
+	const lexical = createLexicalAnalysis(moduleAnalysis.ast);
+	const scope = lexical.nodeScopes.get(a);
+	return scope !== undefined && !lexical.isBound(scope, a.name);
 }
 
 /** Component-level ReturnStatement anywhere under `node`, nested fns excluded. */
@@ -40035,7 +40036,7 @@ function containsComponentReturn(node) {
 // React), a dynamic/member tag, or JSX containing a hook call — poisons the
 // candidate.
 function lowerReturnArgToOutput(argument, origin, state) {
-	if (isNullishReturnArg(argument)) return null;
+	if (isNullishReturnArg(argument, state.moduleAnalysis)) return null;
 	const a = unwrapReturnParens(argument);
 	if (a.type === 'JSXFragment' || a.type === 'Fragment') {
 		state.failed = true;
@@ -40251,27 +40252,23 @@ function collectDisqualifyingComponentUses(moduleBody) {
 
 // One short-lived analysis record belongs to one module pass. Its expensive
 // facts initialize only after a candidate reaches the gate that needs them.
-function createJsxReturnBranchModuleAnalysis() {
-	return { moduleBindings: null, disqualifyingComponentUses: null };
+function createJsxReturnBranchModuleAnalysis(ast) {
+	return { ast, moduleBindings: null, disqualifyingComponentUses: null };
 }
 
 function moduleBindingsForJsxReturnBranches(moduleBody, moduleAnalysis) {
-	if (moduleAnalysis === null) return collectModuleLevelBindings(moduleBody);
 	return (moduleAnalysis.moduleBindings ??= collectModuleLevelBindings(moduleBody));
 }
 
 function moduleOnlyRendersComponent(moduleBody, name, moduleAnalysis) {
-	const disqualifyingUses =
-		moduleAnalysis === null
-			? collectDisqualifyingComponentUses(moduleBody)
-			: (moduleAnalysis.disqualifyingComponentUses ??=
-					collectDisqualifyingComponentUses(moduleBody));
-	return !disqualifyingUses.has(name);
+	const uses = (moduleAnalysis.disqualifyingComponentUses ??=
+		collectDisqualifyingComponentUses(moduleBody));
+	return !uses.has(name);
 }
 
 // Rebuild one candidate function as a JSXCodeBlock (setup + render), or return
 // null when it must keep the generic value ABI.
-function lowerJsxReturnBranchesOf(node, moduleBody, moduleAnalysis = null) {
+function lowerJsxReturnBranchesOf(node, moduleBody, moduleAnalysis) {
 	if (
 		node == null ||
 		(node.type !== 'FunctionDeclaration' && node.type !== 'FunctionExpression') ||
@@ -40285,7 +40282,14 @@ function lowerJsxReturnBranchesOf(node, moduleBody, moduleAnalysis = null) {
 	if (!/^[A-Z]/.test(node.id.name)) return null;
 	// A component's returned-JSX twin exists only for direct calls.
 	if (node._octaneDirectCallTwin === true) return null;
-	const state = { failed: false, totalReturns: 0, branchReturn: false, jsxReturns: 0, roots: [] };
+	const state = {
+		moduleAnalysis,
+		failed: false,
+		totalReturns: 0,
+		branchReturn: false,
+		jsxReturns: 0,
+		roots: [],
+	};
 	const result = armifyComponentReturnList(node.body.body || [], state, false);
 	if (result === null || state.failed) return null;
 	// A single trailing `return <jsx>` stays on the established value paths —
@@ -40326,20 +40330,16 @@ function lowerJsxReturnBranchesOf(node, moduleBody, moduleAnalysis = null) {
 	};
 }
 
-/** Bundler mirror of the compile-time lowering decision (no transform). */
-export function hasLowerableJsxReturnBranches(node, moduleBody) {
-	return lowerJsxReturnBranchesOf(node, moduleBody) !== null;
-}
-
 /** Bundler classifier that shares one lazy analysis across a module. */
-export function createJsxReturnBranchClassifier(moduleBody) {
-	const moduleAnalysis = createJsxReturnBranchModuleAnalysis();
+export function createJsxReturnBranchClassifier(ast) {
+	const moduleAnalysis = createJsxReturnBranchModuleAnalysis(ast);
+	const moduleBody = ast.body || [];
 	return (node) => lowerJsxReturnBranchesOf(node, moduleBody, moduleAnalysis) !== null;
 }
 
 function lowerJsxReturnBranchComponents(ast) {
 	const statements = ast.body || [];
-	const moduleAnalysis = createJsxReturnBranchModuleAnalysis();
+	const moduleAnalysis = createJsxReturnBranchModuleAnalysis(ast);
 	let out = null;
 	for (let i = 0; i < statements.length; i++) {
 		const statement = statements[i];
