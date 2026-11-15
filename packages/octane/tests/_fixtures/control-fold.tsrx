@@ -94,6 +94,40 @@ export function ConditionalInsideKeyedRows({ show }: { show: boolean }) @{
 	</main>
 }
 
+function RowChoice({ label }: { label: string }) @{
+	<b>{label as string}</b>
+}
+
+function FirstChoice({ label }: { label: string }) @{
+	<i>{label as string}</i>
+}
+
+function SecondChoice({ label }: { label: string }) @{
+	<strong>{label as string}</strong>
+}
+
+export function FunctionScopedConditionalKeyedRows({
+	first,
+	rows,
+}: {
+	first: boolean;
+	rows: string[];
+}) @{
+	if (rows.length > 0) {
+		var RowChoice = first ? FirstChoice : SecondChoice;
+	}
+
+	<ol>
+		@for (const label of rows; key label) {
+			@if (label.length > 0) {
+				<li>
+					<RowChoice label={label} />
+				</li>
+			}
+		}
+	</ol>
+}
+
 const rowPrefix = 'module:';
 const rowKey: ((row: number) => number) | undefined = undefined;
 
