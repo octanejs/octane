@@ -170,10 +170,10 @@ function predeclareDirect(statements, scope, hookRuntimeModules, bindingsOnly = 
 	}
 }
 
-function collectHoistedVars(node, functionScope, root = true, bindingsOnly = false) {
+function collectHoistedVars(node, functionScope, root = true, bindingsOnly = false, visit = null) {
 	if (!node || typeof node !== 'object') return;
 	if (Array.isArray(node)) {
-		for (const child of node) collectHoistedVars(child, functionScope, false, bindingsOnly);
+		for (const child of node) collectHoistedVars(child, functionScope, false, bindingsOnly, visit);
 		return;
 	}
 	if (!root && (isFunction(node) || node.type === 'JSXCodeBlock')) return;
@@ -195,12 +195,19 @@ function collectHoistedVars(node, functionScope, root = true, bindingsOnly = fal
 		return;
 	}
 	if (node.type === 'VariableDeclaration' && node.kind === 'var') {
-		for (const decl of node.declarations || []) declarePattern(decl.id, functionScope);
+		for (const decl of node.declarations || []) {
+			if (visit === null) declarePattern(decl.id, functionScope);
+			else visit(decl.id, node);
+		}
 	}
 	for (const key in node) {
 		if (AST_META_KEYS.has(key)) continue;
-		collectHoistedVars(node[key], functionScope, false, bindingsOnly);
+		collectHoistedVars(node[key], functionScope, false, bindingsOnly, visit);
 	}
+}
+
+export function forEachHoistedVarPattern(statements, visit) {
+	collectHoistedVars(statements, null, true, true, visit);
 }
 
 function isFunction(node) {
