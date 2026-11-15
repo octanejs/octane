@@ -537,6 +537,16 @@ jobs:
           retention-days: 1
           overwrite: true
 
+      - name: Upload failed React parity browser traces
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: react-parity-browser-traces-${{ matrix.shard }}-attempt-${{ github.run_attempt }}
+          path: packages/**/.browser-results/*/**/trace.zip
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 1
+
       - name: Upload React parity Vitest shard report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
