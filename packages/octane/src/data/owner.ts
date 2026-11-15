@@ -285,9 +285,10 @@ export function createDataOwner(options: {
 	/** When the newest request whose value was saved for each key started. */
 	const newestSaved = new Map<string, number>();
 	/**
-	 * The newest reply to each read a tab saves, and when its request started,
-	 * until a tab saves it: one that validated it unchanged says so, and the
-	 * owner saves this copy.
+	 * A reply to each read a tab saves, and when its request started, until a
+	 * tab saves it or a newer request's value: one that validated it unchanged
+	 * says so, and the owner saves this copy. A reply that lands while another
+	 * is still kept is not kept, so its tabs send it back.
 	 */
 	const kept = new Map<string, { readonly at: number; readonly value: unknown }>();
 	/** Keys some tab restored or saved this session, which purging leaves alone. */
@@ -325,8 +326,8 @@ export function createDataOwner(options: {
 			if (at !== undefined) {
 				const held = kept.get(key);
 				if (args[2]) {
-					// The tab validated the reply unchanged and sent no value. Another tab's save of
-					// it came first, or a newer request's reply replaced it, unless it is still kept.
+					// The tab validated the reply unchanged and sent no value. Unless it is still
+					// kept, a save of it, or of a newer request's value, came first.
 					if (held?.at !== at) return;
 					saving = { ...saving!, stored: { ...saving!.stored, value: held.value } };
 				}
@@ -496,9 +497,10 @@ export function createDataOwner(options: {
 				started.then(
 					(reply) => {
 						if (!reply.ok) return;
-						// Kept for the tabs that save it, unless a newer request's reply was kept or saved.
-						const newer = kept.get(cacheKey)?.at ?? newestSaved.get(cacheKey) ?? 0;
-						if (asking.keep && !receipt && options.persist && newer < at) {
+						// Kept for the tabs that save it. One kept before it may be the only value a tab
+						// can save, so it stays; one saved from a newer request needs no older one.
+						const saves = asking.keep && !receipt && options.persist && !kept.has(cacheKey);
+						if (saves && (newestSaved.get(cacheKey) ?? 0) < at) {
 							kept.set(cacheKey, { at, value: reply.value });
 						}
 						// A newer read has replaced this one; its value is the one to share.

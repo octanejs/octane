@@ -1920,6 +1920,42 @@ describe('octane/data persistence through a shared owner', () => {
 		expect(remote.log).toEqual([]);
 	});
 
+	it('saves a value a tab validated when a newer reply that no tab can save lands before it does', async () => {
+		const storage = memoryStorage();
+		const first = server(books());
+		const held: Array<(reply: DataReply) => void> = [];
+		let holding = false;
+		const owner = createDataOwner({
+			transport: (request) =>
+				holding ? new Promise((resolve) => held.push(resolve)) : first.transport(request),
+			persist: () => cache(storage, 'ada'),
+		});
+		const [one, two] = [tab(owner, memoryStorage()), tab(owner, memoryStorage())];
+		const shown = await value<Book[]>(one, shelf);
+		await value(two, shelf);
+		// The second tab has asked for the read before, so its reload below is a request of its own.
+		await two.read(shelf).refresh();
+		await saved();
+
+		holding = true;
+		const older = one.read(shelf).refresh();
+		await vi.waitFor(() => expect(held).toHaveLength(1));
+		const newer = two.read(shelf).refresh();
+		await vi.waitFor(() => expect(held).toHaveLength(2));
+		// Both replies land before either tab has saved; the newer one fails every tab's validation.
+		held[0]!({ ok: true, value: [{ id: 'a', title: 'Beloved', read: false }] });
+		held[1]!({ ok: true, value: [{ id: 'a' }] });
+		await Promise.allSettled([older, newer]);
+		await saved();
+		expect(shown.handle.getSnapshot().value![0]!.title).toBe('Beloved');
+
+		const remote = server(first.books);
+		const restarted = tab(ownerOver(storage, remote), memoryStorage());
+		// The value the first tab still shows is the one the next session starts from.
+		expect((await value<Book[]>(restarted, shelf)).value[0]!.title).toBe('Beloved');
+		expect(remote.log).toEqual([]);
+	});
+
 	it('saves the representation a tab’s validator returned, where it is not the owner’s', async () => {
 		const storage = memoryStorage();
 		const first = server(books());
