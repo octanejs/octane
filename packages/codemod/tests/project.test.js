@@ -137,6 +137,98 @@ export function shadow(render: (view: unknown, options: {}) => string) {
 		expect(files.some((file) => fs.existsSync(file.replace('.tsx', '.tsrx')))).toBe(false);
 	});
 
+	it.each([true, false])(
+		'blocks a migrated buffered server renderer from handing a retained React component to Octane (project types: %s)',
+		async (projectTypes) => {
+			const source = `import { renderToStaticMarkup as render } from 'react-dom/server.browser';
+import * as server from 'react-dom/server';
+import { Glyph } from './glyph';
+export function direct() { return render(<Glyph prefix="first" />); }
+export function local() { const view = <Glyph prefix="second" />; return server.renderToString(view); }
+export function assigned(alternate: boolean) {
+	let view = <Glyph prefix="first" />;
+	if (alternate) view = <Glyph prefix="second" />;
+	return render(view);
+}
+export function native() { const view = <svg />; return render(view); }
+export function shadow(render: (view: unknown) => string) { return render(<Glyph prefix="first" />); }
+export function optional() { return server.renderToString?.(<Glyph prefix="first" />); }
+export function late() {
+	let view = <svg />;
+	const html = render(view);
+	view = <Glyph prefix="late" />;
+	return html;
+}`;
+			const other = 'export function Other() { return <aside />; }';
+			const root = project({
+				'package.json': '{"type":"module"}',
+				'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler"}}',
+				'entry.tsx': source,
+				'Other.tsx': other,
+				'glyph.ts': `import { createElement, useState } from 'react';
+export function Glyph(props: { prefix: string }) {
+	const [suffix] = useState('suffix');
+	return createElement('svg', { 'aria-label': props.prefix + '-' + suffix });
+}`,
+			});
+			const require = createRequire(import.meta.url);
+			for (const name of ['react-dom', 'react', '@types/react-dom']) {
+				const target = path.join(root, 'node_modules', name);
+				fs.mkdirSync(path.dirname(target), { recursive: true });
+				fs.symlinkSync(path.dirname(require.resolve(name + '/package.json')), target, 'dir');
+			}
+			fs.symlinkSync(
+				path.join(REPO, 'packages/octane'),
+				path.join(root, 'node_modules/octane'),
+				'dir',
+			);
+			const files = ['Other.tsx', 'entry.tsx'].map((name) => path.join(root, name));
+			const options = { root, strong: true, projectTypes, verify: false };
+			const preview = await runCodemod(files, { ...options, write: false });
+			const notes = (file) =>
+				file.notes.filter(({ rule }) => rule === 'buffered-ssr-react-component');
+			const entry = preview.files.find((file) => file.file === 'entry.tsx');
+			expect(notes(entry)).toEqual(
+				[4, 5, 9].map((line) =>
+					expect.objectContaining({
+						line,
+						severity: 'error',
+						message: expect.stringMatching(/Glyph.*useState/),
+					}),
+				),
+			);
+			const write = await runCodemod(files, { ...options, write: true });
+			expect(write.files).toEqual([
+				expect.objectContaining({ file: 'entry.tsx', output: 'entry.tsx', changed: false }),
+			]);
+			expect(notes(write.files[0])).toHaveLength(1);
+			expect(fs.readFileSync(files[0], 'utf8')).toBe(other);
+			expect(fs.readFileSync(files[1], 'utf8')).toBe(source);
+			expect(files.some((file) => fs.existsSync(file.replace('.tsx', '.tsrx')))).toBe(false);
+			for (const importServer of ['* as server', 'server']) {
+				fs.writeFileSync(
+					files[1],
+					`import ${importServer} from 'react-dom/server';
+import { Glyph } from './glyph';
+(server as { renderToString: () => string }).renderToString = () => 'custom';
+export function markup() { return server.renderToString(<Glyph prefix="first" />); }`,
+				);
+				const reassigned = await runCodemod(files, { ...options, write: false });
+				expect(notes(reassigned.files.find((file) => file.file === 'entry.tsx'))).toEqual([]);
+			}
+			fs.writeFileSync(
+				files[1],
+				`import { renderToStaticMarkup as render } from 'react-dom/server';
+import server from 'react-dom/server.node';
+import { Glyph } from './glyph';
+server.renderToStaticMarkup = () => 'custom';
+export function markup() { return render(<Glyph prefix="first" />); }`,
+			);
+			const sibling = await runCodemod(files, { ...options, write: false });
+			expect(notes(sibling.files.find((file) => file.file === 'entry.tsx'))).toEqual([]);
+		},
+	);
+
 	it('warns when React Router would render a migrated default route export', async () => {
 		const root = project({
 			'package.json': '{"type":"module"}',
