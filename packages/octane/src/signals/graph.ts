@@ -155,10 +155,32 @@ let pureDepth = 0;
 let batchDepth = 0;
 let flushing = false;
 /** While an owner retires: the one error state its nodes and their dependents present. */
-let retirement: NodeState<never> | undefined;
+let retirement: { readonly snapshot: RetiredSnapshot } | undefined;
 let historicalReader:
 	((node: ScopedNode, read: SignalReadMode) => NodeState | undefined) | undefined;
-const queued = new Set<Work>();
+/**
+ * The work the open batch delivers when it ends, in the order it was queued. A
+ * node or observer holds its position (`queuedAt`), so it is queued once and
+ * leaves in place; a slot whose work left is undefined.
+ */
+const queue: Array<Work | undefined> = [];
+let queueIndex = 0;
+let queueLength = 0;
+/** The notices of retiring owners still in the queue, so observers that share one queue it once. */
+const queuedNotices = new Set<() => void>();
+
+function enqueue(work: ScopedNode | SignalObserver): void {
+	if (work.queuedAt !== 0) return;
+	queue[queueLength] = work;
+	work.queuedAt = ++queueLength;
+}
+
+function dequeue(work: ScopedNode | SignalObserver): void {
+	const at = work.queuedAt;
+	if (at === 0) return;
+	queue[at - 1] = undefined;
+	work.queuedAt = 0;
+}
 const settledThrown = new WeakSet<object>();
 const noActivity = {};
 const retainedOwners = new WeakMap<ScopedNode, ReadonlySet<GraphOwner>>();
@@ -167,22 +189,25 @@ const retainedNodes = new WeakMap<GraphOwner, Set<ScopedNode>>();
 function notifyNode(node: ReactiveNode): void {
 	if (node instanceof ScopedNode) {
 		node.revision++;
-		node.wakeup?.resolve();
-		node.wakeup = undefined;
+		const wakeup = node.wakeup;
+		if (wakeup !== undefined) {
+			wakeup.resolve();
+			node.wakeup = undefined;
+		}
 		if (retirement) retireState(node);
 		node.owner.trace('invalidate', node);
 		if (node.invalidateAttempt) {
 			if (candidateHooks.defer) {
 				const invalidate = node.invalidateAttempt;
-				queued.add(() => {
+				queue[queueLength++] = () => {
 					// An accepted read can already have replaced this producer.
 					if (node.invalidateAttempt === invalidate) invalidate();
-				});
+				};
 			} else node.invalidateAttempt();
-			queued.add(node);
-		} else if (node.kind === 'async') queued.add(node);
+			enqueue(node);
+		} else if (node.kind === 'async') enqueue(node);
 	} else {
-		queued.add(node as SignalObserver);
+		enqueue(node as SignalObserver);
 	}
 }
 
@@ -457,7 +482,8 @@ export function startSignalBatch(): void {
 }
 
 export function endSignalBatch(): void {
-	if (--batchDepth === 0) flush();
+	// Most batches queue nothing: a write nothing observes, or a read-only action.
+	if (--batchDepth === 0 && queueLength !== 0) flush();
 }
 
 export function signalBatch<T>(run: () => T): T {
@@ -475,15 +501,23 @@ function flush(): void {
 	let firstError: unknown;
 	let failed = false;
 	try {
-		for (const work of queued) {
-			queued.delete(work);
+		// Work queued while the batch delivers joins the end of the same pass.
+		while (queueIndex < queueLength) {
+			const work = queue[queueIndex];
+			queue[queueIndex++] = undefined;
+			if (work === undefined) continue;
 			try {
 				if (typeof work === 'function') {
+					// A notice that ran can be queued again, as any other work can.
+					if (queuedNotices.size !== 0) queuedNotices.delete(work);
 					untrack(work);
-				} else if (work instanceof ScopedNode) {
-					if (!work.owner.retired) refreshNode(work);
 				} else {
-					runObserver(work);
+					work.queuedAt = 0;
+					if (work instanceof ScopedNode) {
+						if (!work.owner.retired) refreshNode(work);
+					} else {
+						runObserver(work);
+					}
 				}
 			} catch (error) {
 				if (!failed) firstError = error;
@@ -492,6 +526,7 @@ function flush(): void {
 		}
 	} finally {
 		flushing = false;
+		queueIndex = queueLength = 0;
 	}
 	if (failed) throw firstError;
 }
@@ -504,9 +539,10 @@ function flush(): void {
 function presentQueued(): void {
 	let firstError: unknown;
 	let failed = false;
-	for (const work of queued) {
+	for (let at = queueIndex; at < queueLength; at++) {
+		const work = queue[at];
 		if (!(work instanceof SignalObserver) || !work.native) continue;
-		queued.delete(work);
+		dequeue(work);
 		try {
 			runObserver(work);
 		} catch (error) {
@@ -564,6 +600,28 @@ export function errorState(
 			...(requestKey === undefined ? {} : { requestKey }),
 		},
 	};
+}
+
+/**
+ * The error snapshot the nodes of a retired owner present. A read of one of
+ * those nodes is refused before it reaches its state, so most are never looked
+ * at, and an Error captures a stack: the error is built when first read.
+ */
+class RetiredSnapshot {
+	readonly status = 'error';
+	readonly refreshing = false;
+	readonly connection = 'none';
+	readonly complete = false;
+	readonly #scopeKey: string;
+	#error: ScopeDisposedError | undefined = undefined;
+
+	constructor(scopeKey: string) {
+		this.#scopeKey = scopeKey;
+	}
+
+	get error(): ScopeDisposedError {
+		return (this.#error ??= new ScopeDisposedError(this.#scopeKey));
+	}
 }
 
 export function pendingState(
@@ -698,7 +756,8 @@ function revokeRetainedValues(owner: GraphOwner): void {
 				if (!origin.retired) (surviving ??= new Set()).add(origin);
 			}
 		}
-		commitState(node, withOwners(retirement!, surviving));
+		// This state stays readable on a live node, so it is an ordinary error state.
+		commitState(node, withOwners(errorState(retirement!.snapshot.error), surviving));
 		if (node.subs) {
 			propagate(node.subs, executionDepth !== 0);
 			shallowPropagate(node.subs);
@@ -754,6 +813,8 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 	subs: ReactiveNode['subs'];
 	subsTail: ReactiveNode['subsTail'];
 	flags: ReactiveFlags;
+	/** This node's place in the batch's queue, counted from one; zero when it is not queued. */
+	queuedAt = 0;
 	revision = 0;
 	/**
 	 * A node whose state is plain and ready is value-only: a writable cell, or a
@@ -932,8 +993,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 		assertAlive(this.owner);
 		assertWritable();
 		if (typeof notify !== 'function') throw new TypeError(formatClientError(165));
-		const state = untrack(() => refreshNode(this));
-		return attachObserver(this, notify, false, state);
+		return attachObserver(this, notify, false);
 	}
 }
 
@@ -1073,7 +1133,7 @@ function trackRead(node: ScopedNode, read: SignalReadMode): void {
  * strictValue(readNode(node), node.key) that never builds a value-only node's
  * state. Pending, historical and adoption reads take readNode itself.
  */
-function readValue<T>(node: ScopedNode<T>): T {
+export function readValue<T>(node: ScopedNode<T>): T {
 	if (pendingWorld || historicalReader || (node.owner.seedable && getNativeAdoptionResolver()))
 		return strictValue(readNode(node), node.key);
 	refresh(node);
@@ -1194,6 +1254,12 @@ export function refreshNode<T>(node: ScopedNode<T>): NodeState<T> {
 function refresh(node: ScopedNode): void {
 	assertAlive(node.owner);
 	if (node.evaluating) throw new SignalCycleError(node.key);
+	// A current node, the common read, has nothing to check or evaluate.
+	const current = node.flags;
+	if (!(current & (REACTIVE_DIRTY | REACTIVE_PENDING))) {
+		if (current & REACTIVE_RECURSED) node.flags = current & ~REACTIVE_RECURSED;
+		return;
+	}
 	// Dirty dependency checks may execute an async description and its loader
 	// before derivedState runs. They belong to the same pure read boundary as
 	// the computation, including when this derived value was previously cached.
@@ -1502,6 +1568,14 @@ export class SignalObserver implements ReactiveNode {
 	deps: ReactiveNode['deps'];
 	depsTail: ReactiveNode['depsTail'];
 	flags: ReactiveFlags = REACTIVE_WATCHING;
+	/** This observer's place in the batch's queue, counted from one; zero when it is not queued. */
+	queuedAt = 0;
+	/**
+	 * What a public subscriber last heard of: the plain ready value of a
+	 * value-only node while `plain`, otherwise the state in `previous`.
+	 */
+	plain = false;
+	value: unknown = undefined;
 
 	constructor(
 		public node: ScopedNode | undefined,
@@ -1511,13 +1585,57 @@ export class SignalObserver implements ReactiveNode {
 	) {}
 }
 
-export function attachObserver(
-	node: ScopedNode,
-	notify: () => void,
-	native: boolean,
-	state?: NodeState,
-): () => void {
-	const observer = new SignalObserver(node, notify, native, state);
+/** Whether `state` is the plain ready state of `value`, as a value-only node's is. */
+function isPlainReady(state: NodeState | undefined, value: unknown): boolean {
+	if (state === undefined || state.owners?.size) return false;
+	const snapshot = state.snapshot;
+	return (
+		snapshot.status === 'ready' &&
+		!snapshot.refreshing &&
+		snapshot.connection === 'none' &&
+		snapshot.complete &&
+		snapshot.requestKey === undefined &&
+		Object.is(snapshot.value, value)
+	);
+}
+
+/**
+ * Bring a public subscriber's node up to date and record what it now presents.
+ * Returns whether that equals what the subscriber last heard of, by sameState,
+ * without building a value-only node's state.
+ */
+function observeCurrent(observer: SignalObserver, node: ScopedNode): boolean {
+	const previousNode = activeNode;
+	const previousObserver = setNativeReadObserver(null);
+	activeNode = undefined;
+	try {
+		refresh(node);
+	} finally {
+		activeNode = previousNode;
+		setNativeReadObserver(previousObserver);
+	}
+	if (node.valueOnly) {
+		const value = node.last;
+		if (observer.plain ? Object.is(observer.value, value) : isPlainReady(observer.previous, value))
+			return true;
+		observer.plain = true;
+		observer.value = value;
+		observer.previous = undefined;
+		return false;
+	}
+	const state = node.state!;
+	if (observer.plain ? isPlainReady(state, observer.value) : sameState(observer.previous, state))
+		return true;
+	observer.plain = false;
+	observer.value = undefined;
+	observer.previous = state;
+	return false;
+}
+
+export function attachObserver(node: ScopedNode, notify: () => void, native: boolean): () => void {
+	const observer = new SignalObserver(node, notify, native, undefined);
+	// A public subscriber hears of changes from what its node presents now.
+	if (!native) observeCurrent(observer, node);
 	// Link last: no call follows it, so an exhausted native stack cannot leave
 	// a linked observer whose stop never reached the caller.
 	node.owner.observers.add(observer);
@@ -1527,19 +1645,15 @@ export function attachObserver(
 
 /** Internal attempt dependency subscription; callers already hold a graph lease. */
 export function subscribeNode(node: ScopedNode, notify: () => void): () => void {
-	const state = untrack(() => refreshNode(node));
-	return attachObserver(node, notify, true, state);
+	untrack(() => refreshNode(node));
+	return attachObserver(node, notify, true);
 }
 
 function runObserver(observer: SignalObserver): void {
 	const node = observer.node;
 	if (!node || !observer.flags) return;
 	observer.flags = REACTIVE_WATCHING;
-	if (!observer.native) {
-		const state = untrack(() => refreshNode(node));
-		if (sameState(observer.previous, state)) return;
-		observer.previous = state;
-	}
+	if (!observer.native && observeCurrent(observer, node)) return;
 	if (observer.notify) untrack(observer.notify);
 }
 
@@ -1547,7 +1661,7 @@ function runObserver(observer: SignalObserver): void {
 export function stopObserver(observer: SignalObserver, retiring?: boolean): void {
 	const node = observer.node;
 	if (!node) return;
-	queued.delete(observer);
+	dequeue(observer);
 	if (!retiring) node.owner.observers.delete(observer);
 	while (observer.deps) unlink(observer.deps, observer);
 	// Cleared last, so a stop the native stack interrupts can run again.
@@ -1555,6 +1669,7 @@ export function stopObserver(observer: SignalObserver, retiring?: boolean): void
 	observer.node = undefined;
 	observer.notify = undefined;
 	observer.previous = undefined;
+	observer.value = undefined;
 }
 
 /**
@@ -1621,7 +1736,7 @@ export function isRetiredDeclarationView(node: unknown): boolean {
 function retireDeclarationView(view: ScopedNode, record: DeclarationView): void {
 	record.retired = true;
 	if (view.pending !== undefined) pendingSignals!.drop(view.pending);
-	queued.delete(view);
+	dequeue(view);
 	// A retired view never evaluates again. Its readers still wake when the
 	// thenable it threw settles, without that thenable retaining the view.
 	if (view.wakeup) view.wakeup.node = undefined;
@@ -1677,7 +1792,7 @@ function sameViewResult(node: ScopedNode, view: ScopedNode, state: NodeState): b
 export function promoteDeclarationView(view: ScopedNode, node: ScopedNode): void {
 	const record = declarationViews?.get(view);
 	if (record === undefined || record.retired || record.canonical !== node) return;
-	queued.delete(view);
+	dequeue(view);
 	const state = view.state;
 	// A settled view waiter cannot represent a current pending result. Re-read
 	// the accepted definition before presenting it to committed consumers.
@@ -1790,12 +1905,16 @@ export function releaseDeclarationView(view: ScopedNode): void {
 
 export function retireGraph(owner: GraphOwner, nodes: Iterable<ScopedNode>): void {
 	const previous = retirement;
-	retirement = errorState(new ScopeDisposedError(owner.scopeKey));
+	retirement = { snapshot: new RetiredSnapshot(owner.scopeKey) };
 	try {
 		for (const observer of owner.observers) {
 			// Public subscriptions end silently. Native views must invalidate once so
 			// a mounted consumer cannot keep displaying a retired owner's values.
-			if (observer.native && observer.notify) queued.add(observer.notify);
+			const notice = observer.native ? observer.notify : undefined;
+			if (notice !== undefined && !queuedNotices.has(notice)) {
+				queuedNotices.add(notice);
+				queue[queueLength++] = notice;
+			}
 			stopObserver(observer, true);
 		}
 		// Deleting each observer while iterating would rehash the set as it shrinks.
@@ -1803,7 +1922,7 @@ export function retireGraph(owner: GraphOwner, nodes: Iterable<ScopedNode>): voi
 		revokeRetainedValues(owner);
 		for (const node of nodes) {
 			if (node.pending !== undefined) pendingSignals!.drop(node.pending);
-			queued.delete(node);
+			dequeue(node);
 			node.wakeup?.resolve();
 			node.wakeup = undefined;
 			node.revision++;
@@ -1833,9 +1952,7 @@ registerGraphBridge({
 	link: (from, to) => {
 		linkDependency(from, to, ++trackingCycle);
 	},
-	removeQueued: (node) => {
-		queued.delete(node);
-	},
+	removeQueued: dequeue,
 	strictValue,
 	refreshNode,
 	pure,

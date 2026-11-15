@@ -57,6 +57,30 @@ describe('scoped promise resources', () => {
 		]);
 	});
 
+	it('tells a subscriber of a derived value when only its activity changes', async () => {
+		const scope = owner('activity-only');
+		const replies = [deferred<number>(), deferred<number>()];
+		let attempt = 0;
+		const load = query('activity-only', () => replies[attempt++]!.promise);
+		const resource$ = createResource(scope, 'resource', () => load(undefined));
+		const doubled$ = scope.derived$('doubled', () => resource$.get() * 2);
+		replies[0]!.resolve(21);
+		await drainProducers();
+		expect(doubled$.snapshot()).toMatchObject({ status: 'ready', value: 42, refreshing: false });
+		const heard: boolean[] = [];
+		const stop = doubled$.subscribe(() => heard.push(doubled$.snapshot().refreshing));
+		// A quiet refresh keeps the value and reports that it is refreshing.
+		resource$.retry();
+		expect(heard).toEqual([true]);
+		expect(doubled$.snapshot()).toMatchObject({ status: 'ready', value: 42, refreshing: true });
+		// The same value arriving ends the refresh, which is a change too.
+		replies[1]!.resolve(21);
+		await drainProducers();
+		expect(heard).toEqual([true, false]);
+		expect(doubled$.snapshot()).toMatchObject({ status: 'ready', value: 42, refreshing: false });
+		stop();
+	});
+
 	it('does not start replacement work after an abort callback retires the owner', () => {
 		const scope = owner('dispose-in-abort');
 		const signals: AbortSignal[] = [];
