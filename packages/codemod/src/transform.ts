@@ -314,14 +314,22 @@ function isJsx(node: ts.Node) {
 	return ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node);
 }
 
-function isNumericConstant(node: ts.Expression) {
+function numericConstantValue(node: ts.Expression): number | undefined {
 	node = skipWrappers(node);
-	return (
-		ts.isNumericLiteral(node) ||
-		(ts.isPrefixUnaryExpression(node) &&
-			(node.operator === ts.SyntaxKind.MinusToken || node.operator === ts.SyntaxKind.PlusToken) &&
-			ts.isNumericLiteral(skipWrappers(node.operand)))
-	);
+	if (ts.isNumericLiteral(node)) return Number(node.text);
+	if (
+		!ts.isPrefixUnaryExpression(node) ||
+		(node.operator !== ts.SyntaxKind.MinusToken && node.operator !== ts.SyntaxKind.PlusToken)
+	)
+		return undefined;
+	const operand = skipWrappers(node.operand);
+	if (!ts.isNumericLiteral(operand)) return undefined;
+	const value = Number(operand.text);
+	return node.operator === ts.SyntaxKind.MinusToken ? -value : value;
+}
+
+function isNumericConstant(node: ts.Expression) {
+	return numericConstantValue(node) !== undefined;
 }
 
 const TRUTHY = 1;
@@ -6730,9 +6738,11 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return `@{ const ${param} = ${useContext}(${this.emit(tag.expression, PLAIN)}); ${output} }`;
 	}
 
-	private suspenseFallback(node: ts.JsxElement) {
+	private suspenseFallback(node: ts.JsxElement, allowKey = false) {
 		const attributes = node.openingElement.attributes.properties.filter(
-			(a) => !this.removed.has(a),
+			(a) =>
+				!this.removed.has(a) &&
+				!(allowKey && ts.isJsxAttribute(a) && a.name.getText(this.sf) === 'key'),
 		);
 		const fallback = attributes[0];
 		if (
@@ -7584,12 +7594,12 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				: ts.isIdentifier(right) && this.declarationOf(right) === item
 					? left
 					: null;
+		const skipped = compared === null ? undefined : numericConstantValue(compared);
 		return (
-			compared !== null &&
-			ts.isNumericLiteral(compared) &&
+			skipped !== undefined &&
 			literal.elements.some((element) => {
-				const value = skipWrappers(element);
-				return ts.isNumericLiteral(value) && Number(value.text) !== Number(compared.text);
+				const value = numericConstantValue(element);
+				return value !== undefined && value !== skipped;
 			})
 		);
 	}
@@ -7917,15 +7927,16 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 
 	private checkReactClassOutput(
 		node: ts.Expression,
-		conditional = false,
+		conditional: boolean | 'map' = false,
 		retained = false,
-		childSlot = false,
+		descriptorValue = false,
 	) {
 		if (!this.options.localReactClass) return;
-		if (!retained && !conditional) {
+		if (!retained) {
 			while (isWrapper(node)) {
-				// A string assertion selects text even when the value is a descriptor.
+				// String assertions select text in template holes. Descriptor values erase them.
 				if (
+					!descriptorValue &&
 					(ts.isAsExpression(node) ||
 						ts.isSatisfiesExpression(node) ||
 						ts.isTypeAssertionExpression(node)) &&
@@ -7937,9 +7948,9 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			if (ts.isConditionalExpression(node)) {
 				const condition = literalCondition(node.condition);
 				if (condition === undefined || condition === 'truthy')
-					this.checkReactClassOutput(node.whenTrue, conditional, false, childSlot);
+					this.checkReactClassOutput(node.whenTrue, conditional, false, descriptorValue);
 				if (condition !== 'truthy')
-					this.checkReactClassOutput(node.whenFalse, conditional, false, childSlot);
+					this.checkReactClassOutput(node.whenFalse, conditional, false, descriptorValue);
 				return;
 			}
 			if (ts.isBinaryExpression(node)) {
@@ -7949,14 +7960,21 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				const left = this.logicalResult(node.left);
 				// The left result of && is falsy and cannot render JSX.
 				if (operator !== ts.SyntaxKind.AmpersandAmpersandToken && left & ~rightCases)
-					this.checkReactClassOutput(node.left, conditional, false, childSlot);
+					this.checkReactClassOutput(node.left, conditional, false, descriptorValue);
 				if (left & rightCases)
-					this.checkReactClassOutput(node.right, conditional, false, childSlot);
+					this.checkReactClassOutput(node.right, conditional, false, descriptorValue);
+				return;
+			}
+			if (ts.isArrayLiteralExpression(node)) {
+				for (const element of node.elements)
+					this.checkReactClassOutput(element, conditional, false, true);
 				return;
 			}
 			if (ts.isCallExpression(node)) {
-				if (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'map')
-					(this.classOutputMaps ??= new WeakSet()).add(node);
+				const callee = node.expression;
+				if (!ts.isPropertyAccessExpression(callee) || callee.name.text !== 'map') return;
+				if (descriptorValue) this.checkDescriptorMapClassOutput(node, callee.expression);
+				else if (!conditional) (this.classOutputMaps ??= new WeakSet()).add(node);
 				return;
 			}
 		}
@@ -7970,17 +7988,15 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				return;
 			if (ts.isJsxSelfClosingElement(node))
 				return this.checkReactClassRoot(node, conditional, retained);
-			if (!retained && !conditional && rendersOrdinaryHtmlChildren(node.openingElement)) {
-				this.checkReactClassChildren(node, conditional, false, true);
+			if (!retained && rendersOrdinaryHtmlChildren(node.openingElement)) {
+				this.checkReactClassChildren(node, conditional, false, descriptorValue);
 				return;
 			}
 			const tag = node.openingElement.tagName;
 			const callee = this.callee(tag);
 			if (callee?.module !== 'react' && callee?.module !== 'octane')
 				return this.checkReactClassRoot(node, conditional, retained);
-			if (callee.name === 'Fragment') {
-				if (childSlot && callee.module !== 'react')
-					return this.checkReactClassRoot(node, conditional, retained);
+			if (callee.name === 'Fragment' || callee.name === 'Suspense') {
 				const member = ts.isPropertyAccessExpression(tag);
 				const reference = member ? tag.expression : tag;
 				const declaration = ts.isIdentifier(reference) && this.declarationOf(reference);
@@ -7991,51 +8007,72 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				)
 					return this.checkReactClassRoot(node, conditional, retained);
 				const imp = ts.findAncestor(declaration, ts.isImportDeclaration);
-				if (
-					!imp ||
-					imp.attributes ||
-					(childSlot &&
-						!node.openingElement.attributes.properties.every(
-							(attr) =>
-								ts.isJsxAttribute(attr) && ts.isIdentifier(attr.name) && attr.name.text === 'key',
-						))
-				)
-					return this.checkReactClassRoot(node, conditional, retained);
-			} else if (callee.name !== 'StrictMode') {
-				const fallback =
-					!retained && !childSlot && callee.name === 'Suspense' && this.suspenseFallback(node);
-				if (!fallback) return this.checkReactClassRoot(node, conditional, retained);
-				if (ts.isJsxExpression(fallback) && fallback.expression) {
-					const expression = skipParens(fallback.expression);
-					if (isJsx(expression)) this.checkReactClassOutput(expression, true);
+				if (!imp || imp.attributes) return this.checkReactClassRoot(node, conditional, retained);
+				if (callee.name === 'Suspense') {
+					const fallback = !retained && this.suspenseFallback(node, true);
+					if (!fallback) return this.checkReactClassRoot(node, conditional, retained);
+					if (ts.isJsxExpression(fallback) && fallback.expression) {
+						const expression = skipParens(fallback.expression);
+						if (isJsx(expression))
+							this.checkReactClassOutput(
+								expression,
+								conditional === 'map' ? 'map' : true,
+								false,
+								descriptorValue,
+							);
+					}
 				}
+			} else if (callee.name !== 'StrictMode') {
+				return this.checkReactClassRoot(node, conditional, retained);
 			}
 		}
-		this.checkReactClassChildren(node, conditional, retained, childSlot);
+		this.checkReactClassChildren(node, conditional, retained, descriptorValue);
+	}
+
+	private checkDescriptorMapClassOutput(call: ts.CallExpression, receiver: ts.Expression) {
+		const array = skipWrappers(receiver);
+		const [argument] = call.arguments;
+		if (
+			!ts.isArrayLiteralExpression(array) ||
+			!array.elements.some(
+				(element) => !ts.isSpreadElement(element) && !ts.isOmittedExpression(element),
+			) ||
+			call.arguments.length !== 1
+		)
+			return;
+		const fn = skipWrappers(argument);
+		if (
+			(!ts.isArrowFunction(fn) && !ts.isFunctionExpression(fn)) ||
+			fn.modifiers?.length ||
+			fn.asteriskToken
+		)
+			return;
+		const body = fn.body;
+		const output = ts.isBlock(body)
+			? body.statements.length === 1 && ts.isReturnStatement(body.statements[0])
+				? body.statements[0].expression
+				: undefined
+			: body;
+		// The retained map can be overridden and discard its callback's result.
+		if (output) this.checkReactClassOutput(output, 'map', false, true);
 	}
 
 	private checkReactClassChildren(
 		node: ts.JsxElement | ts.JsxFragment,
-		conditional: boolean,
+		conditional: boolean | 'map',
 		retained: boolean,
-		childSlot: boolean,
+		descriptorValue: boolean,
 	) {
 		for (const child of node.children) {
-			if (isJsx(child)) this.checkReactClassOutput(child, conditional, retained, childSlot);
-			else if (
-				!retained &&
-				!conditional &&
-				ts.isJsxExpression(child) &&
-				child.expression &&
-				!child.dotDotDotToken
-			)
-				this.checkReactClassOutput(child.expression, conditional, false, true);
+			if (isJsx(child)) this.checkReactClassOutput(child, conditional, retained, descriptorValue);
+			else if (!retained && ts.isJsxExpression(child) && child.expression && !child.dotDotDotToken)
+				this.checkReactClassOutput(child.expression, conditional, false, descriptorValue);
 		}
 	}
 
 	private checkReactClassRoot(
 		node: ts.JsxElement | ts.JsxSelfClosingElement,
-		conditional: boolean,
+		conditional: boolean | 'map',
 		retained: boolean,
 	) {
 		const check = this.options.localReactClass;
@@ -8046,8 +8083,9 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		if (!entry || entry.namespace || entry.typeOnly) return;
 		const declaration = ts.findAncestor(this.declarationOf(tag)!, ts.isImportDeclaration);
 		if (!declaration || declaration.attributes) return;
-		const severity = check(entry.module, entry.imported);
-		if (!severity) return;
+		const proof = check(entry.module, entry.imported);
+		if (!proof) return;
+		const severity = conditional === 'map' ? 'warning' : proof;
 		this.note(
 			RULE.classComponent,
 			severity,
