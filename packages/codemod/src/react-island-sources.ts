@@ -937,6 +937,7 @@ export function reactServerComponents(
 export function directReactExports(file: string, source: string) {
 	const intrinsics = new Set<string>();
 	const wrappers = new Set<string>();
+	let splitIntrinsicDefault = false;
 	let mayExportThen = false;
 	if (ordinaryReactJsx(source)) {
 		const bound = bind(file, source);
@@ -959,13 +960,13 @@ export function directReactExports(file: string, source: string) {
 		for (const { name, output, localName, decl, splitExport } of directExportReturns(bound, true)) {
 			const tag = openingTag(output).tagName;
 			if (
-				!splitExport &&
 				ts.isIdentifier(tag) &&
 				/^[a-z]/.test(tag.text) &&
 				(!localName || /^[A-Z]/.test(localName))
-			)
-				intrinsics.add(name);
-			else if (
+			) {
+				if (!splitExport) intrinsics.add(name);
+				else if (name === 'default') splitIntrinsicDefault = true;
+			} else if (
 				ts.isFunctionDeclaration(decl) &&
 				(name === 'default'
 					? !localName || /^[A-Z]/.test(localName)
@@ -976,7 +977,7 @@ export function directReactExports(file: string, source: string) {
 				wrappers.add(name);
 		}
 	}
-	return { intrinsics, wrappers, mayExportThen };
+	return { intrinsics, wrappers, splitIntrinsicDefault, mayExportThen };
 }
 
 /** Factories whose intrinsic JSX return survives as Octane JSX in the emitted file. */

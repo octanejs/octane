@@ -1997,11 +1997,15 @@ export async function runCodemod(
 					const originalExports = originalReactExports(match.file);
 					if (edge.lazy && originalExports.mayExportThen) continue;
 					if (!originalExports.intrinsics.has(exportName)) {
+						const splitIntrinsicDefault =
+							edge.renderer === 'createElement' &&
+							exportName === 'default' &&
+							originalExports.splitIntrinsicDefault;
 						if (
 							(!explicit && edge.renderer !== 'createElement') ||
 							edge.lazy ||
 							edge.renderer === 'server render' ||
-							!originalExports.wrappers.has(edge.name) ||
+							(!splitIntrinsicDefault && !originalExports.wrappers.has(edge.name)) ||
 							!hasTemplateExport(leaf, edge.name)
 						)
 							continue;
