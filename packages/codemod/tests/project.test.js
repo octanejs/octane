@@ -50,6 +50,450 @@ function typecheckProject(root) {
 }
 
 describe('runCodemod', () => {
+	it('reports a direct native template root that imports a React class', async () => {
+		const boundary = `import { Component as Base, type ReactNode } from 'react';
+class Frame extends Base<{ children: ReactNode }> {
+	render() { return this.props.children; }
+}
+export { Frame as Boundary };`;
+		const entry = (module) => `import { Boundary as Frame } from '${module}';
+export function App() { return <Frame><b>ready</b></Frame>; }`;
+		const sources = {
+			'tsconfig.json': JSON.stringify({
+				compilerOptions: {
+					jsx: 'react-jsx',
+					moduleResolution: 'bundler',
+					paths: { '@/*': ['./*'] },
+				},
+			}),
+			'Boundary.tsx': boundary,
+			'DefaultBase.tsx': boundary
+				.replace(
+					"import { Component as Base, type ReactNode } from 'react';",
+					"import React, { type ReactNode } from 'react';",
+				)
+				.replace('extends Base', 'extends React.PureComponent'),
+			'DefaultBaseTags.tsx': boundary
+				.replace(
+					"import { Component as Base, type ReactNode } from 'react';",
+					"import React, { type ReactNode } from 'react';",
+				)
+				.replace('extends Base', 'extends React.Component')
+				.replace(
+					'return this.props.children;',
+					'return <React.Fragment><React.StrictMode><React.Suspense fallback={<i />}><React.Fragment />{this.props.children}</React.Suspense></React.StrictMode></React.Fragment>;',
+				),
+			'DefaultBaseNamespaceEscape.tsx': boundary
+				.replace(
+					"import { Component as Base, type ReactNode } from 'react';",
+					"import React, { type ReactNode } from 'react';",
+				)
+				.replace('extends Base', 'extends React.Component')
+				.replace('class Frame', 'replaceReact(React);\nclass Frame'),
+			'DefaultExport.tsx': boundary.replace(
+				'export { Frame as Boundary };',
+				'export default Frame;',
+			),
+			'Metadata.tsx':
+				boundary +
+				'\nFrame.displayName = "Boundary"; Frame.defaultProps = { fallback: "error", attempts: 1, retry: true };',
+			'MetadataSetter.tsx': boundary
+				.replace('render() {', 'static set displayName(value: string) {}\n\trender() {')
+				.concat('\nFrame.displayName = "Boundary";'),
+			'MetadataEffect.tsx': boundary + '\nFrame.displayName = register();',
+			'MetadataGetter.tsx':
+				boundary + '\nFrame.defaultProps = { get fallback() { return "error"; } };',
+			'TypeUses.tsx':
+				boundary + '\nexport type Instance = Frame;\nexport type Factory = typeof Frame;',
+			'RuntimeBase.tsx': boundary + '\nexport class Other extends Frame {}',
+			'DecoratorMetadata.tsx': boundary + '\nclass Other { @capture field!: Frame; }',
+			'MutatedBase.tsx': boundary
+				.replace(
+					"import { Component as Base, type ReactNode } from 'react';",
+					"import React, { type ReactNode } from 'react';\nReact.PureComponent = class Fake {};",
+				)
+				.replace('extends Base', 'extends React.PureComponent'),
+			'DefaultEarly.tsx': boundary
+				.replace('class Frame', 'export default Frame;\nclass Frame')
+				.replace('export { Frame as Boundary };', ''),
+			'Ambiguous.tsx': boundary,
+			'Ambiguous.js': 'export function Boundary() { return null; }',
+			'Pure.tsx': 'export function Boundary() { return <b>ready</b>; }',
+			'Decorated.tsx': boundary.replace(
+				'class Frame',
+				'function replace() { return function Native() { return null; }; }\n@replace\nclass Frame',
+			),
+			'Relative.tsx': entry('./Boundary'),
+			'Alias.tsx': entry('@/Boundary'),
+			'Ternary.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean)')
+				.replace('return <Frame><b>ready</b></Frame>;', 'return show ? <Frame /> : <b />;'),
+			'Guard.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean)')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (show) return <Frame />; return <b />;',
+				),
+			'Retained.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean)')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+				),
+			'RetainedCompound.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean, enabled: boolean)')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } if (!enabled) return <b />; return <Frame />;',
+				),
+			'RetainedArrow.tsx': entry('./Boundary')
+				.replace('export function App()', 'export const App = (show: boolean) =>')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+				),
+			'RetainedArrowMetadata.tsx':
+				entry('./Boundary')
+					.replace('export function App()', 'export const App = (show: boolean) =>')
+					.replace(
+						'return <Frame><b>ready</b></Frame>;',
+						'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+					) + '; export type View = typeof App; App.displayName = "App";',
+			'RetainedDefaultArrow.tsx': entry('./Boundary')
+				.replace('export function App()', 'export default (show: boolean) =>')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+				),
+			'RetainedStrict.tsx':
+				"import { StrictMode } from 'react';\n" +
+				entry('./Boundary')
+					.replace('App()', 'App(show: boolean)')
+					.replace(
+						'return <Frame><b>ready</b></Frame>;',
+						'if (!show) { const text = "off"; return <i>{text}</i>; } return <StrictMode><Frame /></StrictMode>;',
+					),
+			'RetainedCallback.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'const Build = (show: boolean) => { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; }; return <Other render={Build} />;',
+			),
+			'RetainedNamedFactory.tsx': entry('./Boundary').replace(
+				'export function App() { return <Frame><b>ready</b></Frame>; }',
+				'const build = function Build(show: boolean) { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; }; export function App() { build(true); return <b />; }',
+			),
+			'RetainedImperative.tsx': entry('./Boundary').replace(
+				'export function App() { return <Frame><b>ready</b></Frame>; }',
+				'const Build = (show: boolean) => { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; }; export function App() { Build(true); return <b />; }',
+			),
+			'RetainedImperativeDeclaration.tsx': entry('./Boundary').replace(
+				'export function App() { return <Frame><b>ready</b></Frame>; }',
+				'function Build(show: boolean) { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; } export function App() { Build(true); return <b />; }',
+			),
+			'RetainedLocalComponent.tsx': entry('./Boundary').replace(
+				'export function App() { return <Frame><b>ready</b></Frame>; }',
+				'function Build({ show }: { show: boolean }) { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; } export function App() { return <Build show={true} />; }',
+			),
+			'RetainedSplitExport.tsx': entry('./Boundary').replace(
+				'export function App() { return <Frame><b>ready</b></Frame>; }',
+				'function Build(show: boolean) { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; } export { Build as App }; Build(true);',
+			),
+			'RetainedDead.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'if (true) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+			),
+			'RetainedUnconditional.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'return <i>off</i>; return <Frame />;',
+			),
+			'RetainedFactory.tsx': entry('./Boundary')
+				.replace(
+					'export function App()',
+					'declare function makeView(frame: typeof Frame): unknown;\nexport function App(show: boolean)',
+				)
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } return makeView(Frame);',
+				),
+			'RetainedCustom.tsx':
+				'/** @jsx custom */\ndeclare function custom(type: unknown, props: unknown): unknown;\n' +
+				entry('./Boundary')
+					.replace('App()', 'App(show: boolean)')
+					.replace(
+						'return <Frame><b>ready</b></Frame>;',
+						'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+					),
+			'RetainedFragment.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean)')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } return <><b /><Frame /></>;',
+				),
+			'RetainedNamedFragment.tsx':
+				"import { Fragment as Group } from 'react';\n" +
+				entry('./Boundary')
+					.replace('App()', 'App(show: boolean)')
+					.replace(
+						'return <Frame><b>ready</b></Frame>;',
+						'if (!show) { const text = "off"; return <i>{text}</i>; } return <Group key="stable"><Frame /></Group>;',
+					),
+			'RetainedSuspense.tsx':
+				"import { Suspense } from 'react';\n" +
+				entry('./Boundary')
+					.replace('App()', 'App(show: boolean)')
+					.replace(
+						'return <Frame><b>ready</b></Frame>;',
+						'if (!show) { const text = "off"; return <i>{text}</i>; } return <Suspense fallback={<Frame />}><b /></Suspense>;',
+					),
+			'LogicalArm.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean, enabled: boolean)')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'return show ? <b /> : (enabled === true && <Frame />);',
+				),
+			'NestedHole.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'return <Other>{true ? <Frame /> : null}</Other>;',
+			),
+			'MapArm.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'return [true].map((show) => show ? <Frame /> : <b />);',
+			),
+			'DeadTernary.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'return false ? <Frame /> : <b />;',
+			),
+			'DeadLogicalArm.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean)')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'return show ? <b /> : (false && <Frame />);',
+				),
+			'DeadGuards.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'if (false) return <Frame />; if (true) return <b />; if (true) return <Frame />; return <Frame />;',
+			),
+			'Strict.tsx':
+				"import { StrictMode as Strict } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Strict><span /><Frame><b>ready</b></Frame></Strict>',
+				),
+			'KeyedStrict.tsx':
+				"import { StrictMode as Strict } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Strict key="first"><Frame><b>ready</b></Frame></Strict>',
+				),
+			'NativeStrict.tsx':
+				"import { StrictMode as Strict } from 'octane';\n" +
+				entry('./Boundary').replace('<Frame><b>ready</b></Frame>', '<Strict><Frame /></Strict>'),
+			'NamedFragment.tsx':
+				"import { Fragment as Group } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Group key="stable"><Frame /></Group>',
+				),
+			'QualifiedFragment.tsx':
+				"import React from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<React.Fragment><Frame /></React.Fragment>',
+				),
+			'NativeFragment.tsx':
+				"import * as Native from 'octane';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Native.Fragment ref={null}><Frame /></Native.Fragment>',
+				),
+			'ShadowedNamedFragment.tsx':
+				"import { Fragment as Group } from 'react';\n" +
+				entry('./Boundary')
+					.replace('App()', 'App(Group: typeof Other)')
+					.replace('<Frame><b>ready</b></Frame>', '<Group><Frame /></Group>'),
+			'HostedNamedFragment.tsx':
+				"import { Fragment as Group } from 'react';\nimport { ReactCompat } from 'octane/react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<ReactCompat><Group><Frame /></Group></ReactCompat>',
+				),
+			'TypeOnlyFragmentNamespace.tsx':
+				"import type * as Native from 'octane';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Native.Fragment><Frame /></Native.Fragment>',
+				),
+			'DefaultOctaneFragmentNamespace.tsx':
+				"import Native from 'octane';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Native.Fragment><Frame /></Native.Fragment>',
+				),
+			'SuspenseChild.tsx':
+				"import { Suspense } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Suspense fallback={<i />}><Frame /></Suspense>',
+				),
+			'NativeSuspenseFallback.tsx':
+				"import * as Native from 'octane';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Native.Suspense fallback={(<><Frame /></>)}><Other /></Native.Suspense>',
+				),
+			'UnevaluatedSuspenseFallback.tsx':
+				"import { Suspense } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Suspense fallback={Boolean(<Frame />)}><Other /></Suspense>',
+				),
+			'HostedSuspense.tsx':
+				"import { Suspense } from 'react';\nimport { ReactCompat } from 'octane/react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<ReactCompat><Suspense fallback={<Frame />}><Frame /></Suspense></ReactCompat>',
+				),
+			'FragmentRoot.tsx': entry('./Boundary').replace(
+				'<Frame><b>ready</b></Frame>',
+				'<><b>before</b><Frame /></>',
+			),
+			'FragmentStrict.tsx':
+				"import { StrictMode as Strict } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<><Strict key="stable"><><Frame /></></Strict></>',
+				),
+			'NestedRootStrict.tsx':
+				"import React, { StrictMode as Strict } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Strict><React.StrictMode key="inner"><Frame /></React.StrictMode></Strict>',
+				),
+			'NestedHostedStrict.tsx':
+				"import { StrictMode as Strict } from 'react';\nimport { ReactCompat } from 'octane/react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Strict><ReactCompat><Strict><Frame /></Strict></ReactCompat></Strict>',
+				),
+			'NestedStrict.tsx':
+				"import { StrictMode as Strict } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Other><Strict><Frame /></Strict></Other>',
+				),
+			'AmbiguousView.tsx': entry('./Ambiguous'),
+			'PureView.tsx': entry('./Pure'),
+			'DecoratedView.tsx': entry('./Decorated'),
+			'DefaultBaseView.tsx': entry('./DefaultBase'),
+			'DefaultBaseTagsView.tsx': entry('./DefaultBaseTags'),
+			'DefaultBaseNamespaceEscapeView.tsx': entry('./DefaultBaseNamespaceEscape'),
+			'DefaultExportView.tsx': entry('./DefaultExport').replace('{ Boundary as Frame }', 'Frame'),
+			'MetadataView.tsx': entry('./Metadata'),
+			'MetadataSetterView.tsx': entry('./MetadataSetter'),
+			'MetadataEffectView.tsx': entry('./MetadataEffect'),
+			'MetadataGetterView.tsx': entry('./MetadataGetter'),
+			'TypeUsesView.tsx': entry('./TypeUses'),
+			'RuntimeBaseView.tsx': entry('./RuntimeBase'),
+			'DecoratorMetadataView.tsx': entry('./DecoratorMetadata'),
+			'DefaultEarlyView.tsx': entry('./DefaultEarly').replace('{ Boundary as Frame }', 'Frame'),
+			'MutatedBaseView.tsx': entry('./MutatedBase'),
+			'Shadow.tsx': entry('./Boundary').replace('App()', 'App(Frame: () => unknown)'),
+			'Hosted.tsx':
+				"import { ReactCompat } from 'octane/react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<ReactCompat><Frame /></ReactCompat>',
+				),
+			'Passed.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'return <Other render={() => <Frame><b>ready</b></Frame>} />;',
+			),
+		};
+		const root = project(sources);
+		fs.symlinkSync(
+			path.join(REPO, 'packages/codemod/node_modules'),
+			path.join(root, 'node_modules'),
+		);
+		for (const includeClass of [true, false]) {
+			const inputs = Object.keys(sources).filter(
+				(file) =>
+					file.endsWith('.tsx') &&
+					(includeClass ||
+						![
+							'Boundary.tsx',
+							'DefaultBase.tsx',
+							'DefaultBaseTags.tsx',
+							'DefaultExport.tsx',
+							'Hosted.tsx',
+							'Metadata.tsx',
+							'TypeUses.tsx',
+						].includes(file)),
+			);
+			const { files } = await runCodemod(
+				inputs.map((file) => path.join(root, file)),
+				{
+					root,
+					strong: true,
+					verify: true,
+					projectTypes: false,
+					write: false,
+				},
+			);
+			const callers = files.filter((file) =>
+				file.notes.some(
+					(note) =>
+						note.rule === 'class-component' && note.message.includes('imported React class'),
+				),
+			);
+			expect(
+				callers
+					.map(({ file, notes }) => [
+						file,
+						notes.find((note) => note.rule === 'class-component').severity,
+					])
+					.sort(),
+			).toEqual([
+				['Alias.tsx', includeClass ? 'error' : 'warning'],
+				['DefaultBaseTagsView.tsx', includeClass ? 'error' : 'warning'],
+				['DefaultBaseView.tsx', includeClass ? 'error' : 'warning'],
+				['DefaultExportView.tsx', includeClass ? 'error' : 'warning'],
+				['FragmentRoot.tsx', includeClass ? 'error' : 'warning'],
+				['FragmentStrict.tsx', includeClass ? 'error' : 'warning'],
+				['Guard.tsx', includeClass ? 'error' : 'warning'],
+				['KeyedStrict.tsx', includeClass ? 'error' : 'warning'],
+				['LogicalArm.tsx', includeClass ? 'error' : 'warning'],
+				['MetadataView.tsx', includeClass ? 'error' : 'warning'],
+				['NamedFragment.tsx', includeClass ? 'error' : 'warning'],
+				['NativeFragment.tsx', includeClass ? 'error' : 'warning'],
+				['NativeStrict.tsx', includeClass ? 'error' : 'warning'],
+				['NativeSuspenseFallback.tsx', includeClass ? 'error' : 'warning'],
+				['NestedRootStrict.tsx', includeClass ? 'error' : 'warning'],
+				['QualifiedFragment.tsx', includeClass ? 'error' : 'warning'],
+				['Relative.tsx', includeClass ? 'error' : 'warning'],
+				['Retained.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedArrow.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedArrowMetadata.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedCompound.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedDefaultArrow.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedFragment.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedLocalComponent.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedNamedFragment.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedSplitExport.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedStrict.tsx', includeClass ? 'error' : 'warning'],
+				['Strict.tsx', includeClass ? 'error' : 'warning'],
+				['SuspenseChild.tsx', includeClass ? 'error' : 'warning'],
+				['Ternary.tsx', includeClass ? 'error' : 'warning'],
+				['TypeUsesView.tsx', includeClass ? 'error' : 'warning'],
+			]);
+			for (const { file, notes, code } of callers) {
+				if (!file.startsWith('Retained')) continue;
+				expect(notes.find((note) => note.rule === 'class-component').message).toMatch(
+					/if octane renders/i,
+				);
+				expect(code).toContain('return <i>');
+			}
+		}
+	});
+
 	it('reports opaque map methods that receive JSX from a callback switch', async () => {
 		const setup = `function makeRows() {
 	const rows = ['a', 'b'];

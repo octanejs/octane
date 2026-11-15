@@ -45,6 +45,7 @@ import {
 	directReactExports,
 	migratedJsxFactories,
 	octaneRootComponents,
+	reactClassExports,
 	reactServerComponents,
 	retainedReactComponentReturns,
 	reverseIslandExports,
@@ -639,6 +640,27 @@ export async function runCodemod(
 	}
 	const { inputFactory, changedJsxExport, helperFunction, localFile, exportsConstObject } =
 		storeSources(root, config, unchangedStoreInput, (file) => renames.has(file));
+	const noClasses = new Set<string>();
+	const localClasses = new Map<string, ReadonlySet<string>>();
+	function localReactClass(from: string, module: string, name: string) {
+		if (/[!%?#\\]/.test(module)) return;
+		const file = localFile(from, module, true);
+		if (!file || !file.endsWith('.tsx') || conflicts.has(file)) return;
+		let classes = localClasses.get(file);
+		if (classes === undefined) {
+			const source = fs.readFileSync(file, 'utf8');
+			classes =
+				/\bclass\b/.test(source) && installedReact(file)
+					? reactClassExports(file, source)
+					: noClasses;
+			localClasses.set(file, classes);
+		}
+		if (
+			classes.has(name) &&
+			ts.findConfigFile(path.dirname(from), ts.sys.fileExists) === rootProject
+		)
+			return renamed(from, module)?.file === file ? 'error' : 'warning';
+	}
 	const localHints = new Map<string, Map<string, string>>();
 	function initializerResourceHint(from: string, module: string, name: string) {
 		const file = localFile(from, module);
@@ -666,7 +688,11 @@ export async function runCodemod(
 
 	const localHooks = new Map<
 		string,
-		{ direct: Map<string, string>; privateContexts: Set<string> }
+		{
+			direct: Map<string, string>;
+			privateContexts: Set<string>;
+			retainedStores?: Map<string, string>;
+		}
 	>();
 	const intlHookPackages = new Map<string, boolean>();
 	function originalIntlHook(file: string) {
@@ -768,12 +794,21 @@ export async function runCodemod(
 				originalModule(file, 'react') &&
 				readInstalled(path.dirname(file), 'react')?.manifest.name === 'react';
 			const intl = (source.includes('useIntl') || escaped) && originalIntlHook(file);
-			if (react || intl) {
+			const store = planStoreHook && /\buse[A-Z]|\\u/.test(source);
+			if (react || intl || store) {
 				const existing = program?.getSourceFile(file);
 				const bound =
 					existing && program
 						? { sf: existing, checker: program.getTypeChecker() }
 						: bind(file, source);
+				if (planStoreHook && store)
+					hooks.retainedStores = directRendererCalls(
+						bound.sf,
+						bound.checker,
+						(specifier, exported) =>
+							!!unportedName(specifier, file) &&
+							planStoreHook(specifier, exported, file)?.requiresReact() === true,
+					);
 				if (react)
 					hooks.direct = directRendererCalls(
 						bound.sf,
@@ -799,13 +834,22 @@ export async function runCodemod(
 		}
 		// Keep TS substitution advisory. A loader may select a different executable.
 		const hook = jsSpecifier ? undefined : hooks.direct.get(name);
-		if ((!hook && !hooks.privateContexts.has(name)) || fs.statSync(file).nlink > 1) return;
+		const retainedStore =
+			!jsSpecifier && hooks.retainedStores?.has(name) && automaticReactJsx(from);
+		if (
+			(!hook && !retainedStore && !hooks.privateContexts.has(name)) ||
+			fs.statSync(file).nlink > 1
+		)
+			return;
 		// Writing an unrenamed selection through a symlink changes its physical target.
 		selectedInPlace ??= new Set(
 			[...known].filter((f) => !renames.has(f) && !conflicts.has(f)).map((f) => fs.realpathSync(f)),
 		);
 		if (selectedInPlace.has(fs.realpathSync(file))) return;
-		if (!hook) return { privateContext: true } as const;
+		if (!hook)
+			return retainedStore
+				? ({ retainedStore: true } as const)
+				: ({ privateContext: true } as const);
 		if (
 			nativeOnly &&
 			compiler &&
@@ -1051,7 +1095,7 @@ export async function runCodemod(
 				? undefined
 				: (module, name, safeUses) => {
 						if (!unportedName(module, file)) return null;
-						const plan = planStoreHook(module, name, file);
+						const plan = planStoreHook(module, name, file)?.plan;
 						if (
 							!plan ||
 							!safeUses(
@@ -1191,6 +1235,9 @@ export async function runCodemod(
 					: undefined,
 				localReactHook: renames.has(file)
 					? (module, name, nativeOnly) => localReactHook(file, module, name, nativeOnly)
+					: undefined,
+				localReactClass: renames.has(file)
+					? (module, name) => localReactClass(file, module, name)
 					: undefined,
 				localReactRootComponent: renames.has(file)
 					? (module, name) => {

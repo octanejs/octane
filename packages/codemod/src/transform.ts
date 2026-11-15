@@ -299,6 +299,16 @@ function isJsx(node: ts.Node) {
 	return ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node);
 }
 
+function isNumericConstant(node: ts.Expression) {
+	node = skipWrappers(node);
+	return (
+		ts.isNumericLiteral(node) ||
+		(ts.isPrefixUnaryExpression(node) &&
+			(node.operator === ts.SyntaxKind.MinusToken || node.operator === ts.SyntaxKind.PlusToken) &&
+			ts.isNumericLiteral(skipWrappers(node.operand)))
+	);
+}
+
 /** A deferred clsx call may test a binding only if its truth value stays fixed. */
 function svgClassToken(
 	expr: ts.Expression,
@@ -2142,28 +2152,18 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		// Keep exactly one declaration, with no renderer-specific priority handling.
 		if (ts.isStringLiteralLike(text)) return text.text.trim() !== '' && !/[!;]/.test(text.text);
 		if (!ts.isTemplateExpression(text) || /[!;]/.test(text.head.text)) return false;
-		const numeric = (node: ts.Expression) => {
-			node = skipWrappers(node);
-			return (
-				ts.isNumericLiteral(node) ||
-				(ts.isPrefixUnaryExpression(node) &&
-					(node.operator === ts.SyntaxKind.MinusToken ||
-						node.operator === ts.SyntaxKind.PlusToken) &&
-					ts.isNumericLiteral(skipWrappers(node.operand)))
-			);
-		};
 		return text.templateSpans.every(({ expression, literal }) => {
 			if (/[!;]/.test(literal.text)) return false;
 			const part = skipWrappers(expression);
-			if (numeric(part)) return true;
+			if (isNumericConstant(part)) return true;
 			if (!ts.isConditionalExpression(part)) return false;
 			const test = skipWrappers(part.condition);
 			return (
 				ts.isIdentifier(test) &&
 				fixedBinding(this.checker, test, part, (this.fixedSvgParameters ??= new Map())) &&
 				initializedBefore(this.checker, test, part) &&
-				numeric(part.whenTrue) &&
-				numeric(part.whenFalse)
+				isNumericConstant(part.whenTrue) &&
+				isNumericConstant(part.whenFalse)
 			);
 		});
 	}
@@ -3492,6 +3492,15 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		);
 	}
 
+	private warnRetainedStore(module: string, name: string, site: ts.Expression) {
+		this.note(
+			RULE.bindings,
+			'warning',
+			site,
+			`If native setup reaches the unchanged ${module} export ${name} through the original workspace entry, its store hook calls React. Provide a compiled Octane hook or keep the component under React.`,
+		);
+	}
+
 	private checkRetainedNamespaceHooks(module: string, binding: ts.Identifier) {
 		const retainedHook = this.options.localReactHook;
 		if (!retainedHook) return;
@@ -3499,23 +3508,36 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		for (const ref of renderUses(this.localUses(binding))) {
 			const member = ref.parent;
 			if (!ts.isPropertyAccessExpression(member) && !ts.isElementAccessExpression(member)) continue;
-			if (member.expression !== ref || ts.isOptionalChain(member)) continue;
+			const call = member.parent;
+			if (
+				member.expression !== ref ||
+				ts.isOptionalChain(member) ||
+				!ts.isCallExpression(call) ||
+				call.expression !== member ||
+				ts.isOptionalChain(call)
+			)
+				continue;
 			const name = ts.isPropertyAccessExpression(member)
 				? member.name.text
 				: ts.isStringLiteralLike(member.argumentExpression) && member.argumentExpression.text;
 			if (!name || !/^use[A-Z0-9]/.test(name) || reported?.has(name)) continue;
+			const setup = this.retainedHookSetup();
 			if (
-				!nativeSetupHook(member, this.localUses, this.checker, {
-					...this.retainedHookSetup(),
-					privateContext: true,
-				})
+				!nativeSetupHook(member, this.localUses, this.checker) &&
+				!nativeSetupHook(member, this.localUses, this.checker, setup) &&
+				!nativeSetupHook(member, this.localUses, this.checker, { ...setup, contextSetup: true })
 			)
 				continue;
 			const local = retainedHook(module, name, false);
-			if (local && typeof local !== 'string' && 'privateContext' in local) {
+			if (!local || typeof local === 'string') continue;
+			if ('retainedStore' in local) this.warnRetainedStore(module, name, member);
+			else if (
+				'privateContext' in local &&
+				nativeSetupHook(member, this.localUses, this.checker, { ...setup, privateContext: true })
+			)
 				this.warnRetainedPrivateContext(module, name, member);
-				(reported ??= new Set()).add(name);
-			}
+			else continue;
+			(reported ??= new Set()).add(name);
 		}
 	}
 
@@ -3624,7 +3646,8 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 								}),
 							);
 							if (advisorySite) this.warnRetainedPrivateContext(module, name, advisorySite);
-						}
+						} else if (site && local && typeof local !== 'string' && 'retainedStore' in local)
+							this.warnRetainedStore(module, name, site);
 					}
 					if (!dest) {
 						kept.push(item);
@@ -5010,6 +5033,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		key: string,
 		hook: ts.CallExpression,
 		dependencies: ts.ArrayLiteralExpression,
+		nestedRead: (member: ts.PropertyAccessExpression) => boolean | undefined,
 	) {
 		const state = this.declarationOf(receiver);
 		if (
@@ -5073,6 +5097,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			ts.isIdentifier(name) || ts.isStringLiteral(name) ? name.text : undefined;
 
 		const required = new Set([key]);
+		const numeric = new Set<string>();
 		const addField = (name: string | undefined) => {
 			if (name === undefined || name === '__proto__') return false;
 			required.add(name);
@@ -5104,15 +5129,29 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			let value: ts.Expression = parent;
 			while (isWrapper(value.parent)) value = value.parent;
 			const outer = value.parent;
-			return (
-				(ts.isPrefixUnaryExpression(outer) && outer.operator === ts.SyntaxKind.ExclamationToken) ||
+			if (
+				ts.isPrefixUnaryExpression(outer) &&
+				outer.operator !== ts.SyntaxKind.PlusPlusToken &&
+				outer.operator !== ts.SyntaxKind.MinusMinusToken
+			) {
+				if (outer.operator !== ts.SyntaxKind.ExclamationToken) numeric.add(parent.name.text);
+				return true;
+			}
+			if (
+				ts.isTypeOfExpression(outer) ||
+				ts.isVoidExpression(outer) ||
 				(ts.isBinaryExpression(outer) &&
 					(outer.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken ||
 						outer.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken)) ||
 				(ts.isIfStatement(outer) && outer.expression === value) ||
 				(ts.isJsxExpression(outer) && ts.isJsxAttribute(outer.parent)) ||
 				outer === dependencies
-			);
+			)
+				return true;
+			const coercesNumber = nestedRead(parent);
+			if (coercesNumber === undefined) return false;
+			if (coercesNumber) numeric.add(parent.name.text);
+			return true;
 		});
 		if (!closed) return false;
 
@@ -5137,6 +5176,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				if (!ts.isPropertyAssignment(field)) return false;
 				const name = simpleName(field.name);
 				if (name === undefined || name === '__proto__') return false;
+				if (numeric.has(name) && !isNumericConstant(field.initializer)) return false;
 				missing.delete(name);
 			}
 			return missing.size === 0;
@@ -5180,6 +5220,8 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		member: ts.PropertyAccessExpression | ts.ElementAccessExpression,
 		hook: ts.CallExpression,
 		dependencies: ts.ArrayLiteralExpression,
+		coercesNumber: boolean,
+		nestedRead: (member: ts.PropertyAccessExpression) => boolean | undefined,
 	) {
 		const receiver = skipWrappers(member.expression);
 		const name = ts.isPropertyAccessExpression(member)
@@ -5192,7 +5234,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			return false;
 		const key = name.text;
 		if (key === '__proto__' || !ts.isIdentifier(receiver)) return false;
-		if (this.ownStateDependency(receiver, key, hook, dependencies)) return true;
+		if (this.ownStateDependency(receiver, key, hook, dependencies, nestedRead)) return true;
 		const init = this.constValue(receiver);
 		const object = init && skipWrappers(init);
 		const owner = ts.findAncestor(hook, ts.isFunctionLike);
@@ -5206,29 +5248,59 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		)
 			return false;
 		// Spreads, computed names and accessors can redefine the property.
-		return (
-			object.properties.every(
-				(field) =>
-					(ts.isPropertyAssignment(field) && !ts.isComputedPropertyName(field.name)) ||
-					(ts.isShorthandPropertyAssignment(field) && !field.objectAssignmentInitializer),
-			) &&
-			object.properties.some(
-				({ name }) =>
-					name && (ts.isIdentifier(name) || ts.isStringLiteralLike(name)) && name.text === key,
+		let owns = false;
+		for (const field of object.properties) {
+			const name = field.name;
+			if (
+				!(ts.isPropertyAssignment(field) && !ts.isComputedPropertyName(field.name)) &&
+				!(ts.isShorthandPropertyAssignment(field) && !field.objectAssignmentInitializer)
 			)
-		);
+				return false;
+			if (!name || (!ts.isIdentifier(name) && !ts.isStringLiteralLike(name))) {
+				// A numeric name can override the corresponding string name.
+				if (coercesNumber) return false;
+				continue;
+			}
+			if (name.text !== key) continue;
+			owns = true;
+			if (
+				coercesNumber &&
+				!(ts.isPropertyAssignment(field) && isNumericConstant(field.initializer))
+			)
+				return false;
+		}
+		return owns;
 	}
 
 	private checkHookDependencyReads(node: ts.CallExpression, deps: ts.Expression) {
 		const list = skipWrappers(deps);
 		if (!this.emitsTsrx || !ts.isArrayLiteralExpression(list)) return;
-		const read = (expr: ts.Expression): ts.Expression | undefined => {
+		type Member = ts.PropertyAccessExpression | ts.ElementAccessExpression;
+		const read = (
+			expr: ts.Expression,
+			visit: (member: Member, coercesNumber: boolean) => Member | undefined,
+			coercesNumber = false,
+		): Member | undefined => {
 			const member = skipWrappers(expr);
+			if (ts.isTypeOfExpression(member) || ts.isVoidExpression(member))
+				return read(member.expression, visit);
+			if (
+				ts.isPrefixUnaryExpression(member) &&
+				member.operator !== ts.SyntaxKind.PlusPlusToken &&
+				member.operator !== ts.SyntaxKind.MinusMinusToken
+			)
+				return read(member.operand, visit, member.operator !== ts.SyntaxKind.ExclamationToken);
 			if (ts.isConditionalExpression(member)) {
 				const condition = skipWrappers(member.condition);
-				if (condition.kind === ts.SyntaxKind.TrueKeyword) return read(member.whenTrue);
-				if (condition.kind === ts.SyntaxKind.FalseKeyword) return read(member.whenFalse);
-				return read(condition) ?? read(member.whenTrue) ?? read(member.whenFalse);
+				if (condition.kind === ts.SyntaxKind.TrueKeyword)
+					return read(member.whenTrue, visit, coercesNumber);
+				if (condition.kind === ts.SyntaxKind.FalseKeyword)
+					return read(member.whenFalse, visit, coercesNumber);
+				return (
+					read(condition, visit) ??
+					read(member.whenTrue, visit, coercesNumber) ??
+					read(member.whenFalse, visit, coercesNumber)
+				);
 			}
 			if (ts.isBinaryExpression(member)) {
 				const op = member.operatorToken.kind;
@@ -5237,7 +5309,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					op === ts.SyntaxKind.BarBarToken ||
 					op === ts.SyntaxKind.QuestionQuestionToken
 				) {
-					const left = read(member.left);
+					// Only a falsy left value can become the result of &&.
+					const left = read(
+						member.left,
+						visit,
+						coercesNumber && op !== ts.SyntaxKind.AmpersandAmpersandToken,
+					);
 					if (left) return left;
 					const condition = literalCondition(member.left);
 					if (
@@ -5246,18 +5323,37 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 						(op === ts.SyntaxKind.BarBarToken && condition !== 'truthy') ||
 						(op === ts.SyntaxKind.QuestionQuestionToken && condition === 'nullish')
 					)
-						return read(member.right);
+						return read(member.right, visit, coercesNumber);
 				}
 			}
-			if (
-				(ts.isPropertyAccessExpression(member) || ts.isElementAccessExpression(member)) &&
-				!this.ownDataDependency(member, node, list)
-			)
-				return member;
+			if (ts.isPropertyAccessExpression(member) || ts.isElementAccessExpression(member))
+				return visit(member, coercesNumber);
 		};
-		let opaque: ts.Expression | undefined;
+		// The closed-state proof must account for every field read in this list.
+		let members: Map<Member, boolean> | undefined;
+		const nestedRead = (member: ts.PropertyAccessExpression) => {
+			if (!members) {
+				const reachable = new Map<Member, boolean>();
+				for (const entry of list.elements) {
+					read(entry, (dep, coercesNumber) => {
+						reachable.set(dep, coercesNumber);
+						return undefined;
+					});
+				}
+				members = reachable;
+			}
+			return members.get(member);
+		};
+		let opaqueCoercion = false;
+		const check = (member: Member, coercesNumber: boolean) => {
+			if (!this.ownDataDependency(member, node, list, coercesNumber, nestedRead)) {
+				opaqueCoercion = coercesNumber;
+				return member;
+			}
+		};
+		let opaque: Member | undefined;
 		for (const entry of list.elements) {
-			opaque = read(entry);
+			opaque = read(entry, check);
 			if (opaque) break;
 		}
 		if (opaque)
@@ -5265,7 +5361,9 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				RULE.deps,
 				'error',
 				opaque,
-				'This hook dependency reads a property during render and may run a getter owned by React. Keep the component in React or verify the getter before moving it to native SSR.',
+				opaqueCoercion
+					? 'This hook dependency reads a property during render. It may run a getter owned by React or execute user code during numeric coercion. Keep the component in React or verify the property before moving it to native SSR.'
+					: 'This hook dependency reads a property during render and may run a getter owned by React. Keep the component in React or verify the getter before moving it to native SSR.',
 			);
 	}
 
@@ -6520,11 +6618,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return `@{ const ${param} = ${useContext}(${this.emit(tag.expression, PLAIN)}); ${output} }`;
 	}
 
-	/**
-	 * `<Suspense fallback={f}>…</Suspense>` is the template boundary
-	 * `@try { … } @pending { f }`.
-	 */
-	rewriteSuspense(node: ts.JsxElement) {
+	private suspenseFallback(node: ts.JsxElement) {
 		const attributes = node.openingElement.attributes.properties.filter(
 			(a) => !this.removed.has(a),
 		);
@@ -6537,8 +6631,20 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		) {
 			return null;
 		}
-		let pending: string;
 		const value = fallback.initializer;
+		return ts.isStringLiteral(value) || (ts.isJsxExpression(value) && value.expression)
+			? value
+			: null;
+	}
+
+	/**
+	 * `<Suspense fallback={f}>…</Suspense>` is the template boundary
+	 * `@try { … } @pending { f }`.
+	 */
+	rewriteSuspense(node: ts.JsxElement) {
+		const value = this.suspenseFallback(node);
+		if (!value) return null;
+		let pending: string;
 		if (ts.isStringLiteral(value)) pending = `<>{${value.getText(this.sf)}}</>`;
 		else if (ts.isJsxExpression(value) && value.expression) {
 			const expression = skipParens(value.expression);
@@ -6764,16 +6870,20 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	 * The template directive equivalent to a renderable expression, as
 	 * relative text, or null.
 	 */
-	directive(expression: ts.Expression): string | null {
+	directive(expression: ts.Expression, componentRoot = false): string | null {
 		const node = skipParens(expression);
-		if (ts.isConditionalExpression(node)) return this.ifDirective(node);
+		if (ts.isConditionalExpression(node)) return this.ifDirective(node, componentRoot);
 		if (
 			ts.isBinaryExpression(node) &&
 			node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
 			(this.isBoolean(node.left) ||
 				(this.strictTypes && isBooleanGuardType(this.typeOf(node.left))))
 		) {
-			const arm = this.arm(node.right);
+			const condition = componentRoot ? literalCondition(node.left) : undefined;
+			const arm = this.arm(
+				node.right,
+				componentRoot && (condition === undefined || condition === 'truthy'),
+			);
 			if (arm === null || arm === '') return null;
 			this.count(RULE.if);
 			return this.block(`@if (${this.emit(node.left, PLAIN)})`, arm);
@@ -6787,11 +6897,14 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	 * directive, or '' for nothing. An arm that is only a value is null; the
 	 * caller decides whether it may become a `{value}` hole.
 	 */
-	arm(expression: ts.Expression): string | null {
+	arm(expression: ts.Expression, componentRoot = false): string | null {
 		const node = skipParens(expression);
-		if (isJsx(node)) return this.relative(this.emit(node, TEMPLATE), node);
+		if (isJsx(node)) {
+			if (componentRoot) this.checkReactClassOutput(node);
+			return this.relative(this.emit(node, TEMPLATE), node);
+		}
 		if (isNullish(node)) return '';
-		const directive = this.directive(node);
+		const directive = this.directive(node, componentRoot);
 		// A retained map is a JSX hole, which needs a fragment inside a directive arm.
 		return directive?.startsWith('{') ? `<>${directive}</>` : directive;
 	}
@@ -6829,11 +6942,15 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return `<input defaultValue={${condition} ? ${JSON.stringify(yes)} : ${JSON.stringify(no)}} />`;
 	}
 
-	ifDirective(node: ts.ConditionalExpression) {
+	ifDirective(node: ts.ConditionalExpression, componentRoot = false) {
 		const shared = this.conditionalInputDefault(node);
 		if (shared !== null) return shared;
-		let whenTrue = this.arm(node.whenTrue);
-		let whenFalse = this.arm(node.whenFalse);
+		const literal = componentRoot ? literalCondition(node.condition) : undefined;
+		let whenTrue = this.arm(
+			node.whenTrue,
+			componentRoot && (literal === undefined || literal === 'truthy'),
+		);
+		let whenFalse = this.arm(node.whenFalse, componentRoot && literal !== 'truthy');
 		// A ternary between two values is a value; one with an element on
 		// either side is control flow, and a value arm is a hole in a fragment:
 		// a bare `{value}` arm is a JavaScript block, not a hole.
@@ -7469,11 +7586,31 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		const last = statements[statements.length - 1];
 		if (!last || !ts.isReturnStatement(last) || !last.expression) return null;
 		const guard = statements.findIndex((s, i) => i < statements.length - 1 && guardReturn(s));
-		if (guard !== -1) return this.rewriteGuards(node, body, guard);
+		if (guard !== -1) {
+			const output = this.rewriteGuards(node, body, guard);
+			if (output !== null) return output;
+		}
+		const inner = skipParens(last.expression);
 		// A template body has one output; any other early `return <A />` would
 		// render through runtime descriptors, so the plain function stays.
-		if (returnsJsx(statements.slice(0, -1))) return null;
-		const inner = skipParens(last.expression);
+		const setupStatements = statements.slice(0, -1);
+		if (guard !== -1 || returnsJsx(setupStatements)) {
+			if (
+				this.options.localReactClass &&
+				isJsx(inner) &&
+				this.moduleComponent(node) &&
+				setupStatements.every(
+					(statement) =>
+						ts.isVariableStatement(statement) ||
+						(ts.isIfStatement(statement) &&
+							!statement.elseStatement &&
+							literalCondition(statement.expression) !== 'truthy'),
+				) &&
+				this.options.automaticReactJsx
+			)
+				this.checkReactClassOutput(inner, false, true);
+			return null;
+		}
 		let output = this.output(inner);
 		if (output === null) return null;
 		const head = this.head(node, body.getStart(this.sf));
@@ -7519,7 +7656,17 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		// value early; the rest moves into arms, which may only return nothing.
 		const rest = statements.slice(first + 1, -1).filter((statement) => !guardReturn(statement));
 		if (returnsJsx(statements.slice(0, first)) || this.emptyArmExit(rest) === null) return null;
-		const output = this.arm(last.expression as ts.Expression);
+		const checkClass = this.options.localReactClass !== undefined;
+		const terminal = checkClass
+			? statements.findIndex(
+					(statement, index) =>
+						index >= first &&
+						ts.isIfStatement(statement) &&
+						guardReturn(statement) &&
+						literalCondition(statement.expression) === 'truthy',
+				)
+			: -1;
+		const output = this.arm(last.expression as ts.Expression, checkClass && terminal === -1);
 		if (output === null) return null;
 		const chain: (from: number) => string = (from) => {
 			let at = from;
@@ -7539,10 +7686,16 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					: '');
 			if (at === statements.length - 1) return prefix + output;
 			const guard = statements[at] as ts.IfStatement;
+			const condition = checkClass ? literalCondition(guard.expression) : undefined;
 			this.count(RULE.if);
 			const then = this.block(
 				`@if (${this.emit(guard.expression, PLAIN)})`,
-				this.arm(guardReturn(guard) as ts.Expression) as string,
+				this.arm(
+					guardReturn(guard) as ts.Expression,
+					checkClass &&
+						(terminal === -1 || at <= terminal) &&
+						(condition === undefined || condition === 'truthy'),
+				) as string,
 			);
 			const rest = chain(at + 1);
 			return prefix + (rest === '' ? then : then + ' ' + this.block('@else', rest));
@@ -7569,16 +7722,132 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	 * and indentation `node` had, or null when it is not a single renderable.
 	 */
 	output(node: ts.Expression) {
-		if (isJsx(node)) return this.emit(node, TEMPLATE);
+		if (isJsx(node)) {
+			this.checkReactClassOutput(node);
+			return this.emit(node, TEMPLATE);
+		}
 		if (ts.isConditionalExpression(node) || ts.isCallExpression(node)) {
-			const directive = this.directive(node);
+			const directive = this.directive(node, this.options.localReactClass !== undefined);
 			return directive === null ? null : this.absolute(directive, node);
 		}
 		return null;
 	}
 
+	private checkReactClassOutput(
+		node: ts.JsxElement | ts.JsxSelfClosingElement | ts.JsxFragment,
+		conditional = false,
+		retained = false,
+	) {
+		if (!this.options.localReactClass) return;
+		if (!ts.isJsxFragment(node)) {
+			if (
+				this.islands.has(node) ||
+				this.unrenderable.has(node) ||
+				this.reactRendererBodies.has(node)
+			)
+				return;
+			if (ts.isJsxSelfClosingElement(node))
+				return this.checkReactClassRoot(node, conditional, retained);
+			const tag = node.openingElement.tagName;
+			const callee = this.callee(tag);
+			if (callee?.module !== 'react' && callee?.module !== 'octane')
+				return this.checkReactClassRoot(node, conditional, retained);
+			if (callee.name === 'Fragment') {
+				const member = ts.isPropertyAccessExpression(tag);
+				const reference = member ? tag.expression : tag;
+				const declaration = ts.isIdentifier(reference) && this.declarationOf(reference);
+				if (
+					!declaration ||
+					this.imports.get(declaration)?.typeOnly !== false ||
+					(member && callee.module === 'octane' && !ts.isNamespaceImport(declaration))
+				)
+					return this.checkReactClassRoot(node, conditional, retained);
+				const imp = ts.findAncestor(declaration, ts.isImportDeclaration);
+				if (!imp || imp.attributes) return this.checkReactClassRoot(node, conditional, retained);
+			} else if (callee.name !== 'StrictMode') {
+				const fallback = !retained && callee.name === 'Suspense' && this.suspenseFallback(node);
+				if (!fallback) return this.checkReactClassRoot(node, conditional, retained);
+				if (ts.isJsxExpression(fallback) && fallback.expression) {
+					const expression = skipParens(fallback.expression);
+					if (isJsx(expression)) this.checkReactClassOutput(expression, true);
+				}
+			}
+		}
+		for (const child of node.children) {
+			if (isJsx(child)) this.checkReactClassOutput(child, conditional, retained);
+		}
+	}
+
+	private checkReactClassRoot(
+		node: ts.JsxElement | ts.JsxSelfClosingElement,
+		conditional: boolean,
+		retained: boolean,
+	) {
+		const check = this.options.localReactClass;
+		if (!check) return;
+		const tag = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
+		if (!ts.isIdentifier(tag) || !isComponentName(tag.text)) return;
+		const entry = this.importOf(tag);
+		if (!entry || entry.namespace || entry.typeOnly) return;
+		const declaration = ts.findAncestor(this.declarationOf(tag)!, ts.isImportDeclaration);
+		if (!declaration || declaration.attributes) return;
+		const severity = check(entry.module, entry.imported);
+		if (!severity) return;
+		this.note(
+			RULE.classComponent,
+			severity,
+			tag,
+			severity === 'error'
+				? `The migration resolves \`${entry.module}\` to the imported React class \`${tag.text}\`, ${retained ? 'which fails if Octane renders this output' : `which this native template ${conditional ? 'can render' : 'renders'}`}. Keep this render in React or replace the class with an Octane function component.`
+				: `If ${retained ? 'Octane' : 'this native template'} renders the imported React class \`${tag.text}\` resolved from \`${entry.module}\`, the call will fail. Verify the runtime import, keep the render in React, or replace the class with an Octane function component.`,
+		);
+	}
+
 	startsLine(node: ts.Node) {
 		return this.linePrefix(node).trim() === '';
+	}
+
+	/** A direct module component, without going through an arbitrary wrapper or callback. */
+	private moduleComponent(node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction) {
+		const parent = node.parent;
+		if (ts.isExportAssignment(parent)) return !parent.isExportEquals && parent.parent === this.sf;
+		let statement: ts.FunctionDeclaration | ts.VariableStatement;
+		let name: ts.Identifier | undefined;
+		if (ts.isFunctionDeclaration(node)) {
+			statement = node;
+			name = node.name;
+		} else {
+			if (
+				!ts.isVariableDeclaration(parent) ||
+				parent.initializer !== node ||
+				!ts.isIdentifier(parent.name) ||
+				!isComponentName(parent.name.text) ||
+				(ts.getCombinedNodeFlags(parent) & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
+				!ts.isVariableStatement(parent.parent.parent)
+			)
+				return false;
+			statement = parent.parent.parent;
+			name = parent.name;
+		}
+		if (statement.parent !== this.sf) return false;
+		if (statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword))
+			return true;
+		if (!name) return false;
+		const refs = renderUses(this.localUses(name));
+		return (
+			refs.some((ref) =>
+				ts.isExportSpecifier(ref.parent)
+					? !ref.parent.parent.parent.moduleSpecifier
+					: ts.isExportAssignment(ref.parent) && !ref.parent.isExportEquals,
+			) ||
+			(refs.length > 0 &&
+				refs.every(
+					(ref) =>
+						!ts.isExportAssignment(ref.parent) &&
+						!ts.isExportSpecifier(ref.parent) &&
+						componentTagOrExport(ref),
+				))
+		);
 	}
 
 	/**
