@@ -99,7 +99,7 @@ const OCTANE_TYPES = new Set(
 		'SVGAttributes SVGLineElementAttributes SVGProps SVGTextElementAttributes ScriptHTMLAttributes ' +
 		'SelectHTMLAttributes SetStateAction SlotHTMLAttributes SourceHTMLAttributes StrictModeProps ' +
 		'StyleHTMLAttributes SuspenseProps TableHTMLAttributes TdHTMLAttributes TextareaHTMLAttributes ' +
-		'ThHTMLAttributes TimeHTMLAttributes ToggleEvent ToggleEventHandler TouchEvent TouchEventHandler ' +
+		'ThHTMLAttributes TimeHTMLAttributes ToggleEvent ToggleEventHandler Touch TouchEvent TouchEventHandler ' +
 		'TrackHTMLAttributes TransitionEvent TransitionEventHandler UIEvent UIEventHandler ' +
 		'VideoHTMLAttributes WebViewHTMLAttributes WheelEvent WheelEventHandler'
 	).split(' '),
@@ -357,7 +357,8 @@ export function mapReactImport(
 		return OCTANE_SERVER_VALUES.has(name) ? { module: 'octane/server', name } : null;
 	}
 	if (!typeOnly && OCTANE_VALUES.has(name)) return { module: 'octane', name };
-	if (OCTANE_TYPES.has(name)) return { module: 'octane', name };
+	if (OCTANE_TYPES.has(name) && (name !== 'Touch' || (module === 'react' && typeOnly)))
+		return { module: 'octane', name };
 	if (name in RENAMED_TYPES) return { module: 'octane', name: RENAMED_TYPES[name] };
 	return null;
 }
@@ -373,7 +374,8 @@ export function hasOctaneValue(name: string) {
 }
 
 /** The Octane name for `React.<name>` in a type position. */
-export function mapQualifiedType(name: string): string | null {
+export function mapQualifiedType(name: string, module: string, typeOf: boolean): string | null {
+	if (name === 'Touch' && (module !== 'react' || typeOf)) return null;
 	if (name in QUALIFIED_TYPE_PREFERENCES) return QUALIFIED_TYPE_PREFERENCES[name];
 	if (OCTANE_TYPES.has(name)) return name;
 	return RENAMED_TYPES[name] ?? null;

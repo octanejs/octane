@@ -535,6 +535,326 @@ export type Qualified = typeof R.createRef;`,
 		expect(code).toContain(`export type Qualified = typeof ${imported?.[1] ?? 'createRef'};`);
 	});
 
+	it.each(['type ', ''])(
+		'migrates React Touch annotations without changing the touch point type (%j)',
+		(type) => {
+			const { code, notes } = transformModule(
+				`import { ${type}Touch as Point, useRef } from 'react';
+				import type * as R from 'react';
+				export type { Touch as PublicPoint } from 'react';
+				export type Saved = [R.Touch, import('react').Touch];
+				export function Pad() {
+					const start = useRef<Point | null>(null);
+					return <div onTouchStart={event => { start.current = event.touches[0] ?? null; }} />;
+				}`,
+				'pad.tsx',
+			);
+			expect(notes).toEqual([]);
+			expect(code).toContain(
+				"import { type Touch as Point, useRef, type Touch as OctaneTouch } from 'octane';",
+			);
+			expect(code).toContain("export type { Touch as PublicPoint } from 'octane';");
+			expect(code).toContain("Saved = [OctaneTouch, import('octane').Touch]");
+		},
+	);
+
+	it.each([
+		"import { Touch } from 'react'; export const View = Touch;",
+		"import * as R from 'react'; export const View = R.Touch;",
+		"import { Touch as Point } from 'react'; export type View = typeof Point;",
+		"import { Touch as Point } from 'react'; export const View = { Point };",
+		"import { Touch as Point } from 'react'; export { Point as View };",
+		"import { Touch as Point } from 'react'; export type View = Point.X;",
+	])('reports Touch when used as a value or namespace', (source) => {
+		const { code, notes } = transformModule(source, 'touch.ts');
+		expect(code).not.toMatch(/import (?:type )?\{ Touch(?: as Point)? \} from 'octane'/);
+		expect(notes).toContainEqual(
+			expect.objectContaining({ rule: 'unsupported-api', severity: 'error' }),
+		);
+	});
+
+	it.each(['typeof Point', 'typeof Point.token'])(
+		'keeps explicit type-only React Touch imports used in a value query (%s)',
+		(query) => {
+			const { code, notes } = transformModule(
+				`import { type Touch as Point } from 'react';
+				declare module 'react' { const Touch: { token: string }; }
+				export type View = [Point, ${query}];`,
+				'points.ts',
+			);
+			expect(code).toContain("import { type Touch as Point } from 'react';");
+			expect(notes).toContainEqual(
+				expect.objectContaining({ rule: 'unsupported-api', severity: 'error' }),
+			);
+		},
+	);
+
+	it.each(['export type { Point as PublicPoint };', 'export { type Point };'])(
+		'preserves a React Touch import referenced only by a local type export',
+		(statement) => {
+			const { code, notes } = transformModule(
+				`import { Touch as Point } from 'react'; ${statement}`,
+				'points.ts',
+			);
+			expect(notes).toEqual([]);
+			expect(code).toContain("import type { Touch as Point } from 'octane';");
+			expect(code).toContain(statement);
+		},
+	);
+
+	it.each(["import R from 'react';", "import type R from 'react';"])(
+		'keeps direct and nested Touch value queries on default React imports',
+		(declaration) => {
+			const { code, notes } = transformModule(
+				`${declaration} export type Point = R.Touch;
+				 export type Queries = [typeof R.Touch, typeof R.Touch.token];`,
+				'points.ts',
+			);
+			expect(code).toMatch(/import type \{ Touch(?: as \w+)? \} from 'octane'/);
+			expect(code).toContain(declaration);
+			expect(code).toContain('[typeof R.Touch, typeof R.Touch.token]');
+			expect(notes.filter((note) => note.rule === 'unsupported-api')).toHaveLength(2);
+		},
+	);
+
+	it('retains static Touch queries alongside migrated named hooks', () => {
+		const { code } = transformModule(
+			`import React,{ useState }from 'react';
+			 declare module 'react' { export namespace Touch { const loose: any } }
+			 export type Deep = typeof React.Touch.loose.more;
+			 export function useCounter() { return useState(0); }`,
+			'points.ts',
+		);
+		expect(code).toContain("import React from 'react';");
+		expect(code).toContain("import { useState } from 'octane';");
+		expect(code).toContain('export type Deep = typeof React.Touch.loose.more;');
+	});
+
+	it('keeps the authored erasure of an unsupported named Touch query', () => {
+		const source = `import type { Touch as Point } from 'react';
+			export type Query = typeof Point.token;`;
+		const { code, notes } = transformModule(source, 'points.ts');
+		expect(code).toBe(source);
+		expect(notes).toContainEqual(
+			expect.objectContaining({ rule: 'unsupported-api', severity: 'error' }),
+		);
+	});
+
+	it('keeps the portable Touch alias distinct from a retained value query', () => {
+		const { code } = transformModule(
+			`import type { Touch } from 'react';
+			 export type Query = typeof Touch.token;
+			 export type Point = React.Touch;`,
+			'points.ts',
+		);
+		expect(code).toContain("import type { Touch } from 'react';");
+		expect(code).toContain("import type { Touch as OctaneTouch } from 'octane';");
+		expect(code).toContain('export type Point = OctaneTouch;');
+	});
+
+	it('preserves a retained React attribute declaration with named siblings', () => {
+		const source = `import React, { type ReactNode as Node } from 'react' with { layer: 'original' };
+			export type Query = typeof React.Touch.token;
+			export type Value = Node;`;
+		const { code, notes } = transformModule(source, 'points.mts');
+		expect(code).toBe(source);
+		expect(notes).toContainEqual(
+			expect.objectContaining({ rule: 'unsupported-api', severity: 'warning' }),
+		);
+	});
+
+	it('keeps an attributed type-only default alias with its named siblings', () => {
+		const source = `import type { default as R, ReactNode as Node } from 'react' with { 'resolution-mode': 'require' };
+			export type Query = typeof R.Touch.token;
+			export type Value = Node;`;
+		expect(transformModule(source, 'points.mts').code).toBe(source);
+	});
+
+	it('reserves names from an attributed React import kept for a Touch query', () => {
+		const { code } = transformModule(
+			`export function useBoth() { return [useState(0), React.useState(1)]; }
+			 import React, { useState } from 'react' with { layer: 'original' };
+			 export type Query = typeof React.Touch.token;`,
+			'points.mts',
+		);
+		expect(code).toContain("import React, { useState } from 'react' with { layer: 'original' };");
+		expect(code).toContain("import { useState as OctaneUseState } from 'octane';");
+		expect(code).toContain('return [useState(0), OctaneUseState(1)];');
+	});
+
+	it('preserves combined default and namespace owners for Touch queries', () => {
+		const source = `import React, * as R from 'react';
+			export type Queries = [typeof React.Touch.loose.more, typeof R.Touch.loose.more];`;
+		expect(transformModule(source, 'points.ts').code).toBe(source);
+	});
+
+	it.each([
+		'export type Result = typeof Point.token;',
+		'export type { Point as PublicPoint };',
+		'export type Result = Point;',
+	])('preserves the resolution mode of a named React Touch import', (usage) => {
+		const declaration = `import type { Touch as Point } from 'react' with { 'resolution-mode': 'require' };`;
+		const { code } = transformModule(`${declaration}\n${usage}`, 'points.ts');
+		expect(code).toContain(declaration);
+		expect(code).toContain(usage);
+	});
+
+	it('checks each alias in an attributed React Touch import', () => {
+		const source = `import type { Touch as Point, Touch as Original } from 'react' with { 'resolution-mode': 'require' };
+			export type Result = [Point, typeof Original.token];`;
+		const { code, notes } = transformModule(source, 'points.ts');
+		expect(code).toBe(source);
+		expect(notes.filter((note) => note.rule === 'unsupported-api')).toEqual([
+			expect.objectContaining({ severity: 'error' }),
+		]);
+	});
+
+	it('keeps qualified references to an explicitly imported React Touch namespace', () => {
+		const declaration = "import type { Touch as Point } from 'react';";
+		const { code, notes } = transformModule(
+			`${declaration} export type Metadata = Point.Metadata;`,
+			'points.ts',
+		);
+		expect(code).toMatch(/import (?:type \{ |\{ type )Touch as Point \} from 'react'/);
+		expect(code).toContain('type Metadata = Point.Metadata;');
+		expect(notes).toContainEqual(
+			expect.objectContaining({ rule: 'unsupported-api', severity: 'error' }),
+		);
+	});
+
+	it('preserves the source of React DOM Touch type references', () => {
+		const { code, notes } = transformModule(
+			`import type * as RD from 'react-dom';
+			 export type Points = [RD.Touch, RD.Touch.Metadata, typeof RD.Touch.token,
+			   import('react-dom').Touch, import('react-dom').Touch.Metadata];`,
+			'points.ts',
+		);
+		expect(code).toContain("import type * as RD from 'react-dom';");
+		expect(code).toContain('[RD.Touch, RD.Touch.Metadata, typeof RD.Touch.token,');
+		expect(code.match(/import\('react-dom'\)\.Touch/g)).toHaveLength(2);
+		expect(notes.filter((note) => note.rule === 'unsupported-api')).toHaveLength(5);
+	});
+
+	it.each([
+		["import type * as R from 'react';", 'interface A extends R.Touch {}'],
+		["import type R from 'react';", 'declare class A implements R.Touch {}'],
+		['', 'interface A extends React.Touch {}'],
+	])('maps a portable Touch base in type-only heritage (%s)', (importLine, declaration) => {
+		const { code, notes } = transformModule(`${importLine} export ${declaration}`, 'points.ts');
+		expect(code).toContain("import type { Touch } from 'octane';");
+		expect(code).toContain(declaration.replace(/(?:R|React)\.Touch/, 'Touch'));
+		expect(notes).toEqual([]);
+	});
+
+	it.each([
+		["import type * as R from 'react' with { 'resolution-mode': 'require' };", 'R.Touch'],
+		["import type * as R from 'react-dom';", 'R.Touch'],
+		['', 'React.Touch'],
+	])(
+		'retains authored Touch heritage when its module binding cannot move (%s)',
+		(importLine, type) => {
+			const source = `${importLine} interface A extends ${type} {}`;
+			const { code } = transformModule(source, 'points.ts');
+			expect(code).toBe(source);
+		},
+	);
+
+	it('does not map a Touch constructor or a locally declared Touch base', () => {
+		const { code, notes } = transformModule(
+			`import * as R from 'react';
+			 export class Constructor extends R.Touch {}
+			 export namespace Local {
+			   export interface Touch {}
+			   export interface Point extends Local.Touch {}
+			 }`,
+			'points.ts',
+		);
+		expect(code).not.toContain('import type { Touch }');
+		expect(code).toContain('class Constructor extends R.Touch');
+		expect(code).toContain('interface Point extends Local.Touch');
+		expect(notes).toContainEqual(expect.objectContaining({ rule: 'unsupported-api' }));
+	});
+
+	it('keeps global React Touch property queries and nested types intact', () => {
+		const { code, notes } = transformModule(
+			`export type Nested = React.Touch.Metadata;
+			 export type Query = typeof React.Touch.loose.more;
+			 export type Portable = React.Touch;
+			 export namespace Scope {
+			   const React = { Touch: { loose: { more: 'local' } } };
+			   export type Shadow = typeof React.Touch.loose.more;
+			 }`,
+			'points.ts',
+		);
+		expect(code).toContain('Nested = React.Touch.Metadata;');
+		expect(code).toContain('Query = typeof React.Touch.loose.more;');
+		expect(code).toContain('Shadow = typeof React.Touch.loose.more;');
+		expect(code).toContain('Portable = Touch;');
+		expect(notes.filter((note) => note.rule === 'unsupported-api')).toHaveLength(2);
+	});
+
+	it('keeps nested React Touch types on their original namespace', () => {
+		const { code, notes } = transformModule(
+			`import type * as R from 'react';
+			 export type Metadata = [R.Touch.Metadata, import('react').Touch.Metadata];`,
+			'points.ts',
+		);
+		expect(code).toContain("import type * as R from 'react';");
+		expect(code).toContain("[R.Touch.Metadata, import('react').Touch.Metadata]");
+		expect(notes.filter((note) => note.rule === 'unsupported-api')).toHaveLength(2);
+	});
+
+	it('preserves the selected React module facet for qualified Touch types', () => {
+		const source = `import type R from 'react' with { 'resolution-mode': 'require' };
+			export type Points = [R.Touch, import('react', { with: { 'resolution-mode': 'require' } }).Touch];`;
+		const { code, notes } = transformModule(source, 'points.ts');
+		expect(code).toBe(source);
+		expect(notes).toEqual([]);
+	});
+
+	it('keeps qualified Touch value queries on React', () => {
+		const source = `import type * as R from 'react';
+declare module 'react' { const Touch: { token: { nested: 'real' } }; }
+export type Point = R.Touch;
+export type Direct = typeof R.Touch;
+export type Nested = typeof R /* keep */ .Touch.token;
+export type Deep = typeof R.Touch.token.nested;
+export namespace Local {
+	export const R = { Touch: { token: 'shadow' } };
+	export type Shadow = typeof R.Touch.token;
+}`;
+		const { code, notes } = transformModule(source, 'points.ts');
+		expect(code).toContain("import type { Touch as OctaneTouch } from 'octane';");
+		expect(code).toContain("import type * as R from 'react';");
+		expect(code).toContain('typeof R.Touch;');
+		expect(code).toContain('typeof R /* keep */ .Touch.token;');
+		expect(code).toContain('typeof R.Touch.token.nested;');
+		expect(code).toContain('export type Shadow = typeof R.Touch.token;');
+		expect(notes.filter((note) => note.rule === 'unsupported-api')).toHaveLength(4);
+		expect(transformModule(code, 'points.ts').code).toBe(code);
+	});
+
+	it('preserves a Touch value query with no other module marker', () => {
+		const source = `import type * as R from 'react' with /* condition */ { 'resolution-mode': 'require' };
+declare module 'react' {
+	const Touch: { token: 'original' };
+	export type Result = typeof R.Touch.token;
+}`;
+		const { code } = transformModule(source, 'points.ts');
+		expect(code).toBe(source);
+		expect(transformModule(code, 'points.ts').code).toBe(code);
+	});
+
+	it('keeps Touch references outside the React type export unmapped', () => {
+		const { notes } = transformModule(
+			`import * as R from 'react';
+			import type * as RD from 'react-dom';
+			export type Points = [typeof R.Touch, typeof import('react').Touch, RD.Touch, import('react-dom').Touch];`,
+			'points.ts',
+		);
+		expect(notes.filter((note) => note.rule === 'unsupported-api')).toHaveLength(4);
+	});
+
 	it("imports `useSyncExternalStore` from Octane, not React's shim for it", () => {
 		const { code } = transformModule(
 			"import { useEffect } from 'react';\nimport { useSyncExternalStore } from 'use-sync-external-store/shim';\nexport const useOnline = (s: { on(f: () => void): () => void; get(): boolean }) => {\n\tuseEffect(() => {}, []);\n\treturn useSyncExternalStore(s.on, s.get);\n};\n",

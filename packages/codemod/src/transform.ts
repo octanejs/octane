@@ -76,6 +76,20 @@ function directMember(receiver: ts.Node) {
 	return null;
 }
 
+function firstQualifiedName(name: ts.EntityName): ts.Identifier {
+	while (ts.isQualifiedName(name)) name = name.left;
+	return name;
+}
+
+function isValueTypeQuery(name: ts.EntityName) {
+	while (ts.isQualifiedName(name.parent) && name.parent.left === name) name = name.parent;
+	return ts.isTypeQueryNode(name.parent) && name.parent.exprName === name;
+}
+
+function needsTouchValueOrNamespace(ref: ts.Identifier) {
+	return isValueTypeQuery(ref) || (ts.isQualifiedName(ref.parent) && ref.parent.left === ref);
+}
+
 type Severity = Note['severity'];
 type ModuleExports = TransformResult['exports'];
 
@@ -3031,19 +3045,21 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		// A React import of the same name becomes this import.
 		const prior = this.apiLocals.get(name);
 		const originalFactory =
-			module === 'octane' &&
-			name === 'createElement' &&
-			prior?.module === 'react' &&
-			[...this.imports].some(
-				([declaration, entry]) =>
+			module === 'octane' && name === 'createElement' && prior?.module === 'react';
+		const canReuse =
+			prior &&
+			mapReactImport(prior.module, prior.imported, prior.typeOnly)?.name === name &&
+			![...this.imports].some(
+				([decl, entry]) =>
 					entry === prior &&
-					ts.isImportSpecifier(declaration) &&
-					this.retainedReactFactoryImport(declaration),
+					ts.isImportSpecifier(decl) &&
+					(decl.parent.parent.parent.attributes ||
+						(entry.module === 'react' &&
+							entry.imported === 'Touch' &&
+							this.localUses(decl.name).some(needsTouchValueOrNamespace)) ||
+						(originalFactory && this.retainedReactFactoryImport(decl))),
 			);
-		const collides =
-			(this.declared.has(name) || this.readsGlobal(name)) &&
-			(originalFactory ||
-				!(prior && mapReactImport(prior.module, prior.imported, prior.typeOnly)?.name === name));
+		const collides = (this.declared.has(name) || this.readsGlobal(name)) && !canReuse;
 		let local = collides ? `Octane${name[0].toUpperCase()}${name.slice(1)}` : name;
 		while (collides && (this.declared.has(local) || this.readsGlobal(local))) local += '_';
 		names.set(name, { local, typeOnly });
@@ -3617,6 +3633,42 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		}
 		if (module in REACT_MODULES) {
 			if (module === 'react' && this.retainedRegistryFactoryImport(node)) return null;
+			const clause = node.importClause;
+			const bindings = clause?.namedBindings;
+			if (
+				module === 'react' &&
+				node.attributes &&
+				clause &&
+				bindings &&
+				ts.isNamedImports(bindings)
+			) {
+				const touch = bindings.elements.filter(
+					(element) =>
+						(clause.isTypeOnly || element.isTypeOnly) &&
+						(element.propertyName ?? element.name).text === 'Touch',
+				);
+				// An erased default import may also be written inside a named import list.
+				const defaultTouch = bindings.elements.some(
+					(element) =>
+						(clause.isTypeOnly || element.isTypeOnly) &&
+						element.propertyName?.text === 'default' &&
+						this.localUses(element.name).some((ref) => directMember(ref)?.text === 'Touch'),
+				);
+				if (touch.length > 0) {
+					// Preserve the authored resolution condition and its React export.
+					for (const element of touch) {
+						if (this.localUses(element.name).some(needsTouchValueOrNamespace))
+							this.note(
+								RULE.unsupported,
+								'error',
+								element,
+								"`Touch` from 'react' has no Octane equivalent for this use.",
+							);
+					}
+					return null;
+				}
+				if (defaultTouch) return null;
+			}
 			this.importSlots.push(node);
 			return `\u0000IMPORT${this.importSlots.length - 1}\u0000`;
 		}
@@ -4113,6 +4165,21 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		const module = REACT_MODULES[specifier.text];
 		if (module === undefined) return this.rewriteSpecifier(node, specifier);
 		const qualifier = node.qualifier;
+		if (
+			qualifier &&
+			firstQualifiedName(qualifier).text === 'Touch' &&
+			(specifier.text === 'react-dom' ||
+				(specifier.text === 'react' &&
+					(node.attributes || node.isTypeOf || ts.isQualifiedName(qualifier))))
+		) {
+			this.reportRetainedTouchType(
+				specifier.text,
+				node,
+				node.isTypeOf,
+				ts.isQualifiedName(qualifier),
+			);
+			return null;
+		}
 		const name = qualifier && ts.isIdentifier(qualifier) ? qualifier.text : null;
 		let missingValue = false;
 		if (specifier.text === 'react' && node.isTypeOf && qualifier) {
@@ -4138,7 +4205,8 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			}
 		}
 		this.count(RULE.import);
-		const renamed = name === null || missingValue ? null : mapQualifiedType(name);
+		const renamed =
+			name === null || missingValue ? null : mapQualifiedType(name, specifier.text, node.isTypeOf);
 		if (name !== null && renamed === null && !missingValue) {
 			const unresolvedProjection = specifier.text === 'react' && !node.isTypeOf;
 			this.note(
@@ -4313,6 +4381,10 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				(bindings && ts.isNamespaceImport(bindings) ? bindings.name.text : null);
 			// Members the rewrite could not map keep the namespace alive.
 			if (namespace && this.retainedTypeNamespaces.has(clause)) {
+				if (node.attributes) {
+					typeNamespaces.push(node.getText(this.sf));
+					continue;
+				}
 				// A static type query can follow a value chain that an import() type cannot.
 				typeNamespaces.push(
 					clause.name && bindings && ts.isNamedImports(bindings)
@@ -4326,15 +4398,28 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			if (!bindings || !ts.isNamedImports(bindings)) continue;
 			for (const element of bindings.elements) {
 				const local = element.name.text;
-				if (!this.used.has(local)) continue;
 				const imported = (element.propertyName ?? element.name).text;
-				const typeOnly = clause.isTypeOnly || element.isTypeOnly;
+				let typeOnly = clause.isTypeOnly || element.isTypeOnly;
+				let typeReferences = false;
+				let unsupportedTouchUse = false;
+				if (module === 'react' && imported === 'Touch' && !node.attributes && this.isTypeScript()) {
+					// A type query still needs a value export, which Touch does not have.
+					const references = this.localUses(element.name);
+					typeReferences =
+						references.length > 0 &&
+						references.every(
+							(ref) => ts.isPartOfTypeNode(ref) || ts.isTypeOnlyExportDeclaration(ref.parent),
+						);
+					unsupportedTouchUse = references.some(needsTouchValueOrNamespace);
+					if (!unsupportedTouchUse) typeOnly ||= typeReferences;
+				}
+				if (!this.used.has(local) && !typeReferences) continue;
 				if (imported === 'createElement' && this.retainedReactFactoryImport(element)) {
 					add(module, imported, local, false);
 					retainsCreateElement ||= local === 'createElement';
 					continue;
 				}
-				const mapped = mapReactImport(module, imported, typeOnly);
+				const mapped = unsupportedTouchUse ? null : mapReactImport(module, imported, typeOnly);
 				if (mapped) {
 					// A name read only in types imports as a type, which bundlers elide.
 					add(mapped.module, mapped.name, local, typeOnly || !this.valueUses.has(local));
@@ -4352,6 +4437,13 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					UNSUPPORTED_VALUES[imported] ??
 						`\`${imported}\` from '${module}' has no Octane equivalent.`,
 				);
+				if (unsupportedTouchUse && clause.isTypeOnly) {
+					const binding = imported === local ? local : `${imported} as ${local}`;
+					typeNamespaces.push(
+						`import type { ${binding} } from ${this.quote}${module}${this.quote};`,
+					);
+					continue;
+				}
 				const spec =
 					(typeOnly ? 'type ' : '') + (imported === local ? local : `${imported} as ${local}`);
 				kept.set(module, [...(kept.get(module) ?? []), spec]);
@@ -4607,6 +4699,18 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			: this.isGlobalNamespace(node, 'React');
 	}
 
+	private reportRetainedTouchType(module: string, node: ts.Node, query: boolean, nested: boolean) {
+		const message =
+			module === 'react-dom'
+				? "`Touch` from 'react-dom' stays on React DOM. Octane only maps the type from 'react'."
+				: query
+					? 'Octane has no Touch value for this type query.'
+					: nested
+						? 'Octane has no Touch namespace for this type reference.'
+						: null;
+		if (message) this.note(RULE.unsupported, 'warning', node, message);
+	}
+
 	rewriteQualifiedType(node: ts.QualifiedName) {
 		const member = this.rewritePackageMember(node.left, node.right, 'warning');
 		if (member !== null) return member;
@@ -4617,6 +4721,34 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				: !this.isGlobalNamespace(node.left, 'React')
 		) {
 			return null;
+		}
+		if (
+			ts.isIdentifier(node.left) &&
+			node.right.text === 'Touch' &&
+			(!namespace || namespace.module === 'react-dom' || namespace.module === 'react')
+		) {
+			const declaration = this.declarationOf(node.left);
+			if (!namespace && declaration) return null;
+			const clause =
+				declaration && (ts.isNamespaceImport(declaration) ? declaration.parent : declaration);
+			const importClause = clause && ts.isImportClause(clause) ? clause : null;
+			if (!namespace || importClause) {
+				let access = node;
+				while (ts.isQualifiedName(access.parent) && access.parent.left === access)
+					access = access.parent;
+				const query = isValueTypeQuery(access);
+				const nested = access !== node;
+				const attributes = importClause?.parent.attributes;
+				if (
+					query ||
+					(ts.isTypeReferenceNode(access.parent) &&
+						(namespace?.module === 'react-dom' || nested || attributes))
+				) {
+					this.reportRetainedTouchType(namespace?.module ?? 'react', node, query, nested);
+					if (importClause) this.retainedTypeNamespaces.add(importClause);
+					return node.getText(this.sf);
+				}
+			}
 		}
 		let queried: ts.QualifiedName = node;
 		if (namespace?.module === 'react') {
@@ -4643,7 +4775,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				return null;
 			}
 		}
-		const name = mapQualifiedType(node.right.text);
+		const name = mapQualifiedType(
+			node.right.text,
+			namespace?.module ?? 'react',
+			ts.isTypeQueryNode(node.parent),
+		);
 		if (!name) {
 			if (namespace) this.used.add(namespace.local);
 			const unresolvedProjection =
@@ -4664,6 +4800,43 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		node: ts.TypeReferenceNode | ts.ExpressionWithTypeArguments,
 		name: ts.EntityName | ts.Expression,
 	) {
+		// Type heritage parses a qualified name as a property access expression.
+		if (
+			ts.isExpressionWithTypeArguments(node) &&
+			ts.isPartOfTypeNode(node) &&
+			ts.isPropertyAccessExpression(name) &&
+			!name.questionDotToken &&
+			ts.isIdentifier(name.expression) &&
+			name.name.text === 'Touch'
+		) {
+			const receiver = name.expression;
+			const entry = this.importOf(receiver);
+			const declaration = this.declarationOf(receiver);
+			if (entry?.namespace && (entry.module === 'react' || entry.module === 'react-dom')) {
+				const clause =
+					declaration && (ts.isNamespaceImport(declaration) ? declaration.parent : declaration);
+				if (
+					clause &&
+					ts.isImportClause(clause) &&
+					(clause.parent.attributes || entry.module === 'react-dom')
+				) {
+					this.reportRetainedTouchType(entry.module, name, false, false);
+					this.retainedTypeNamespaces.add(clause);
+					return name.getText(this.sf) + this.span(node, name.end, node.end, PLAIN);
+				}
+			}
+			if (
+				(entry?.namespace && entry.module === 'react') ||
+				(!entry &&
+					!declaration &&
+					this.isGlobalNamespace(receiver, 'React') &&
+					ts.isExternalModule(this.sf))
+			) {
+				this.count(RULE.import);
+				return this.require('octane', 'Touch', true) + this.span(node, name.end, node.end, PLAIN);
+			}
+		}
+
 		// The global `JSX` namespace React's types declared is Octane's export.
 		if (ts.isQualifiedName(name) && this.isGlobalNamespace(name.left, 'JSX'))
 			this.require('octane', 'JSX', true);
