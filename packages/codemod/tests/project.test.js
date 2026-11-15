@@ -1481,6 +1481,17 @@ export async function clipboard() {
 		it.each([
 			['named', server, owner],
 			['inline', server.replace('OctaneCompat', 'OctaneCompatInline'), owner],
+			['client', server.replace('/server', ''), owner],
+			[
+				'client inline',
+				server.replace('/server', '').replace('OctaneCompat', 'OctaneCompatInline'),
+				owner,
+			],
+			[
+				'client namespace',
+				"import * as Bridge from 'octane/react';",
+				owner.replace('<Host', '<Bridge.OctaneCompat'),
+			],
 			[
 				'styled inline',
 				server.replace('OctaneCompat', 'OctaneCompatInline'),
@@ -1497,7 +1508,7 @@ export async function clipboard() {
 			['explicit React JSX', '/** @jsxImportSource react */ ' + server, owner],
 			['escaped import', server.replace('/server', '/\\u0073erver'), owner],
 			['underscore alias', server.replace('as Host', 'as _Host'), owner.replace('<Host', '<_Host')],
-		])('keeps a selected authored %s server host in React', async (_, hostImport, component) => {
+		])('keeps a selected authored %s host in React', async (_, hostImport, component) => {
 			const { root, files, selected } = app(`${hostImport}\n${child}\n${component}`, native);
 			selected.push(path.join(root, 'App.server.tsx'));
 			const ownership = expect.objectContaining({
@@ -1520,6 +1531,18 @@ export async function clipboard() {
 
 		it.each([
 			['retained authored host', `${server}\n${child}\n${owner}`, {}, false],
+			[
+				'retained authored client host',
+				`${server.replace('/server', '')}\n${child}\n${owner}`,
+				{},
+				false,
+			],
+			[
+				'local alias using the client specifier',
+				`${server.replace('/server', '')}\n${child}\n${owner}`,
+				{ 'octane/react': ['./Other.ts'] },
+				true,
+			],
 			[
 				'intrinsic with a lowercase import alias',
 				`${server.replace('as Host', 'as host')}\n${child}\n${owner.replace('<Host', '<host')}`,
