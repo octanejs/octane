@@ -100,6 +100,43 @@ describe('runCodemod', () => {
 		},
 	);
 
+	it('blocks writing migrations with options passed to a React buffered server renderer', async () => {
+		const source = `import { renderToString as render } from 'react-dom/server';
+import * as server from 'react-dom/server.browser';
+const view = <main>body</main>;
+export const single = render(view);
+export const withOptions = render(view, { identifierPrefix: 'test-' });
+export const optional = server.renderToStaticMarkup?.(view, { identifierPrefix: 'test-' });
+export function shadow(render: (view: unknown, options: {}) => string) {
+	return render(view, {});
+}`;
+		const other = 'export function Other() { return <aside />; }';
+		const root = project({ 'entry.tsx': source, 'Other.tsx': other });
+		const files = ['Other.tsx', 'entry.tsx'].map((name) => path.join(root, name));
+		const preview = await runCodemod(files, { root, write: false });
+		const entry = preview.files.find((file) => file.file === 'entry.tsx');
+		expect(entry.code).toContain('render(view).html');
+		expect(entry.notes).toEqual(
+			[5, 6].map((line) =>
+				expect.objectContaining({ rule: 'buffered-ssr-options', severity: 'error', line }),
+			),
+		);
+		const write = await runCodemod(files, { root });
+		expect(write.files).toEqual([
+			expect.objectContaining({
+				file: 'entry.tsx',
+				output: 'entry.tsx',
+				changed: false,
+				notes: [
+					expect.objectContaining({ rule: 'buffered-ssr-options', severity: 'error', line: 5 }),
+				],
+			}),
+		]);
+		expect(fs.readFileSync(files[0], 'utf8')).toBe(other);
+		expect(fs.readFileSync(files[1], 'utf8')).toBe(source);
+		expect(files.some((file) => fs.existsSync(file.replace('.tsx', '.tsrx')))).toBe(false);
+	});
+
 	it('uses the default React Router directory when config omits it', async () => {
 		const root = project({
 			'node_modules/@react-router/dev/package.json': JSON.stringify({

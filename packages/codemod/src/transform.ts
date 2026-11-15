@@ -151,6 +151,7 @@ export const CONTEXT_PROVIDER_GETTER = 'context-provider-getter';
 export const ELEMENT_CHILD_ALIAS = 'element-child-path-alias';
 export const INTL_PROVIDER_DEFAULTS = 'intl-provider-defaults';
 export const REACT_TYPE_PROJECTION = 'react-type-projection';
+export const BUFFERED_SSR_OPTIONS = 'buffered-ssr-options';
 
 /** Rule names, as reported. */
 const RULE = {
@@ -5084,9 +5085,18 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		}
 		if (
 			(name === 'renderToString' || name === 'renderToStaticMarkup') &&
-			callee.module.startsWith('react-dom/server') &&
-			node.arguments.length === 1
+			callee.module.startsWith('react-dom/server')
 		) {
+			if (node.arguments.length > 1) {
+				this.note(
+					BUFFERED_SSR_OPTIONS,
+					'error',
+					node,
+					'Keep this buffered server render in React. Migrating the call can change when arguments are evaluated and which server options the renderer reads.',
+				);
+				return null;
+			}
+			if (node.arguments.length !== 1) return null;
 			// React returns the HTML; Octane returns `{ html, css }`.
 			this.count(RULE.serverRender);
 			return (
