@@ -1134,6 +1134,18 @@ export async function runCodemod(
 						ordinaryCaller,
 					),
 				resolveStoreHook,
+				retainedRegistry:
+					files.length === 1 && file.endsWith('.ts') && esmContextProject
+						? (specifier) => {
+								if (!specifier.startsWith('./') && !specifier.startsWith('../')) return;
+								const registry = localFile(file, specifier, true);
+								if (!registry || known.has(registry)) return;
+								const request = path.resolve(path.dirname(file), specifier);
+								if (registry !== request && registry !== request + path.extname(registry)) return;
+								if (ts.findConfigFile(path.dirname(registry), ts.sys.fileExists) === rootProject)
+									return program?.getSourceFile(registry);
+							}
+						: undefined,
 				get originalReact() {
 					return installedReact(file);
 				},
