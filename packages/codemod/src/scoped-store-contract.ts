@@ -749,27 +749,29 @@ function modulePlan(
 		return !!target && reachesReact(target, seen);
 	}
 
-	function originalExportPath(
+	function localExportName(symbol: ts.Symbol, fn: ts.FunctionDeclaration) {
+		if (
+			fn.name?.text === symbol.name &&
+			fn.modifiers?.some((mod) => mod.kind === ts.SyntaxKind.ExportKeyword)
+		)
+			return fn.name;
+		const alias = symbol.declarations?.find(
+			(item): item is ts.ExportSpecifier =>
+				ts.isExportSpecifier(item) && localExportBody(item, fn.getSourceFile()) === fn,
+		);
+		return alias?.name;
+	}
+
+	function originalExportName(
 		sf: ts.SourceFile,
 		name: string,
 		fn: ts.FunctionDeclaration,
 		depth = 0,
-	): boolean {
+	): string | false {
 		if (depth === 5) return false;
 		const exported = exports(sf).find((item) => item.name === name);
 		if (!exported || !identity(exported).declarations?.includes(fn)) return false;
-		if (fn.parent === sf) {
-			if (
-				fn.name?.text === name &&
-				fn.modifiers?.some((mod) => mod.kind === ts.SyntaxKind.ExportKeyword)
-			)
-				return true;
-			return (
-				exported.declarations?.some(
-					(item) => ts.isExportSpecifier(item) && localExportBody(item, sf) === fn,
-				) === true
-			);
-		}
+		if (fn.parent === sf) return localExportName(exported, fn)?.text ?? false;
 		const reexports = sf.statements
 			.filter(ts.isExportDeclaration)
 			.filter((edge) => !edge.isTypeOnly);
@@ -822,7 +824,7 @@ function modulePlan(
 			edge.exportClause && ts.isNamedExports(edge.exportClause)
 				? edge.exportClause.elements.find((item) => !item.isTypeOnly && item.name.text === name)
 				: undefined;
-		return originalExportPath(child, binding?.propertyName?.text ?? name, fn, depth + 1);
+		return originalExportName(child, binding?.propertyName?.text ?? name, fn, depth + 1);
 	}
 
 	const sharedExports = new Map<string, boolean>();
@@ -871,40 +873,41 @@ function modulePlan(
 					contract = {
 						requiresReact: () =>
 							readsContext(fn, new Set(), files, true) &&
-							originalExportPath(root, requested, fn) &&
+							originalExportName(root, requested, fn) !== false &&
 							reachesReact(fn),
 					};
 				}
-				// Local export lists only extend the advisory proof.
-				if (contract && !localExports.size && readsContext(fn, new Set(), files)) {
+				const hasLocalExports = localExports.size > 0;
+				const name =
+					hasLocalExports && contract ? originalExportName(root, requested, fn) : fn.name.text;
+				if (contract && name && readsContext(fn, new Set(), files)) {
 					const raw = output(sf),
 						entry = raw.replace(/-impl\.ts$/, '.ts');
-					const bound = exports(sf).flatMap((sym) => {
-						const impl = identity(sym).declarations?.find(
+					const bound = exports(sf).flatMap((symbol) => {
+						const impl = identity(symbol).declarations?.find(
 							(d): d is ts.FunctionDeclaration => ts.isFunctionDeclaration(d) && !!d.body,
 						);
-						return impl &&
-							impl.getSourceFile() === sf &&
-							impl.name &&
+						if (!impl || impl.getSourceFile() !== sf) return [];
+						const key = hasLocalExports ? localExportName(symbol, impl) : impl.name;
+						return key &&
+							ts.isIdentifier(key) &&
+							/^use[A-Z0-9]/.test(key.text) &&
 							readsContext(impl, new Set(), files)
-							? [impl.name.text]
+							? [key.text]
 							: [];
 					});
-					const code = [
-						`import { bindStoreHook } from ${JSON.stringify(relative(entry, shim))};`,
-						`import * as implementations from ${JSON.stringify(relative(entry, raw))};`,
-						...bound.map(
-							(name) => `export const ${name} = bindStoreHook(implementations.${name});`,
-						),
-						'',
-					].join('\n');
-					files.set(entry, nativeDirective + code);
-					contract.plan = {
-						entry,
-						name: fn.name.text,
-						files,
-						isSharedExport,
-					};
+					if (bound.includes(name)) {
+						const code = [
+							`import { bindStoreHook } from ${JSON.stringify(relative(entry, shim))};`,
+							`import * as implementations from ${JSON.stringify(relative(entry, raw))};`,
+							...bound.map(
+								(name) => `export const ${name} = bindStoreHook(implementations.${name});`,
+							),
+							'',
+						].join('\n');
+						files.set(entry, nativeDirective + code);
+						contract.plan = { entry, name, files, isSharedExport };
+					}
 				}
 			}
 			result.set(requested, contract);
