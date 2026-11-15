@@ -210,6 +210,40 @@ the ordered source/target identities stable for the boundary's lifetime, or
 change the boundary key. Duplicate target contexts are rejected. React providers
 inside the island keep their usual precedence.
 
+## Request-scoped signals in Node.js
+
+A Node.js server using React's `renderToPipeableStream` can give compiled module-level signals a request-local owner. Install a carrier once in the server entry. Enter the caller's scope when starting each render so React's asynchronous work can read that request's signals.
+
+```ts
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { renderToPipeableStream } from 'react-dom/server';
+import {
+  installSignalOwnerEnvironment,
+  runWithSignalOwner,
+  type SignalOwner,
+  type SignalOwnerIdentity,
+} from 'octane/signals/server';
+
+const owners = new AsyncLocalStorage<SignalOwnerIdentity>();
+installSignalOwnerEnvironment({
+  current: () => owners.getStore() ?? null,
+  run: (owner, render) => owners.run(owner, render),
+  capture: (owner) => (render) => owners.run(owner, render),
+});
+
+export function renderRequest(
+  owner: SignalOwner,
+  tree: Parameters<typeof renderToPipeableStream>[0],
+  options?: Parameters<typeof renderToPipeableStream>[1],
+) {
+  return runWithSignalOwner(owner, () => renderToPipeableStream(tree, options));
+}
+```
+
+The HTTP handler owns the scope. For a scope dedicated to one response, dispose it when the response finishes, and abort the React stream and dispose the scope if the client disconnects first. A recoverable React render error can leave other work pending.
+
+The carrier applies to Node server rendering. To [borrow an owner in the browser](https://octanejs.dev/docs/react-compat#borrow-a-client-signal-owner), pass `clientSignalOwner` from the browser entry with the same scope key as the request owner. The existing island sidecars supply historical reads during hydration. After hydration, the islands read live values from the browser owner.
+
 ## Server rendering and hydration
 
 The server implementation is `ReactCompat` from `octane/react/server`. Octane's
