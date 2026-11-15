@@ -159,6 +159,9 @@ describe('compiler AST emit architecture', () => {
 			// @tsrx/core also lacks builders for indexed access and satisfies in Valdi callback types.
 			'TSIndexedAccessType',
 			'TSSatisfiesExpression',
+			// @tsrx/core has no union or parenthesized type builders for optional hook initializers.
+			'TSParenthesizedType',
+			'TSUnionType',
 		]);
 		const compilerRecordShapes = new Set([
 			'ActivityStatement',
