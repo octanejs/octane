@@ -2835,6 +2835,26 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 					warns ? [expect.objectContaining({ severity: 'warning', line })] : [],
 				);
 			}
+			if (kind === 'direct return') {
+				const selected = await runCodemod([root], {
+					root,
+					strong: true,
+					verify: true,
+					write: false,
+				});
+				const owner = selected.files.find((entry) => entry.file === 'Owner.ts');
+				expect(owner?.code).toContain("import { createElement as element } from 'octane';");
+				expect(owner?.code).toContain("import Leaf from './Leaf.tsrx';");
+				for (const file of ['Owner.ts', 'Leaf.tsx']) {
+					const notes = selected.files.find((entry) => entry.file === file)?.notes;
+					expect(notes).not.toContainEqual(
+						expect.objectContaining({
+							rule: 'react-compat',
+							message: expect.stringContaining('retained React createElement'),
+						}),
+					);
+				}
+			}
 		},
 	);
 
