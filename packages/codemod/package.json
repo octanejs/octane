@@ -54,6 +54,7 @@
     "@octanejs/cli": "workspace:*",
     "@tsrx/oxc": "catalog:default",
     "octane": "workspace:*",
+    "parse5": "8.0.1",
     "picocolors": "catalog:default",
     "typescript": "catalog:default"
   },
