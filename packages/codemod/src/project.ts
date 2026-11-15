@@ -655,7 +655,6 @@ export async function runCodemod(
 		if (
 			!/^\.{1,2}\//.test(module) ||
 			/[!%?#\\]/.test(module) ||
-			name === 'default' ||
 			!automaticReactJsx(from) ||
 			config?.rootDirs?.length ||
 			config?.moduleSuffixes?.some(Boolean)

@@ -4153,11 +4153,13 @@ export function App() { return <main><Leaf label="Ready" /></main>; }`;
 		const root = project({
 			'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler"}}',
 			'leaf.tsx': leaf,
+			'default-leaf.tsx': `export default function Leaf({ label }: { label: string }) { return <button>{label}</button>; }`,
 			'ambiguous.tsx': leaf,
 			'ambiguous.tsrx': 'export function Leaf() @{ <button>Native</button> }',
 			'native.tsx': '/** @jsxImportSource octane */\n' + leaf.replace("'react'", "'octane'"),
 			'App.tsx': app(),
 			'Explicit.tsx': app('./leaf.tsx'),
+			'Default.tsx': app('./default-leaf').replace('import { Leaf }', 'import Leaf'),
 			'Native.tsx': app('./native'),
 			'Ambiguous.tsx': app('./ambiguous'),
 			'Host.tsx': `import { ReactCompat } from 'octane/react';
@@ -4169,9 +4171,14 @@ export function App() { return <ReactCompat component={Leaf} props={{label: 'Rea
 			path.join(root, 'node_modules'),
 			'dir',
 		);
-		const inputs = ['App.tsx', 'Explicit.tsx', 'Native.tsx', 'Host.tsx', 'Ambiguous.tsx'].map(
-			(file) => path.join(root, file),
-		);
+		const inputs = [
+			'App.tsx',
+			'Default.tsx',
+			'Explicit.tsx',
+			'Native.tsx',
+			'Host.tsx',
+			'Ambiguous.tsx',
+		].map((file) => path.join(root, file));
 		for (const projectTypes of [true, false]) {
 			const options = { root, strong: true, write: false, projectTypes };
 			const result = await runCodemod(inputs, options);
@@ -4182,9 +4189,13 @@ export function App() { return <ReactCompat component={Leaf} props={{label: 'Rea
 			);
 			expect(matches.sort()).toEqual([
 				['App.tsx', 'warning', 2],
+				['Default.tsx', 'warning', 2],
 				['Explicit.tsx', 'warning', 2],
 			]);
-			const selected = await runCodemod([...inputs, path.join(root, 'leaf.tsx')], options);
+			const selected = await runCodemod(
+				[...inputs, path.join(root, 'leaf.tsx'), path.join(root, 'default-leaf.tsx')],
+				options,
+			);
 			expect(selected.files.flatMap((file) => file.notes)).not.toContainEqual(
 				expect.objectContaining({ rule: 'retained-react-component' }),
 			);
