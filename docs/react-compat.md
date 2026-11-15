@@ -65,6 +65,12 @@ When React removes an `OctaneCompat` host, it takes the host out of the DOM
 during the commit. Octane disposes the hosted root afterward, so its ref and
 effect cleanups can run after the surrounding React unmount call returns.
 
+While React Suspense shows the fallback for an `OctaneCompat` island, changes to
+the child of the same host wait for the current suspension to settle. Change the
+React `key` on `OctaneCompat` itself to start a replacement without waiting for
+that work. This creates a new hosted root and resets the island's local state.
+If the replacement suspends, React shows the fallback until it is ready.
+
 Resource hints such as `preload` and `preinit` issued during an
 `OctaneCompat` render use the React host's document resource handling.
 Place declarative document metadata such as `<title>` and `<meta>` in the
