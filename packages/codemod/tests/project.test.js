@@ -152,6 +152,13 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 					'return <Frame><b>ready</b></Frame>;',
 					'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
 				),
+			'RetainedArrowMetadata.tsx':
+				entry('./Boundary')
+					.replace('export function App()', 'export const App = (show: boolean) =>')
+					.replace(
+						'return <Frame><b>ready</b></Frame>;',
+						'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+					) + '; export type View = typeof App; App.displayName = "App";',
 			'RetainedDefaultArrow.tsx': entry('./Boundary')
 				.replace('export function App()', 'export default (show: boolean) =>')
 				.replace(
@@ -464,6 +471,7 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 				['Relative.tsx', includeClass ? 'error' : 'warning'],
 				['Retained.tsx', includeClass ? 'error' : 'warning'],
 				['RetainedArrow.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedArrowMetadata.tsx', includeClass ? 'error' : 'warning'],
 				['RetainedCompound.tsx', includeClass ? 'error' : 'warning'],
 				['RetainedDefaultArrow.tsx', includeClass ? 'error' : 'warning'],
 				['RetainedFragment.tsx', includeClass ? 'error' : 'warning'],

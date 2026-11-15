@@ -7712,27 +7712,43 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	/** A direct module component, without going through an arbitrary wrapper or callback. */
 	private moduleComponent(node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction) {
 		const parent = node.parent;
-		if (parent === this.sf && ts.isFunctionDeclaration(node)) {
+		if (ts.isExportAssignment(parent)) return !parent.isExportEquals && parent.parent === this.sf;
+		let statement: ts.FunctionDeclaration | ts.VariableStatement;
+		let name: ts.Identifier | undefined;
+		if (ts.isFunctionDeclaration(node)) {
+			statement = node;
+			name = node.name;
+		} else {
 			if (
-				!node.name ||
-				node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
+				!ts.isVariableDeclaration(parent) ||
+				parent.initializer !== node ||
+				!ts.isIdentifier(parent.name) ||
+				!isComponentName(parent.name.text) ||
+				(ts.getCombinedNodeFlags(parent) & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
+				!ts.isVariableStatement(parent.parent.parent)
 			)
-				return true;
-			const refs = renderUses(this.localUses(node.name));
-			return (
-				refs.some((ref) => ts.isExportSpecifier(ref.parent) || ts.isExportAssignment(ref.parent)) ||
-				(refs.length > 0 && refs.every(componentTagOrExport))
-			);
+				return false;
+			statement = parent.parent.parent;
+			name = parent.name;
 		}
+		if (statement.parent !== this.sf) return false;
+		if (statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword))
+			return true;
+		if (!name) return false;
+		const refs = renderUses(this.localUses(name));
 		return (
-			(ts.isExportAssignment(parent) && !parent.isExportEquals && parent.parent === this.sf) ||
-			(ts.isVariableDeclaration(parent) &&
-				parent.initializer === node &&
-				ts.isIdentifier(parent.name) &&
-				isComponentName(parent.name.text) &&
-				(ts.getCombinedNodeFlags(parent) & ts.NodeFlags.BlockScoped) === ts.NodeFlags.Const &&
-				parent.parent.parent.parent === this.sf &&
-				this.localUses(parent.name).every(componentTagOrExport))
+			refs.some((ref) =>
+				ts.isExportSpecifier(ref.parent)
+					? !ref.parent.parent.parent.moduleSpecifier
+					: ts.isExportAssignment(ref.parent) && !ref.parent.isExportEquals,
+			) ||
+			(refs.length > 0 &&
+				refs.every(
+					(ref) =>
+						!ts.isExportAssignment(ref.parent) &&
+						!ts.isExportSpecifier(ref.parent) &&
+						componentTagOrExport(ref),
+				))
 		);
 	}
 
