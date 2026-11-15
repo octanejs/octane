@@ -535,36 +535,56 @@ export type Qualified = typeof R.createRef;`,
 		expect(code).toContain(`export type Qualified = typeof ${imported?.[1] ?? 'createRef'};`);
 	});
 
-	it('migrates React Touch annotations without changing the touch point type', () => {
-		const { code, notes } = transformModule(
-			`import { type Touch as Point, useRef } from 'react';
-			import type * as R from 'react';
-			export type { Touch as PublicPoint } from 'react';
-			export type Saved = [R.Touch, import('react').Touch];
-			export function Pad() {
-				const start = useRef<Point | null>(null);
-				return <div onTouchStart={event => { start.current = event.touches[0] ?? null; }} />;
-			}`,
-			'pad.tsx',
-		);
-		expect(notes).toEqual([]);
-		expect(code).toContain(
-			"import { type Touch as Point, useRef, type Touch as OctaneTouch } from 'octane';",
-		);
-		expect(code).toContain("export type { Touch as PublicPoint } from 'octane';");
-		expect(code).toContain("Saved = [OctaneTouch, import('octane').Touch]");
-	});
+	it.each(['type ', ''])(
+		'migrates React Touch annotations without changing the touch point type (%j)',
+		(type) => {
+			const { code, notes } = transformModule(
+				`import { ${type}Touch as Point, useRef } from 'react';
+				import type * as R from 'react';
+				export type { Touch as PublicPoint } from 'react';
+				export type Saved = [R.Touch, import('react').Touch];
+				export function Pad() {
+					const start = useRef<Point | null>(null);
+					return <div onTouchStart={event => { start.current = event.touches[0] ?? null; }} />;
+				}`,
+				'pad.tsx',
+			);
+			expect(notes).toEqual([]);
+			expect(code).toContain(
+				"import { type Touch as Point, useRef, type Touch as OctaneTouch } from 'octane';",
+			);
+			expect(code).toContain("export type { Touch as PublicPoint } from 'octane';");
+			expect(code).toContain("Saved = [OctaneTouch, import('octane').Touch]");
+		},
+	);
 
 	it.each([
 		"import { Touch } from 'react'; export const View = Touch;",
 		"import * as R from 'react'; export const View = R.Touch;",
-	])('does not migrate the Touch type as a value', (source) => {
-		const { code, notes } = transformModule(source, 'touch.js');
-		expect(code).not.toContain("import { Touch } from 'octane'");
+		"import { Touch as Point } from 'react'; export type View = typeof Point;",
+		"import { Touch as Point } from 'react'; export const View = { Point };",
+		"import { Touch as Point } from 'react'; export { Point as View };",
+		"import { Touch as Point } from 'react'; export type View = Point.X;",
+	])('reports Touch when used as a value or namespace', (source) => {
+		const { code, notes } = transformModule(source, 'touch.ts');
+		expect(code).not.toMatch(/import (?:type )?\{ Touch(?: as Point)? \} from 'octane'/);
 		expect(notes).toContainEqual(
 			expect.objectContaining({ rule: 'unsupported-api', severity: 'error' }),
 		);
 	});
+
+	it.each(['export type { Point as PublicPoint };', 'export { type Point };'])(
+		'preserves a React Touch import referenced only by a local type export',
+		(statement) => {
+			const { code, notes } = transformModule(
+				`import { Touch as Point } from 'react'; ${statement}`,
+				'points.ts',
+			);
+			expect(notes).toEqual([]);
+			expect(code).toContain("import type { Touch as Point } from 'octane';");
+			expect(code).toContain(statement);
+		},
+	);
 
 	it('keeps Touch references outside the React type export unmapped', () => {
 		const { notes } = transformModule(

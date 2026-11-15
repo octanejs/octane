@@ -4293,9 +4293,20 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			if (!bindings || !ts.isNamedImports(bindings)) continue;
 			for (const element of bindings.elements) {
 				const local = element.name.text;
-				if (!this.used.has(local)) continue;
 				const imported = (element.propertyName ?? element.name).text;
-				const typeOnly = clause.isTypeOnly || element.isTypeOnly;
+				let typeOnly = clause.isTypeOnly || element.isTypeOnly;
+				let typeReferences = false;
+				if (module === 'react' && imported === 'Touch' && !node.attributes && this.isTypeScript()) {
+					// A type query still needs a value export, which Touch does not have.
+					const references = this.localUses(element.name);
+					typeReferences =
+						references.length > 0 &&
+						references.every(
+							(ref) => ts.isPartOfTypeNode(ref) || ts.isTypeOnlyExportDeclaration(ref.parent),
+						);
+					typeOnly ||= typeReferences;
+				}
+				if (!this.used.has(local) && !typeReferences) continue;
 				if (imported === 'createElement' && this.retainedReactFactoryImport(element)) {
 					add(module, imported, local, false);
 					retainsCreateElement ||= local === 'createElement';
