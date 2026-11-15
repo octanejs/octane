@@ -242,7 +242,7 @@ export function renderRequest(
 
 The HTTP handler owns the scope. For a scope dedicated to one response, dispose it when the response finishes, and abort the React stream and dispose the scope if the client disconnects first. A recoverable React render error can leave other work pending.
 
-The carrier applies to Node server rendering. Browser hydration uses its own document owner. The React-hosted client wrappers currently have no props for choosing a custom owner or passing `initialDocumentSignals`.
+The carrier applies to Node server rendering. To [borrow an owner in the browser](https://octanejs.dev/docs/react-compat#borrow-a-client-signal-owner), pass `clientSignalOwner` from the browser entry with the same scope key as the request owner. The existing island sidecars supply historical reads during hydration. After hydration, the islands read live values from the browser owner.
 
 ## Server rendering and hydration
 
