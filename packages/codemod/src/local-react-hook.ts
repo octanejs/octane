@@ -128,7 +128,7 @@ function conditionalOutput(value: ts.Expression) {
 
 /** A direct initialization in an ordinary component with native output. */
 export function nativeSetupHook(
-	ref: ts.Identifier,
+	ref: ts.Expression,
 	uses: ReturnType<typeof localUses>,
 	checker: ts.TypeChecker,
 	diagnostic?: {
