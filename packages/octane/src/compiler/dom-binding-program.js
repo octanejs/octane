@@ -311,8 +311,13 @@ export function planBindingProgram(fn, render, context) {
 		return next;
 	};
 	const annotated = annotate(render);
+	const fragment = imports.get('Fragment');
+	const bindingFragment = {
+		lexical,
+		imported: fragment?.source === 'octane' && fragment.imported === 'Fragment',
+	};
 	const normalize = (nodes, namespace) =>
-		helpers.normalizeChildren(nodes, namespace === 1, null, false, false);
+		helpers.normalizeChildren(nodes, namespace === 1, null, false, false, bindingFragment);
 	const environment = (names, exclude = []) =>
 		b.array_pattern(
 			names.map((name, index) =>
@@ -614,6 +619,12 @@ export function planBindingProgram(fn, render, context) {
 			if (node.type !== 'Element') fail(node, `unsupported binding program construct ${node.type}`);
 			const tag = tagOf(node);
 			if (!/^[a-z]/.test(tag ?? '')) {
+				if (tag === 'Fragment') {
+					const scope = lexical.nodeScopes.get(node.id) ?? lexical.rootScope;
+					const binding = lexical.resolveBinding(scope, tag);
+					if (binding && binding.scope !== lexical.rootScope)
+						fail(node, 'binding child components must be module-level binding views');
+				}
 				const site = node._octaneBindingSite?.site;
 				if (site === undefined) fail(node, 'binding child component is missing its authored site');
 				const index = nodes.length;

@@ -1965,6 +1965,7 @@ function addUserImportSpecifiers(ctx, node) {
 function collectOctaneImportBindings(astBody) {
 	const locals = new Map();
 	const namespaces = new Set();
+	let fragmentImportSources = null;
 	// Local names bound by VALUE imports from any module OTHER than 'octane'. A
 	// library may export a hook whose name collides with a base hook (`useId`
 	// from a React-parity binding) — such a call site is that library's CUSTOM
@@ -1985,12 +1986,19 @@ function collectOctaneImportBindings(astBody) {
 		for (const sp of node.specifiers || []) {
 			if (sp.type === 'ImportSpecifier' && sp.local?.name && sp.imported?.name) {
 				locals.set(sp.local.name, sp.imported.name);
+				if (
+					sp.imported.name === 'Fragment' &&
+					sp.importKind !== 'type' &&
+					node.importKind !== 'type'
+				)
+					(fragmentImportSources ??= new Set()).add(node.source);
 			} else if (sp.type === 'ImportNamespaceSpecifier' && sp.local?.name) {
 				namespaces.add(sp.local.name);
+				if (node.importKind !== 'type') (fragmentImportSources ??= new Set()).add(node.source);
 			}
 		}
 	}
-	return { locals, namespaces, foreignLocals };
+	return { locals, namespaces, foreignLocals, fragmentImportSources };
 }
 
 export function collectNestedBindingNames(root) {
@@ -9771,7 +9779,9 @@ function singleRootComponentArmName(node, locals, ctx) {
  * consulted).
  */
 function collectSingleRootIfDeps(render, locals, ctx) {
-	const roots = normalizeChildren(render ? [render] : []).filter((n) => n.type !== 'HeadHoist');
+	const roots = normalizeChildrenForShape(render ? [render] : [], ctx).filter(
+		(n) => n.type !== 'HeadHoist',
+	);
 	if (roots.length !== 1 || (!isIfDirective(roots[0]) && !isSwitchDirective(roots[0]))) {
 		return null;
 	}
@@ -13094,6 +13104,7 @@ function compileInternal(
 		const imports = collectOctaneImportBindings(ast.body);
 		ctx.octaneImportLocals = imports.locals;
 		ctx.octaneImportNamespaces = imports.namespaces;
+		ctx.fragmentImportSources = imports.fragmentImportSources;
 		ctx.foreignImportLocals = imports.foreignLocals;
 		ctx.provenContextBindings = collectProvenContextBindings(ast);
 		ctx.activityModuleAst = ast;
@@ -13701,8 +13712,9 @@ function compileInternal(
 		// declined borrow would probe for a child pair the server never emitted.
 		// Reject lite for such callees.
 		if (eligible && compNode.body && compNode.body.type === 'JSXCodeBlock') {
-			const bodyNodes = normalizeChildren(
+			const bodyNodes = normalizeChildrenForShape(
 				compNode.body.render ? [compNode.body.render] : [],
+				ctx,
 			).filter((n) => n.type !== 'HeadHoist');
 			if (inheritSoleCompRoot(bodyNodes, ctx)) eligible = false;
 		}
@@ -14709,6 +14721,7 @@ function compileServer(
 		const imports = collectOctaneImportBindings(ast.body);
 		ctx.octaneImportLocals = imports.locals;
 		ctx.octaneImportNamespaces = imports.namespaces;
+		ctx.fragmentImportSources = imports.fragmentImportSources;
 		ctx.foreignImportLocals = imports.foreignLocals;
 		ctx.provenContextBindings = collectProvenContextBindings(ast);
 		ctx.activityModuleAst = ast;
@@ -28166,6 +28179,12 @@ function isDescriptorBuiltElement(node, inSvg, ctx) {
 	return hasJsxAttribute(node, 'key') || (!inSvg && requiresImperativeHostTree(node, ctx));
 }
 
+// Output-shape analysis needs the emitting Fragment binding proof, while other
+// lowerings (map, Activity, and imperative hosts) remain disabled.
+function normalizeChildrenForShape(nodes, ctx, inSvg = false) {
+	return normalizeChildren(nodes, inSvg, null, false, true, null, ctx);
+}
+
 /**
  * Normalize a list of JSX child nodes into the shapes the emitters consume:
  *   - Indentation-only JSXText / JSX comments (`{…}` empty containers) → dropped
@@ -28195,6 +28214,8 @@ function normalizeChildren(
 	ctx = null,
 	inNoscript = false,
 	allowImperative = true,
+	bindingFragment = null,
+	fragmentCtx = ctx,
 ) {
 	const out = [];
 	if (!nodes) return out;
@@ -28268,7 +28289,10 @@ function normalizeChildren(
 			// has no notion of marker pairs. A keyed Fragment is a reconciliation
 			// boundary instead, so it takes the descriptor branch below; the
 			// lexical-nesting walk (no imperative lowering) still sees through it.
-			if (isFragmentLongForm(n, ctx) && !(allowImperative && hasJsxAttribute(n, 'key'))) {
+			if (
+				isFragmentLongForm(n, fragmentCtx, bindingFragment) &&
+				!(allowImperative && hasJsxAttribute(n, 'key'))
+			) {
 				const attributes = n.openingElement.attributes || [];
 				const refAttr = attributes.find(
 					(a) =>
@@ -28287,11 +28311,19 @@ function normalizeChildren(
 							refVal && refVal.type === 'JSXExpressionContainer' ? refVal.expression : refVal;
 					}
 					out.push({ type: 'FragmentStart', refExpr });
-					out.push(...normalizeChildren(n.children || [], inSvg, ctx, inNoscript));
-					out.push({ type: 'FragmentEnd' });
-				} else {
-					out.push(...normalizeChildren(n.children || [], inSvg, ctx, inNoscript));
 				}
+				out.push(
+					...normalizeChildren(
+						n.children || [],
+						inSvg,
+						ctx,
+						inNoscript,
+						true,
+						bindingFragment,
+						fragmentCtx,
+					),
+				);
+				if (refAttr || hasSpread) out.push({ type: 'FragmentEnd' });
 				continue;
 			}
 			// The mode-only builtin keeps its direct boundary lowering. Richer
@@ -28388,7 +28420,17 @@ function normalizeChildren(
 			}
 			out.push(element);
 		} else if (n.type === 'Tsx' || n.type === 'Tsrx' || n.type === 'JSXFragment') {
-			out.push(...normalizeChildren(n.children || [], inSvg, ctx, inNoscript));
+			out.push(
+				...normalizeChildren(
+					n.children || [],
+					inSvg,
+					ctx,
+					inNoscript,
+					true,
+					bindingFragment,
+					fragmentCtx,
+				),
+			);
 		} else if (n.type === 'JSXStyleElement') {
 			if (hasJsxAttribute(n, 'dangerouslySetInnerHTML') || hasJsxAttribute(n, 'children')) {
 				out.push(
@@ -28398,6 +28440,8 @@ function normalizeChildren(
 						ctx,
 						inNoscript,
 						allowImperative,
+						bindingFragment,
+						fragmentCtx,
 					),
 				);
 				continue;
@@ -28418,7 +28462,17 @@ function normalizeChildren(
 			// still template output, not setup JavaScript. Unwrap it before lowering
 			// so both client and server compilation route it through their construct
 			// emitters rather than asking esrap to print a TSRX-only expression.
-			out.push(...normalizeChildren([n.expression], inSvg, ctx, inNoscript));
+			out.push(
+				...normalizeChildren(
+					[n.expression],
+					inSvg,
+					ctx,
+					inNoscript,
+					true,
+					bindingFragment,
+					fragmentCtx,
+				),
+			);
 		} else if (n.type === 'JSXIfExpression') {
 			// `@if (cond) { ... } @else { ... }` — lower to the old IfStatement
 			// shape so the existing makeIfCall path picks it up. `consequent` and
@@ -28485,7 +28539,17 @@ function normalizeChildren(
 			if (body.length === 0 && render === null) continue;
 			if (body.length === 0 && render !== null) {
 				// Recurse — render is a single JSX node, treat as a sibling child.
-				out.push(...normalizeChildren([render], inSvg, ctx, inNoscript));
+				out.push(
+					...normalizeChildren(
+						[render],
+						inSvg,
+						ctx,
+						inNoscript,
+						true,
+						bindingFragment,
+						fragmentCtx,
+					),
+				);
 			} else {
 				out.push(
 					inheritOriginLoc(
@@ -34655,7 +34719,8 @@ function emitElementHtml(
 	let directChildrenClientBinding = null;
 	let hostCommitClientBinding = null;
 	const hasNestedJsxChildren =
-		hasAuthoredStaticScriptBody || normalizeChildren(sourceChildren, childNs === 'svg').length > 0;
+		hasAuthoredStaticScriptBody ||
+		normalizeChildrenForShape(sourceChildren, ctx, childNs === 'svg').length > 0;
 	// Strict whole-element proofs for the two lean controlled-form helpers. A
 	// spread or duplicate/conflicting writer makes source-order ownership
 	// ambiguous, so those elements keep the generic helpers. Select is excluded:
@@ -34962,7 +35027,7 @@ function emitElementHtml(
 					? b.literal(true, 'true', attr)
 					: tsrxExprNode(obj, ctx, componentName, inlinedSubs);
 			const noChildren =
-				sourceChildren.length === 0 || normalizeChildren(sourceChildren).length === 0;
+				sourceChildren.length === 0 || normalizeChildrenForShape(sourceChildren, ctx).length === 0;
 			if (noChildren && !isAfterSpread) {
 				bindings.push({
 					id: bindings.length,
@@ -36669,6 +36734,10 @@ function isActivityName(value) {
 function activityReferenceBinding(name, node, ctx) {
 	if (!ctx?.activityModuleAst) return undefined;
 	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	return templateReferenceBinding(name, node, lexical);
+}
+
+function templateReferenceBinding(name, node, lexical) {
 	const scope =
 		lexical.nodeScopes.get(name) ??
 		lexical.nodeScopes.get(node.openingElement) ??
@@ -36770,17 +36839,34 @@ function isCheckedCompiledBoundary(node, ctx) {
 // named-import alias, or the Fragment member of an Octane namespace import.
 // Resolve aliases against their import bindings so a foreign or locally
 // shadowed component retains its ordinary component semantics.
-function isFragmentLongForm(node, ctx = null) {
+function resolvesModuleFragmentImport(name, node, ctx) {
+	const binding = activityReferenceBinding(name, node, ctx);
+	// TypeScript output retains erased imports in the import-name table.
+	return (
+		binding == null ||
+		(binding.scope === ctx.activityLexical.rootScope &&
+			ctx.fragmentImportSources?.has(binding.importSource) === true)
+	);
+}
+
+function isFragmentLongForm(node, ctx = null, bindingFragment = null) {
 	const name = node.openingElement?.name || node.id;
 	if (!name) return false;
 	if (name.type === 'Identifier' || name.type === 'JSXIdentifier') {
 		const local = name.name;
 		if (ctx?.currentComponentLocals?.has(local)) return false;
 		const imported = ctx?.octaneImportLocals?.get(local);
-		if (imported !== undefined) return imported === 'Fragment';
+		if (imported !== undefined)
+			return imported === 'Fragment' && resolvesModuleFragmentImport(name, node, ctx);
 		if (ctx?.foreignImportLocals?.has(local)) return false;
-		if (ctx?.componentInfo?.has(local)) return false;
-		return local === 'Fragment';
+		if (local !== 'Fragment' || ctx?.componentInfo?.has(local)) return false;
+		const binding = bindingFragment
+			? templateReferenceBinding(name, node, bindingFragment.lexical)
+			: activityReferenceBinding(name, node, ctx);
+		const lexical = bindingFragment?.lexical ?? ctx?.activityLexical;
+		if (bindingFragment?.imported && binding?.scope === lexical.rootScope) return true;
+		if (binding !== undefined) return binding === null;
+		return !lexical?.isBound(lexical.rootScope, local);
 	}
 	if (name.type !== 'MemberExpression' && name.type !== 'JSXMemberExpression') return false;
 	const object = name.object;
@@ -36791,7 +36877,8 @@ function isFragmentLongForm(node, ctx = null) {
 		(property?.type === 'Identifier' || property?.type === 'JSXIdentifier') &&
 		property.name === 'Fragment' &&
 		ctx?.octaneImportNamespaces?.has(object.name) === true &&
-		!ctx.currentComponentLocals?.has(object.name)
+		!ctx.currentComponentLocals?.has(object.name) &&
+		resolvesModuleFragmentImport(object, node, ctx)
 	);
 }
 
