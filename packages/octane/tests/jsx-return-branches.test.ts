@@ -9,6 +9,7 @@ import {
 	Logged,
 	MemoHost,
 	Outlet,
+	ShadowedUndefined,
 	Panel,
 	Split,
 	StampList,
@@ -147,6 +148,31 @@ describe('conditional JSX returns', () => {
 		m.update(IconHost as any, { kind: 'pill' });
 		expect(m.find('.icon.pill').textContent).toBe('o');
 		m.unmount();
+	});
+
+	it('renders an early return through the authored binding of undefined', () => {
+		const initial = { stop: true };
+		const next = { stop: false };
+		const mounted = mount(ShadowedUndefined as any, initial);
+		expect(mounted.container.textContent).toBe('fallback');
+		mounted.update(ShadowedUndefined as any, next);
+		expect(mounted.container.textContent).toBe('ready');
+		mounted.update(ShadowedUndefined as any, initial);
+		expect(mounted.container.textContent).toBe('fallback');
+		mounted.unmount();
+
+		const container = document.createElement('div');
+		container.innerHTML = ServerRT.renderToString(server.ShadowedUndefined, initial).html;
+		const textNode = Array.from(container.childNodes).find((node) => node.nodeType === 3);
+		expect(textNode?.textContent).toBe('fallback');
+		const errors: unknown[] = [];
+		const root = hydrateRoot(container, ShadowedUndefined as any, initial, {
+			onRecoverableError: (error) => errors.push(error),
+		});
+		flushSync(() => {});
+		expect(Array.from(container.childNodes)).toContain(textNode);
+		expect(errors).toEqual([]);
+		root.unmount();
 	});
 
 	it('SSR output for every branch shape adopts cleanly under hydration', () => {

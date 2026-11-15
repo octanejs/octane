@@ -153,6 +153,25 @@ export default memo(Local);`,
 		}
 	});
 
+	it('agrees on the void contract for bound and unbound undefined returns', () => {
+		const id = '/project/src/Exit.tsrx';
+		for (const [source, expected] of [
+			['export function App({ cut }) { if (cut) return undefined; return <i />; }', ['App']],
+			[
+				"export function App({ cut }) { const undefined = 'local'; if (cut) return undefined; return <i />; }",
+				[],
+			],
+			[
+				"const undefined = 'module'; export function App({ cut }) { if (cut) return undefined; return <i />; }",
+				[],
+			],
+			["export function App({ cut, undefined = 'param' }) { return cut ? undefined : <i />; }", []],
+		] as const) {
+			expect(findVoidComponentExports(source, id), source).toEqual(expected);
+			expect(finalVoidExports(compileClient(source, id).code, id), source).toEqual(expected);
+		}
+	});
+
 	it('follows transpiled output and rejects any export that can return a value', () => {
 		const runtime = `import { __s, markWarm, memo } from 'octane';
 import { bindPresentationView, delegateEvents } from 'octane/internal/client';\n`;
