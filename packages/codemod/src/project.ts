@@ -45,6 +45,7 @@ import {
 	directReactExports,
 	migratedJsxFactories,
 	octaneRootComponents,
+	reactClassExports,
 	reactServerComponents,
 	retainedReactComponentReturns,
 	reverseIslandExports,
@@ -639,6 +640,27 @@ export async function runCodemod(
 	}
 	const { inputFactory, changedJsxExport, helperFunction, localFile, exportsConstObject } =
 		storeSources(root, config, unchangedStoreInput, (file) => renames.has(file));
+	const noClasses = new Set<string>();
+	const localClasses = new Map<string, ReadonlySet<string>>();
+	function localReactClass(from: string, module: string, name: string) {
+		if (/[!%?#\\]/.test(module)) return;
+		const file = localFile(from, module, true);
+		if (!file || !file.endsWith('.tsx') || conflicts.has(file)) return;
+		let classes = localClasses.get(file);
+		if (classes === undefined) {
+			const source = fs.readFileSync(file, 'utf8');
+			classes =
+				/\bclass\b/.test(source) && installedReact(file)
+					? reactClassExports(file, source)
+					: noClasses;
+			localClasses.set(file, classes);
+		}
+		if (
+			classes.has(name) &&
+			ts.findConfigFile(path.dirname(from), ts.sys.fileExists) === rootProject
+		)
+			return renamed(from, module)?.file === file ? 'error' : 'warning';
+	}
 	const localHints = new Map<string, Map<string, string>>();
 	function initializerResourceHint(from: string, module: string, name: string) {
 		const file = localFile(from, module);
@@ -1191,6 +1213,9 @@ export async function runCodemod(
 					: undefined,
 				localReactHook: renames.has(file)
 					? (module, name, nativeOnly) => localReactHook(file, module, name, nativeOnly)
+					: undefined,
+				localReactClass: renames.has(file)
+					? (module, name) => localReactClass(file, module, name)
 					: undefined,
 				localReactRootComponent: renames.has(file)
 					? (module, name) => {
