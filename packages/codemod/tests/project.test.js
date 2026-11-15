@@ -108,15 +108,19 @@ describe('runCodemod', () => {
 		['Context.tsx', 'StateContext'],
 		['Context.ts', 'StateContext.Provider'],
 		['Context.tsx', 'StateContext.Provider'],
+		['Context.tsx', 'stateContext.Provider'],
 	])('reports a retained React provider from %s rendered as %s', async (producer, tag) => {
+		const local = tag.split('.')[0];
+		const binding = local === 'StateContext' ? local : `StateContext as ${local}`;
 		const root = fs.realpathSync(
 			project({
 				'tsconfig.json': JSON.stringify({
 					compilerOptions: { jsx: 'react-jsx', moduleResolution: 'bundler' },
 				}),
 				[producer]: `import { createContext } from 'react'; export const StateContext = createContext('initial');`,
-				'View.tsx': `import { StateContext } from './${producer}'; export function View() { return <${tag} value="next"><b>ready</b></${tag}>; }`,
-				'Shadow.tsx': `import { StateContext } from './${producer}'; export function Shadow(StateContext) { return <StateContext.Provider value="next"><b>ready</b></StateContext.Provider>; }`,
+				'View.tsx': `import { ${binding} } from './${producer}'; export function View() { return <${tag} value="next"><b>ready</b></${tag}>; }`,
+				'Shadow.tsx': `import { ${binding} } from './${producer}'; export function Shadow(${local}) { return <${local}.Provider value="next"><b>ready</b></${local}.Provider>; }`,
+				'Intrinsic.tsx': `import { StateContext as stateContext } from './${producer}'; export function View() { return <stateContext data-ready="yes" />; }`,
 			}),
 		);
 		fs.symlinkSync(
@@ -125,7 +129,7 @@ describe('runCodemod', () => {
 			'dir',
 		);
 		const report = await runCodemod(
-			['View.tsx', 'Shadow.tsx'].map((file) => path.join(root, file)),
+			['View.tsx', 'Shadow.tsx', 'Intrinsic.tsx'].map((file) => path.join(root, file)),
 			{
 				root,
 				strong: true,
@@ -141,6 +145,8 @@ describe('runCodemod', () => {
 			expect.objectContaining({ rule: 'retained-react-context', severity: 'warning' }),
 		);
 		expect(shadow?.notes.some((note) => note.rule === 'retained-react-context')).toBe(false);
+		const intrinsic = report.files.find((file) => file.file === 'Intrinsic.tsx');
+		expect(intrinsic?.notes.some((note) => note.rule === 'retained-react-context')).toBe(false);
 	});
 
 	it('reports retained React factories read from closed namespace and default imports', async () => {

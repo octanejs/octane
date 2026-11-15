@@ -8078,8 +8078,8 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		);
 	}
 
-	private directImportedComponent(tag: ts.Node) {
-		if (!ts.isIdentifier(tag) || !isComponentName(tag.text)) return;
+	private directImportedValue(tag: ts.Node) {
+		if (!ts.isIdentifier(tag)) return;
 		const entry = this.importOf(tag);
 		if (!entry || entry.namespace || entry.typeOnly) return;
 		const declaration = ts.findAncestor(this.declarationOf(tag)!, ts.isImportDeclaration);
@@ -8103,7 +8103,8 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			return;
 		const tag = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
 		const provider = ts.isPropertyAccessExpression(tag) && tag.name.text === 'Provider';
-		const binding = this.directImportedComponent(provider ? tag.expression : tag);
+		if (!provider && (!ts.isIdentifier(tag) || !isComponentName(tag.text))) return;
+		const binding = this.directImportedValue(provider ? tag.expression : tag);
 		if (!binding) return;
 		const { tag: context, entry } = binding;
 		if (
@@ -8126,7 +8127,8 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		const check = this.options.localReactClass;
 		if (!check) return;
 		const tagName = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
-		const binding = this.directImportedComponent(tagName);
+		if (!ts.isIdentifier(tagName) || !isComponentName(tagName.text)) return;
+		const binding = this.directImportedValue(tagName);
 		if (!binding) return;
 		const { tag, entry } = binding;
 		const proof = check(entry.module, entry.imported);
