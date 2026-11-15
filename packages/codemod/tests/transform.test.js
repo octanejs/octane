@@ -412,7 +412,7 @@ root.render(<App />);`;
 			'root.render(App, { size: 2, on: true });',
 		);
 		expect(render('root.render(createElement(App, { depth: 10 }))')).toBe(
-			'root.render(App, { depth: 10 });',
+			'root.render(createElement(App, { depth: 10 }));',
 		);
 		expect(render('createRoot(document.body).render(createElement(App))')).toBe(
 			'createRoot(document.body).render(App);',
@@ -465,6 +465,35 @@ export function render(undefined: { depth?: number }) {
 		expect(code).toContain('hydrateRoot(document.body, h(App, (undefined)));');
 		expect(code).toContain('return renderToString((h(App, undefined))).html;');
 		expect(rules['root-render']).toBeUndefined();
+	});
+
+	it('keeps factory config handling when migrating React renderer roots', () => {
+		const source = `import { createElement as h } from 'react';
+import { createRoot, hydrateRoot } from 'react-dom/client';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { App } from './App';
+
+export function mount(host, key, label) {
+	const root = createRoot(host);
+	root.render(h(App, { key, label }));
+	root.render(h(App));
+	return root;
+}
+export function hydrate(host, config) {
+	return hydrateRoot(host, h(App, config));
+}
+export function serialize(config) {
+	return renderToStaticMarkup(h(App, config));
+}
+export function shadow(h) {
+	return renderToStaticMarkup(h(App, { key: 1 }));
+}`;
+		const { code } = transformModule(source, 'main.tsx');
+		expect(code).toContain('root.render(h(App, { key, label }))');
+		expect(code).toContain('root.render(App)');
+		expect(code).toContain('hydrateRoot(host, h(App, config))');
+		expect(code).toContain('renderToStaticMarkup(h(App, config)).html');
+		expect(code).toContain('renderToStaticMarkup(h(App, { key: 1 })).html');
 	});
 
 	it('lowers `&&` to `@if` through a `const` that holds a comparison', () => {
