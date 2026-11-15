@@ -1259,7 +1259,7 @@ export async function runCodemod(
 					),
 				resolveStoreHook,
 				retainedRegistry:
-					files.length === 1 && file.endsWith('.ts') && esmContextProject
+					files.length === 1 && /\.tsx?$/.test(file) && esmContextProject
 						? (specifier) => {
 								if (!specifier.startsWith('./') && !specifier.startsWith('../')) return;
 								const registry = localFile(file, specifier, true);
