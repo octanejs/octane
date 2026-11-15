@@ -99,6 +99,111 @@ it('accepts an own data dependency over closed state updates', () => {
 	expect(result.notes).not.toContainEqual(dependencyError);
 });
 
+it('accepts unary reads from a closed state record when coercion cannot call user code', () => {
+	for (const dependency of [
+		'typeof retry.failed',
+		'void (retry.failed)',
+		'+retry.attempt',
+		'-retry.attempt',
+		'~retry.attempt',
+	]) {
+		const source = ownedState.replace('retry.failed, onFailure', dependency + ', onFailure');
+		expect(migrate(source).notes, dependency).not.toContainEqual(dependencyError);
+	}
+	const number = ownedState.replace('retry.failed, onFailure', '+retry.attempt, onFailure');
+	const coercion = '{ valueOf() { return readNumber(); } }';
+	for (const source of [
+		number.replace('attempt: 0', 'attempt: ' + coercion),
+		number.replace('attempt: 1', 'attempt: ' + coercion),
+		number.replace('...previous, failed: true', '...previous, attempt: ' + coercion),
+	]) {
+		expect(migrate(source).notes).toContainEqual(dependencyError);
+	}
+	const signed = number
+		.replace('attempt: 0', 'attempt: -1')
+		.replace('attempt: 1', 'attempt: +2')
+		.replace('...previous, failed: true', '...previous, attempt: -(3 as number), failed: true');
+	expect(migrate(signed).notes).not.toContainEqual(dependencyError);
+}, 20_000);
+
+it('checks every closed state field used in a conditional or short-circuit dependency', () => {
+	const input = (dependency) =>
+		ownedState.replace('retry.failed, onFailure', dependency + ', onFailure');
+	const coercion = '{ valueOf() { return readNumber(); } }';
+	for (const dependency of [
+		'+(retry.failed ? retry.attempt : 0)',
+		'-(retry.attempt || 0)',
+		'~(retry.attempt ?? 0)',
+		'+(retry.failed && retry.attempt)',
+	]) {
+		expect(migrate(input(dependency)).notes, dependency).not.toContainEqual(dependencyError);
+	}
+	const attemptAsObject = (source) => source.replace('attempt: 0', 'attempt: ' + coercion);
+	expect(migrate(attemptAsObject(input('+(retry.attempt && 0)'))).notes).not.toContainEqual(
+		dependencyError,
+	);
+	for (const source of [
+		attemptAsObject(input('+(+retry.attempt && 0)')),
+		attemptAsObject(input('+(retry.attempt && 0), +(retry.attempt || 0)')),
+		input('+(retry.failed ? retry.attempt : 0), +(retry.failed || 0)').replace(
+			'failed: false',
+			'failed: ' + coercion,
+		),
+		input('+(retry.failed ? retry.attempt : 0)').replace(
+			'...previous, failed: true',
+			'...previous, attempt: ' + coercion,
+		),
+	]) {
+		expect(migrate(source).notes).toContainEqual(dependencyError);
+	}
+}, 20_000);
+
+it('reports numeric coercion of own data from a local object when it can call user code', () => {
+	const input = (dependency) => `import { useEffect } from 'react';
+		export function Probe({ flag }) {
+			const probe = { value: { valueOf() { return readNumber(); } } };
+			useEffect(() => {}, [${dependency}]);
+			return <b>ok</b>;
+		}`;
+	for (const dependency of [
+		'+probe.value',
+		'~(flag ? probe.value : 0)',
+		'-(probe.value ?? 0)',
+		'+(probe.value || 0)',
+		'+(flag && probe.value)',
+		'+((+probe.value) && 1)',
+		'typeof +probe.value',
+	]) {
+		expect(migrate(input(dependency)).notes, dependency).toContainEqual(dependencyError);
+	}
+	for (const dependency of [
+		'typeof probe.value',
+		'+!probe.value',
+		'+(false && probe.value)',
+		'+(probe.value && 1)',
+	]) {
+		expect(migrate(input(dependency)).notes, dependency).not.toContainEqual(dependencyError);
+	}
+	const getter = input('+(probe.value && 1)').replace(
+		'value: { valueOf() { return readNumber(); } }',
+		'get value() { return readNumber(); }',
+	);
+	expect(migrate(getter).notes).toContainEqual(dependencyError);
+	const localNumber = input('+(flag ? probe.value : 0)').replace(
+		'{ valueOf() { return readNumber(); } }',
+		'1',
+	);
+	expect(migrate(localNumber).notes).not.toContainEqual(dependencyError);
+	expect(migrate(localNumber.replace('value: 1', 'value: -1')).notes).not.toContainEqual(
+		dependencyError,
+	);
+	expect(migrate(localNumber.replace('value: 1', 'value: +1n')).notes).toContainEqual(
+		dependencyError,
+	);
+	const duplicate = input("+probe['1']").replace('value: { valueOf()', '"1": 1, 0x1: { valueOf()');
+	expect(migrate(duplicate).notes).toContainEqual(dependencyError);
+}, 20_000);
+
 it.each([
 	['setter escape', 'leak(setRetry);'],
 	['state escape', 'leak(retry);'],
@@ -269,6 +374,45 @@ it('reports a getter in a conditional dependency that can register a React SSR s
 	}
 	const unreachable = input.replace('enabled ? probe.value : 0', 'true ? 0 : probe.value');
 	expect(migrate(unreachable).notes).not.toContainEqual(dependencyError);
+}, 20_000);
+
+it('reports getters evaluated by unary dependency expressions', () => {
+	function Reference({ probe }) {
+		useMemo(() => 1, [typeof probe.value]);
+		return createElement('b', null, 'ok');
+	}
+	const probe = {
+		get value() {
+			preinit('/unary.css', { as: 'style' });
+			return 1;
+		},
+	};
+	expect(renderToStaticMarkup(createElement(Reference, { probe }))).toContain(
+		'<link rel="stylesheet" href="/unary.css"',
+	);
+	const input = (dependency) => `import { useMemo } from 'react';
+		export function Probe({ probe }: { probe: { value: number } }) {
+			useMemo(() => 1, [${dependency}]);
+			return <b>ok</b>;
+		}`;
+	for (const strong of [false, true]) {
+		for (const dependency of [
+			'typeof probe.value',
+			'void probe.value',
+			'!probe.value',
+			'+probe.value',
+			'-probe.value',
+			'~probe.value',
+		]) {
+			expect(migrate(input(dependency), strong).notes, dependency).toContainEqual(dependencyError);
+		}
+	}
+	expect(migrate(input('!(false && probe.value)')).notes).not.toContainEqual(dependencyError);
+	const ownData = input('!probe.value').replace(
+		'({ probe }: { probe: { value: number } }) {',
+		'() { const probe = { value: 1 };',
+	);
+	expect(migrate(ownData).notes).not.toContainEqual(dependencyError);
 }, 20_000);
 
 it('reports a getter in a short-circuit dependency that can register a React SSR stylesheet', () => {
