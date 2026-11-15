@@ -1976,6 +1976,19 @@ export async function runCodemod(
 			let installedLazy: boolean | undefined;
 			for (const edge of edges) {
 				const factory = 'factory' in edge && edge.factory;
+				const inferredServerPath =
+					edge.renderer === 'server render' && !/\.[jt]sx$/.test(edge.module);
+				if (
+					inferredServerPath &&
+					(/\.(?:[cm]?[jt]sx?|tsrx)$/.test(edge.module) ||
+						(config?.moduleResolution !== undefined &&
+							config.moduleResolution !== ts.ModuleResolutionKind.Bundler) ||
+						!/^\.{1,2}\//.test(edge.module) ||
+						/[!%?#\\]/.test(edge.module) ||
+						config?.rootDirs ||
+						config?.moduleSuffixes?.some(Boolean))
+				)
+					continue;
 				const original = path.resolve(path.dirname(file), edge.module);
 				const direct = edge.renderer === 'createElement' ? null : renamed(file, edge.module);
 				const proven =
@@ -1990,14 +2003,7 @@ export async function runCodemod(
 				if (!match || (edge.renderer === 'createElement' && proven?.indirect)) continue;
 				const exportName = proven?.name ?? edge.name;
 				const extensionlessServer =
-					edge.renderer === 'server render' &&
-					path.posix.extname(edge.module) === '' &&
-					(config?.moduleResolution === undefined ||
-						config.moduleResolution === ts.ModuleResolutionKind.Bundler) &&
-					/^\.{1,2}\//.test(edge.module) &&
-					!/[!%?#\\]/.test(edge.module) &&
-					!config?.rootDirs &&
-					!config?.moduleSuffixes?.some(Boolean) &&
+					inferredServerPath &&
 					match.file.endsWith('.tsx') &&
 					unambiguousJsxPath(match.file, original) &&
 					isPlainFile(match.file);
