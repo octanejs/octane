@@ -7462,7 +7462,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			if (!expr) return false;
 			const read = skipWrappers(expr);
 			if (ts.isIdentifier(read)) return this.declarationOf(read) === ordinal;
-			if (ts.isTypeOfExpression(read) || ts.isVoidExpression(read))
+			if (ts.isTypeOfExpression(read) || ts.isVoidExpression(read) || ts.isDeleteExpression(read))
 				return readsOrdinal(read.expression);
 			if (ts.isPrefixUnaryExpression(read))
 				return (
