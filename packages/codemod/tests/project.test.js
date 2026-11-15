@@ -177,6 +177,47 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 			'NativeStrict.tsx':
 				"import { StrictMode as Strict } from 'octane';\n" +
 				entry('./Boundary').replace('<Frame><b>ready</b></Frame>', '<Strict><Frame /></Strict>'),
+			'NamedFragment.tsx':
+				"import { Fragment as Group } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Group key="stable"><Frame /></Group>',
+				),
+			'QualifiedFragment.tsx':
+				"import React from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<React.Fragment><Frame /></React.Fragment>',
+				),
+			'NativeFragment.tsx':
+				"import * as Native from 'octane';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Native.Fragment ref={null}><Frame /></Native.Fragment>',
+				),
+			'ShadowedNamedFragment.tsx':
+				"import { Fragment as Group } from 'react';\n" +
+				entry('./Boundary')
+					.replace('App()', 'App(Group: typeof Other)')
+					.replace('<Frame><b>ready</b></Frame>', '<Group><Frame /></Group>'),
+			'HostedNamedFragment.tsx':
+				"import { Fragment as Group } from 'react';\nimport { ReactCompat } from 'octane/react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<ReactCompat><Group><Frame /></Group></ReactCompat>',
+				),
+			'TypeOnlyFragmentNamespace.tsx':
+				"import type * as Native from 'octane';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Native.Fragment><Frame /></Native.Fragment>',
+				),
+			'DefaultOctaneFragmentNamespace.tsx':
+				"import Native from 'octane';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Native.Fragment><Frame /></Native.Fragment>',
+				),
 			'SuspenseChild.tsx':
 				"import { Suspense } from 'react';\n" +
 				entry('./Boundary').replace(
@@ -311,9 +352,12 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 				['KeyedStrict.tsx', includeClass ? 'error' : 'warning'],
 				['LogicalArm.tsx', includeClass ? 'error' : 'warning'],
 				['MetadataView.tsx', includeClass ? 'error' : 'warning'],
+				['NamedFragment.tsx', includeClass ? 'error' : 'warning'],
+				['NativeFragment.tsx', includeClass ? 'error' : 'warning'],
 				['NativeStrict.tsx', includeClass ? 'error' : 'warning'],
 				['NativeSuspenseFallback.tsx', includeClass ? 'error' : 'warning'],
 				['NestedRootStrict.tsx', includeClass ? 'error' : 'warning'],
+				['QualifiedFragment.tsx', includeClass ? 'error' : 'warning'],
 				['Relative.tsx', includeClass ? 'error' : 'warning'],
 				['Strict.tsx', includeClass ? 'error' : 'warning'],
 				['SuspenseChild.tsx', includeClass ? 'error' : 'warning'],

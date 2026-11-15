@@ -7628,10 +7628,23 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			)
 				return;
 			if (ts.isJsxSelfClosingElement(node)) return this.checkReactClassRoot(node, conditional);
-			const callee = this.callee(node.openingElement.tagName);
+			const tag = node.openingElement.tagName;
+			const callee = this.callee(tag);
 			if (callee?.module !== 'react' && callee?.module !== 'octane')
 				return this.checkReactClassRoot(node, conditional);
-			if (callee.name !== 'StrictMode') {
+			if (callee.name === 'Fragment') {
+				const member = ts.isPropertyAccessExpression(tag);
+				const reference = member ? tag.expression : tag;
+				const declaration = ts.isIdentifier(reference) && this.declarationOf(reference);
+				if (
+					!declaration ||
+					this.imports.get(declaration)?.typeOnly !== false ||
+					(member && callee.module === 'octane' && !ts.isNamespaceImport(declaration))
+				)
+					return this.checkReactClassRoot(node, conditional);
+				const imp = ts.findAncestor(declaration, ts.isImportDeclaration);
+				if (!imp || imp.attributes) return this.checkReactClassRoot(node, conditional);
+			} else if (callee.name !== 'StrictMode') {
 				const fallback = callee.name === 'Suspense' && this.suspenseFallback(node);
 				if (!fallback) return this.checkReactClassRoot(node, conditional);
 				if (ts.isJsxExpression(fallback) && fallback.expression) {
