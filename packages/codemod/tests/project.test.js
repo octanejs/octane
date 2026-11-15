@@ -104,6 +104,95 @@ describe('runCodemod', () => {
 		},
 	);
 
+	it.each([
+		['Context.tsx', 'StateContext'],
+		['Context.ts', 'StateContext.Provider'],
+		['Context.tsx', 'StateContext.Provider'],
+	])('reports a retained React provider from %s rendered as %s', async (producer, tag) => {
+		const root = fs.realpathSync(
+			project({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { jsx: 'react-jsx', moduleResolution: 'bundler' },
+				}),
+				[producer]: `import { createContext } from 'react'; export const StateContext = createContext('initial');`,
+				'View.tsx': `import { StateContext } from './${producer}'; export function View() { return <${tag} value="next"><b>ready</b></${tag}>; }`,
+				'Shadow.tsx': `import { StateContext } from './${producer}'; export function Shadow(StateContext) { return <StateContext.Provider value="next"><b>ready</b></StateContext.Provider>; }`,
+			}),
+		);
+		fs.symlinkSync(
+			path.resolve(import.meta.dirname, '../node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const report = await runCodemod(
+			['View.tsx', 'Shadow.tsx'].map((file) => path.join(root, file)),
+			{
+				root,
+				strong: true,
+				verify: true,
+				projectTypes: false,
+				write: false,
+			},
+		);
+		const view = report.files.find((file) => file.file === 'View.tsx');
+		const shadow = report.files.find((file) => file.file === 'Shadow.tsx');
+		expect(view?.strong).toBe(true);
+		expect(view?.notes).toContainEqual(
+			expect.objectContaining({ rule: 'retained-react-context', severity: 'warning' }),
+		);
+		expect(shadow?.notes.some((note) => note.rule === 'retained-react-context')).toBe(false);
+	});
+
+	it('reports retained React factories read from closed namespace and default imports', async () => {
+		const owners = {
+			Default: "import React from 'react'; export const State = React.createContext(null);",
+			Namespace: "import * as R from 'react'; export const State = R.createContext(null);",
+			Patched:
+				"import React from 'react'; React.createContext = () => function Replacement() { return null; }; export const State = React.createContext(null);",
+			Alternate:
+				"import * as R from 'react'; import { default as Other } from 'react'; Other.createContext = () => function Replacement() { return null; }; export const State = R.createContext(null);",
+			Combined:
+				"import Other, * as R from 'react'; Other.createContext = () => function Replacement() { return null; }; export const State = R.createContext(null);",
+			Escaped:
+				"import * as R from 'react'; Object.assign(R.default, { createContext: () => null }); export const State = R.createContext(null);",
+		};
+		const files = Object.entries(owners).flatMap(([name, source]) => [
+			[`owner${name}.ts`, source],
+			[
+				`${name}.tsx`,
+				`import { State } from './owner${name}.ts'; export function View() { return <State value={null}><b>ready</b></State>; }`,
+			],
+		]);
+		const root = fs.realpathSync(
+			project({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { jsx: 'react-jsx', moduleResolution: 'bundler' },
+				}),
+				...Object.fromEntries(files),
+			}),
+		);
+		fs.symlinkSync(
+			path.resolve(import.meta.dirname, '../node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const report = await runCodemod(
+			Object.keys(owners).map((name) => path.join(root, `${name}.tsx`)),
+			{
+				root,
+				strong: true,
+				verify: true,
+				projectTypes: false,
+				write: false,
+			},
+		);
+		expect(
+			report.files
+				.filter((file) => file.notes.some((note) => note.rule === 'retained-react-context'))
+				.map((file) => file.file),
+		).toEqual(['Default.tsx', 'Namespace.tsx']);
+	});
+
 	it('reports a direct native template root that imports a React class', async () => {
 		const boundary = `import { Component as Base, type ReactNode } from 'react';
 class Frame extends Base<{ children: ReactNode }> {

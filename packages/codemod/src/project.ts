@@ -674,7 +674,7 @@ export async function runCodemod(
 	function localReactContext(from: string, module: string, name: string) {
 		if (/[!%?#\\]/.test(module) || catalogName(module) !== null || resolveRename(from, module))
 			return false;
-		const file = localFile(from, module);
+		const file = localFile(from, module, true);
 		if (!file || known.has(file)) return false;
 		let contexts = retainedContexts.get(file);
 		if (contexts === undefined) {

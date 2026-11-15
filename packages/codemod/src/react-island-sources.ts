@@ -54,9 +54,10 @@ function imported(checker: ts.TypeChecker, node: ts.Node, defaultMember = false)
 		return { name, module: imp.moduleSpecifier.text };
 }
 
-function closedDefaultReactReceiver(receiver: ts.Identifier, uses: ReturnType<typeof localUses>) {
+function closedReactReceiver(receiver: ts.Identifier, uses: ReturnType<typeof localUses>) {
 	return uses(receiver).every((ref) => {
-		if (ts.isImportClause(ref.parent) || inTypeNode(ref)) return true;
+		if (ts.isImportClause(ref.parent) || ts.isNamespaceImport(ref.parent) || inTypeNode(ref))
+			return true;
 		const member = ref.parent;
 		if (!ts.isPropertyAccessExpression(member) || member.expression !== ref) return false;
 		const parent = member.parent;
@@ -74,6 +75,16 @@ function closedDefaultReactReceiver(receiver: ts.Identifier, uses: ReturnType<ty
 				member.name.text !== 'default')
 		);
 	});
+}
+
+function soleReactReceiver(checker: ts.TypeChecker, receiver: ts.Identifier) {
+	const declaration = checker.getSymbolAtLocation(receiver)?.declarations?.[0];
+	return (
+		declaration &&
+		(ts.isNamespaceImport(declaration)
+			? !declaration.parent.name
+			: ts.isImportClause(declaration) && !declaration.namedBindings)
+	);
 }
 
 /** A direct assignment of inert metadata does not change the exported constructor. */
@@ -170,7 +181,7 @@ export function reactClassExports(file: string, source: string) {
 		let entry = imported(checker, base);
 		if (!entry && ts.isPropertyAccessExpression(base) && ts.isIdentifier(base.expression)) {
 			const candidate = imported(checker, base, true);
-			if (candidate?.module === 'react' && closedDefaultReactReceiver(base.expression, uses))
+			if (candidate?.module === 'react' && closedReactReceiver(base.expression, uses))
 				entry = candidate;
 		}
 		if (entry?.module !== 'react' || (entry.name !== 'Component' && entry.name !== 'PureComponent'))
@@ -193,6 +204,8 @@ export function retainedReactContextExports(file: string, source: string) {
 	const module = checker.getSymbolAtLocation(sf);
 	const names = new Set<string>();
 	if (!module) return names;
+	let uses: ReturnType<typeof localUses> | undefined;
+	let singleReactImport: boolean | undefined;
 	for (const symbol of checker.getExportsOfModule(module)) {
 		const declaration = symbol.valueDeclaration;
 		if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer)
@@ -206,10 +219,26 @@ export function retainedReactContextExports(file: string, source: string) {
 		)
 			continue;
 		const init = skipWrappers(declaration.initializer);
-		if (!ts.isCallExpression(init) || ts.isOptionalChain(init) || !ts.isIdentifier(init.expression))
-			continue;
-		const entry = imported(checker, init.expression);
-		if (entry?.module === 'react' && entry.name === 'createContext') names.add(symbol.name);
+		if (!ts.isCallExpression(init) || ts.isOptionalChain(init)) continue;
+		const factory = init.expression;
+		const entry = imported(checker, factory, true);
+		if (entry?.module !== 'react' || entry.name !== 'createContext') continue;
+		if (ts.isPropertyAccessExpression(factory)) {
+			// With interop the default and namespace can share the same mutable React object.
+			singleReactImport ??=
+				!hasEval(sf) &&
+				ts
+					.preProcessFile(source, true, true)
+					.importedFiles.filter(({ fileName }) => fileName === 'react').length === 1;
+			if (
+				!singleReactImport ||
+				!ts.isIdentifier(factory.expression) ||
+				!soleReactReceiver(checker, factory.expression) ||
+				!closedReactReceiver(factory.expression, (uses ??= localUses(sf, checker)))
+			)
+				continue;
+		}
+		names.add(symbol.name);
 	}
 	return names;
 }

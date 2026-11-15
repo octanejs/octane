@@ -8073,8 +8073,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		);
 	}
 
-	private directImportedComponent(node: ts.JsxElement | ts.JsxSelfClosingElement) {
-		const tag = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
+	private directImportedComponent(tag: ts.Node) {
 		if (!ts.isIdentifier(tag) || !isComponentName(tag.text)) return;
 		const entry = this.importOf(tag);
 		if (!entry || entry.namespace || entry.typeOnly) return;
@@ -8083,15 +8082,20 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	}
 
 	private checkRetainedReactContext(node: ts.JsxElement | ts.JsxSelfClosingElement) {
-		const binding = this.directImportedComponent(node);
+		const tag = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
+		const provider = ts.isPropertyAccessExpression(tag) && tag.name.text === 'Provider';
+		const binding = this.directImportedComponent(provider ? tag.expression : tag);
 		if (!binding) return;
-		const { tag, entry } = binding;
-		if (this.options.localReactContext?.(entry.module, entry.imported))
+		const { tag: context, entry } = binding;
+		if (
+			this.options.localReactContext?.(entry.module, entry.imported) &&
+			(!provider || this.isContext(context, tag))
+		)
 			this.note(
 				'retained-react-context',
 				'warning',
 				tag,
-				`If this native template resolves \`${entry.module}\` to the retained React context \`${tag.text}\`, Octane cannot render it as a provider. Verify the runtime import and keep this render in React or migrate the context producer.`,
+				`If this native template resolves \`${entry.module}\` to the retained React context \`${context.text}\`, Octane cannot render it as a provider. Verify the runtime import and keep this render in React or migrate the context producer.`,
 			);
 	}
 
@@ -8102,7 +8106,8 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	) {
 		const check = this.options.localReactClass;
 		if (!check) return;
-		const binding = this.directImportedComponent(node);
+		const tagName = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
+		const binding = this.directImportedComponent(tagName);
 		if (!binding) return;
 		const { tag, entry } = binding;
 		const proof = check(entry.module, entry.imported);
