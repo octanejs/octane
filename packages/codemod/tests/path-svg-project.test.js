@@ -293,7 +293,7 @@ it.each(['unsupported SVG', 'existing sidecar', 'existing shared helper'])(
 	},
 );
 
-it.each(['v1', 'v2', 'v3'])(
+it.each(['v1', 'v2', 'v3', 'v4'])(
 	'upgrades only the pristine %s shared SVG helper and keeps existing sidecars usable',
 	async (version) => {
 		const { root, icon } = fixture();
@@ -1364,6 +1364,84 @@ it.each(['./action', '@/action'])(
 		expect(together.files.find((f) => f.file === 'src/pane.tsx').rules['svg-paths']).toBe(1);
 	},
 );
+
+it('preserves an authored SVG title through server render, hydration, and updates', async () => {
+	const { root, file, icon } = fixture(`import Mark from './icons/mark.svg';
+		export function Pane({className}) { return <button><Mark className={className}/></button>; }`);
+	const title = 'Résumé status';
+	fs.writeFileSync(icon, asset.replace('><path', `><title>${title}</title><!-- </title> --><path`));
+	const { files } = await runCodemod([file], {
+		root,
+		svgPaths: true,
+		strong: true,
+		verify: true,
+		write: true,
+	});
+	const migrated = files.find((row) => row.file === 'src/pane.tsx');
+	expect(migrated.rules['svg-paths']).toBe(1);
+	expect(migrated.strong).toBe(true);
+	const load = (mode, entry) =>
+		bundleRuntime(root, mode, "export {Pane} from './src/pane.tsrx';" + entry, [], {
+			'.svg': 'text',
+		});
+	const dom = installDOM();
+	try {
+		const server = await load('server', "export {renderToString} from 'octane/server';");
+		const host = document.createElement('div');
+		const initial = { className: 'first' };
+		const { html, head } = server.renderToString(server.Pane, initial, { headChannel: 'separate' });
+		expect(head ?? '').toBe('');
+		host.innerHTML = html;
+		const svg = host.querySelector('svg');
+		const name = svg.firstElementChild;
+		expect(name.localName).toBe('title');
+		expect(name.namespaceURI).toBe('http://www.w3.org/2000/svg');
+		expect(name.textContent).toBe(title);
+		const client = await load('client', "export {act, createRoot, hydrateRoot} from 'octane';");
+		const mounted = client.hydrateRoot(host, client.Pane, initial);
+		const fresh = document.createElement('div');
+		const rootClient = client.createRoot(fresh);
+		try {
+			await client.act(async () => rootClient.render(client.Pane, initial));
+			expect(fresh.querySelector('svg > title')?.textContent).toBe(title);
+			await client.act(async () => mounted.render(client.Pane, { className: 'next' }));
+			expect(host.querySelector('svg > title')).toBe(name);
+			expect(svg.getAttribute('class')).toBe('next');
+		} finally {
+			rootClient.unmount();
+			mounted.unmount();
+		}
+	} finally {
+		dom.window.close();
+		vi.unstubAllGlobals();
+	}
+});
+
+it.each([
+	'<title id="name">Status</title>',
+	'<title>unsafe &amp; ambiguous</title>',
+	'<title> </title>',
+	'<title>invalid ]]> end</title>',
+	'<title><script>unsafe</script></title>',
+	'<title>First</title><title>Second</title>',
+	'<path d="M0 0L6 4Z"/><title>After geometry</title>',
+	'<title>Line one\nLine two</title>',
+	'<g><title>Nested</title><path d="M0 0L6 4Z"/></g>',
+])('keeps the diagnostic for an unsupported SVG title shape (%#)', async (label) => {
+	const { root, file, icon } = fixture();
+	fs.writeFileSync(icon, asset.replace('><path', `>${label}<path`));
+	const { files } = await runCodemod([file], {
+		root,
+		svgPaths: true,
+		strong: true,
+		verify: true,
+		write: false,
+	});
+	const source = files.find((row) => row.file === 'src/pane.tsx');
+	expect(source.rules['svg-paths']).toBeUndefined();
+	expect(source.notes).toContainEqual(expect.objectContaining({ rule: 'svg-issuer' }));
+	expect(files.some((row) => row.output.endsWith('.svg.octane.ts'))).toBe(false);
+});
 
 it('renders an SVG passed through selected local slots as a direct button child on the server and client', async () => {
 	const { root, file } = fixture(`import Mark from './icons/mark.svg';

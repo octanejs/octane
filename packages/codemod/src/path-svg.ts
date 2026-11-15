@@ -220,6 +220,7 @@ function closedContainer(tag: SvgParent, children: readonly StaticSvgNode[]) {
 export function parseStaticSvg(source: string) {
 	if (typeof source !== 'string') return null;
 	let root: Record<string, string> | null = null;
+	let title: string | undefined;
 	const children: StaticSvgNode[] = [];
 	const open: { tag: SvgParent; children: StaticSvgNode[] }[] = [];
 	const definitions = new Map<string, SvgTag>();
@@ -244,6 +245,21 @@ export function parseStaticSvg(source: string) {
 			root = attributes(fields!, rootAttributes, true);
 			if (!root) return null;
 			open.push({ tag, children });
+		} else if (tag === 'title') {
+			if (parent?.tag !== 'svg' || children.length || title !== undefined || fields || selfClosing)
+				return null;
+			// Keep one literal text child. XML entities, markup, and line endings require loader rules.
+			const titleToken = /([^<&]+)<\/title>/uy;
+			titleToken.lastIndex = token.lastIndex;
+			const text = titleToken.exec(source);
+			if (
+				!text ||
+				/\]\]>|[^\u0020-\uD7FF\uE000-\uFFFD\u{10000}-\u{10FFFF}]/u.test(text[1]) ||
+				!text[1].trim()
+			)
+				return null;
+			title = text[1];
+			token.lastIndex = titleToken.lastIndex;
 		} else {
 			if (!parent || !tag || !Object.prototype.hasOwnProperty.call(shapeAttributes, tag))
 				return null;
@@ -308,14 +324,16 @@ export function parseStaticSvg(source: string) {
 				definitions.get(id) === target || (rootRect && definitions.get(id) === 'pattern'),
 		) &&
 		space.test(source.slice(end))
-		? { root, children }
+		? title === undefined
+			? { root, children }
+			: { root, children, title }
 		: null;
 }
 
 // Existing generated helpers expose this path-only result to their importers.
 export function parsePathSvg(source: string) {
 	const svg = parseStaticSvg(source);
-	return svg && svg.children.every((node) => node.tag === 'path')
+	return svg && svg.title === undefined && svg.children.every((node) => node.tag === 'path')
 		? { root: svg.root, paths: svg.children.map((node) => node.attributes) }
 		: null;
 }
