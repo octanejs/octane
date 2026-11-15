@@ -303,8 +303,14 @@ Save the script below as `extract-formatjs.mjs` in a project with Octane and the
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join, sep } from 'node:path';
 import { compileToVolarMappings } from 'octane/compiler';
+
+// FormatJS interprets positional paths as glob patterns.
+function filePattern(file) {
+	const absolute = isAbsolute(file) ? file : process.cwd() + sep + file;
+	return absolute.split(sep).join('/').replace(/[\\[\]{}()*?+@!|]/g, '\\$&');
+}
 
 const directory = mkdtempSync(join(tmpdir(), 'octane-formatjs-'));
 try {
@@ -316,9 +322,11 @@ try {
 		writeFileSync(projection, code);
 		return projection;
 	});
-	execFileSync('formatjs', ['extract', '--throws', '--out-file', 'messages.json', ...files], {
-		stdio: 'inherit',
-	});
+	execFileSync(
+		'formatjs',
+		['extract', '--throws', '--out-file', 'messages.json', '--', ...files.map(filePattern)],
+		{ stdio: 'inherit' },
+	);
 } finally {
 	rmSync(directory, { recursive: true, force: true });
 }
@@ -328,7 +336,7 @@ try {
 pnpm exec node extract-formatjs.mjs src/retained.tsx src/migrated.tsrx
 ```
 
-Use the same FormatJS options you used before migration. Aliased message components may need `--additional-component-names` with your extractor version. This example writes a catalog without source locations. With `--extract-source-location`, FormatJS reports the temporary TSX paths and offsets for projected files. If your workflow needs authored locations, keep message definitions in ordinary TypeScript or use the codemod's `--target tsx` option.
+Apply the existing include and exclude rules when choosing which filenames to pass to the script. Keep your other FormatJS extraction options. Aliased message components may need `--additional-component-names` with your extractor version. This example writes a catalog without source locations. With `--extract-source-location`, FormatJS reports the temporary TSX paths and offsets for projected files. If your workflow needs authored locations, keep message definitions in ordinary TypeScript or use the codemod's `--target tsx` option.
 
 ## Store hooks in linked workspace packages
 
