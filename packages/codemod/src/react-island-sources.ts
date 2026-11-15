@@ -250,7 +250,15 @@ function hostedLeaf(output: ts.JsxElement | ts.JsxSelfClosingElement) {
 		const name = attr.name.text;
 		if (
 			seen.has(name) ||
-			!['component', 'props', 'key', 'hostClassName', 'hostStyle'].includes(name)
+			![
+				'component',
+				'props',
+				'key',
+				'hostClassName',
+				'hostStyle',
+				'hostRole',
+				'hostAriaLabel',
+			].includes(name)
 		)
 			return;
 		seen.add(name);

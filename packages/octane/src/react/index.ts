@@ -699,6 +699,8 @@ function createOctaneCompat(host: 'div' | 'span') {
 			'data-octane-compat': '',
 			className: props.hostClassName,
 			style: props.hostStyle ?? OCTANE_COMPAT_HOST_STYLE,
+			role: props.hostRole,
+			'aria-label': props.hostAriaLabel,
 			ref: hostRef,
 			// §9.3 opaque-host contract: the server writes real island HTML; the
 			// client ALWAYS supplies this stable frozen sentinel so React neither
