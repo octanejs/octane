@@ -31,6 +31,8 @@ export interface TransformOptions {
 	bindingExports?(from: string, to: string): ReadonlySet<string> | undefined;
 	/** Record a successful rewrite that was checked against a partial binding's catalog. */
 	recordBindingRewrite?(from: string, to: string): void;
+	/** Resolve a direct relative import of an unselected source in a single-file run. */
+	retainedRegistry?(specifier: string): ts.SourceFile | undefined;
 	/** The issuer resolves the original installed React runtime and types. */
 	originalReact?: boolean;
 	/** The authored React bridge and its direct component import still resolve to React. */
