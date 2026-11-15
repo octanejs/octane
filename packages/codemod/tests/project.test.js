@@ -137,6 +137,57 @@ export function shadow(render: (view: unknown, options: {}) => string) {
 		expect(files.some((file) => fs.existsSync(file.replace('.tsx', '.tsrx')))).toBe(false);
 	});
 
+	it('warns when React Router would render a migrated default route export', async () => {
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'tsconfig.json':
+				'{"compilerOptions":{"module":"ESNext","moduleResolution":"bundler","jsx":"react-jsx"}}',
+			'react-router.config.ts': 'export default { appDirectory: "web", ssr: true };',
+			'web/root.tsx': 'export default function Root() { return <main />; }',
+			'web/routes.ts': `import { route as add, index, layout } from '@react-router/dev/routes';
+export default [add('page', 'page.tsx'), layout('frame.tsx', [index('index.tsx')]), add('data', 'data.tsx'), add('nil', 'nil.tsx')];
+function unused(add: (pattern: string, file: string) => unknown) { return add('fake', 'unused.tsx'); }`,
+			'web/page.tsx': 'export default function Page() { return <main>page</main>; }',
+			'web/frame.tsx': 'export default function Frame() { return <main>frame</main>; }',
+			'web/index.tsx': 'export default function Index() { return <main>index</main>; }',
+			'web/data.tsx':
+				'export function loader() { return new Response("data"); } export function Local() { return <main />; }',
+			'web/nil.tsx':
+				'export default function Nil() { return null; } export function Local() { return <main />; }',
+			'web/unused.tsx': 'export default function Unused() { return <main />; }',
+		});
+		fs.mkdirSync(path.join(root, 'node_modules/@react-router'), { recursive: true });
+		const router = path.join(root, 'node_modules/@react-router/dev');
+		fs.mkdirSync(router);
+		fs.writeFileSync(
+			path.join(router, 'package.json'),
+			JSON.stringify({
+				name: '@react-router/dev',
+				version: '7.18.1',
+				exports: { './routes': './routes.js' },
+			}),
+		);
+		fs.writeFileSync(
+			path.join(router, 'routes.js'),
+			'exports.route = exports.index = exports.layout = () => ({});',
+		);
+		const inputs = ['page', 'frame', 'index', 'data', 'nil', 'unused'].map((name) =>
+			path.join(root, `web/${name}.tsx`),
+		);
+		const result = await runCodemod(inputs, { root, write: false });
+		const warned = result.files
+			.filter((file) =>
+				file.notes.some(
+					(note) => note.rule === 'react-compat' && /React Router/.test(note.message),
+				),
+			)
+			.map((file) => file.file)
+			.sort();
+		expect(warned).toEqual(['web/frame.tsx', 'web/index.tsx', 'web/page.tsx', 'web/routes.ts']);
+		const registry = result.files.find((file) => file.file === 'web/routes.ts');
+		expect(registry.code).toContain("add('page', 'page.tsrx')");
+	});
+
 	it('uses the default React Router directory when config omits it', async () => {
 		const root = project({
 			'node_modules/@react-router/dev/package.json': JSON.stringify({
