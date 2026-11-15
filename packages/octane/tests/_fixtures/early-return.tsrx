@@ -1,4 +1,4 @@
-import { useState, type OctaneNode } from 'octane';
+import { memo, useState, withSlot, type OctaneNode } from 'octane';
 
 // Simple early-return: render nothing when condition holds.
 // Old syntax: `if (props.hide) return;` before the JSX.
@@ -59,4 +59,94 @@ export function MutableCapture({ off }: { off: boolean }) {
 			{read()}
 		</span>
 	);
+}
+
+export const cell = useState;
+
+export function AliasedState({ hide }: { hide: boolean }) @{
+	if (hide) return null;
+	const [value, setValue, getValue] = cell(1);
+	const [other] = cell(10);
+	<button onClick={() => setValue(getValue() + 1)}>{value + ':' + other}</button>
+}
+
+export function ManualStateAlias() @{
+	const slot = Symbol.for('early-return:manual-state');
+	const [value] = cell(slot);
+	const path = Symbol.for('early-return:manual-path');
+	const first = withSlot(path, () => cell(1)[0]);
+	const second = withSlot(path, () => cell(10)[0]);
+	<output>{typeof value + ':' + first + ':' + second}</output>
+}
+
+export function ShadowedStateAlias() @{
+	function cell(value: number, _slot?: unknown) {
+		return [value, arguments.length];
+	}
+	const [value, count] = cell(1);
+	<output>{value + ':' + count}</output>
+}
+
+// The named and memoized inner bodies own state separately from their parent.
+export function NestedAliasedState({ hide }: { hide: boolean }) @{
+	function Named({ hide }: { hide: boolean }) @{
+		if (hide) return null;
+		const [value, setValue, getValue] = cell(1);
+		<button onClick={() => setValue(getValue() + 1)}>{value as number}</button>
+	}
+	const Memoized = memo(function Memoized({ hide }: { hide: boolean }) @{
+		if (hide) return null;
+		const [value, setValue, getValue] = cell(10);
+		<button onClick={() => setValue(getValue() + 1)}>{value as number}</button>
+	});
+	<main>
+		<Named hide={hide} />
+		<Memoized hide={hide} />
+	</main>
+}
+
+const StaticMemoized = memo(function StaticMemoized() @{
+	const [value, setValue, getValue] = cell(10);
+	<button onClick={() => setValue(getValue() + 1)}>{value as number}</button>
+});
+
+export function NestedAliasedExpressions() @{
+	const Arrow = () => @{
+		const [value, setValue, getValue] = cell(1);
+		<button onClick={() => setValue(getValue() + 1)}>{value as number}</button>
+	};
+	<main>
+		<Arrow />
+		<StaticMemoized />
+	</main>
+}
+
+function DirectAliasCard({ hide }: { hide: boolean }) @{
+	if (hide) return null;
+	const [value, setValue, getValue] = cell<number>(1);
+	const [other] = cell(10);
+	<button onClick={() => setValue(getValue() + 1)}>{value + ':' + other}</button>
+}
+
+export function DirectAliasedState({ hide }: { hide: boolean }) @{
+	const first = DirectAliasCard({ hide });
+	const repeat = DirectAliasCard({ hide });
+	<main>
+		{first}
+		{repeat}
+		<DirectAliasCard hide={hide} />
+	</main>
+}
+
+export function ScopedDirectAliasedState() @{
+	function renderCounter<T extends number>(initial: T) @{
+		const [value, setValue, getValue] = cell<number>(() => initial);
+		<button onClick={() => setValue(getValue() + 1)}>{value as number}</button>
+	}
+	const first = withSlot(Symbol.for('direct-state:first'), () => renderCounter(1));
+	const second = withSlot(Symbol.for('direct-state:second'), () => renderCounter(10));
+	<main>
+		{first}
+		{second}
+	</main>
 }

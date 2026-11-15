@@ -178,6 +178,7 @@ import {
 	collectOctaneImportLocals,
 	findDirectlyCalledNames,
 	findDirectlyCalledTemplateFunctions,
+	isLowerableTemplateFunction,
 	portalImportBinding,
 	soleRenderPropChild,
 } from './descriptor-lowering.js';
@@ -12610,6 +12611,7 @@ function compileInternal(
 			serverBoundaryPreparation?.ast ?? analyzedAst,
 			hasStringChildProofs,
 			strongModeEnabled,
+			serverBoundaryPreparation === null,
 		);
 		return compiled;
 	}
@@ -12798,12 +12800,17 @@ function compileInternal(
 	// and HMR share one DOM-range shape. HMR still emits the generic component
 	// call ABI, and invalidates normally if an edit introduces a value return.
 	const typescriptWeb = options?.output === 'ts' && options?.__valdiAbiGuard === undefined;
+	const localStateAliases =
+		rendererBoundaryPreparation === null
+			? findLocalStateAliases(ast, filename, options)
+			: undefined;
+	ast = markLocalStateAliases(ast, localStateAliases);
 	ast = lowerNullishComponentExits(ast, typescriptWeb);
 	// Same contract for React-style conditional JSX returns: branch-selected
 	// output compiles as template control flow instead of de-opt descriptors.
 	ast = lowerJsxReturnBranchComponents(ast);
 	// A nested `@{ … }` function that code calls directly returns JSX instead.
-	ast = lowerDirectlyCalledTemplateFunctions(ast);
+	ast = lowerDirectlyCalledTemplateFunctions(ast, localStateAliases);
 	// Omitted dependency lists are compiler-owned: infer reactive captures
 	// before any component splitting/hoisting so every lexical binding is still
 	// visible to the shared TSRX/TSX analysis. Explicit arrays and `null` pass
@@ -14451,6 +14458,7 @@ function compileInternal(
 	}
 
 	// Built after every lowering and HMR wiring so all generated imports exist.
+	moduleBody = attachLocalStateGetterDeclarations(moduleBody, ctx);
 	const runtimeImportNodes = buildRuntimeImportNodes(ctx, 'octane', moduleOrigin);
 	const profileRuntimeImportNodes = buildProfileRuntimeImportNodes(ctx, moduleOrigin);
 
@@ -14561,6 +14569,7 @@ function compileServer(
 	analyzedAst = null,
 	hasStringChildProofs = false,
 	strongModeEnabled = false,
+	canMarkLocalStateAliases = false,
 ) {
 	const parsedAst = analyzedAst ?? adoptParserAst(parseModule(source, filename));
 	const nativeChangeAnalysis =
@@ -14589,9 +14598,13 @@ function compileServer(
 	ast = splitDirectlyCalledComponents(ast);
 	// Mirror the client transform so SSR emits the same control-flow ranges
 	// hydration expects in both development and production.
+	const localStateAliases = canMarkLocalStateAliases
+		? findLocalStateAliases(ast, filename, options)
+		: undefined;
+	ast = markLocalStateAliases(ast, localStateAliases);
 	ast = lowerNullishComponentExits(ast, options?.output === 'ts');
 	ast = lowerJsxReturnBranchComponents(ast);
-	ast = lowerDirectlyCalledTemplateFunctions(ast);
+	ast = lowerDirectlyCalledTemplateFunctions(ast, localStateAliases);
 	// Mirror the client transform exactly. Effects are server no-ops, but
 	// useMemo/useCallback execute during SSR and must receive the same inferred
 	// dependency shape as hydration's client compile.
@@ -14827,7 +14840,7 @@ function compileServer(
 			...nativeActivation,
 			...signalActivation,
 			...helperNodes,
-			...bodyNodes,
+			...attachLocalStateGetterDeclarations(bodyNodes, ctx),
 		],
 		metadata: { path: [] },
 		start: ast.start,
@@ -22728,6 +22741,36 @@ function wrapHookCallWithSlot(call, ctx, slot, callee, args) {
 	};
 }
 
+function localStateGetterReference(node, ctx, helper) {
+	const byAlias = (ctx.localStateGetterReferences ??= new Map());
+	const alias = node.callee.name;
+	let entry = byAlias.get(alias);
+	if (entry === undefined) {
+		const imported = allocCompilerName(ctx, rtAlias(helper));
+		ctx.userRuntimeNames.add(`${helper} as ${imported}`);
+		entry = { ref: allocCompilerName(ctx, '_$' + alias + 'WithGetter'), imported };
+		byAlias.set(alias, entry);
+	}
+	return b.id(entry.ref);
+}
+
+function attachLocalStateGetterDeclarations(body, ctx) {
+	const references = ctx.localStateGetterReferences;
+	if (references === undefined) return body;
+	return body.flatMap((statement) => {
+		const node = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+		if (node?.type !== 'VariableDeclaration' || node.kind !== 'const') return [statement];
+		// The alias is a single declarator. Initializing its private getter
+		// immediately afterward preserves the authored alias's TDZ and export.
+		const declaration = node.declarations[0];
+		const entry =
+			declaration?.id.type === 'Identifier' ? references.get(declaration.id.name) : undefined;
+		return entry === undefined
+			? [statement]
+			: [statement, inheritOriginLoc(b.const(entry.ref, b.id(entry.imported)), declaration)];
+	});
+}
+
 function arrayPatternObservesStateGetter(pattern) {
 	const elements = pattern.elements || [];
 	if (elements[2] != null) return true;
@@ -23441,7 +23484,8 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					else if (hookRuntimeImportedName === undefined) {
 						ctx.userRuntimeNames.add(localName === name ? name : `${name} as ${localName}`);
 					}
-					if (getterHelper !== null) requireRuntimeForContext(ctx, getterHelper);
+					if (getterHelper !== null && n._octaneLocalStateAlias !== true)
+						requireRuntimeForContext(ctx, getterHelper);
 					if (nativeMemo) requireRuntimeForContext(ctx, 'nativePuMemo');
 				}
 				if (isServerUse)
@@ -23488,7 +23532,9 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				const callee = nativeMemo
 					? b.id(runtimeAliasForContext(ctx, 'nativePuMemo'))
 					: getterHelper !== null
-						? b.id(runtimeAliasForContext(ctx, getterHelper))
+						? n._octaneLocalStateAlias === true
+							? localStateGetterReference(n, ctx, getterHelper)
+							: b.id(runtimeAliasForContext(ctx, getterHelper))
 						: n.callee._octaneGenerated
 							? b.id(runtimeAliasForContext(ctx, name))
 							: n.callee;
@@ -39506,6 +39552,115 @@ function sourceError(code, ctx, node, message) {
 	return codedError(code, message + at);
 }
 
+// A same-module const may read the exact imported Octane state function as a
+// value. Mark direct component setup before the early-exit pass moves slots.
+function findLocalStateAliases(ast, filename, options) {
+	if (
+		!cleanCompileFilename(filename).endsWith('.tsrx') ||
+		!domSignalTarget(options) ||
+		options?.universalRuntime !== undefined ||
+		options?.__rendererBoundariesLowered === true ||
+		options?.__valdiAbiGuard !== undefined
+	)
+		return undefined;
+	let imports;
+	for (const node of ast.body) {
+		if (
+			node.type !== 'ImportDeclaration' ||
+			node.source.value !== 'octane' ||
+			node.importKind === 'type' ||
+			node.phase != null ||
+			node.attributes?.length ||
+			node.assertions?.length
+		)
+			continue;
+		for (const specifier of node.specifiers) {
+			if (
+				specifier.type === 'ImportSpecifier' &&
+				specifier.importKind !== 'type' &&
+				(specifier.imported.name ?? specifier.imported.value) === 'useState'
+			)
+				(imports ??= new Set()).add(specifier.local.name);
+		}
+	}
+	if (imports === undefined) return undefined;
+	let aliases;
+	for (const statement of ast.body) {
+		const node = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+		if (
+			node?.type !== 'VariableDeclaration' ||
+			node.kind !== 'const' ||
+			node.declare === true ||
+			node.declarations.length !== 1
+		)
+			continue;
+		const { id, init } = node.declarations[0];
+		if (
+			id?.type === 'Identifier' &&
+			id.typeAnnotation == null &&
+			init?.type === 'Identifier' &&
+			imports.has(init.name)
+		)
+			(aliases ??= new Set()).add(id.name);
+	}
+	return aliases;
+}
+
+function localStateSetupMarker(ast, aliases) {
+	let lexical;
+	const mark = (node) => {
+		if (
+			node.type !== 'CallExpression' ||
+			node._octaneLocalStateAlias === true ||
+			node.optional === true ||
+			node.callee.type !== 'Identifier' ||
+			!aliases.has(node.callee.name) ||
+			node.arguments.length !== 1
+		)
+			return node;
+		// A lone Symbol is also the runtime's authored manual-slot ABI.
+		const initial = unwrapTsExpr(node.arguments[0]);
+		if (!isInvariantLiteral(initial) && !isFunctionNode(initial)) return node;
+		lexical ??= createLexicalAnalysis(ast);
+		const scope = lexical.nodeScopes.get(node);
+		if (
+			scope === undefined ||
+			lexical.resolveBinding(scope, node.callee.name)?.scope !== lexical.rootScope
+		)
+			return node;
+		return {
+			...node,
+			_octaneHookRuntimeImportedHook: 'useState',
+			_octaneLocalStateAlias: true,
+		};
+	};
+	return (body) => {
+		const setup = mapNodes(body.body, (node) => {
+			if (node.type !== 'VariableDeclaration') return node;
+			const declarations = mapNodes(node.declarations, (declaration) => {
+				const init = declaration.init && mark(declaration.init);
+				return init === declaration.init ? declaration : { ...declaration, init };
+			});
+			return declarations === node.declarations ? node : { ...node, declarations };
+		});
+		return setup === body.body ? body : { ...body, body: setup };
+	};
+}
+
+function markLocalStateAliases(ast, aliases) {
+	if (aliases === undefined) return ast;
+	const markSetup = localStateSetupMarker(ast, aliases);
+	const bodyNodes = mapNodes(ast.body, (statement) => {
+		const component = moduleStatementDeclaration(statement);
+		if (!isComponentFunction(component)) return statement;
+		const body = markSetup(component.body);
+		if (body === component.body) return statement;
+		const next = { ...component, body };
+		return statement === component ? next : { ...statement, declaration: next };
+	});
+	return bodyNodes === ast.body ? ast : { ...ast, body: bodyNodes };
+}
+
 /**
  * Turn compiler-proven shorthand guards into ordinary template control flow:
  *
@@ -39649,6 +39804,7 @@ function containsHookCall(node, slotKeyed = false) {
 		)
 			return false;
 		if (value.type === 'CallExpression') {
+			if (value._octaneLocalStateAlias === true) return true;
 			const callee = value.callee;
 			if (callee?.type === 'Identifier' && isHookName(callee.name)) return true;
 			if (
@@ -40064,15 +40220,38 @@ function lowerJsxReturnBranchComponents(ast) {
  * because their returned-JSX forms return a promise or an iterator instead of
  * JSX.
  */
-function lowerDirectlyCalledTemplateFunctions(ast) {
+function lowerDirectlyCalledTemplateFunctions(ast, localStateAliases) {
 	const portalBinding = portalImportBinding(ast);
 	const lowered = findDirectlyCalledTemplateFunctions(ast, portalBinding);
-	if (lowered.size === 0 && portalBinding === null) return ast;
-	const lower = (node) =>
+	if (lowered.size === 0 && portalBinding === null && localStateAliases === undefined) return ast;
+	const markSetup =
+		localStateAliases === undefined ? null : localStateSetupMarker(ast, localStateAliases);
+	const moduleStatements =
+		markSetup === null ? null : new Set(ast.body.map(moduleStatementDeclaration));
+	const lower = (node, markNested = markSetup !== null) =>
 		mapAst(node, (n) => {
-			if (lowered.has(n)) return returnedJsxFunction(n, lower);
+			if (lowered.has(n)) {
+				const body = markSetup === null ? n.body : markSetup(n.body);
+				return returnedJsxFunction(body === n.body ? n : { ...n, body }, (node) =>
+					lower(node, markNested),
+				);
+			}
+			if (markNested && n._octaneDirectCallTwin === true) {
+				const body = markSetup(n.body);
+				return lower(body === n.body ? n : { ...n, body }, false);
+			}
+			// The remaining nested templates keep renderer-owned slots.
+			if (
+				markNested &&
+				isFunctionNode(n) &&
+				isLowerableTemplateFunction(n) &&
+				!moduleStatements.has(n)
+			) {
+				const body = markSetup(n.body);
+				if (body !== n.body) return lower({ ...n, body }, markNested);
+			}
 			if (n.type === 'CallExpression' && portalBinding?.(n.callee) === 'createPortal')
-				return { ...n, arguments: lower(n.arguments), _octanePortalCall: true };
+				return { ...n, arguments: lower(n.arguments, markNested), _octanePortalCall: true };
 			return null;
 		});
 	return lower(ast);
