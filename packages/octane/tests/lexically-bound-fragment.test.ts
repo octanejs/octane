@@ -2,10 +2,13 @@ import { expect, it } from 'vitest';
 import { renderToString } from 'octane/server';
 import { flushSync, hydrateRoot } from '../src/index.js';
 import {
+	EmptyFragmentChildren,
+	FragmentOverridesChildren,
 	GenuineFragmentImports,
 	LocalFragment,
 	ShadowedFragmentImports,
 } from './_fixtures/lexically-bound-fragment.tsrx';
+import { NestedLocalFragment } from './_fixtures/lexically-bound-fragment-lite.tsrx';
 import { mount } from './_helpers.js';
 import { loadServerFixture } from './_server-fixture.js';
 
@@ -83,5 +86,47 @@ it('renders the children of genuine named and namespace fragments', () => {
 		]);
 	} finally {
 		view.unmount();
+	}
+});
+
+it('adopts the single component rendered by a hookless Fragment wrapper', () => {
+	const server = loadServerFixture<{ NestedLocalFragment: typeof NestedLocalFragment }>(
+		'packages/octane/tests/_fixtures/lexically-bound-fragment-lite.tsrx',
+	);
+	const { html } = renderToString(server.NestedLocalFragment, {});
+	const container = document.createElement('div');
+	container.innerHTML = html;
+	const leaf = container.querySelector('i')!;
+	expect(leaf.textContent).toBe('expected');
+
+	document.body.append(container);
+	const recoverable: unknown[] = [];
+	const root = hydrateRoot(
+		container,
+		NestedLocalFragment,
+		{},
+		{
+			onRecoverableError: (error) => recoverable.push(error),
+		},
+	);
+	try {
+		expect(container.querySelector('i')).toBe(leaf);
+		expect(recoverable).toEqual([]);
+	} finally {
+		root.unmount();
+		container.remove();
+	}
+});
+
+it('uses the Fragment binding when deciding whether nested JSX overrides the children prop', () => {
+	const props = { label: 'Ignored' };
+	const local = mount(FragmentOverridesChildren, props);
+	const builtin = mount(EmptyFragmentChildren, props);
+	try {
+		expect(local.find('section').textContent).toBe('Nested: 0');
+		expect(builtin.find('section').textContent).toBe('Ignored');
+	} finally {
+		local.unmount();
+		builtin.unmount();
 	}
 });

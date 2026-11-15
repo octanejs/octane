@@ -9770,7 +9770,9 @@ function singleRootComponentArmName(node, locals, ctx) {
  * consulted).
  */
 function collectSingleRootIfDeps(render, locals, ctx) {
-	const roots = normalizeChildren(render ? [render] : []).filter((n) => n.type !== 'HeadHoist');
+	const roots = normalizeChildrenForShape(render ? [render] : [], ctx).filter(
+		(n) => n.type !== 'HeadHoist',
+	);
 	if (roots.length !== 1 || (!isIfDirective(roots[0]) && !isSwitchDirective(roots[0]))) {
 		return null;
 	}
@@ -13689,8 +13691,9 @@ function compileInternal(
 		// declined borrow would probe for a child pair the server never emitted.
 		// Reject lite for such callees.
 		if (eligible && compNode.body && compNode.body.type === 'JSXCodeBlock') {
-			const bodyNodes = normalizeChildren(
+			const bodyNodes = normalizeChildrenForShape(
 				compNode.body.render ? [compNode.body.render] : [],
+				ctx,
 			).filter((n) => n.type !== 'HeadHoist');
 			if (inheritSoleCompRoot(bodyNodes, ctx)) eligible = false;
 		}
@@ -28110,6 +28113,12 @@ function isDescriptorBuiltElement(node, inSvg, ctx) {
 	return hasJsxAttribute(node, 'key') || (!inSvg && requiresImperativeHostTree(node, ctx));
 }
 
+// Output-shape analysis needs the emitting Fragment binding proof, while other
+// lowerings (map, Activity, and imperative hosts) remain disabled.
+function normalizeChildrenForShape(nodes, ctx, inSvg = false) {
+	return normalizeChildren(nodes, inSvg, null, false, true, null, ctx);
+}
+
 /**
  * Normalize a list of JSX child nodes into the shapes the emitters consume:
  *   - Indentation-only JSXText / JSX comments (`{…}` empty containers) → dropped
@@ -28140,6 +28149,7 @@ function normalizeChildren(
 	inNoscript = false,
 	allowImperative = true,
 	bindingFragment = null,
+	fragmentCtx = ctx,
 ) {
 	const out = [];
 	if (!nodes) return out;
@@ -28214,7 +28224,7 @@ function normalizeChildren(
 			// boundary instead, so it takes the descriptor branch below; the
 			// lexical-nesting walk (no imperative lowering) still sees through it.
 			if (
-				isFragmentLongForm(n, ctx, bindingFragment) &&
+				isFragmentLongForm(n, fragmentCtx, bindingFragment) &&
 				!(allowImperative && hasJsxAttribute(n, 'key'))
 			) {
 				const attributes = n.openingElement.attributes || [];
@@ -28237,7 +28247,15 @@ function normalizeChildren(
 					out.push({ type: 'FragmentStart', refExpr });
 				}
 				out.push(
-					...normalizeChildren(n.children || [], inSvg, ctx, inNoscript, true, bindingFragment),
+					...normalizeChildren(
+						n.children || [],
+						inSvg,
+						ctx,
+						inNoscript,
+						true,
+						bindingFragment,
+						fragmentCtx,
+					),
 				);
 				if (refAttr || hasSpread) out.push({ type: 'FragmentEnd' });
 				continue;
@@ -28337,7 +28355,15 @@ function normalizeChildren(
 			out.push(element);
 		} else if (n.type === 'Tsx' || n.type === 'Tsrx' || n.type === 'JSXFragment') {
 			out.push(
-				...normalizeChildren(n.children || [], inSvg, ctx, inNoscript, true, bindingFragment),
+				...normalizeChildren(
+					n.children || [],
+					inSvg,
+					ctx,
+					inNoscript,
+					true,
+					bindingFragment,
+					fragmentCtx,
+				),
 			);
 		} else if (n.type === 'JSXStyleElement') {
 			if (hasJsxAttribute(n, 'dangerouslySetInnerHTML') || hasJsxAttribute(n, 'children')) {
@@ -28349,6 +28375,7 @@ function normalizeChildren(
 						inNoscript,
 						allowImperative,
 						bindingFragment,
+						fragmentCtx,
 					),
 				);
 				continue;
@@ -28369,7 +28396,17 @@ function normalizeChildren(
 			// still template output, not setup JavaScript. Unwrap it before lowering
 			// so both client and server compilation route it through their construct
 			// emitters rather than asking esrap to print a TSRX-only expression.
-			out.push(...normalizeChildren([n.expression], inSvg, ctx, inNoscript, true, bindingFragment));
+			out.push(
+				...normalizeChildren(
+					[n.expression],
+					inSvg,
+					ctx,
+					inNoscript,
+					true,
+					bindingFragment,
+					fragmentCtx,
+				),
+			);
 		} else if (n.type === 'JSXIfExpression') {
 			// `@if (cond) { ... } @else { ... }` — lower to the old IfStatement
 			// shape so the existing makeIfCall path picks it up. `consequent` and
@@ -28436,7 +28473,17 @@ function normalizeChildren(
 			if (body.length === 0 && render === null) continue;
 			if (body.length === 0 && render !== null) {
 				// Recurse — render is a single JSX node, treat as a sibling child.
-				out.push(...normalizeChildren([render], inSvg, ctx, inNoscript, true, bindingFragment));
+				out.push(
+					...normalizeChildren(
+						[render],
+						inSvg,
+						ctx,
+						inNoscript,
+						true,
+						bindingFragment,
+						fragmentCtx,
+					),
+				);
 			} else {
 				out.push(
 					inheritOriginLoc(
@@ -34606,7 +34653,8 @@ function emitElementHtml(
 	let directChildrenClientBinding = null;
 	let hostCommitClientBinding = null;
 	const hasNestedJsxChildren =
-		hasAuthoredStaticScriptBody || normalizeChildren(sourceChildren, childNs === 'svg').length > 0;
+		hasAuthoredStaticScriptBody ||
+		normalizeChildrenForShape(sourceChildren, ctx, childNs === 'svg').length > 0;
 	// Strict whole-element proofs for the two lean controlled-form helpers. A
 	// spread or duplicate/conflicting writer makes source-order ownership
 	// ambiguous, so those elements keep the generic helpers. Select is excluded:
@@ -34913,7 +34961,7 @@ function emitElementHtml(
 					? b.literal(true, 'true', attr)
 					: tsrxExprNode(obj, ctx, componentName, inlinedSubs);
 			const noChildren =
-				sourceChildren.length === 0 || normalizeChildren(sourceChildren).length === 0;
+				sourceChildren.length === 0 || normalizeChildrenForShape(sourceChildren, ctx).length === 0;
 			if (noChildren && !isAfterSpread) {
 				bindings.push({
 					id: bindings.length,

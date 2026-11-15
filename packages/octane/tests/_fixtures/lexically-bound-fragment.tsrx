@@ -46,3 +46,16 @@ export function GenuineFragmentImports() @{
 		</Native.Fragment>
 	</main>
 }
+
+export function FragmentOverridesChildren(props: { label: string }) @{
+	<section children={props.label}>
+		<Fragment label="Nested" />
+	</section>
+}
+
+export function EmptyFragmentChildren(props: { label: string }) @{
+	<section children={props.label}>
+		<Group />
+		<Native.Fragment />
+	</section>
+}
