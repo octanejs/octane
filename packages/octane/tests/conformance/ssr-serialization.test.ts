@@ -144,6 +144,11 @@ export function InertDiv(p) @{ <div inert={p.v} /> }
 
 // ---- fragments (Fragment :41-:113) ----
 export function FragOne() @{ <><div>text1</div></> }
+export function FragRootText() @{ <><div>hero</div>{'left'}{'right'}<i>end</i></> }
+export function FragRootTextAndEmpty() @{ <><div>hero</div>{'left'}{''}{'right'}<i>end</i></> }
+export function FragRootTextOnly() @{ <>{'left'}{'right'}</> }
+export function FragRootEmptyOnly() @{ <>{''}</> }
+export function FragRootMixedText(p) @{ <><div>hero</div>{'left'}{''}{p.label as string}<i>end</i></> }
 function Header() @{ <p>header</p> }
 function Footer() @{ <><h2>footer</h2><h3>about</h3></> }
 export function FragSeveral() @{ <>
@@ -1167,6 +1172,38 @@ describe('conformance: SSR serialization — custom elements (Attributes)', () =
 // ===========================================================================
 
 describe('conformance: SSR serialization — fragments (Fragment)', () => {
+	it.each([
+		['FragRootText', 'heroleftrightend'],
+		['FragRootTextAndEmpty', 'heroleftrightend'],
+		['FragRootTextOnly', 'leftright'],
+		['FragRootEmptyOnly', ''],
+		['FragRootMixedText', 'heroleftrightend'],
+	])('adopts the original root text slots for %s', (name, content) => {
+		const props = { label: 'right' };
+		container.innerHTML = serverHtml(name, props);
+		const originalHost = container.querySelector('div');
+		const originalText = Array.from(container.childNodes).find((node) => node.nodeValue === 'left');
+		hydrateRoot(container, client[name], props);
+		flushSync(() => {});
+		expect(warns()).toEqual([]);
+		expect(container.textContent).toBe(content);
+		if (originalHost !== null) expect(container.querySelector('div')).toBe(originalHost);
+		if (content.includes('left')) {
+			expect(originalText).toBeDefined();
+			expect(originalText?.parentNode).toBe(container);
+		}
+	});
+
+	it.each([
+		['FragRootText', '<div>hero</div>leftright<i>end</i>'],
+		['FragRootTextAndEmpty', '<div>hero</div>leftright<i>end</i>'],
+		['FragRootTextOnly', 'leftright'],
+		['FragRootEmptyOnly', ''],
+		['FragRootMixedText', '<div>hero</div>left<!-- -->right<i>end</i>'],
+	])('omits hydration-only text markers in static markup for %s', (name, expected) => {
+		expect(ServerRT.renderToStaticMarkup(server[name], { label: 'right' }).html).toBe(expected);
+	});
+
 	it('renders a fragment with one child (Per ReactDOMServerIntegrationFragment-test.js:41)', () => {
 		const host = parse(ssr('FragOne'));
 		expect(host.firstElementChild!.tagName).toBe('DIV');
