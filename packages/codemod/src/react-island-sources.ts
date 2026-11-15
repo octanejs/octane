@@ -764,10 +764,32 @@ export function reactServerComponents(
 			)
 				visit(call);
 		}
-		for (const statement of sf.statements) {
+		function visitEntryStatement(statement: ts.Statement) {
 			if (ts.isVariableStatement(statement)) {
 				for (const declaration of statement.declarationList.declarations)
 					visitDirectRoot(declaration.initializer);
+			} else if (
+				ts.isExpressionStatement(statement) ||
+				(ts.isExportAssignment(statement) && !statement.isExportEquals)
+			) {
+				visitDirectRoot(statement.expression);
+			}
+		}
+		for (const statement of sf.statements) {
+			if (ts.isIfStatement(statement)) {
+				const condition = skipParens(statement.expression);
+				if (
+					ts.isPropertyAccessExpression(condition) &&
+					!ts.isOptionalChain(condition) &&
+					condition.name.text === 'main' &&
+					ts.isMetaProperty(condition.expression) &&
+					condition.expression.keywordToken === ts.SyntaxKind.ImportKeyword &&
+					condition.expression.name.text === 'meta'
+				) {
+					const body = statement.thenStatement;
+					if (ts.isBlock(body)) body.statements.forEach(visitEntryStatement);
+					else visitEntryStatement(body);
+				}
 			} else if (
 				ts.isFunctionDeclaration(statement) &&
 				statement.body &&
@@ -776,7 +798,7 @@ export function reactServerComponents(
 			) {
 				for (const bodyStatement of statement.body.statements)
 					if (ts.isReturnStatement(bodyStatement)) visitDirectRoot(bodyStatement.expression);
-			}
+			} else visitEntryStatement(statement);
 		}
 	} else visit(sf);
 	return edges;
