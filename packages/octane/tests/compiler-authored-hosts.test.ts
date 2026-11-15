@@ -15,6 +15,62 @@ function fixture(source: string, server = false) {
 
 describe('authored host JSX', () => {
 	it.each([
+		{
+			name: 'a destructured parameter used as text',
+			source: `export function App({ value: undefined, title }: { value: string; title: string }) @{
+				<section title={title}>{undefined as string}</section>
+			}`,
+			first: { value: 'first', title: 'before' },
+			next: { value: 'second', title: 'after' },
+			initial: '<section title="before">first</section>',
+			updated: '<section title="after">second</section>',
+		},
+		{
+			name: 'a setup local used as raw HTML',
+			source: `export function App(props: { html: string }) @{
+				const undefined = { __html: props.html };
+				<section dangerouslySetInnerHTML={undefined}>{null}</section>
+			}`,
+			first: { html: '<b>first</b>' },
+			next: { html: '<i>second</i>' },
+			initial: '<section><b>first</b></section>',
+			updated: '<section><i>second</i></section>',
+		},
+	])(
+		'mounts, hydrates and updates with $name named undefined',
+		({ source, first, next, initial, updated }) => {
+			const { App } = fixture(source);
+			const { App: ServerApp } = fixture(source, true);
+			const container = document.createElement('div');
+			const serverHtml = renderToString(ServerApp, first).html;
+			container.innerHTML = serverHtml;
+			expect(container.querySelector('section')?.outerHTML).toBe(initial);
+
+			for (const hydrate of [false, true]) {
+				container.innerHTML = hydrate ? serverHtml : '';
+				const original = container.querySelector('section');
+				const onRecoverableError = vi.fn();
+				const root = hydrate
+					? hydrateRoot(container, App, first, { onRecoverableError })
+					: createRoot(container);
+				try {
+					if (!hydrate) flushSync(() => root.render(App, first));
+					const host = container.querySelector('section');
+					expect(host?.outerHTML).toBe(initial);
+					if (hydrate) expect(host).toBe(original);
+
+					flushSync(() => root.render(App, next));
+					expect(container.querySelector('section')).toBe(host);
+					expect(host?.outerHTML).toBe(updated);
+					expect(onRecoverableError).not.toHaveBeenCalled();
+				} finally {
+					root.unmount();
+				}
+			}
+		},
+	);
+
+	it.each([
 		'label(ready)',
 		'((label as (ready: boolean) => string)(ready as boolean) as string)',
 		'(label!(ready!) satisfies string)',
