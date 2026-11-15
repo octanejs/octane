@@ -69,6 +69,7 @@ const FRAME = Symbol.for('octane-motion:frame');
 const HOST_REF = Symbol.for('octane-motion:hostRef');
 const ENTER = Symbol.for('octane-motion:enter');
 const ANIMATE = Symbol.for('octane-motion:animate');
+const ANIMATE_COMPLETE = Symbol.for('octane-motion:animate-complete');
 const GESTURE = Symbol.for('octane-motion:gesture');
 const EXIT = Symbol.for('octane-motion:exit');
 const LAYOUT = Symbol.for('octane-motion:layout');
@@ -446,6 +447,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 			() =>
 				({
 					host: { current: null as HTMLElement | null },
+					animationComplete: undefined,
 					initialAnimationKey: initialLabel === false ? true : null,
 					frame: firstFrame(
 						tag,
@@ -545,6 +547,20 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		// If we're a stagger child, fold in our per-child delay (our index + the sibling
 		// count are both known by now — all children registered during the parent render).
 		const animationKey = stableKey(resolvedAnimate);
+		const animationComplete = props.onAnimationComplete;
+		// An existing animation can finish after a render that never commits.
+		if (animationEnabled && resolvedAnimate && animationComplete) {
+			useInsertionEffect(
+				() => {
+					latest.animationComplete = animationComplete;
+					return () => {
+						latest.animationComplete = undefined;
+					};
+				},
+				[animationComplete],
+				ANIMATE_COMPLETE,
+			);
+		}
 		// The first-frame style is captured during render, including hidden Activity
 		// mounts whose first layout effect may see a different target.
 		if (latest.initialAnimationKey === true) latest.initialAnimationKey = animationKey;
@@ -575,9 +591,21 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 						if (delay > 0) t = { ...(t || {}), delay: (t?.delay || 0) + delay };
 					}
 					const controls = animateTarget(node, resolvedAnimate, t, latest.shouldReduceMotion);
-					if (props.onAnimationComplete)
-						whenDone(controls, () => props.onAnimationComplete(animateLabel));
-					return () => controls.stop();
+					let active = true;
+					whenDone(controls, () => {
+						const complete = latest.animationComplete;
+						if (!active || !complete) return;
+						try {
+							complete(animateLabel);
+						} catch (error) {
+							if (typeof reportError === 'function') reportError(error);
+							else console.error(error);
+						}
+					});
+					return () => {
+						active = false;
+						controls.stop();
+					};
 				}
 			},
 			[animationEnabled, animationKey, stableKey(transition), shouldReduceMotion],

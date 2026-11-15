@@ -14,8 +14,8 @@ export function VariantCompletion({
 	target,
 	onComplete,
 }: {
-	target: string | { opacity: number };
-	onComplete: (definition: unknown) => void;
+	target?: string | { opacity: number };
+	onComplete?: (definition: unknown) => void;
 }) @{
 	<motion.div variants={PV} initial={false} animate={target} onAnimationComplete={onComplete} />
 }
