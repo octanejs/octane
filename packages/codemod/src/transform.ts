@@ -2254,6 +2254,28 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 	private svgRead?: ReturnType<typeof svgLocalReads>;
 	private nativeSvgProps?: ReturnType<typeof forwardedProps>;
 	private provenSvgOwners?: Set<ts.Node>;
+	private provenOutputOwners?: Set<ts.Node>;
+	/** A direct component-value entry into one of the installed native server renderers. */
+	private nativeSvgServerEntry(ref: ts.Identifier) {
+		let argument: ts.Expression = ref;
+		while (ts.isParenthesizedExpression(argument.parent)) argument = argument.parent;
+		const call = argument.parent;
+		if (
+			!ts.isCallExpression(call) ||
+			call.arguments[0] !== argument ||
+			call.arguments.length > 3 ||
+			ts.isOptionalChain(call) ||
+			call.arguments.some(ts.isSpreadElement)
+		)
+			return false;
+		const entry = this.directImportedValue(skipParens(call.expression))?.entry;
+		return (
+			entry?.module === 'octane/server' &&
+			(entry.imported === 'renderToString' || entry.imported === 'renderToStaticMarkup') &&
+			this.options.originalSvgServer === true
+		);
+	}
+
 	private nativeOutput(
 		value: ts.Node,
 		uses: ReturnType<typeof localUses>,
@@ -2274,9 +2296,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		const first = nativeOutputOwner(value, slot, destination);
 		if (!first) return false;
 		const pending = [first];
-		const proven = (this.provenSvgOwners ??= new Set());
+		const proven = unproven
+			? (this.provenSvgOwners ??= new Set())
+			: (this.provenOutputOwners ??= new Set());
 		const seen = new Set<ts.Node>();
-		let exported = false;
+		let reachesRenderer = false;
 		// A local function can hand its return value to another renderer. Follow every
 		// use of its binding, including uses of a component that also has an export.
 		while (pending.length) {
@@ -2289,14 +2313,14 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			)
 				return false;
 			if (proven.has(fn)) {
-				exported = true;
+				reachesRenderer = true;
 				continue;
 			}
 			if (seen.has(fn)) continue;
 			seen.add(fn);
 			const parent = fn.parent;
 			if (ts.isExportAssignment(parent) && parent.parent === this.sf) {
-				exported = true;
+				reachesRenderer = true;
 				continue;
 			}
 			const variable =
@@ -2311,11 +2335,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			const refs = name && ts.isIdentifier(name) ? renderUses(uses(name)) : [];
 			const directExport = statement.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
 			if (!refs.length && !directExport) return false;
-			if (directExport) exported = true;
+			if (directExport) reachesRenderer = true;
 			for (const ref of refs) {
 				const tag = ref.parent;
 				if (ts.isExportSpecifier(tag) || ts.isExportAssignment(tag)) {
-					exported = true;
+					reachesRenderer = true;
 					continue;
 				}
 				if (
@@ -2325,8 +2349,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 						ts.isJsxClosingElement(tag)
 					) ||
 					tag.tagName !== ref
-				)
-					return false;
+				) {
+					if (!unproven || !this.nativeSvgServerEntry(ref)) return false;
+					reachesRenderer = true;
+					continue;
+				}
 				const owner = nativeOutputOwner(
 					ts.isJsxSelfClosingElement(tag) ? tag : tag.parent,
 					slot,
@@ -2336,8 +2363,8 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				pending.push(owner);
 			}
 		}
-		if (exported) proven.add(first);
-		return exported;
+		if (reachesRenderer) proven.add(first);
+		return reachesRenderer;
 	}
 
 	/** Keep the imported React component as the type of the element the service receives. */
