@@ -367,6 +367,11 @@ export function isComputedReactHookOrRef(name: string) {
 	return name === 'createRef' || (name.startsWith('use') && OCTANE_VALUES.has(name));
 }
 
+/** Whether a React value type query can name an actual Octane export. */
+export function hasOctaneValue(name: string) {
+	return OCTANE_VALUES.has(name);
+}
+
 /** The Octane name for `React.<name>` in a type position. */
 export function mapQualifiedType(name: string): string | null {
 	if (name in QUALIFIED_TYPE_PREFERENCES) return QUALIFIED_TYPE_PREFERENCES[name];

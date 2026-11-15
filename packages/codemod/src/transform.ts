@@ -37,6 +37,7 @@ import {
 	TEXT_FIELD_COMPONENTS,
 	TEXT_INPUT_TYPES,
 	UNSUPPORTED_VALUES,
+	hasOctaneValue,
 	isComputedReactHookOrRef,
 	mapPackageExport,
 	mapQualifiedType,
@@ -4111,12 +4112,21 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		if (module === undefined) return this.rewriteSpecifier(node, specifier);
 		const qualifier = node.qualifier;
 		const name = qualifier && ts.isIdentifier(qualifier) ? qualifier.text : null;
-		if (
-			node.isTypeOf &&
-			name &&
-			mapReactImport(specifier.text, name, true)?.module === specifier.text
-		) {
-			return null;
+		let missingValue = false;
+		if (specifier.text === 'react' && node.isTypeOf && qualifier) {
+			let value = qualifier;
+			while (ts.isQualifiedName(value)) value = value.left;
+			const retained = mapReactImport('react', value.text, true)?.module === 'react';
+			if (retained && value === qualifier) return null;
+			if (!retained && !hasOctaneValue(value.text)) {
+				missingValue = true;
+				this.note(
+					REACT_TYPE_PROJECTION,
+					'error',
+					value,
+					`Octane has no value export \`${value.text}\`.`,
+				);
+			}
 		}
 		if (specifier.text === 'react' && !node.isTypeOf) {
 			const event = this.nativeEventType(node, name);
@@ -4126,8 +4136,8 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			}
 		}
 		this.count(RULE.import);
-		const renamed = name === null ? null : mapQualifiedType(name);
-		if (name !== null && renamed === null) {
+		const renamed = name === null || missingValue ? null : mapQualifiedType(name);
+		if (name !== null && renamed === null && !missingValue) {
 			const unresolvedProjection = specifier.text === 'react' && !node.isTypeOf;
 			this.note(
 				unresolvedProjection ? REACT_TYPE_PROJECTION : RULE.unsupported,
@@ -4595,12 +4605,22 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		) {
 			return null;
 		}
-		if (ts.isTypeQueryNode(node.parent)) {
-			const mapped = mapReactImport(namespace?.module ?? 'react', node.right.text, true);
-			if (mapped?.module === 'react') {
+		let queried: ts.QualifiedName = node;
+		if (namespace?.module === 'react') {
+			while (ts.isQualifiedName(queried.parent) && queried.parent.left === queried)
+				queried = queried.parent;
+		}
+		if (ts.isTypeQueryNode(queried.parent) && queried.parent.exprName === queried) {
+			const name = node.right.text;
+			const mapped = mapReactImport(namespace?.module ?? 'react', name, true);
+			if (mapped?.module === 'react' && queried === node) {
 				if (!namespace) return null;
 				this.count(RULE.import);
 				return this.require(mapped.module, mapped.name, true);
+			}
+			if (namespace?.module === 'react' && mapped?.module !== 'react' && !hasOctaneValue(name)) {
+				this.note(REACT_TYPE_PROJECTION, 'error', node, `Octane has no value export \`${name}\`.`);
+				return null;
 			}
 		}
 		const name = mapQualifiedType(node.right.text);

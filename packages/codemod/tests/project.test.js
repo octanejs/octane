@@ -5789,6 +5789,19 @@ export * from './View.tsrx';`,
 		],
 		['inline', "export type Props = import('react').ConsumerProps<string>;"],
 		['re-export', "export type { ReactNode, ConsumerProps } from 'react';"],
+		[
+			'value query on a namespace',
+			"import type * as React from 'react'; export type Props = React.ComponentProps<typeof React.Profiler>;",
+		],
+		['inline value query', "export type Factory = typeof import('react').Profiler;"],
+		[
+			'qualified value query on a namespace',
+			"import * as React from 'react'; export type Length = typeof React.Profiler.length; export const value = React.memo;",
+		],
+		[
+			'inline qualified value query',
+			"export type Length = typeof import('react').Profiler.length;",
+		],
 	])(
 		'previews and blocks an unresolved React type projection before writing (%s)',
 		(_kind, projection) => {

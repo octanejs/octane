@@ -1590,6 +1590,42 @@ export type Qualified = typeof R.createRef;`,
 		expect(code).toContain('Node = OctaneNode');
 	});
 
+	it('does not map a React value query using type-only exports', () => {
+		const { code, notes } = transformModule(
+			`import type * as R from 'react';
+			declare module 'react' { const ReactNode: { token: string }; }
+			export type Inline = typeof import('react').ReactNode;
+			export type Qualified = typeof R.ReactNode.token;`,
+			'types.ts',
+		);
+		expect(notes.filter(({ rule }) => rule === 'react-type-projection')).toEqual([
+			expect.objectContaining({ severity: 'error', line: 3 }),
+			expect.objectContaining({ severity: 'error', line: 4 }),
+		]);
+		expect(code).toContain("export type Inline = typeof import('octane').ReactNode;");
+	});
+
+	it('preserves value queries for the React allocator and leaves other owners alone', () => {
+		const { code, notes } = transformModule(
+			`import type * as R from 'react';
+			import type { createRef } from 'react';
+			export type Allocator = typeof createRef;
+			export type InlineAllocator = typeof import('react').createRef;
+			export type Memo = typeof R.memo;
+			export type InlineMemo = typeof import('react').memo;
+			export function read(createRef: 42, R: { Profiler: string }) {
+				const value: typeof createRef = createRef;
+				const other: typeof R.Profiler = R.Profiler;
+				return [value, other];
+			}`,
+			'types.ts',
+		);
+		expect(notes.some(({ rule }) => rule === 'react-type-projection')).toBe(false);
+		expect(code).toContain("export type InlineAllocator = typeof import('react').createRef;");
+		expect(code).toContain("export type InlineMemo = typeof import('octane').memo;");
+		expect(code).toContain('const other: typeof R.Profiler = R.Profiler;');
+	});
+
 	it('reports explicit React type re-exports when Octane lacks the authored spelling', () => {
 		const { code, notes } = transformModule(
 			`export type { ConsumerProps as Props, SyntheticEvent, ReactNode, useState } from 'react';
