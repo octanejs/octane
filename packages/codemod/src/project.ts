@@ -640,6 +640,14 @@ export async function runCodemod(
 	}
 	const { inputFactory, changedJsxExport, helperFunction, localFile, exportsConstObject } =
 		storeSources(root, config, unchangedStoreInput, (file) => renames.has(file));
+	let selectedInPlace: Set<string> | undefined;
+	function writesSelectedInput(file: string) {
+		// An in-place write through a symlink changes its physical target.
+		selectedInPlace ??= new Set(
+			[...known].filter((f) => !renames.has(f) && !conflicts.has(f)).map((f) => fs.realpathSync(f)),
+		);
+		return selectedInPlace.has(fs.realpathSync(file));
+	}
 	const noClasses = new Set<string>();
 	const localClasses = new Map<string, ReadonlySet<string>>();
 	function localReactClass(from: string, module: string, name: string) {
@@ -662,7 +670,12 @@ export async function runCodemod(
 			return renamed(from, module)?.file === file ? 'error' : 'warning';
 	}
 	const localHints = new Map<string, Map<string, string>>();
-	function initializerResourceHint(from: string, module: string, name: string) {
+	function initializerResourceHint(
+		from: string,
+		module: string,
+		name: string,
+		retainedOnly = false,
+	) {
 		const file = localFile(from, module);
 		if (
 			!file ||
@@ -683,7 +696,9 @@ export async function runCodemod(
 			}
 			localHints.set(file, calls);
 		}
-		return calls.get(name);
+		const hint = calls.get(name);
+		if (hint && (!retainedOnly || (fs.statSync(file).nlink === 1 && !writesSelectedInput(file))))
+			return hint;
 	}
 
 	const localHooks = new Map<
@@ -757,7 +772,6 @@ export async function runCodemod(
 			return false;
 		}
 	}
-	let selectedInPlace: Set<string> | undefined;
 	function localReactHook(from: string, module: string, name: string, nativeOnly: boolean) {
 		if (
 			catalogName(module) !== null ||
@@ -841,11 +855,7 @@ export async function runCodemod(
 			fs.statSync(file).nlink > 1
 		)
 			return;
-		// Writing an unrenamed selection through a symlink changes its physical target.
-		selectedInPlace ??= new Set(
-			[...known].filter((f) => !renames.has(f) && !conflicts.has(f)).map((f) => fs.realpathSync(f)),
-		);
-		if (selectedInPlace.has(fs.realpathSync(file))) return;
+		if (writesSelectedInput(file)) return;
 		if (!hook)
 			return retainedStore
 				? ({ retainedStore: true } as const)
@@ -1231,7 +1241,8 @@ export async function runCodemod(
 					originalReactEntry(file, module, bindingOptions(file)) &&
 					originalOctaneBridge(file, 'octane/server'),
 				initializerResourceHint: renames.has(file)
-					? (module, name) => initializerResourceHint(file, module, name)
+					? (module, name, retainedOnly) =>
+							initializerResourceHint(file, module, name, retainedOnly)
 					: undefined,
 				localReactHook: renames.has(file)
 					? (module, name, nativeOnly) => localReactHook(file, module, name, nativeOnly)
