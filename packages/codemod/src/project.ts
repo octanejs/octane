@@ -1852,7 +1852,6 @@ export async function runCodemod(
 			selected &&
 			storeHookComponents.size &&
 			result?.rules['server-render'] &&
-			result.rules['root-render'] &&
 			automaticReactJsx(file) &&
 			originalReactEntry(file, 'react-dom/server') &&
 			originalOctaneBridge(file, 'octane/server')
