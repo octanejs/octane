@@ -68,7 +68,7 @@ function fixture(replacements = {}) {
 		library,
 		planner,
 		plan: (name = 'useSnapshot', file = path.join(out, 'pane.tsx')) =>
-			planner('observer', name, file),
+			planner('observer', name, file)?.plan ?? null,
 	};
 }
 
@@ -734,6 +734,195 @@ it('warns when an existing Octane server renderer imports a migrated store consu
 	expect(plain()).toContain('<b>plain</b>');
 	expect(hosted()).toContain('title42');
 }, 30_000);
+
+it.each([
+	['direct', 'read(current)', false],
+	['nested', 'valueOf(read(current))', false],
+	['local forwarding', 'read(current)', false, false, 'useForward(value)'],
+	['grouped local forwarding', 'read(current)', false, false, '(useForward(value))'],
+	[
+		'type-asserted local forwarding',
+		'read(current)',
+		false,
+		false,
+		'((useForward(value)! as number) satisfies number)',
+	],
+	['named alongside star', 'read(current)', true],
+	['parent-relative barrel', 'read(current)', false, true],
+	['same-file named export', 'read(current)', false, false, 'useForward(value)', 'useChannel'],
+	[
+		'same-file mixed type export',
+		'read(current)',
+		false,
+		false,
+		'useForward(value)',
+		'useChannel, type Options',
+	],
+	[
+		'same-file aliased export',
+		'read(current)',
+		false,
+		false,
+		'useForward(value)',
+		'useChannel as useSnapshot',
+	],
+])(
+	'warns about a retained wrapper through a %s linked hook',
+	async (_case, read, named, parent, forwarding, localExport) => {
+		const view = (name) => `import { ${name} as read } from './helper';
+export function Pane() { const value = read(); return <p>{String(value)}</p>; }`;
+		const { app, library, plan } = project({
+			'observer/entry.ts': named
+				? "export * from './state'; export { useSnapshot, useMaybe } from './api';"
+				: "export * from './api'; export { valueOf } from './state';",
+			'observer/state.ts': `export function valueOf(x: number) { return x; }
+export function useSnapshot() { return 0; }`,
+			'observer/api/index.ts': parent
+				? "export { useChannel as useSnapshot, useMaybe } from '../implementation/hooks';"
+				: localExport?.includes(' as ')
+					? "export { useSnapshot, useMaybe } from './hooks';"
+					: "export { useChannel as useSnapshot, useMaybe } from './hooks';",
+			[parent ? 'observer/implementation/hooks.ts' : 'observer/api/hooks.ts']:
+				`import { use as read } from 'react';
+import { current } from '../renderer';
+import { valueOf } from '../state';
+type Options = { value: number };
+${forwarding ? 'function useInner(value: number): number;' : ''}
+${forwarding ? 'function useInner' : 'export function useChannel'}(value: number) {
+	const checked = valueOf(value);
+	if (checked) { const snapshot = ${read}; return snapshot; }
+	return ${read};
+}
+${
+	forwarding
+		? `function useForward(value: number) { return useInner(value); }
+${localExport ? '' : 'export '}function useChannel(value: number) { return ${forwarding}; }
+${localExport ? `export { ${localExport} };` : ''}`
+		: ''
+}
+export function useMaybe(value: number) {
+	return valueOf(value ? read(current) : value);
+}`,
+			'app/src/helper.ts': `import { useSnapshot as reading, useMaybe as maybe, valueOf } from 'observer';
+export function useReading() { return reading(valueOf(1)); }
+export function useAsserted() { return ((reading(valueOf(1))! as number) satisfies number); }
+export function useProperty() { return (reading(valueOf(1)) as unknown[]).length; }
+export function useOptionalCall() { return (reading?.(1) as number); }
+export function useOptional() { return maybe(1); }`,
+			'app/src/asserted.tsx': view('useAsserted'),
+			'app/src/pane.tsx': view('useReading'),
+			'app/src/namespace.tsx': `import * as hooks from './helper';
+export function Pane() {
+	const first = hooks.useReading();
+	const second = hooks['useReading']();
+	return <><p>{String(first)}</p><p>{String(second)}</p></>;
+}`,
+			'app/src/optional-namespace.tsx': `import * as hooks from './helper';
+export function Pane() { const value = hooks.useReading?.(); return <p>{String(value)}</p>; }`,
+			'app/src/property.tsx': view('useProperty'),
+			'app/src/optional-call.tsx': view('useOptionalCall'),
+			'app/src/optional.tsx': view('useOptional'),
+		});
+		const run = (projectTypes) =>
+			runCodemod(
+				[
+					'asserted',
+					'namespace',
+					'optional-namespace',
+					'pane',
+					'property',
+					'optional-call',
+					'optional',
+				].map((name) => path.join(app, 'src', name + '.tsx')),
+				{
+					root: app,
+					strong: true,
+					verify: true,
+					write: false,
+					projectTypes,
+				},
+			);
+		const warnings = ({ files }) =>
+			files.flatMap((file) =>
+				file.notes
+					.filter((note) => note.message.includes('through the original workspace entry'))
+					.map((note) => [file.file, note.severity]),
+			);
+		for (const projectTypes of [true, false]) {
+			const result = await run(projectTypes);
+			expect(warnings(result)).toEqual([
+				['src/asserted.tsx', 'warning'],
+				['src/namespace.tsx', 'warning'],
+				['src/pane.tsx', 'warning'],
+			]);
+			expect(result.files.find((file) => file.file === 'src/pane.tsx')).toMatchObject({
+				strong: true,
+				code: expect.stringContaining("from './helper'"),
+			});
+		}
+		if (forwarding) {
+			expect(plan()?.name).toBe(
+				localExport || forwarding.startsWith('(') ? undefined : 'useChannel',
+			);
+		}
+		fs.writeFileSync(path.join(library, 'api.js'), 'export function useSnapshot() { return 1; }');
+		expect(warnings(await run(true))).toEqual([]);
+		if (parent) {
+			fs.unlinkSync(path.join(library, 'api.js'));
+			const outside = path.join(app, '../outside');
+			fs.mkdirSync(outside);
+			const hooks = path.join(library, 'implementation/hooks.ts');
+			fs.writeFileSync(
+				path.join(outside, 'hooks.ts'),
+				fs.readFileSync(hooks, 'utf8').replaceAll("from '../", "from '../observer/"),
+			);
+			fs.writeFileSync(
+				path.join(library, 'api/index.ts'),
+				"export { useChannel as useSnapshot, useMaybe } from '../../outside/hooks';",
+			);
+			expect(warnings(await run(true))).toEqual([]);
+		}
+	},
+);
+
+it.each([
+	['an empty record', '{}', true],
+	['a scalar', '0', true],
+	['a property read', 'settings.options', false],
+	['a renderer hook used as a default', 'read(current)', false],
+])('checks a retained store hook with %s default', async (_case, initializer, expected) => {
+	const { app } = project({
+		'observer/entry.ts':
+			"export { valueOf } from './state'; export { useChannel as useSnapshot } from './react-hooks';",
+		'observer/react-hooks.ts': `import { use as read } from 'react';
+import { current } from './renderer';
+import { valueOf } from './state';
+${initializer === 'settings.options' ? "import { settings } from './settings';" : ''}
+export function useChannel(_value: number, options = ${initializer}) {
+	${initializer === 'read(current)' ? 'return options;' : 'return valueOf(read(current));'}
+}`,
+		'observer/settings.ts':
+			"export const settings = { get options() { throw Error('default ran'); } };",
+		'app/src/helper.ts': `import { useSnapshot } from 'observer';
+export function useReading() { return useSnapshot(1); }`,
+		'app/src/pane.tsx': `import { useReading } from './helper';
+export function Pane() { const value = useReading(); return <p>{String(value)}</p>; }`,
+	});
+	for (const projectTypes of [true, false]) {
+		const { files } = await runCodemod([path.join(app, 'src/pane.tsx')], {
+			root: app,
+			strong: true,
+			verify: true,
+			write: false,
+			projectTypes,
+		});
+		const pane = files.find((file) => file.file === 'src/pane.tsx');
+		expect(pane.code).toContain("from './helper'");
+		expect(
+			pane.notes.some((note) => note.message.includes('through the original workspace entry')),
+		).toBe(expected);
+	}
+});
 
 it('previews, writes and reuses hook helpers without changing a linked dependency', async () => {
 	const source = `import {useSnapshot as useReading, valueOf} from 'observer';
@@ -2442,7 +2631,7 @@ it('emits identical companions from parent and nested links to the same workspac
 		path.join(app, 'src'),
 		path.join(app, 'src/store-context.tsrx'),
 	);
-	const nested = nestedFirst('observer', 'useSnapshot', file),
+	const nested = nestedFirst('observer', 'useSnapshot', file)?.plan,
 		parent = outer();
 	expect(nested?.files).toEqual(parent?.files);
 	expect(nested?.files.size).toBeGreaterThan(0);
