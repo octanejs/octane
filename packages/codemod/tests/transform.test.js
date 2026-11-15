@@ -619,7 +619,7 @@ export type Qualified = typeof R.createRef;`,
 
 	it('retains static Touch queries alongside migrated named hooks', () => {
 		const { code } = transformModule(
-			`import React, { useState } from 'react';
+			`import React,{ useState }from 'react';
 			 declare module 'react' { export namespace Touch { const loose: any } }
 			 export type Deep = typeof React.Touch.loose.more;
 			 export function useCounter() { return useState(0); }`,
@@ -733,6 +733,46 @@ export type Qualified = typeof R.createRef;`,
 		expect(code).toContain('[RD.Touch, RD.Touch.Metadata, typeof RD.Touch.token,');
 		expect(code.match(/import\('react-dom'\)\.Touch/g)).toHaveLength(2);
 		expect(notes.filter((note) => note.rule === 'unsupported-api')).toHaveLength(5);
+	});
+
+	it.each([
+		["import type * as R from 'react';", 'interface A extends R.Touch {}'],
+		["import type R from 'react';", 'declare class A implements R.Touch {}'],
+		['', 'interface A extends React.Touch {}'],
+	])('maps a portable Touch base in type-only heritage (%s)', (importLine, declaration) => {
+		const { code, notes } = transformModule(`${importLine} export ${declaration}`, 'points.ts');
+		expect(code).toContain("import type { Touch } from 'octane';");
+		expect(code).toContain(declaration.replace(/(?:R|React)\.Touch/, 'Touch'));
+		expect(notes).toEqual([]);
+	});
+
+	it.each([
+		["import type * as R from 'react' with { 'resolution-mode': 'require' };", 'R.Touch'],
+		["import type * as R from 'react-dom';", 'R.Touch'],
+		['', 'React.Touch'],
+	])(
+		'retains authored Touch heritage when its module binding cannot move (%s)',
+		(importLine, type) => {
+			const source = `${importLine} interface A extends ${type} {}`;
+			const { code } = transformModule(source, 'points.ts');
+			expect(code).toBe(source);
+		},
+	);
+
+	it('does not map a Touch constructor or a locally declared Touch base', () => {
+		const { code, notes } = transformModule(
+			`import * as R from 'react';
+			 export class Constructor extends R.Touch {}
+			 export namespace Local {
+			   export interface Touch {}
+			   export interface Point extends Local.Touch {}
+			 }`,
+			'points.ts',
+		);
+		expect(code).not.toContain('import type { Touch }');
+		expect(code).toContain('class Constructor extends R.Touch');
+		expect(code).toContain('interface Point extends Local.Touch');
+		expect(notes).toContainEqual(expect.objectContaining({ rule: 'unsupported-api' }));
 	});
 
 	it('keeps global React Touch property queries and nested types intact', () => {

@@ -4375,7 +4375,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				typeNamespaces.push(
 					clause.name && bindings && ts.isNamedImports(bindings)
 						? this.source.slice(node.getStart(this.sf), clause.name.end) +
-								this.source.slice(clause.end, node.end)
+								this.source.slice(clause.end, node.end).replace(/^from\b/, ' from')
 						: node.getText(this.sf),
 				);
 			} else if (namespace && this.used.has(namespace)) {
@@ -4767,6 +4767,43 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		node: ts.TypeReferenceNode | ts.ExpressionWithTypeArguments,
 		name: ts.EntityName | ts.Expression,
 	) {
+		// Type heritage parses a qualified name as a property access expression.
+		if (
+			ts.isExpressionWithTypeArguments(node) &&
+			ts.isPartOfTypeNode(node) &&
+			ts.isPropertyAccessExpression(name) &&
+			!name.questionDotToken &&
+			ts.isIdentifier(name.expression) &&
+			name.name.text === 'Touch'
+		) {
+			const receiver = name.expression;
+			const entry = this.importOf(receiver);
+			const declaration = this.declarationOf(receiver);
+			if (entry?.namespace && (entry.module === 'react' || entry.module === 'react-dom')) {
+				const clause =
+					declaration && (ts.isNamespaceImport(declaration) ? declaration.parent : declaration);
+				if (
+					clause &&
+					ts.isImportClause(clause) &&
+					(clause.parent.attributes || entry.module === 'react-dom')
+				) {
+					this.reportRetainedTouchType(entry.module, name, false, false);
+					this.retainedTypeNamespaces.add(clause);
+					return name.getText(this.sf) + this.span(node, name.end, node.end, PLAIN);
+				}
+			}
+			if (
+				(entry?.namespace && entry.module === 'react') ||
+				(!entry &&
+					!declaration &&
+					this.isGlobalNamespace(receiver, 'React') &&
+					ts.isExternalModule(this.sf))
+			) {
+				this.count(RULE.import);
+				return this.require('octane', 'Touch', true) + this.span(node, name.end, node.end, PLAIN);
+			}
+		}
+
 		// The global `JSX` namespace React's types declared is Octane's export.
 		if (ts.isQualifiedName(name) && this.isGlobalNamespace(name.left, 'JSX'))
 			this.require('octane', 'JSX', true);
