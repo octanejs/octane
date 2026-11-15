@@ -8,6 +8,7 @@ import { shallow } from '@octanejs/zustand/shallow';
 import { useStore } from '../../hooks/useStore';
 import { MiniMapNode } from './MiniMapNode.tsrx';
 import type { ReactFlowState, Node } from '../../types';
+import type { AllowUndefined } from '../../types/allow-undefined-props';
 import type {
 	MiniMapNodes as MiniMapNodesProps,
 	GetMiniMapNodeAttribute,
@@ -32,7 +33,7 @@ function MiniMapNodes<NodeType extends Node>({
 	 */
 	nodeComponent: NodeComponent = MiniMapNode,
 	onClick,
-}: MiniMapNodesProps<NodeType>) {
+}: AllowUndefined<MiniMapNodesProps<NodeType>, keyof MiniMapNodesProps<NodeType>>) {
 	const nodeIds = useStore(selectorNodeIds, shallow);
 	const nodeColorFunc = getAttrFunction<NodeType>(nodeColor);
 	const nodeStrokeColorFunc = getAttrFunction<NodeType>(nodeStrokeColor);
@@ -84,7 +85,7 @@ function NodeComponentWrapperInner<NodeType extends Node>({
 	nodeStrokeColorFunc: GetMiniMapNodeAttribute<NodeType>;
 	nodeClassNameFunc: GetMiniMapNodeAttribute<NodeType>;
 	nodeBorderRadius: number;
-	nodeStrokeWidth?: number;
+	nodeStrokeWidth: number | undefined;
 	NodeComponent: ComponentType<MiniMapNodeProps>;
 	onClick: MiniMapNodesProps['onClick'];
 	shapeRendering: string;
