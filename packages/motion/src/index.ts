@@ -26,6 +26,7 @@ import {
 	visualElementStore,
 	type MotionValue,
 } from 'motion-dom';
+import { getRendererOwnerVisibility } from 'octane/internal/client';
 import {
 	createElement,
 	useContext,
@@ -35,6 +36,7 @@ import {
 	useMemo,
 	useState,
 	type OctaneElement,
+	type Scope,
 } from 'octane';
 import {
 	LayoutGroupContext,
@@ -395,7 +397,7 @@ export type MotionComponent = (props: any, scope: any) => OctaneElement;
 function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionComponent {
 	const svg = !tag.includes('-') && (svgHost.test(tag) || /[A-Z]/.test(tag));
 	const svgRoot = svg && isSVGTag(tag);
-	return function MotionComponent(props: any) {
+	return function MotionComponent(props: any, scope: Scope) {
 		const config = useContext(MotionConfigContext);
 		const layoutGroup = useContext(LayoutGroupContext);
 		const lazy = useContext(LazyMotionContext);
@@ -919,6 +921,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 				if (!latest.animationEnabled) return;
 				const exit = latest.exit;
 				if (!exit || !n || !n.isConnected || n.parentNode == null) return;
+				if (!scope.block.disposed && getRendererOwnerVisibility(scope) !== 'visible') return;
 				const parent = n.parentNode as HTMLElement;
 				const clone = n.cloneNode(true) as HTMLElement;
 				const rect = n.getBoundingClientRect();

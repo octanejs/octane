@@ -17,6 +17,7 @@ interface Options {
 	width: number;
 	left: number;
 	mode: 'visible' | 'hidden';
+	exit?: boolean;
 	cached: boolean;
 	barrierAfter: number;
 	boundaries: boolean;
@@ -52,6 +53,7 @@ function Rows(props: Options) {
 			id: `row-${i}`,
 			key: i,
 			layout: true,
+			exit: props.exit ? { opacity: 0, transition: { duration: 1 } } : undefined,
 			transition: { duration: 0 },
 			className: 'row',
 			style: { width: `${props.width}px`, height: '20px', transform: 'translateX(2px)' },
