@@ -35,6 +35,8 @@ export interface TransformOptions {
 	retainedRegistry?(specifier: string): ts.SourceFile | undefined;
 	/** The issuer resolves the original installed React runtime and types. */
 	originalReact?: boolean;
+	/** The authored React bridge and its direct component import still resolve to React. */
+	retainedReactBridgeComponent?(bridge: string, module: string, name: string): boolean;
 	/** The issuer resolves the original React DOM server entry that this call will migrate. */
 	originalReactServerEntry?(module: string): boolean;
 	/** A React DOM resource hint called by an imported plain TypeScript initializer. */
