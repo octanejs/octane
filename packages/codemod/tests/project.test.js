@@ -50,6 +50,60 @@ function typecheckProject(root) {
 }
 
 describe('runCodemod', () => {
+	it.each(['./context.ts', '@/context'])(
+		'reports a native root that would render a retained React context from %s',
+		async (specifier) => {
+			const context =
+				"import { createContext as factory } from 'react'; export const State = factory<string | null>(null);";
+			const root = fs.realpathSync(
+				project({
+					'tsconfig.json': JSON.stringify({
+						compilerOptions: {
+							strict: true,
+							jsx: 'react-jsx',
+							moduleResolution: 'bundler',
+							paths: { '@/*': ['./*'] },
+						},
+					}),
+					'context.ts': context,
+					'native.ts': context.replace("from 'react'", "from 'octane'"),
+					'View.tsx': `import { State as Provider } from '${specifier}';
+					export function View() { return <Provider value="ready"><b>hello</b></Provider>; }`,
+					'Native.tsx':
+						"import { State as Provider } from './native.ts'; export function Native() { return <Provider value='ready'><b>hello</b></Provider>; }",
+					'Shadow.tsx': `import { State as Provider } from '${specifier}';
+					export function Shadow(Provider: typeof import('react').Fragment) { return <Provider><b>hello</b></Provider>; }`,
+				}),
+			);
+			fs.symlinkSync(
+				path.resolve(import.meta.dirname, '../node_modules'),
+				path.join(root, 'node_modules'),
+				'dir',
+			);
+			const run = (/** @type {string[]} */ files) =>
+				runCodemod(
+					files.map((file) => path.join(root, file)),
+					{
+						root,
+						strong: true,
+						verify: true,
+						write: false,
+					},
+				);
+			const includesAdvisory = (/** @type {import('../dist/types.js').FileResult} */ file) =>
+				file.notes.find((note) => note.rule === 'retained-react-context');
+			const report = await run(['View.tsx', 'Native.tsx', 'Shadow.tsx']);
+			const consumer = report.files.find((file) => file.file === 'View.tsx');
+			expect(consumer?.strong).toBe(true);
+			expect(consumer?.code).toContain('<Provider');
+			expect(consumer && includesAdvisory(consumer)).toMatchObject({ severity: 'warning' });
+			for (const file of report.files.filter((file) => file !== consumer))
+				expect(includesAdvisory(file)).toBeUndefined();
+			const together = await run(['View.tsx', 'context.ts']);
+			expect(together.files.every((file) => includesAdvisory(file) === undefined)).toBe(true);
+		},
+	);
+
 	it('reports a direct native template root that imports a React class', async () => {
 		const boundary = `import { Component as Base, type ReactNode } from 'react';
 class Frame extends Base<{ children: ReactNode }> {

@@ -7883,6 +7883,12 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	 */
 	output(node: ts.Expression) {
 		if (isJsx(node)) {
+			if (
+				this.options.localReactContext &&
+				!ts.isJsxFragment(node) &&
+				!this.retainedReactOutput(node)
+			)
+				this.checkRetainedReactContext(node);
 			this.checkReactClassOutput(node);
 			return this.emit(node, TEMPLATE);
 		}
@@ -7976,12 +7982,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		}
 		if (!isJsx(node)) return;
 		if (!ts.isJsxFragment(node)) {
-			if (
-				this.islands.has(node) ||
-				this.unrenderable.has(node) ||
-				this.reactRendererBodies.has(node)
-			)
-				return;
+			if (this.retainedReactOutput(node)) return;
 			if (ts.isJsxSelfClosingElement(node))
 				return this.checkReactClassRoot(node, conditional, retained);
 			if (!retained && rendersOrdinaryHtmlChildren(node.openingElement)) {
@@ -8066,6 +8067,34 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		}
 	}
 
+	private retainedReactOutput(node: ts.JsxElement | ts.JsxSelfClosingElement) {
+		return (
+			this.islands.has(node) || this.unrenderable.has(node) || this.reactRendererBodies.has(node)
+		);
+	}
+
+	private directImportedComponent(node: ts.JsxElement | ts.JsxSelfClosingElement) {
+		const tag = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
+		if (!ts.isIdentifier(tag) || !isComponentName(tag.text)) return;
+		const entry = this.importOf(tag);
+		if (!entry || entry.namespace || entry.typeOnly) return;
+		const declaration = ts.findAncestor(this.declarationOf(tag)!, ts.isImportDeclaration);
+		if (declaration && !declaration.attributes) return { tag, entry };
+	}
+
+	private checkRetainedReactContext(node: ts.JsxElement | ts.JsxSelfClosingElement) {
+		const binding = this.directImportedComponent(node);
+		if (!binding) return;
+		const { tag, entry } = binding;
+		if (this.options.localReactContext?.(entry.module, entry.imported))
+			this.note(
+				'retained-react-context',
+				'warning',
+				tag,
+				`If this native template resolves \`${entry.module}\` to the retained React context \`${tag.text}\`, Octane cannot render it as a provider. Verify the runtime import and keep this render in React or migrate the context producer.`,
+			);
+	}
+
 	private checkReactClassRoot(
 		node: ts.JsxElement | ts.JsxSelfClosingElement,
 		conditional: boolean | 'map',
@@ -8073,12 +8102,9 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	) {
 		const check = this.options.localReactClass;
 		if (!check) return;
-		const tag = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
-		if (!ts.isIdentifier(tag) || !isComponentName(tag.text)) return;
-		const entry = this.importOf(tag);
-		if (!entry || entry.namespace || entry.typeOnly) return;
-		const declaration = ts.findAncestor(this.declarationOf(tag)!, ts.isImportDeclaration);
-		if (!declaration || declaration.attributes) return;
+		const binding = this.directImportedComponent(node);
+		if (!binding) return;
+		const { tag, entry } = binding;
 		const proof = check(entry.module, entry.imported);
 		if (!proof) return;
 		const severity = conditional === 'map' ? 'warning' : proof;

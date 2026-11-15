@@ -187,6 +187,33 @@ export function reactClassExports(file: string, source: string) {
 	return names;
 }
 
+/** Direct module-level const exports initialized by the real React context factory. */
+export function retainedReactContextExports(file: string, source: string) {
+	const { sf, checker } = bind(file, source);
+	const module = checker.getSymbolAtLocation(sf);
+	const names = new Set<string>();
+	if (!module) return names;
+	for (const symbol of checker.getExportsOfModule(module)) {
+		const declaration = symbol.valueDeclaration;
+		if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer)
+			continue;
+		const list = declaration.parent;
+		if (
+			(list.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
+			!ts.isVariableStatement(list.parent) ||
+			list.parent.parent !== sf ||
+			ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Ambient
+		)
+			continue;
+		const init = skipWrappers(declaration.initializer);
+		if (!ts.isCallExpression(init) || ts.isOptionalChain(init) || !ts.isIdentifier(init.expression))
+			continue;
+		const entry = imported(checker, init.expression);
+		if (entry?.module === 'react' && entry.name === 'createContext') names.add(symbol.name);
+	}
+	return names;
+}
+
 /** Original imported components handed to an authored React island. */
 export async function islandComponents(
 	file: string,
