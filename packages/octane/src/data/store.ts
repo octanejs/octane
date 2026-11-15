@@ -211,9 +211,17 @@ export interface StoreInternals {
 	record(entity: Entity<any>, id: string, value: unknown, reload: Set<Entry>): void;
 	/**
 	 * Give a read a new confirmed value; `edited` keeps its load's age and sequence, for a value
-	 * changed in part, and otherwise it loaded `age` milliseconds ago.
+	 * changed in part, and otherwise it loaded `age` milliseconds ago, by the shared owner's
+	 * request that started at `requestedAt` where one read it.
 	 */
-	rebase(entry: Entry, value: unknown, edited: boolean, reload: Set<Entry>, age?: number): void;
+	rebase(
+		entry: Entry,
+		value: unknown,
+		edited: boolean,
+		reload: Set<Entry>,
+		age?: number,
+		requestedAt?: number,
+	): void;
 	/**
 	 * A read's confirmed value as its load returned it, and when it loaded; `null` while it
 	 * has none, is stale or loading, or is a view, whose rows need their window's bounds.
@@ -306,6 +314,8 @@ export interface Entry {
 	/** Entity names the confirmed value selects. */
 	names: Set<string>;
 	fetchedAt: number;
+	/** When the shared owner's request that read `base` started; undefined for a value from anywhere else. */
+	requestedAt: number | undefined;
 	/** Store sequence when the load that produced `base` started. */
 	baseSeq: number;
 	error: unknown;
@@ -497,6 +507,12 @@ export function rewrite(value: unknown, replace: Map<unknown, unknown>): unknown
 	return copy ?? value;
 }
 
+/**
+ * @internal When the shared owner's request behind a reply started. A replica
+ * records it for each reply its owner gives it, and a load reads it from there.
+ */
+export const requestTimes = new WeakMap<DataReply, number>();
+
 /** How a store saves: its own persistence, or one a replica forwards to its owner. */
 export type PersistenceFactory = (
 	collect: (key: string) => Saving | null | undefined,
@@ -609,7 +625,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			span: span && { start: span.start, first: span.first, last: span.last },
 			tags: [...entry.read.tags, ...entry.names],
 		};
-		return { stored, read: persistedRead(entry.read) };
+		return { stored, read: persistedRead(entry.read), requestedAt: entry.requestedAt };
 	}
 
 	/** Save an entry once its confirmed value changes; a view's change is every view's of its entity. */
@@ -1057,6 +1073,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		entry.hasBase = true;
 		entry.names = new Set(selections(entry.read, value).map(({ entity }) => entity.name));
 		entry.fetchedAt = hostDateNow() - age;
+		entry.requestedAt = undefined;
 		entry.baseSeq = startedSeq;
 		entry.stale = false;
 		entry.served = entry.subscribers.size > 0;
@@ -1217,15 +1234,18 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		clearHostTimeout(entry.keepTimer);
 		entry.keepTimer = undefined;
 		const current = () => !retired && entry.attempt === attempt;
+		let requestedAt: number | undefined;
 		const done = request({ kind: 'read', name: read.name, input: wireInput(entry) }, abort.signal)
 			.then((reply) => {
 				if (!reply.ok) throw new DataError(reply.code, reply.data, reply.issues);
+				requestedAt = requestTimes.get(reply);
 				return parse(read.output, reply.value);
 			})
 			.then(
 				(value) => {
 					if (!current()) return;
 					adopt(entry, value, startedSeq, hostDateNow() - startedAt);
+					entry.requestedAt = requestedAt;
 					save(entry);
 				},
 				(error) => {
@@ -1351,6 +1371,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			hasBase: false,
 			names: new Set(),
 			fetchedAt: 0,
+			requestedAt: undefined,
 			baseSeq: 0,
 			error: undefined,
 			stale: false,
@@ -1935,10 +1956,11 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			if (value === null) deleteRecord(entity, id, reload);
 			else putRecord(entity, value, ++sequence, null, reload, true);
 		},
-		rebase(entry, value, edited, reload, age = 0) {
+		rebase(entry, value, edited, reload, age = 0, requestedAt) {
 			if (edited) {
-				// The rest of the value is as old, and as stale, as before.
+				// The rest of the value is as old, and as stale, as before, and of the same request.
 				const { stale } = entry;
+				({ requestedAt } = entry);
 				adopt(entry, value, entry.baseSeq, hostDateNow() - entry.fetchedAt, reload);
 				entry.stale = stale;
 			} else {
@@ -1946,6 +1968,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				adopt(entry, value, ++sequence, age, reload);
 				idle(entry);
 			}
+			entry.requestedAt = requestedAt;
 			save(entry);
 		},
 		held(entry) {

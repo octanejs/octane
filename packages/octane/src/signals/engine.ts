@@ -14,13 +14,13 @@ import {
 	inspectNativeNode,
 	presentDuringFlush,
 	readNode,
+	readValue,
 	readyState,
 	refreshNode,
 	retireGraph,
 	setHistoricalReader,
 	signalBatch,
 	startSignalBatch,
-	strictValue,
 	unchangedLiveRead,
 	untrack,
 	type GraphOwner,
@@ -725,8 +725,7 @@ export function installPublicScope(): void {
 		return node as DerivedSignal<T>;
 	};
 	prototype.get = function <T>(this: ScopeImpl, handle$: SignalHandle<T>): T {
-		const node = ownScopeNode(this, handle$);
-		return strictValue(readNode(node), node.key);
+		return readValue(ownScopeNode(this, handle$));
 	};
 	prototype.set = function <T>(
 		this: ScopeImpl,
