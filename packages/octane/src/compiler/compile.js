@@ -2274,8 +2274,7 @@ function collectOctaneBoundaryNames(astBody, only = null) {
 					imported === 'Activity' ||
 					imported === 'unstable_Activity' ||
 					imported === 'Hydrate' ||
-					imported === 'ViewTransition' ||
-					imported === 'unstable_ViewTransition') &&
+					VIEW_TRANSITION_IMPORTS.has(imported)) &&
 				sp.local?.name
 			) {
 				names.add(sp.local.name);
@@ -5540,12 +5539,11 @@ function containsComponentCallOrControlFlow(stmts) {
 }
 
 /**
- * A host-only conditional or ViewTransition wrapper can share its containing
- * row's immutable item/dependency proof, including through a narrowly proven
- * nested keyed list.
- * Entering either construct still needs the row's active scope. Lists without a
- * conditional, components, opaque list expressions, and every other
- * control-flow boundary remain on their existing path.
+ * A host-only conditional, a narrowly proven nested keyed list, or an imported
+ * ViewTransition around host content can share its containing row's immutable
+ * item/dependency proof. Entering any of them still needs the row's active
+ * scope. Rows with none of them, other components, opaque list expressions, and
+ * every other control-flow boundary remain on their existing path.
  */
 function hasOnlyHostConditionalItemBodies(stmts, viewTransitionNames) {
 	let hasConditional = false;
@@ -14675,7 +14673,6 @@ function compileServer(
 	// (see inheritSoleCompRoot; both modes read the same import declarations).
 	ctx._octaneBoundaryNames = collectOctaneBoundaryNames(ast.body);
 	ctx._octaneSuspenseNames = collectOctaneBoundaryNames(ast.body, SUSPENSE_IMPORTS);
-	ctx._octaneViewTransitionNames = collectOctaneBoundaryNames(ast.body, VIEW_TRANSITION_IMPORTS);
 
 	// Style maps are module values and can be referenced by a component declared
 	// before the map itself. Lower every top-level map before compiling any
@@ -38539,6 +38536,13 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			destructureInjection.length > 0 ? [...destructureInjection, ...subStmts] : subStmts;
 		const bodyAst = b.block(analyzedStmts);
 		const free = collectFreeIdentifiers(bodyAst, bodyScope);
+		// Only a tag that still resolves to the import: a component or row local of the
+		// same name is an arbitrary component.
+		const viewTransitionNames = new Set(
+			[...ctx._octaneViewTransitionNames].filter(
+				(name) => free.has(name) && !ctx.currentComponentLocals.has(name),
+			),
+		);
 		let hasParentClosure = false;
 		let hasHook = false;
 		// PURE and DEP-PURE skip a survivor on item identity (plus the deps
@@ -38664,7 +38668,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			!hasHook &&
 			!containsRenderCall(regionStmts, ctx) &&
 			!containsRenderCall([keyBody], ctx) &&
-			!containsAutoMemoUnsafeStructure(regionStmts, ctx, ctx._octaneViewTransitionNames) &&
+			!containsAutoMemoUnsafeStructure(regionStmts, ctx, viewTransitionNames) &&
 			!containsAutoMemoUnsafeStructure([keyBody], ctx) &&
 			!containsImportedMemberRead(keyBody, ctx.importedNames) &&
 			!containsImportedMemberRead(regionAst, ctx.importedNames);
@@ -38677,7 +38681,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		if (listSafe) {
 			for (const name of regionFree) {
 				if (
-					(ctx._octaneBoundaryNames.has(name) && !ctx._octaneViewTransitionNames.has(name)) ||
+					(ctx._octaneBoundaryNames.has(name) && !viewTransitionNames.has(name)) ||
 					ctx.importNamespaceNames.has(name)
 				) {
 					listSafe = false;
@@ -38735,14 +38739,13 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		// function of the item: an unchanged item identity leaves nothing inside
 		// able to move. Two extra gates keep the identity-only skip honest: a
 		// render-time hazard like an assignment in the @if test fails
-		// containsAutoMemoUnsafeStructure. That walk takes the ViewTransition name
-		// set, so the imported boundary is not itself the hazard. A live imported
-		// member read (`@if (mod.flag)`) can still mutate while the import's
-		// identity — the only thing the skip compares — stays fixed.
+		// containsAutoMemoUnsafeStructure, and a live imported member read
+		// (`@if (mod.flag)`) can mutate while the import's identity — the only
+		// thing the skip compares — stays fixed.
 		const hostConditionalPure =
 			hasNestedComp &&
-			hasOnlyHostConditionalItemBodies(subStmts, ctx._octaneViewTransitionNames) &&
-			!containsAutoMemoUnsafeStructure(subStmts, ctx, ctx._octaneViewTransitionNames) &&
+			hasOnlyHostConditionalItemBodies(subStmts, viewTransitionNames) &&
+			!containsAutoMemoUnsafeStructure(subStmts, ctx, viewTransitionNames) &&
 			!containsImportedMemberRead(bodyAst, ctx.importedNames);
 		const hostPure =
 			!hasParentClosure &&
@@ -38760,7 +38763,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			autoMemoDeps !== null &&
 			autoMemoDeps.every((name) => seenDeps.has(name) || ctx.importedNames.has(name)) &&
 			!autoMemoContextReads(bodyAst, ctx) &&
-			hasOnlyHostConditionalItemBodies(subStmts, ctx._octaneViewTransitionNames);
+			hasOnlyHostConditionalItemBodies(subStmts, viewTransitionNames);
 		if (structuredHostDepEligible) {
 			// The whole-list cache already witnesses imported projections. A row
 			// survivor now makes the same decision independently, so its existing

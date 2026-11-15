@@ -32,23 +32,30 @@ if (!process.execArgv.includes('--jitless')) {
 
 const here = import.meta.dirname;
 const repo = path.resolve(here, '../..');
-const compilerFile = path.resolve(
-	process.argv[2] ?? path.join(repo, 'packages/octane/src/compiler/compile.js'),
-);
+const currentCompiler = path.join(repo, 'packages/octane/src/compiler/compile.js');
+const compilerFile = path.resolve(process.argv[2] ?? currentCompiler);
 const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'octane-vt-rows-')));
 // compile.js imports its siblings and the package's dependencies relatively, so
 // an alternate copy has to sit beside it to resolve the same modules.
-const compilerCopy = path.join(
-	repo,
-	'packages/octane/src/compiler',
-	`.bench-compile-${process.pid}.js`,
-);
-fs.copyFileSync(compilerFile, compilerCopy);
+const compilerCopy =
+	compilerFile === currentCompiler
+		? null
+		: path.join(path.dirname(currentCompiler), `.bench-compile-${process.pid}.js`);
+const removeCopy = () => {
+	if (compilerCopy) fs.rmSync(compilerCopy, { force: true });
+};
+process.once('exit', removeCopy);
+for (const signal of ['SIGINT', 'SIGTERM'])
+	process.once(signal, () => {
+		removeCopy();
+		process.exit(130);
+	});
+if (compilerCopy) fs.copyFileSync(compilerFile, compilerCopy);
 let compile;
 try {
-	({ compile } = await import(pathToFileURL(compilerCopy).href));
+	({ compile } = await import(pathToFileURL(compilerCopy ?? currentCompiler).href));
 } finally {
-	fs.rmSync(compilerCopy, { force: true });
+	removeCopy();
 }
 const { build } = await import('esbuild');
 const { Window } = await import('happy-dom');

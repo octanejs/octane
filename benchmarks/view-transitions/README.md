@@ -288,6 +288,18 @@ The exact before/after comparison is recorded in
 is unchanged; each dialect removes 2,000 function entries for clear/remount and
 200 for scattered removal, with the original lifecycle snapshots preserved.
 
+## Unchanged ViewTransition list rows
+
+`boundary-rows.mjs` re-renders a keyed `@for` whose rows each wrap host content in a `ViewTransition`, inside a transition, with a fresh array that keeps every row object but one. It reports row-body executions and jitless production-bundle calls per unchanged row, as the difference between 128 and 256 rows, so per-commit constants cancel. Pass another `compile.js` to compare compilers:
+
+```sh
+git show origin/main:packages/octane/src/compiler/compile.js > /tmp/compile.main.js
+node benchmarks/view-transitions/boundary-rows.mjs /tmp/compile.main.js
+node benchmarks/view-transitions/boundary-rows.mjs
+```
+
+happy-dom runs no native transition, so these are work counts, not timing.
+
 ## Finalizing many element scopes
 
 ```sh

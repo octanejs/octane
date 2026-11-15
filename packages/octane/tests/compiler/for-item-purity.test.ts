@@ -173,6 +173,33 @@ describe('@for item-body purity with host-only conditional content', () => {
 		expect(flags[0]! & (PURE | DEP_ELIGIBLE)).toBe(0);
 	});
 
+	// A local binding that shadows the import is an arbitrary component.
+	it.each([
+		['a row local', '', 'const ViewTransition = item.Comp;'],
+		['a component local', 'const ViewTransition = props.Comp;', ''],
+		['a destructured prop', 'const { ViewTransition } = props;', ''],
+	])('declines %s that shadows the ViewTransition import', (_name, setup, rowSetup) => {
+		const flags = appListFlags(
+			compile(
+				`
+				import { ViewTransition } from 'octane';
+				export function App(props) @{
+					${setup}
+					<ul>@for (const item of props.items; key item.id) {
+						${rowSetup}
+						<ViewTransition><li>{item.label as string}</li></ViewTransition>
+					}</ul>
+				}
+			`,
+				'App.tsrx',
+				{ hmr: false, dev: false },
+			).code,
+		);
+		expect(flags).toHaveLength(1);
+		expect(flags[0]! & PURE).toBe(0);
+		expect(flags[0]! & DEP_ELIGIBLE).toBe(0);
+	});
+
 	it('declines a local component named ViewTransition', () => {
 		const flags = compileList(
 			'<ViewTransition label={item.label} />',

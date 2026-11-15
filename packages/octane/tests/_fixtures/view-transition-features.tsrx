@@ -35,7 +35,7 @@ export function NestedSiblingsApp(props) @{
 	</ViewTransition>
 }
 
-// The same list with no parent capture. An unchanged item is the whole witness,
+// BoundaryRowsApp below with no parent capture. An unchanged item is the whole witness,
 // so a fresh array of the same row objects must not re-read survivor labels.
 export function CaptureFreeBoundaryRows(props: {
 	rows: Array<{ id: string; readonly label: string }>;
