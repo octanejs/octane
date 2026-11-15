@@ -2808,6 +2808,161 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 		if (warns) expect(owner.code).toContain("import('./Leaf.tsrx')");
 	});
 
+	it.each([
+		['direct return', 'return element(Leaf, { label: "Ready" });', './Leaf.tsx', false, true],
+		['shadowed factory', 'return ((element) => element(Leaf))(other);', './Leaf.tsx', false, false],
+		['local React alias', 'return element(Leaf);', './Leaf.tsx', true, false],
+		['extensionless component import', 'return element(Leaf);', './Leaf', false, true],
+		['re-exported component', 'return element(Leaf);', './barrel', false, false],
+		['spread component position', 'return element(...[Leaf]);', './Leaf.tsx', false, false],
+		['dual exports', 'return element(Leaf);', './Leaf.tsx', false, true],
+		[
+			'a named default wrapper',
+			'return element(Leaf);',
+			'./Leaf.tsx',
+			false,
+			true,
+			'function Child() { return <strong>Ready</strong>; } export default function Leaf() { return <Child />; }',
+		],
+		[
+			'default assignment to a wrapper',
+			'return element(Leaf);',
+			'./Leaf.tsx',
+			false,
+			true,
+			'function Child() { return <strong>Ready</strong>; } function View() { return <Child />; } export default View;',
+		],
+		[
+			'local default export specifier',
+			'return element(Leaf);',
+			'./Leaf.tsx',
+			false,
+			true,
+			'function Child() { return <strong>Ready</strong>; } function View() { return <Child />; } export { View as default };',
+		],
+		[
+			'local default export specifier of an intrinsic',
+			'return element(Leaf);',
+			'./Leaf.tsx',
+			false,
+			true,
+			'function View() { return <strong>Ready</strong>; } export { View as default };',
+		],
+		[
+			'local default export specifier of an intrinsic without an emitted template',
+			'return element(Leaf);',
+			'./Leaf.tsx',
+			false,
+			false,
+			'function View() { return <strong>Ready</strong> as React.ReactElement; } export { View as default };',
+		],
+		[
+			'parenthesized default assignment',
+			'return element(Leaf);',
+			'./Leaf.tsx',
+			false,
+			true,
+			'function Child() { return <strong>Ready</strong>; } function View() { return <Child />; } export default (View);',
+		],
+		[
+			'quoted local default export',
+			'return element(Leaf);',
+			'./Leaf.tsx',
+			false,
+			true,
+			'function Child() { return <strong>Ready</strong>; } function View() { return <Child />; } export { View as "default" };',
+		],
+		[
+			'split wrapper with no emitted template',
+			'return element(Leaf);',
+			'./Leaf.tsx',
+			false,
+			false,
+			'function Child() { return <strong>Ready</strong>; } function View() { return <Child /> as React.ReactElement; } export default View;',
+		],
+		[
+			'a wrapper without a template export',
+			'return element(Leaf);',
+			'./Leaf.tsx',
+			false,
+			false,
+			'function Child() { return <strong>Ready</strong>; } export default function Leaf() { return <Child /> as React.ReactElement; }',
+		],
+	])(
+		'reports a retained React element factory for a %s',
+		async (kind, body, specifier, alias, warns, leaf) => {
+			const root = project({
+				'package.json': '{"type":"module"}',
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: {
+						jsx: 'react-jsx',
+						moduleResolution: 'Bundler',
+						...(alias ? { paths: { react: ['./other.ts'] } } : {}),
+					},
+				}),
+				'other.ts': 'export function createElement() { return null; }',
+				'barrel.ts': "export { default } from './Leaf.tsx';",
+				'Owner.ts': [
+					"import { createElement as element } from 'react';",
+					`import Leaf from '${specifier}';`,
+					`export function Owner() { ${body} }`,
+					...(kind === 'dual exports' ? ['export default Owner;'] : []),
+				].join('\n'),
+				'Leaf.tsx': leaf ?? 'export default function Leaf() { return <strong>Ready</strong>; }',
+			});
+			fs.mkdirSync(path.join(root, 'node_modules/@types'), { recursive: true });
+			for (const name of ['octane', 'react'])
+				fs.symlinkSync(
+					fs.realpathSync(path.join(import.meta.dirname, '../node_modules', name)),
+					path.join(root, 'node_modules', name),
+					'dir',
+				);
+			const reactTypes = createRequire(path.join(REPO, 'packages/octane/package.json')).resolve(
+				'@types/react/package.json',
+			);
+			fs.symlinkSync(path.dirname(reactTypes), path.join(root, 'node_modules/@types/react'), 'dir');
+			const result = await runCodemod([path.join(root, 'Leaf.tsx')], {
+				root,
+				strong: true,
+				verify: true,
+				write: false,
+			});
+			for (const [file, line] of [
+				['Owner.ts', 3],
+				['Leaf.tsx', 1],
+			]) {
+				const notes = result.files.find((entry) => entry.file === file)?.notes ?? [];
+				const warnings = notes.filter(
+					(note) =>
+						note.rule === 'react-compat' && note.message.includes('retained React createElement'),
+				);
+				expect(warnings).toEqual(
+					warns ? [expect.objectContaining({ severity: 'warning', line })] : [],
+				);
+			}
+			if (kind === 'direct return') {
+				const selected = await runCodemod([root], {
+					root,
+					strong: true,
+					verify: true,
+					write: false,
+				});
+				const owner = selected.files.find((entry) => entry.file === 'Owner.ts');
+				expect(owner?.code).toContain("import { createElement as element } from 'octane';");
+				expect(owner?.code).toContain("import Leaf from './Leaf.tsrx';");
+				for (const file of ['Owner.ts', 'Leaf.tsx']) {
+					const notes = selected.files.find((entry) => entry.file === file)?.notes;
+					expect(notes).not.toContainEqual(
+						expect.objectContaining({
+							rule: 'react-compat',
+							message: expect.stringContaining('retained React createElement'),
+						}),
+					);
+				}
+			}
+		},
+	);
+
 	describe('retained React server rendering', () => {
 		it.each([
 			['direct JSX', 'render(<Leaf />)', '', true],
