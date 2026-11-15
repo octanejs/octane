@@ -39,7 +39,11 @@ import {
 	textKind,
 	transformModule,
 } from './transform.js';
-import { directRendererCalls, nativeExternalStore } from './local-react-hook.js';
+import {
+	directRendererCalls,
+	namedRuntimeImport,
+	nativeExternalStore,
+} from './local-react-hook.js';
 import { contains, forwardedProps } from './forwarded-props.js';
 import {
 	importsReactBridge,
@@ -191,7 +195,10 @@ export async function runCodemod(
 		}
 		renames.set(file, output);
 	}
-	for (const entry of implicitReactRouterEntries(root, renames.keys(), outputKey)) {
+	const routerEntries = renames.size ? reactRouterEntries(root) : undefined;
+	const protectedEntries = new Set(routerEntries?.map(outputKey));
+	for (const entry of renames.keys()) {
+		if (!protectedEntries.has(outputKey(entry))) continue;
 		const conflict = conflictFor(
 			entry,
 			fs.readFileSync(entry, 'utf8'),
@@ -1646,6 +1653,15 @@ export async function runCodemod(
 			const { program, errors } = parseSync(file.output, file.code);
 			if (program && !errors.length) {
 				let defaultLocal: string | undefined;
+				const templateLocals = new Set<string>();
+				const isTemplateBody = (body: unknown) => isRecord(body) && body.type === 'JSXCodeBlock';
+				// The TSRX parser does not expose the type-only flag on local export lists.
+				const scanner = ts.createScanner(
+					ts.ScriptTarget.Latest,
+					true,
+					ts.LanguageVariant.JSX,
+					file.code,
+				);
 				for (const statement of program.body) {
 					const defaultExport = statement.type === 'ExportDefaultDeclaration';
 					let fn =
@@ -1655,26 +1671,51 @@ export async function runCodemod(
 					if (defaultExport) {
 						while (fn?.type === 'ParenthesizedExpression') fn = fn.expression;
 						if (fn?.type === 'Identifier') defaultLocal = fn.name;
-					} else if (statement.type === 'ExportNamedDeclaration' && !statement.source) {
+					} else if (
+						statement.type === 'ExportNamedDeclaration' &&
+						!statement.source &&
+						statement.specifiers.length
+					) {
+						scanner.setTextPos(statement.start);
+						scanner.scan();
+						const typeOnly = scanner.scan() === ts.SyntaxKind.TypeKeyword;
 						for (const specifier of statement.specifiers) {
 							if (
+								!typeOnly &&
 								(specifier.exported.type === 'Identifier'
 									? specifier.exported.name === 'default'
 									: specifier.exported.value === 'default') &&
-								specifier.local.type === 'Identifier'
+								specifier.local.type === 'Identifier' &&
+								specifier.start === specifier.local.start
 							)
 								defaultLocal = specifier.local.name;
 						}
 					}
-					if (fn?.type !== 'FunctionDeclaration') continue;
-					// The parser exposes TSRX code blocks through its ESTree body type.
-					const body: unknown = fn.body;
-					if (isRecord(body) && body.type === 'JSXCodeBlock') {
+					if (fn?.type === 'FunctionDeclaration' && isTemplateBody(fn.body)) {
 						if (defaultExport) names.add('default');
 						else if (fn.id) names.add(fn.id.name);
+					} else if (
+						defaultExport &&
+						fn?.type === 'ArrowFunctionExpression' &&
+						isTemplateBody(fn.body)
+					) {
+						names.add('default');
+					} else if (fn?.type === 'VariableDeclaration' && fn.kind === 'const') {
+						for (const declaration of fn.declarations) {
+							if (
+								declaration.id.type === 'Identifier' &&
+								declaration.init?.type === 'ArrowFunctionExpression' &&
+								isTemplateBody(declaration.init.body)
+							)
+								templateLocals.add(declaration.id.name);
+						}
 					}
 				}
-				if (defaultLocal !== undefined && names.has(defaultLocal)) names.add('default');
+				if (
+					defaultLocal !== undefined &&
+					(names.has(defaultLocal) || templateLocals.has(defaultLocal))
+				)
+					names.add('default');
 			}
 			templateExports.set(file.output, names);
 		}
@@ -1825,6 +1866,7 @@ export async function runCodemod(
 		))
 			protectIslandModule(file, module, owner);
 	}
+	const routesEntry = routerEntries?.[1];
 	for (const file of edited.size || renames.size
 		? new Set([...collect(root, (name) => SOURCE.test(name) || isTsrx(name)), ...files])
 		: []) {
@@ -1944,6 +1986,25 @@ export async function runCodemod(
 		if (paths) {
 			if (result) Object.assign(result, { code: paths.code, changed: true, rules });
 			else results.push(host);
+		}
+		if (
+			paths &&
+			file === routesEntry &&
+			originalReactEntry(file, '@react-router/dev/routes', bindingOptions(file))
+		) {
+			for (const { target, line } of registeredReactRoutes(file, source)) {
+				const leaf = byFile.get(target);
+				if (!renames.has(target) || !leaf || !hasTemplateExport(leaf, 'default')) continue;
+				const note: Note = {
+					rule: 'react-compat',
+					severity: 'warning',
+					line,
+					message: `The React Router registration in ${name} points to ${leaf.file}. The standard React Router renderer cannot render its migrated Octane default export. Keep a React route component that owns an Octane boundary or use an Octane router.`,
+				};
+				host.notes.push(note);
+				if (!leaf.notes.some((existing) => existing.message === note.message))
+					leaf.notes.push({ ...note, line: 1 });
+			}
 		}
 		const retainedServer =
 			paths && !isTsrx(file) && (source.includes('react-dom/server') || source.includes('\\'));
@@ -2409,29 +2470,21 @@ function isTsrx(name: string) {
 // React Router 7's file discovery does not consider .tsrx to be an entry extension.
 const REACT_ROUTER_ENTRY_EXTENSIONS = ['.js', '.jsx', '.ts', '.tsx', '.mjs', '.mts'];
 
-function implicitReactRouterEntries(
-	root: string,
-	renamedFiles: Iterable<string>,
-	entryKey: (file: string) => string,
-): string[] {
-	const candidates = [...renamedFiles].filter((file) =>
-		/^(?:root|routes)\.[jt]sx?$/i.test(path.basename(file)),
-	);
-	if (!candidates.length) return [];
+function reactRouterEntries(root: string): [string, string] | undefined {
 	const pkg = readInstalled(root, '@react-router/dev');
 	if (
 		pkg?.manifest.name !== '@react-router/dev' ||
 		!pkg.version.startsWith('7.') ||
 		!record(pkg.manifest.exports)['./routes']
 	)
-		return [];
+		return;
 
 	const findEntry = (dir: string, name: string) =>
 		REACT_ROUTER_ENTRY_EXTENSIONS.map((ext) => path.join(dir, name + ext)).find((file) =>
 			fs.existsSync(file),
 		);
 	const config = findEntry(root, 'react-router.config');
-	if (!config) return [];
+	if (!config) return;
 
 	let app = 'app';
 	const source = ts.createSourceFile(
@@ -2441,15 +2494,15 @@ function implicitReactRouterEntries(
 	);
 	const exported = source.statements.find(ts.isExportAssignment);
 	const value = exported && !exported.isExportEquals && skipWrappers(exported.expression);
-	if (!value || !ts.isObjectLiteralExpression(value)) return [];
+	if (!value || !ts.isObjectLiteralExpression(value)) return;
 	let hasAppDirectory = false;
 	for (const property of value.properties) {
 		if (!property.name || (!ts.isIdentifier(property.name) && !ts.isStringLiteral(property.name)))
-			return [];
-		if (property.name.text === '__proto__' || property.name.text === 'presets') return [];
+			return;
+		if (property.name.text === '__proto__' || property.name.text === 'presets') return;
 		if (property.name.text !== 'appDirectory') continue;
 		const directory = ts.isPropertyAssignment(property) && skipWrappers(property.initializer);
-		if (hasAppDirectory || !directory || !ts.isStringLiteralLike(directory)) return [];
+		if (hasAppDirectory || !directory || !ts.isStringLiteralLike(directory)) return;
 		app = directory.text || app;
 		hasAppDirectory = true;
 	}
@@ -2457,12 +2510,83 @@ function implicitReactRouterEntries(
 	const dir = path.resolve(root, app);
 	const relative = path.relative(root, dir);
 	if (relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative))
-		return [];
+		return;
 	const rootEntry = findEntry(dir, 'root');
 	const routesEntry = findEntry(dir, 'routes');
-	if (!rootEntry || !routesEntry) return [];
-	const entries = new Set([entryKey(rootEntry), entryKey(routesEntry)]);
-	return candidates.filter((file) => entries.has(entryKey(file)));
+	if (rootEntry && routesEntry) return [rootEntry, routesEntry];
+}
+
+/** Direct registrations in the framework's exported routes array and its literal child groups. */
+function registeredReactRoutes(file: string, source: string) {
+	const { sf, checker } = bind(file, source);
+	const paths: { target: string; line: number }[] = [];
+	const exported = sf.statements.find(ts.isExportAssignment);
+	if (!exported || exported.isExportEquals) return paths;
+	const dir = path.dirname(file);
+	function visit(node: ts.Expression) {
+		const value = skipWrappers(node);
+		if (ts.isArrayLiteralExpression(value)) {
+			for (const element of value.elements) {
+				if (!ts.isSpreadElement(element)) {
+					visit(element);
+					continue;
+				}
+				const group = skipWrappers(element.expression);
+				if (
+					!ts.isCallExpression(group) ||
+					ts.isOptionalChain(group) ||
+					!ts.isIdentifier(group.expression) ||
+					group.arguments.length !== 2
+				)
+					continue;
+				const helper = namedRuntimeImport(group.expression, checker);
+				if (helper?.module !== '@react-router/dev/routes' || helper.name !== 'prefix') continue;
+				const children = skipWrappers(group.arguments[1]);
+				if (!ts.isSpreadElement(group.arguments[0]) && ts.isArrayLiteralExpression(children))
+					visit(children);
+			}
+			return;
+		}
+		if (
+			!ts.isCallExpression(value) ||
+			ts.isOptionalChain(value) ||
+			!ts.isIdentifier(value.expression)
+		)
+			return;
+		const callee = namedRuntimeImport(value.expression, checker);
+		if (callee?.module !== '@react-router/dev/routes') return;
+		const position =
+			callee.name === 'route' ? 1 : callee.name === 'index' || callee.name === 'layout' ? 0 : -1;
+		if (position < 0) return;
+		const raw = value.arguments[position];
+		if (
+			(position === 1 && value.arguments[0] && ts.isSpreadElement(value.arguments[0])) ||
+			(raw && ts.isSpreadElement(raw))
+		)
+			return;
+		const literal = raw && skipWrappers(raw);
+		if (
+			literal &&
+			ts.isStringLiteralLike(literal) &&
+			!path.isAbsolute(literal.text) &&
+			!/[!%?#\\]/.test(literal.text)
+		) {
+			paths.push({
+				target: path.resolve(dir, literal.text),
+				line: sf.getLineAndCharacterOfPosition(literal.getStart(sf)).line + 1,
+			});
+		}
+		if (callee.name === 'index') return;
+		const options = value.arguments[position + 1];
+		if (!options) return;
+		const argument = skipWrappers(options);
+		const next = value.arguments[position + 2];
+		const children = ts.isObjectLiteralExpression(argument) && next ? skipWrappers(next) : argument;
+		if (ts.isArrayLiteralExpression(children)) visit(children);
+	}
+	const routes = skipWrappers(exported.expression);
+	if (ts.isArrayLiteralExpression(routes)) visit(routes);
+	return paths;
 }
 
 /** The compiler options of the tsconfig that governs `root`, or null. */
