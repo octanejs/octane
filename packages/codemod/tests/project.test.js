@@ -3116,6 +3116,44 @@ export function View() {
 					"import { ReactCompat } from 'octane/react';\n" +
 					view('owner') +
 					'\nexport function Parent() { return <ReactCompat><View /></ReactCompat>; }',
+				'hook-arrow.ts': owner.replace(helper, 'const readTheme = () => readContext(Theme);'),
+				'Arrow.tsx': view('hook-arrow'),
+				'hook-arrow-async.ts': owner.replace(
+					helper,
+					'const readTheme = async () => readContext(Theme);',
+				),
+				'ArrowAsync.tsx': view('hook-arrow-async'),
+				'hook-arrow-conditional.ts': owner.replace(
+					helper,
+					'const readTheme = () => false ? readContext(Theme) : "local";',
+				),
+				'ArrowConditional.tsx': view('hook-arrow-conditional'),
+				'hook-arrow-exported.ts':
+					owner.replace(helper, 'const readTheme = () => readContext(Theme);') +
+					'\nexport { readTheme };',
+				'ArrowExported.tsx': view('hook-arrow-exported'),
+				'hook-arrow-mutable.ts': owner.replace(
+					helper,
+					'let readTheme = () => readContext(Theme); readTheme = () => "local";',
+				),
+				'ArrowMutable.tsx': view('hook-arrow-mutable'),
+				'hook-arrow-default.ts': owner.replace(
+					helper,
+					'const readTheme = (value = fail()) => readContext(Theme);',
+				),
+				'ArrowDefault.tsx': view('hook-arrow-default'),
+				'hook-arrow-deferred.ts': owner.replace(
+					helper,
+					'const readTheme = () => () => readContext(Theme);',
+				),
+				'ArrowDeferred.tsx': view('hook-arrow-deferred'),
+				'hook-arrow-shadowed.ts': owner
+					.replace(helper, 'const readTheme = () => readContext(Theme);')
+					.replace(
+						hook,
+						'export function useLabel() { return readTheme(); function readTheme() { return "local"; } }',
+					),
+				'ArrowShadowed.tsx': view('hook-arrow-shadowed'),
 				'hook-default.ts': owner.replace('readTheme()', 'readTheme(value = fail())'),
 				'Default.tsx': view('hook-default'),
 				'hook-changed.ts': owner + '\nreadTheme = () => "different";',
@@ -3166,6 +3204,7 @@ export function View() {
 					.map((note) => [file.file, note.line, note.severity, note.message]),
 			);
 			expect(findings).toEqual([
+				['Arrow.tsx', 2, 'warning', expect.stringContaining('after its module initializes')],
 				[
 					'ConsumerBracket.tsx',
 					2,
