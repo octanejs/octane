@@ -719,6 +719,34 @@ export function retainedReactComponentReturns(file: string, source: string) {
 	return edges;
 }
 
+/** Named React factories returned by an otherwise retained function. */
+export function retainedReactElementReturns(file: string, source: string) {
+	const bound = bind(file, source);
+	const { sf, checker } = bound;
+	const edges: { name: string; module: string; line: number }[] = [];
+	for (const { output } of exportReturns(bound)) {
+		if (
+			!ts.isCallExpression(output) ||
+			ts.isOptionalChain(output) ||
+			!ts.isIdentifier(output.expression) ||
+			!output.arguments.length ||
+			output.arguments.some(ts.isSpreadElement)
+		)
+			continue;
+		const factory = imported(checker, output.expression);
+		if (factory?.module !== 'react' || factory.name !== 'createElement') continue;
+		const component = skipWrappers(output.arguments[0]);
+		if (!ts.isIdentifier(component)) continue;
+		const leaf = imported(checker, component);
+		if (leaf?.module.startsWith('.'))
+			edges.push({
+				...leaf,
+				line: sf.getLineAndCharacterOfPosition(output.getStart(sf)).line + 1,
+			});
+	}
+	return edges;
+}
+
 /** Existing Octane roots that render a directly imported component body. */
 export function octaneRootComponents(file: string, source: string) {
 	const { sf, checker } = bind(file, source);

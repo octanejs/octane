@@ -2703,6 +2703,64 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 		if (warns) expect(owner.code).toContain("import('./Leaf.tsrx')");
 	});
 
+	it.each([
+		['direct return', 'return element(Leaf, { label: "Ready" });', './Leaf.tsx', false, true],
+		['shadowed factory', 'return ((element) => element(Leaf))(other);', './Leaf.tsx', false, false],
+		['local React alias', 'return element(Leaf);', './Leaf.tsx', true, false],
+		['extensionless component import', 'return element(Leaf);', './Leaf', false, true],
+		['re-exported component', 'return element(Leaf);', './barrel', false, false],
+		['spread component position', 'return element(...[Leaf]);', './Leaf.tsx', false, false],
+	])(
+		'reports a retained React element factory for a %s',
+		async (_, body, specifier, alias, warns) => {
+			const root = project({
+				'package.json': '{"type":"module"}',
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: {
+						jsx: 'react-jsx',
+						moduleResolution: 'Bundler',
+						...(alias ? { paths: { react: ['./other.ts'] } } : {}),
+					},
+				}),
+				'other.ts': 'export function createElement() { return null; }',
+				'barrel.ts': "export { default } from './Leaf.tsx';",
+				'Owner.ts': [
+					"import { createElement as element } from 'react';",
+					`import Leaf from '${specifier}';`,
+					`export function Owner() { ${body} }`,
+				].join('\n'),
+				'Leaf.tsx': 'export default function Leaf() { return <strong>Ready</strong>; }',
+			});
+			fs.mkdirSync(path.join(root, 'node_modules/@types'), { recursive: true });
+			for (const name of ['octane', 'react'])
+				fs.symlinkSync(
+					fs.realpathSync(path.join(import.meta.dirname, '../node_modules', name)),
+					path.join(root, 'node_modules', name),
+					'dir',
+				);
+			const reactTypes = createRequire(path.join(REPO, 'packages/octane/package.json')).resolve(
+				'@types/react/package.json',
+			);
+			fs.symlinkSync(path.dirname(reactTypes), path.join(root, 'node_modules/@types/react'), 'dir');
+			const result = await runCodemod([path.join(root, 'Leaf.tsx')], {
+				root,
+				strong: true,
+				verify: true,
+				write: false,
+			});
+			const warning = expect.objectContaining({
+				rule: 'react-compat',
+				severity: 'warning',
+				message: expect.stringContaining('retained React createElement'),
+			});
+			for (const file of ['Owner.ts', 'Leaf.tsx']) {
+				const notes = result.files.find((entry) => entry.file === file)?.notes ?? [];
+				if (warns) expect(notes).toContainEqual(warning);
+				else expect(notes).not.toContainEqual(warning);
+			}
+		},
+	);
+
 	describe('retained React server rendering', () => {
 		it.each([
 			['direct JSX', 'render(<Leaf />)', '', true],
