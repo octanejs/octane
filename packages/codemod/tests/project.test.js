@@ -51,6 +51,100 @@ function typecheckProject(root) {
 
 describe('runCodemod', () => {
 	it.each([
+		['Leaf.js', 'Leaf.tsx', "const { Leaf } = require('./Leaf.js');"],
+		['Leaf.tsx', 'Leaf.tsx', 'const { Leaf } = require(`./Leaf.js`);'],
+		[
+			'Leaf.js',
+			'Leaf.d.ts',
+			"const { Leaf } = require('./Leaf.js');\n/** @type {'declaration'} */\nconst value = Leaf();\nexports.typed = value;",
+		],
+		[
+			'Leaf.js',
+			'Leaf.d.ts',
+			"function load(require) { return require('./Leaf.js'); }\nexports.local = load;\nconst { Leaf } = require('./Leaf.js');",
+		],
+	])(
+		'retains the separate runtime and types of a CommonJS import when migrating %s beside %s (%#)',
+		async (selected, types, importer) => {
+			const files = {
+				'package.json': '{"type":"commonjs"}',
+				'tsconfig.json':
+					'{"compilerOptions":{"allowJs":true,"checkJs":true,"jsx":"react-jsx","module":"NodeNext","moduleResolution":"NodeNext"}}',
+				'Leaf.js': 'export function Leaf() { return <b>runtime</b>; }',
+				[types]: types.endsWith('.d.ts')
+					? "export declare function Leaf(): 'declaration';"
+					: 'export function Leaf() { return <b>types</b>; }',
+				'Entry.js': `${importer}\nmodule.exports.value = Leaf();`,
+				'Other.tsx': 'export function Other() { return <i />; }',
+				'index.html': '<script type="module" src="./Other.tsx"></script>',
+			};
+			const root = project(files);
+			const paths = [selected, 'Other.tsx'].map((file) => path.join(root, file));
+			const conflict = expect.objectContaining({
+				rule: 'rename-conflict',
+				severity: 'error',
+				message: expect.stringContaining('./Leaf.js'),
+			});
+			const preview = await runCodemod(paths, { root, write: false });
+			expect(preview.files.find((row) => row.file === selected)?.notes).toContainEqual(conflict);
+			const entry = preview.files.find((row) => row.file === 'Entry.js')?.code ?? files['Entry.js'];
+			const nativeCall = importer.split('\n').find((line) => line.startsWith('const { Leaf }'));
+			expect(entry.split('\n')).toContain(nativeCall);
+			const result = await runCodemod(paths, { root, write: true });
+			expect(result.files.find((row) => row.file === selected)?.notes).toContainEqual(conflict);
+			for (const [file, contents] of Object.entries(files)) {
+				expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(contents);
+			}
+			expect(fs.existsSync(path.join(root, 'Leaf.tsrx'))).toBe(false);
+			expect(fs.existsSync(path.join(root, 'Other.tsrx'))).toBe(false);
+		},
+	);
+
+	it.each([
+		[
+			'a shadowed require',
+			'commonjs',
+			"function load(require) { return require('./Leaf.js'); }\nexports.load = load;",
+			true,
+		],
+		[
+			'a replaced require',
+			'commonjs',
+			"require = globalThis.load;\nexports.value = require('./Leaf.js');",
+			true,
+		],
+		[
+			'a replaced module loader',
+			'commonjs',
+			"Object.defineProperty(module, 'require', { value: () => 1 });\nmodule.exports = require('./Leaf.js');",
+			true,
+		],
+		['an ES module loader', 'module', "export const value = require('./Leaf.js');", true],
+		['an ordinary path string', 'commonjs', "exports.config = './Leaf.js';", true],
+		[
+			'a CommonJS path without separate types',
+			'commonjs',
+			"exports.value = require('./Leaf.js');",
+			false,
+		],
+	])('retains the existing exact-path rewrite for %s', async (_label, type, source, split) => {
+		const root = project({
+			'package.json': JSON.stringify({ type }),
+			'tsconfig.json': '{"compilerOptions":{"allowJs":true,"jsx":"react-jsx","module":"NodeNext"}}',
+			'Leaf.js': 'export function Leaf() { return <b>runtime</b>; }',
+			...(split ? { 'Leaf.d.ts': "export function Leaf(): 'declaration';" } : {}),
+			'Entry.js': source,
+		});
+		const result = await runCodemod([path.join(root, 'Leaf.js')], { root, write: true });
+		expect(result.files.flatMap((row) => row.notes)).not.toContainEqual(
+			expect.objectContaining({ rule: 'rename-conflict' }),
+		);
+		expect(fs.readFileSync(path.join(root, 'Entry.js'), 'utf8')).toBe(
+			source.replace('./Leaf.js', './Leaf.tsrx'),
+		);
+	});
+
+	it.each([
 		['Widget.js', './Widget.js', 'Widget.tsx'],
 		['Widget.jsx', './Widget.jsx', 'Widget.tsx'],
 		['Widget.js', './Widget.js', 'Widget.d.ts'],
