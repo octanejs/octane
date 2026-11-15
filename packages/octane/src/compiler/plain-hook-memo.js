@@ -250,7 +250,7 @@ function slotBaseHooks(ast, state, options) {
 				};
 			}
 			if (args.length === 0 && INITIAL_VALUE_HOOKS.has(imported))
-				args.push(b.id('undefined', node));
+				args.push(b.unary('void', b.literal(0, '0'), node));
 			args.push(slot);
 		}
 		return { ...mapped, callee, arguments: args };
