@@ -1421,20 +1421,25 @@ export function List() { return <main>{makeRows().map(row => {
 	});
 
 	it.each([
-		['a single registration', '', ''],
+		['a single TS registration', 'ts', '', ''],
+		['a single TSX registration', 'tsx', '', ''],
 		[
 			'unrelated primitive exports',
+			'ts',
 			"export const label = 'Registry';\n",
 			'\nexport const version = 1;',
 		],
 		[
 			'wrapped and signed primitive exports',
+			'ts',
 			"export const label = ('Registry' as const);\nexport const status = ('ready' satisfies string);\n",
 			'\nexport const version = -(1 as const);\nexport const revision = -2n;\nexport const empty = null!;',
 		],
 	])(
 		'keeps a typed callback factory for a retained React registry with %s',
-		async (_case, before, after) => {
+		async (_case, extension, before, after) => {
+			const name = `register.${extension}`;
+			const output = extension === 'tsx' ? 'register.tsrx' : name;
 			const registration = `import { createElement as createIcon } from 'react';
 import { register } from './registry';
 ${before}export const tab = register('notes', { getIcon: () => createIcon('b', { className: 'icon' }, 'Notes') });${after}`;
@@ -1454,9 +1459,9 @@ export const getIcon = () => registrations.get('notes')!.getIcon();`;
 				'package.json': '{"type":"module"}',
 				'tsconfig.json':
 					'{"compilerOptions":{"target":"es2022","module":"esnext","moduleResolution":"bundler","jsx":"react-jsx","strict":true}}',
-				'register.ts': registration,
+				[name]: registration,
 				'registry.tsx': registry,
-				'entry.tsx': `import './register';
+				'entry.tsx': `import './${name}';
 export { Registry, getIcon } from './registry';`,
 				'Reader.tsx':
 					"import { tab } from './register'; export function Reader() { return <aside>{tab.getIcon()}</aside>; }",
@@ -1475,32 +1480,23 @@ export { Registry, getIcon } from './registry';`,
 					'dir',
 				);
 			}
-			const input = path.join(root, 'register.ts');
+			const input = path.join(root, name);
 			const options = { root, strong: true, verify: true };
 			const preview = await runCodemod([input], { ...options, write: false });
-			expect(preview.files).toEqual([
-				expect.objectContaining({
-					file: 'register.ts',
-					output: 'register.ts',
-					changed: false,
-					code: registration,
-					notes: [],
-					diagnostics: [],
-				}),
-			]);
-			await runCodemod([input], { ...options, write: true });
-			expect(fs.readFileSync(input, 'utf8')).toBe(registration);
-			const { Registry, getIcon } = await bundleRuntime(root, 'server', "export * from './entry';");
-			expect(isValidElement(getIcon())).toBe(true);
-			expect(renderReact(reactElement(Registry))).toBe('<nav><b class="icon">Notes</b></nav>');
+			const converted = preview.files.find(({ file }) => file === name);
+			expect(converted).toMatchObject({
+				output,
+				changed: extension === 'tsx',
+				code: extension === 'tsx' ? expect.stringContaining(registration) : registration,
+				notes: [],
+				diagnostics: [],
+			});
 
 			const batch = await runCodemod([input, path.join(root, 'Reader.tsx')], {
 				...options,
 				write: false,
 			});
-			expect(batch.files.find(({ file }) => file === 'register.ts').code).toContain(
-				"from 'octane'",
-			);
+			expect(batch.files.find(({ file }) => file === name).code).toContain("from 'octane'");
 			const unchecked = await runCodemod([input], {
 				...options,
 				write: false,
@@ -1534,6 +1530,17 @@ export function register(name: string, entry: any) {`,
 			);
 			const overloaded = await runCodemod([input], { ...options, write: false });
 			expect(overloaded.files[0].code).toContain("from 'octane'");
+
+			fs.writeFileSync(path.join(root, 'registry.tsx'), registry);
+			await runCodemod([input], { ...options, write: true });
+			expect(fs.readFileSync(path.join(root, output), 'utf8')).toBe(converted.code);
+			expect(fs.existsSync(input)).toBe(input.endsWith('.ts'));
+			expect(fs.readFileSync(path.join(root, 'entry.tsx'), 'utf8')).toContain(
+				`import './${output}';`,
+			);
+			const { Registry, getIcon } = await bundleRuntime(root, 'server', "export * from './entry';");
+			expect(isValidElement(getIcon())).toBe(true);
+			expect(renderReact(reactElement(Registry))).toBe('<nav><b class="icon">Notes</b></nav>');
 		},
 	);
 
