@@ -13,6 +13,8 @@ import {
 	SwitchScopedBranch,
 	TryScopedBranch,
 	PendingScopedBranch,
+	FunctionScopedConditionalKeyedRows,
+	FunctionScopedConditionalRowsWithEmpty,
 	ReturnedMailbox,
 	ReturnedDashboard,
 	ReturnedProviderMailbox,
@@ -196,6 +198,60 @@ describe('function-scoped bindings across directive branches', () => {
 		}
 	});
 });
+
+it.each([
+	['FunctionScopedConditionalKeyedRows', FunctionScopedConditionalKeyedRows],
+	['FunctionScopedConditionalRowsWithEmpty', FunctionScopedConditionalRowsWithEmpty],
+] as const)(
+	'updates locally captured components inside a keyed row conditional in %s',
+	(name, App) => {
+		const rows = ['first', 'second'];
+		const props = { first: true, rows };
+		const view = mount(App, props);
+		try {
+			expect(view.findAll('li > i').map((node) => node.textContent)).toEqual(rows);
+		} finally {
+			view.unmount();
+		}
+
+		const container = document.createElement('div');
+		container.innerHTML = ServerRT.renderToString(serverModule()[name], props).html;
+		document.body.appendChild(container);
+		const serverRows = [...container.querySelectorAll('li')];
+		const serverChildren = [...container.querySelectorAll('li > i')];
+		expect(serverChildren.map((node) => node.textContent)).toEqual(rows);
+		const errors: unknown[] = [];
+		const root = hydrateRoot(container, App, props, {
+			onRecoverableError: (error) => errors.push(error),
+		});
+		try {
+			flushSync(() => {});
+			expect(container.querySelectorAll('li > i')[0]).toBe(serverChildren[0]);
+			expect(container.querySelectorAll('li > i')[1]).toBe(serverChildren[1]);
+			flushSync(() => root.render(App, { first: false, rows }));
+			expect(container.querySelectorAll('li')[0]).toBe(serverRows[0]);
+			expect(container.querySelectorAll('li')[1]).toBe(serverRows[1]);
+			expect(
+				[...container.querySelectorAll('li > strong')].map((node) => node.textContent),
+			).toEqual(rows);
+			const reversed = [...rows].reverse();
+			const reorderedProps = { first: false, rows: reversed };
+			flushSync(() => root.render(App, reorderedProps));
+			expect(container.querySelectorAll('li')[0]).toBe(serverRows[1]);
+			expect(container.querySelectorAll('li')[1]).toBe(serverRows[0]);
+			if (name === 'FunctionScopedConditionalRowsWithEmpty') {
+				flushSync(() => root.render(App, { first: true, rows: [] }));
+				expect(container.querySelector('ol > i')?.textContent).toBe('empty');
+				flushSync(() => root.render(App, { first: false, rows: [] }));
+				expect(container.querySelector('ol > i')?.textContent).toBe('fallback');
+			}
+			expect(errors).toEqual([]);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	},
+);
 
 it('preserves block-declared var reads in keyed rows, keys and the empty arm', () => {
 	const props = { rows: [1, 2], label: 'A', offset: 0 };
