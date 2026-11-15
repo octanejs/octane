@@ -203,11 +203,13 @@ export function GuardedMemoApp({ shown }: { shown: boolean }) @{
 }
 
 const guardedState = useState;
-const GuardedAliasedCounter = memo(function GuardedAliasedCounter({ shown }: { shown: boolean }) @{
-	if (!shown) return null;
-	const [count, setCount, getCount] = guardedState(1);
-	<button onClick={() => setCount(getCount() + 1)}>{count as number}</button>
-});
+const GuardedAliasedCounter = memo!(
+	function GuardedAliasedCounter({ shown }: { shown: boolean }) @{
+		if (!shown) return null;
+		const [count, setCount, getCount] = guardedState(1);
+		<button onClick={() => setCount(getCount() + 1)}>{count as number}</button>
+	}!,
+)!;
 
 export function GuardedAliasedMemoApp({ shown }: { shown: boolean }) @{
 	<main>
@@ -215,10 +217,12 @@ export function GuardedAliasedMemoApp({ shown }: { shown: boolean }) @{
 	</main>
 }
 
-const EscapedGuardedCounter = memo(function EscapedGuardedCounter({ shown }: { shown: boolean }) @{
-	if (!shown) return null;
-	<output>shown</output>
-});
+const EscapedGuardedCounter = memo!(
+	function EscapedGuardedCounter({ shown }: { shown: boolean }) @{
+		if (!shown) return null;
+		<output>shown</output>
+	}!,
+)!;
 
 export function EscapedGuardedMemoApp() @{
 	const call = EscapedGuardedCounter.type as (props: { shown: boolean }) => OctaneNode;

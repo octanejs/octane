@@ -12812,7 +12812,13 @@ function compileInternal(
 		rendererBoundaryPreparation === null && canLowerLocalDomTemplates(filename, options);
 	const localStateAliases = canLowerLocalTemplates ? findLocalStateAliases(ast) : undefined;
 	ast = markLocalStateAliases(ast, localStateAliases);
-	ast = lowerNullishComponentExits(ast, typescriptWeb, canLowerLocalTemplates, localStateAliases);
+	ast = lowerNullishComponentExits(
+		ast,
+		typescriptWeb,
+		canLowerLocalTemplates,
+		localStateAliases,
+		parsedAst,
+	);
 	// Same contract for React-style conditional JSX returns: branch-selected
 	// output compiles as template control flow instead of de-opt descriptors.
 	ast = lowerJsxReturnBranchComponents(ast);
@@ -14614,6 +14620,7 @@ function compileServer(
 		options?.output === 'ts',
 		canLowerLocalTemplates,
 		localStateAliases,
+		parsedAst,
 	);
 	ast = lowerJsxReturnBranchComponents(ast);
 	ast = lowerDirectlyCalledTemplateFunctions(ast, localStateAliases);
@@ -39690,6 +39697,14 @@ function privateMemoTagUses(ast) {
 	return privateTags;
 }
 
+// Only syntax that does not constrain the memo wrapper or callback's return type.
+function unwrapPrivateMemoExpression(node) {
+	while (node?.type === 'ParenthesizedExpression' || node?.type === 'TSNonNullExpression') {
+		node = node.expression;
+	}
+	return node;
+}
+
 /**
  * Turn compiler-proven shorthand guards into ordinary template control flow:
  *
@@ -39701,7 +39716,13 @@ function privateMemoTagUses(ast) {
  * generic return-value ABI. HMR continues to invoke every component through
  * its generic slot and invalidates if a later edit introduces a value return.
  */
-function lowerNullishComponentExits(ast, typescriptWeb, canLowerLocalTemplates, localStateAliases) {
+function lowerNullishComponentExits(
+	ast,
+	typescriptWeb,
+	canLowerLocalTemplates,
+	localStateAliases,
+	parsedAst,
+) {
 	const statements = ast.body || [];
 	let out = null;
 	// Compiler-name allocation for retainTailHookState, before the compile
@@ -39710,6 +39731,7 @@ function lowerNullishComponentExits(ast, typescriptWeb, canLowerLocalTemplates, 
 	let memoLocals;
 	let privateTags;
 	let markMemoSetup;
+	let typeReferences;
 	for (let i = 0; i < statements.length; i++) {
 		const statement = statements[i];
 		const node = moduleStatementDeclaration(statement);
@@ -39722,23 +39744,28 @@ function lowerNullishComponentExits(ast, typescriptWeb, canLowerLocalTemplates, 
 			node.declarations[0].id.type === 'Identifier'
 				? node.declarations[0]
 				: null;
-		const call = memoItem?.init;
-		const callback = call?.type === 'CallExpression' && call.arguments[0];
+		const call = unwrapPrivateMemoExpression(memoItem?.init);
+		const callee =
+			call?.type === 'CallExpression' ? unwrapPrivateMemoExpression(call.callee) : null;
+		const argument = callee?.type === 'Identifier' ? call.arguments[0] : null;
+		const callback = unwrapPrivateMemoExpression(argument);
 		// A memo body can also render in a shared scope that ignores return values.
 		const memoBody =
 			(callback?.type === 'FunctionExpression' || callback?.type === 'ArrowFunctionExpression') &&
 			!callback.async &&
 			!callback.generator &&
 			call.optional !== true &&
-			call.callee.type === 'Identifier' &&
 			callback.body?.type === 'JSXCodeBlock' &&
-			(memoLocals ??= collectOctaneImportLocals(statements, ['memo'], true)).has(
-				call.callee.name,
-			) &&
+			(memoLocals ??= collectOctaneImportLocals(statements, ['memo'], true)).has(callee.name) &&
 			hasOnlyLowerableNullishExits(callback) &&
 			(privateTags ??= privateMemoTagUses(ast)).has(memoItem.id.name) &&
+			memoItem.id.typeAnnotation == null &&
+			callback.returnType == null &&
+			call.typeArguments == null &&
+			!(typeReferences ??= collectTypeReferenceNames(parsedAst, new Set())).has(memoItem.id.name) &&
 			(callback.id == null ||
-				!collectFreeIdentifiers([callback.body, ...callback.params], []).has(callback.id.name))
+				(!typeReferences.has(callback.id.name) &&
+					!collectFreeIdentifiers([callback.body, ...callback.params], []).has(callback.id.name)))
 				? callback
 				: null;
 		const component = memoBody ?? node;
@@ -39774,7 +39801,13 @@ function lowerNullishComponentExits(ast, typescriptWeb, canLowerLocalTemplates, 
 								declarations: [
 									{
 										...memoItem,
-										init: { ...call, arguments: [lowered, ...call.arguments.slice(1)] },
+										init: replaceTsInner(memoItem.init, call, {
+											...call,
+											arguments: [
+												replaceTsInner(call.arguments[0], memoBody, lowered),
+												...call.arguments.slice(1),
+											],
+										}),
 									},
 								],
 							};

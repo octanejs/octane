@@ -167,20 +167,23 @@ describe('generic component return reconciliation', () => {
 		}
 	});
 
-	it('keeps a memoized counter across an early null return', () => {
-		const r = mount(GuardedMemoApp, { shown: false });
+	it.each([
+		['GuardedMemoApp', GuardedMemoApp],
+		['GuardedAliasedMemoApp', GuardedAliasedMemoApp],
+	] as const)('keeps %s across an early null return', (_name, CounterApp) => {
+		const r = mount(CounterApp, { shown: false });
 		try {
 			expect(r.container.querySelector('button')).toBeNull();
-			r.update(GuardedMemoApp, { shown: true });
+			r.update(CounterApp, { shown: true });
 			const button = r.find('button');
 			expect(button.textContent).toBe('1');
 			r.click('button');
 			expect(button.textContent).toBe('2');
-			r.update(GuardedMemoApp, { shown: true });
+			r.update(CounterApp, { shown: true });
 			expect(r.find('button')).toBe(button);
-			r.update(GuardedMemoApp, { shown: false });
+			r.update(CounterApp, { shown: false });
 			expect(r.container.querySelector('button')).toBeNull();
-			r.update(GuardedMemoApp, { shown: true });
+			r.update(CounterApp, { shown: true });
 			expect(r.find('button').textContent).toBe('2');
 		} finally {
 			r.unmount();

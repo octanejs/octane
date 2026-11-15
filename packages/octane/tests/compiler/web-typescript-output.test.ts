@@ -85,6 +85,28 @@ function typecheck(
 	}
 }
 
+it('preserves an inferred private memo callback return type observed by TypeScript', () => {
+	const source = `import { memo } from 'octane';
+
+const Counter = memo(function CounterImpl({ shown }: { shown: boolean }) @{
+	if (!shown) return null;
+	<button>visible</button>
+});
+
+export type CounterResult = ReturnType<typeof Counter.type>;
+export const hidden: CounterResult = null;
+
+export function App({ shown }: { shown: boolean }) @{
+	<main><Counter shown={shown} /></main>
+}`;
+	const result = compile(source, '/src/memo-return-contract.tsrx', {
+		mode: 'client',
+		output: 'ts',
+	});
+	expect(result.diagnostics).toEqual([]);
+	expect(typecheck({ 'memo-return-contract.ts': result.code })).toEqual([]);
+});
+
 it('typechecks generated traversal when the host exposes an opaque Node', () => {
 	const result = compile(
 		`export function Scene(props: { label: string }) @{
