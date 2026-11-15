@@ -44,6 +44,7 @@ for (const mode of ['development', 'production']) {
 					__OCTANE_PROFILE_ENABLED__: 'false',
 				},
 				alias: {
+					'octane/internal/client': resolve(root, 'packages/octane/src/internal/client.ts'),
 					octane: resolve(root, 'packages/octane/src/index.ts'),
 					'@octanejs/motion': resolve(root, 'packages/motion/src/index.ts'),
 				},
