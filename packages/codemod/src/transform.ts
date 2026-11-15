@@ -7137,9 +7137,8 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		if (guard !== -1 || returnsJsx(setupStatements)) {
 			if (
 				this.options.localReactClass &&
-				(ts.isJsxElement(inner) || ts.isJsxSelfClosingElement(inner)) &&
-				ts.isFunctionDeclaration(node) &&
-				node.parent === this.sf &&
+				isJsx(inner) &&
+				this.moduleComponent(node) &&
 				setupStatements.every(
 					(statement) =>
 						ts.isVariableStatement(statement) ||
@@ -7149,7 +7148,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				) &&
 				this.options.automaticReactJsx
 			)
-				this.checkReactClassRoot(inner);
+				this.checkReactClassOutput(inner);
 			return null;
 		}
 		let output = this.output(inner);
@@ -7278,14 +7277,15 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		if (!this.options.localReactClass) return;
 		const callee = ts.isJsxElement(node) && this.callee(node.openingElement.tagName);
 		if (
-			ts.isJsxElement(node) &&
-			callee &&
-			callee.module === 'react' &&
-			callee.name === 'StrictMode' &&
-			!node.openingElement.attributes.properties.length &&
-			!this.islands.has(node) &&
-			!this.unrenderable.has(node) &&
-			!this.reactRendererBodies.has(node)
+			ts.isJsxFragment(node) ||
+			(ts.isJsxElement(node) &&
+				callee &&
+				callee.module === 'react' &&
+				callee.name === 'StrictMode' &&
+				!node.openingElement.attributes.properties.length &&
+				!this.islands.has(node) &&
+				!this.unrenderable.has(node) &&
+				!this.reactRendererBodies.has(node))
 		) {
 			for (const child of node.children)
 				if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child))
@@ -7324,6 +7324,22 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 
 	startsLine(node: ts.Node) {
 		return this.linePrefix(node).trim() === '';
+	}
+
+	/** A direct module component, without going through an arbitrary wrapper or callback. */
+	private moduleComponent(node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction) {
+		const parent = node.parent;
+		return (
+			parent === this.sf ||
+			(ts.isExportAssignment(parent) && !parent.isExportEquals && parent.parent === this.sf) ||
+			(ts.isVariableDeclaration(parent) &&
+				parent.initializer === node &&
+				ts.isIdentifier(parent.name) &&
+				isComponentName(parent.name.text) &&
+				(ts.getCombinedNodeFlags(parent) & ts.NodeFlags.BlockScoped) === ts.NodeFlags.Const &&
+				parent.parent.parent.parent === this.sf &&
+				this.localUses(parent.name).every(componentTagOrExport))
+		);
 	}
 
 	/**

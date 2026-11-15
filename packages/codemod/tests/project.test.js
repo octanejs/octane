@@ -95,6 +95,17 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 			),
 			'Relative.tsx': entry('./Boundary'),
 			'Alias.tsx': entry('@/Boundary'),
+			'FragmentRoot.tsx': entry('./Boundary').replace(
+				'<Frame><b>ready</b></Frame>',
+				'<><b>before</b><Frame /></>',
+			),
+			'FragmentArm.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean)')
+				.replace('<Frame><b>ready</b></Frame>', 'show ? <><Frame /></> : <b />'),
+			'FragmentChild.tsx': entry('./Boundary').replace(
+				'<Frame><b>ready</b></Frame>',
+				'<Other><><Frame /></></Other>',
+			),
 			'Ternary.tsx': entry('./Boundary')
 				.replace('App()', 'App(show: boolean)')
 				.replace('return <Frame><b>ready</b></Frame>;', 'return show ? <Frame /> : <b />;'),
@@ -116,6 +127,38 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 					'return <Frame><b>ready</b></Frame>;',
 					'if (!show) { const text = "off"; return <i>{text}</i>; } if (!enabled) return <b />; return <Frame />;',
 				),
+			'RetainedArrow.tsx': entry('./Boundary')
+				.replace('export function App()', 'export const App = (show: boolean) =>')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+				),
+			'RetainedDefaultArrow.tsx': entry('./Boundary')
+				.replace('export function App()', 'export default (show: boolean) =>')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+				),
+			'RetainedStrict.tsx':
+				"import { StrictMode } from 'react';\n" +
+				entry('./Boundary')
+					.replace('App()', 'App(show: boolean)')
+					.replace(
+						'return <Frame><b>ready</b></Frame>;',
+						'if (!show) { const text = "off"; return <i>{text}</i>; } return <StrictMode><Frame /></StrictMode>;',
+					),
+			'RetainedCallback.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'const Build = (show: boolean) => { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; }; return <Other render={Build} />;',
+			),
+			'RetainedNamedFactory.tsx': entry('./Boundary').replace(
+				'export function App() { return <Frame><b>ready</b></Frame>; }',
+				'const build = function Build(show: boolean) { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; }; export function App() { build(true); return <b />; }',
+			),
+			'RetainedImperative.tsx': entry('./Boundary').replace(
+				'export function App() { return <Frame><b>ready</b></Frame>; }',
+				'const Build = (show: boolean) => { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; }; export function App() { Build(true); return <b />; }',
+			),
 			'RetainedDead.tsx': entry('./Boundary').replace(
 				'return <Frame><b>ready</b></Frame>;',
 				'if (true) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
@@ -239,11 +282,16 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 				['Alias.tsx', includeClass ? 'error' : 'warning'],
 				['DefaultBaseView.tsx', includeClass ? 'error' : 'warning'],
 				['DefaultExportView.tsx', includeClass ? 'error' : 'warning'],
+				['FragmentArm.tsx', includeClass ? 'error' : 'warning'],
+				['FragmentRoot.tsx', includeClass ? 'error' : 'warning'],
 				['Guard.tsx', includeClass ? 'error' : 'warning'],
 				['LogicalArm.tsx', includeClass ? 'error' : 'warning'],
 				['Relative.tsx', includeClass ? 'error' : 'warning'],
 				['Retained.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedArrow.tsx', includeClass ? 'error' : 'warning'],
 				['RetainedCompound.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedDefaultArrow.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedStrict.tsx', includeClass ? 'error' : 'warning'],
 				['Strict.tsx', includeClass ? 'error' : 'warning'],
 				['Ternary.tsx', includeClass ? 'error' : 'warning'],
 			]);
