@@ -329,6 +329,20 @@ for (const parserName of ['native', 'javascript']) {
 				).toEqual([]);
 			});
 
+			it('typechecks a state value captured by output after an early return', () => {
+				parser.javascript = parserName === 'javascript';
+				vi.stubEnv('OCTANE_COMPILE_FROZEN_AST', '1');
+				vi.stubEnv('OCTANE_COMPILE_ASSERT_LOC', '1');
+				const source = `import { useState } from 'octane';
+					export function App({ hide }: { hide: boolean }) @{
+						if (hide) return null;
+						const [count] = useState(1);
+						<output>{count as number}</output>
+					}`;
+				const { code } = compile(source, '/src/App.tsrx', { mode, output: 'ts' });
+				expect(typecheck({ 'app.ts': code })).toEqual([]);
+			});
+
 			it('emits valid typed hook and control-flow code with scoped type aliases', () => {
 				parser.javascript = parserName === 'javascript';
 				vi.stubEnv('OCTANE_COMPILE_FROZEN_AST', '1');
