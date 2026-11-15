@@ -4316,7 +4316,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				typeNamespaces.push(
 					clause.name && bindings && ts.isNamedImports(bindings)
 						? this.source.slice(node.getStart(this.sf), clause.name.end) +
-								this.source.slice(clause.end, node.end)
+								this.source.slice(clause.end, node.end).replace(/^from\b/, ' from')
 						: node.getText(this.sf),
 				);
 			} else if (namespace && this.used.has(namespace)) {

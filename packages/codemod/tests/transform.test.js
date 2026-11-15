@@ -1647,7 +1647,7 @@ export type Qualified = typeof R.createRef;`,
 
 	it('keeps the owner of a nested ref query when a named allocator is shadowed', () => {
 		const { code, notes } = transformModule(
-			`import React, { createRef, useState } from 'react';
+			`import React,{ createRef, useState }from 'react';
 			 export type Allocator = typeof createRef;
 			 export function useCounter() {
 			   const createRef = true;
