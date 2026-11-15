@@ -1135,6 +1135,11 @@ export function List() { return <main>{makeRows().map(row => {
 			"export const label = 'Registry';\n",
 			'\nexport const version = 1;',
 		],
+		[
+			'wrapped and signed primitive exports',
+			"export const label = ('Registry' as const);\nexport const status = ('ready' satisfies string);\n",
+			'\nexport const version = -(1 as const);\nexport const revision = -2n;\nexport const empty = null!;',
+		],
 	])(
 		'keeps a typed callback factory for a retained React registry with %s',
 		async (_case, before, after) => {
