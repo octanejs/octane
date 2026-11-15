@@ -216,6 +216,55 @@ for (const parserName of ['native', 'javascript']) {
 				).toEqual([]);
 			});
 
+			if (mode === 'server') {
+				it('typechecks nullable memo output in ordinary server components', () => {
+					parser.javascript = parserName === 'javascript';
+					const result = compile(
+						`import { memo } from 'octane';
+							type Props = { shown: boolean };
+							const Panel = memo(function Panel({ shown }: Props) @{
+								if (!shown) return null;
+								<output>ready</output>
+							});
+							const Marker = memo(function Marker({ shown }: Props) @{
+								if (!shown) return null;
+								<circle r="12" />
+							});
+							export type PanelResult = ReturnType<typeof Panel.type>;
+							export type MarkerResult = ReturnType<typeof Marker.type>;
+							export function App(props: Props) @{
+								<main>
+									<Panel shown={props.shown} />
+									<Panel key="spread" {...props} />
+									<svg><Marker shown={props.shown} /></svg>
+								</main>
+							}`,
+						'/src/nullable-memo.tsrx',
+						{ mode, strong: true, hmr: false, output: 'ts' },
+					);
+					expect(result.diagnostics).toEqual([]);
+					expect(
+						typecheck({
+							'nullable-memo.ts': result.code,
+							'compiled-only.ts': `import { ssrComponent, ssrHtml } from 'octane/server';
+								import type { SSRScope } from 'octane/internal/server';
+								import type { PanelResult } from './nullable-memo';
+								declare const scope: SSRScope;
+								declare const checked: true | undefined;
+								const hidden: PanelResult = null;
+								const nullable = (_props: { shown: boolean }, _scope: SSRScope): string | null => hidden;
+								const compiled = () => ssrHtml('ready');
+								ssrComponent(scope, nullable, { shown: false }, false, undefined, undefined, undefined, undefined, undefined);
+								ssrComponent(scope, compiled, {}, false, undefined, undefined, undefined, undefined, checked);
+								// @ts-expect-error The compiled-only path does not accept null.
+								ssrComponent(scope, nullable, { shown: false }, false, undefined, undefined, undefined, undefined, true);
+								// @ts-expect-error A flag that may be true still needs compiled output.
+								ssrComponent(scope, nullable, { shown: false }, false, undefined, undefined, undefined, undefined, checked);`,
+						}),
+					).toEqual([]);
+				});
+			}
+
 			it('preserves authored component props and generic declarations for TypeScript consumers', () => {
 				parser.javascript = parserName === 'javascript';
 				const files: Record<string, string> = {};
