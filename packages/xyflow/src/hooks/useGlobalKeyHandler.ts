@@ -9,7 +9,7 @@ import { Edge, Node } from '../types';
 
 const selected = (item: Node | Edge) => item.selected;
 
-const win = typeof window !== 'undefined' ? window : undefined;
+const win = typeof window !== 'undefined' ? window : null;
 
 /**
  * Hook for handling global key events.

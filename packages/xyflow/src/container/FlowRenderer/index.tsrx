@@ -29,7 +29,7 @@ export type FlowRendererProps<NodeType extends Node = Node> = Omit<
 	children: OctaneNode;
 };
 
-const win = typeof window !== 'undefined' ? window : undefined;
+const win = typeof window !== 'undefined' ? window : null;
 
 const selector = (s: ReactFlowState) => {
 	return {
