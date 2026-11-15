@@ -828,10 +828,11 @@ export function deferScopeSignalOwner(scope: Scope): SignalOwner | null | undefi
 			signalRetryBoundary(scope.block)?.retrySignalOwners !== undefined)
 	)
 		return;
-	const previous = signalOwnerFrame!.defer(resolveDeferredOwner);
-	if (previous === undefined) return;
+	// Before the frame is entered: nothing after the entry may throw, because
+	// the caller only restores a frame this returned.
 	if (root !== undefined) root.signalOwner ??= documentSignalOwner(scope.block.parentNode);
-	deferredOwnerScope = scope;
+	const previous = signalOwnerFrame!.defer(resolveDeferredOwner);
+	if (previous !== undefined) deferredOwnerScope = scope;
 	return previous;
 }
 
