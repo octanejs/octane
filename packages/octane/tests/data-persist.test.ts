@@ -903,10 +903,11 @@ describe('octane/data durable writes', () => {
 	] as const)('preserves a journaled write for a later restart when %s', async (reason) => {
 		const inner = memoryStorage();
 		let failRead = false;
+		let journalPartition: string | undefined;
 		const storage: PersistentStorage = {
 			...inner,
 			get(partition, key) {
-				if (failRead && partition !== key) {
+				if (failRead && partition === journalPartition) {
 					failRead = false;
 					return reason === 'storage returns unreadable data'
 						? Promise.resolve('incomplete journal value')
@@ -927,14 +928,15 @@ describe('octane/data durable writes', () => {
 			'write no longer declared': [],
 			'input schema changed': [incompatible],
 		}[reason];
+		[journalPartition] = listPartitions(inner);
 		failRead = reason === 'storage read fails' || reason === 'storage returns unreadable data';
 		const intermediate = server(first.books, first.applied);
 		createDataStore({
 			transport: intermediate.transport,
 			persist: cache(storage, 'ada', { journal: { writes, receipt } }),
 		});
+		if (failRead) await vi.waitFor(() => expect(failRead).toBe(false));
 		await saved();
-		expect(failRead).toBe(false);
 		expect(intermediate.log).toEqual([]);
 
 		const { remote } = restart(storage, first);
