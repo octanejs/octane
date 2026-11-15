@@ -7282,14 +7282,11 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				callee &&
 				callee.module === 'react' &&
 				callee.name === 'StrictMode' &&
-				!node.openingElement.attributes.properties.length &&
 				!this.islands.has(node) &&
 				!this.unrenderable.has(node) &&
 				!this.reactRendererBodies.has(node))
 		) {
-			for (const child of node.children)
-				if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child))
-					this.checkReactClassRoot(child);
+			for (const child of node.children) if (isJsx(child)) this.checkReactClassOutput(child);
 		} else if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
 			this.checkReactClassRoot(node);
 		}

@@ -106,6 +106,16 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 				'<Frame><b>ready</b></Frame>',
 				'<Other><><Frame /></></Other>',
 			),
+			'FragmentStrict.tsx':
+				"import { StrictMode as Strict } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<><Strict key="stable"><><Frame /></></Strict></>',
+				),
+			'NestedFragment.tsx': entry('./Boundary').replace(
+				'<Frame><b>ready</b></Frame>',
+				'<><><Frame /></></>',
+			),
 			'Ternary.tsx': entry('./Boundary')
 				.replace('App()', 'App(show: boolean)')
 				.replace('return <Frame><b>ready</b></Frame>;', 'return show ? <Frame /> : <b />;'),
@@ -284,8 +294,10 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 				['DefaultExportView.tsx', includeClass ? 'error' : 'warning'],
 				['FragmentArm.tsx', includeClass ? 'error' : 'warning'],
 				['FragmentRoot.tsx', includeClass ? 'error' : 'warning'],
+				['FragmentStrict.tsx', includeClass ? 'error' : 'warning'],
 				['Guard.tsx', includeClass ? 'error' : 'warning'],
 				['LogicalArm.tsx', includeClass ? 'error' : 'warning'],
+				['NestedFragment.tsx', includeClass ? 'error' : 'warning'],
 				['Relative.tsx', includeClass ? 'error' : 'warning'],
 				['Retained.tsx', includeClass ? 'error' : 'warning'],
 				['RetainedArrow.tsx', includeClass ? 'error' : 'warning'],
