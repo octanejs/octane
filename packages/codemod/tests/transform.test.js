@@ -611,10 +611,30 @@ export type Qualified = typeof R.createRef;`,
 				'points.ts',
 			);
 			expect(code).toMatch(/import type \{ Touch(?: as \w+)? \} from 'octane'/);
-			expect(code).toContain("[typeof import('react').Touch, typeof import('react').Touch.token]");
+			expect(code).toContain(declaration);
+			expect(code).toContain('[typeof R.Touch, typeof R.Touch.token]');
 			expect(notes.filter((note) => note.rule === 'unsupported-api')).toHaveLength(2);
 		},
 	);
+
+	it('retains static Touch queries alongside migrated named hooks', () => {
+		const { code } = transformModule(
+			`import React, { useState } from 'react';
+			 declare module 'react' { export namespace Touch { const loose: any } }
+			 export type Deep = typeof React.Touch.loose.more;
+			 export function useCounter() { return useState(0); }`,
+			'points.ts',
+		);
+		expect(code).toContain("import React from 'react';");
+		expect(code).toContain("import { useState } from 'octane';");
+		expect(code).toContain('export type Deep = typeof React.Touch.loose.more;');
+	});
+
+	it('preserves combined default and namespace owners for Touch queries', () => {
+		const source = `import React, * as R from 'react';
+			export type Queries = [typeof React.Touch.loose.more, typeof R.Touch.loose.more];`;
+		expect(transformModule(source, 'points.ts').code).toBe(source);
+	});
 
 	it.each([
 		'export type Result = typeof Point.token;',
@@ -657,7 +677,9 @@ export type Qualified = typeof R.createRef;`,
 			   import('react-dom').Touch, import('react-dom').Touch.Metadata];`,
 			'points.ts',
 		);
-		expect(code.match(/import\('react-dom'\)\.Touch/g)).toHaveLength(5);
+		expect(code).toContain("import type * as RD from 'react-dom';");
+		expect(code).toContain('[RD.Touch, RD.Touch.Metadata, typeof RD.Touch.token,');
+		expect(code.match(/import\('react-dom'\)\.Touch/g)).toHaveLength(2);
 		expect(notes.filter((note) => note.rule === 'unsupported-api')).toHaveLength(5);
 	});
 
@@ -667,7 +689,8 @@ export type Qualified = typeof R.createRef;`,
 			 export type Metadata = [R.Touch.Metadata, import('react').Touch.Metadata];`,
 			'points.ts',
 		);
-		expect(code).toContain("[import('react').Touch.Metadata, import('react').Touch.Metadata]");
+		expect(code).toContain("import type * as R from 'react';");
+		expect(code).toContain("[R.Touch.Metadata, import('react').Touch.Metadata]");
 		expect(notes.filter((note) => note.rule === 'unsupported-api')).toHaveLength(2);
 	});
 
@@ -675,9 +698,7 @@ export type Qualified = typeof R.createRef;`,
 		const source = `import type R from 'react' with { 'resolution-mode': 'require' };
 			export type Points = [R.Touch, import('react', { with: { 'resolution-mode': 'require' } }).Touch];`;
 		const { code, notes } = transformModule(source, 'points.ts');
-		expect(
-			code.match(/import\('react', \{ with: \{ 'resolution-mode': 'require' \} \}\)\.Touch/g),
-		).toHaveLength(2);
+		expect(code).toBe(source);
 		expect(notes).toEqual([]);
 	});
 
@@ -694,9 +715,10 @@ export namespace Local {
 }`;
 		const { code, notes } = transformModule(source, 'points.ts');
 		expect(code).toContain("import type { Touch as OctaneTouch } from 'octane';");
-		expect(code).toContain("typeof import('react').Touch;");
-		expect(code).toContain("typeof import('react') /* keep */ .Touch.token;");
-		expect(code).toContain("typeof import('react').Touch.token.nested;");
+		expect(code).toContain("import type * as R from 'react';");
+		expect(code).toContain('typeof R.Touch;');
+		expect(code).toContain('typeof R /* keep */ .Touch.token;');
+		expect(code).toContain('typeof R.Touch.token.nested;');
 		expect(code).toContain('export type Shadow = typeof R.Touch.token;');
 		expect(notes.filter((note) => note.rule === 'unsupported-api')).toHaveLength(4);
 		expect(transformModule(code, 'points.ts').code).toBe(code);
@@ -709,10 +731,7 @@ declare module 'react' {
 	export type Result = typeof R.Touch.token;
 }`;
 		const { code } = transformModule(source, 'points.ts');
-		expect(code).toMatch(/^export \{\};/);
-		expect(code).toContain(
-			"typeof import('react', { with: /* condition */ { 'resolution-mode': 'require' } }).Touch.token",
-		);
+		expect(code).toBe(source);
 		expect(transformModule(code, 'points.ts').code).toBe(code);
 	});
 

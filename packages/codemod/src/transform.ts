@@ -821,6 +821,7 @@ class ModuleTransform {
 	readonly unrenderable = new Map<ts.Node, string>();
 	/** Placeholder index -> import declaration. */
 	readonly importSlots: ts.ImportDeclaration[] = [];
+	private readonly retainedTypeNamespaces = new Set<ts.ImportClause>();
 	intrinsicPropsHelper: string | null = null;
 	hasJsx = false;
 	/** Whether the module imports React, rather than already being Octane. */
@@ -4342,6 +4343,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		};
 		/** React specifiers with no Octane export stay on React, for a person. */
 		const kept = new Map<string, string[]>();
+		const typeNamespaces: string[] = [];
 		/** Locals of React's `jsx` factories, which a JSX runtime consumer calls. */
 		const factories: string[] = [];
 		let retainsCreateElement = false;
@@ -4354,7 +4356,17 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				clause.name?.text ??
 				(bindings && ts.isNamespaceImport(bindings) ? bindings.name.text : null);
 			// Members the rewrite could not map keep the namespace alive.
-			if (namespace && this.used.has(namespace)) add(REACT_MODULES[module], '*', namespace, false);
+			if (namespace && this.retainedTypeNamespaces.has(clause)) {
+				// A static type query can follow a value chain that an import() type cannot.
+				typeNamespaces.push(
+					clause.name && bindings && ts.isNamedImports(bindings)
+						? this.source.slice(node.getStart(this.sf), clause.name.end) +
+								this.source.slice(clause.end, node.end)
+						: node.getText(this.sf),
+				);
+			} else if (namespace && this.used.has(namespace)) {
+				add(REACT_MODULES[module], '*', namespace, false);
+			}
 			if (!bindings || !ts.isNamedImports(bindings)) continue;
 			for (const element of bindings.elements) {
 				const local = element.name.text;
@@ -4412,7 +4424,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			for (const [name, { local, typeOnly }] of names) add(module, name, local, typeOnly);
 		}
 
-		const lines: string[] = [];
+		const lines: string[] = typeNamespaces;
 		const quote = (module: string) => this.quote + module + this.quote;
 		for (const [module, names] of imports) {
 			const specs = [...names.values()];
@@ -4695,14 +4707,9 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					(ts.isTypeReferenceNode(access.parent) &&
 						(namespace.module === 'react-dom' || nested || attributes))
 				) {
-					const options = attributes
-						? `, { ${attributes.getText(this.sf).replace(/^(?:with|assert)\b/, 'with:')} }`
-						: '';
 					this.reportRetainedTouchType(namespace.module, node, query, nested);
-					return (
-						`import(${this.quote}${namespace.module}${this.quote}${options})` +
-						this.source.slice(node.left.end, node.end)
-					);
+					this.retainedTypeNamespaces.add(clause);
+					return node.getText(this.sf);
 				}
 			}
 		}
