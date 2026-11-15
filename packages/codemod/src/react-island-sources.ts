@@ -140,6 +140,14 @@ function classMetadataAssignment(ref: ts.Identifier, decl: ts.ClassDeclaration) 
 	);
 }
 
+function localValueExport(symbol: ts.Symbol, checker: ts.TypeChecker) {
+	const declaration = symbol.valueDeclaration ?? symbol.declarations?.[0];
+	if (!declaration || !ts.isExportSpecifier(declaration)) return declaration;
+	const exported = declaration.parent.parent;
+	if (declaration.isTypeOnly || exported.isTypeOnly || exported.moduleSpecifier) return;
+	return checker.getExportSpecifierLocalTargetSymbol(declaration)?.valueDeclaration;
+}
+
 /** Direct React class exports, including an alias in a local export list. */
 export function reactClassExports(file: string, source: string) {
 	const { sf, checker } = bind(file, source);
@@ -155,12 +163,8 @@ export function reactClassExports(file: string, source: string) {
 		inTypeNode(ref) &&
 		(ts.isTypeQueryNode(ref.parent) || !(decorators ??= source.includes('@') && hasDecorator(sf)));
 	for (const symbol of checker.getExportsOfModule(module)) {
-		let decl = symbol.valueDeclaration ?? symbol.declarations?.[0];
-		if (decl && ts.isExportSpecifier(decl)) {
-			const exp = decl.parent.parent;
-			if (decl.isTypeOnly || exp.isTypeOnly || exp.moduleSpecifier) continue;
-			decl = checker.getExportSpecifierLocalTargetSymbol(decl)?.valueDeclaration;
-		} else if (decl && ts.isExportAssignment(decl)) {
+		let decl = localValueExport(symbol, checker);
+		if (decl && ts.isExportAssignment(decl)) {
 			const value = decl.expression;
 			if (decl.isExportEquals || !ts.isIdentifier(value)) continue;
 			const local = checker.getSymbolAtLocation(value)?.valueDeclaration;
@@ -198,6 +202,26 @@ export function reactClassExports(file: string, source: string) {
 	return names;
 }
 
+function hasSingleReactImport(sf: ts.SourceFile, source: string) {
+	const erased = new Set<number>();
+	for (const statement of sf.statements) {
+		if (
+			(ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) &&
+			statement.moduleSpecifier &&
+			!hasRuntimeDependency(statement, true)
+		)
+			erased.add(statement.moduleSpecifier.getStart(sf));
+	}
+	// Keep dynamic imports and require calls in the scan. Only declaration-level
+	// type imports and exports are erased even with verbatim module syntax.
+	return (
+		ts
+			.preProcessFile(source, true, true)
+			.importedFiles.filter(({ fileName, pos }) => fileName === 'react' && !erased.has(pos))
+			.length === 1
+	);
+}
+
 /** Direct module-level const exports initialized by the real React context factory. */
 export function retainedReactContextExports(file: string, source: string) {
 	const { sf, checker } = bind(file, source);
@@ -207,7 +231,7 @@ export function retainedReactContextExports(file: string, source: string) {
 	let uses: ReturnType<typeof localUses> | undefined;
 	let singleReactImport: boolean | undefined;
 	for (const symbol of checker.getExportsOfModule(module)) {
-		const declaration = symbol.valueDeclaration;
+		const declaration = localValueExport(symbol, checker);
 		if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer)
 			continue;
 		const list = declaration.parent;
@@ -225,11 +249,7 @@ export function retainedReactContextExports(file: string, source: string) {
 		if (entry?.module !== 'react' || entry.name !== 'createContext') continue;
 		if (ts.isPropertyAccessExpression(factory)) {
 			// With interop the default and namespace can share the same mutable React object.
-			singleReactImport ??=
-				!hasEval(sf) &&
-				ts
-					.preProcessFile(source, true, true)
-					.importedFiles.filter(({ fileName }) => fileName === 'react').length === 1;
+			singleReactImport ??= !hasEval(sf) && hasSingleReactImport(sf, source);
 			if (
 				!singleReactImport ||
 				!ts.isIdentifier(factory.expression) ||

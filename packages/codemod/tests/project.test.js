@@ -147,6 +147,20 @@ describe('runCodemod', () => {
 		const owners = {
 			Default: "import React from 'react'; export const State = React.createContext(null);",
 			Namespace: "import * as R from 'react'; export const State = R.createContext(null);",
+			LocalAlias:
+				"import { createContext } from 'react'; const Local = createContext(null); export { Local as State };",
+			ExportTypeOnly:
+				"import { createContext } from 'react'; const Local = createContext(null); export type { Local as State };",
+			NamespaceTypeImport:
+				"import * as R from 'react'; import type { ReactNode } from 'react'; export const State = R.createContext<ReactNode>(null);",
+			DefaultTypeExport:
+				"import R from 'react'; export type { ReactNode } from 'react'; export const State = R.createContext(null);",
+			SeparateInlineType:
+				"import R from 'react'; import { type ReactNode } from 'react'; export const State = R.createContext<ReactNode>(null);",
+			DynamicImport:
+				"import R from 'react'; const other = import('react'); export const State = R.createContext(null);",
+			RequireImport:
+				"import R from 'react'; const other = require('react'); export const State = R.createContext(null);",
 			Patched:
 				"import React from 'react'; React.createContext = () => function Replacement() { return null; }; export const State = React.createContext(null);",
 			Alternate:
@@ -190,7 +204,74 @@ describe('runCodemod', () => {
 			report.files
 				.filter((file) => file.notes.some((note) => note.rule === 'retained-react-context'))
 				.map((file) => file.file),
-		).toEqual(['Default.tsx', 'Namespace.tsx']);
+		).toEqual([
+			'Default.tsx',
+			'Namespace.tsx',
+			'LocalAlias.tsx',
+			'NamespaceTypeImport.tsx',
+			'DefaultTypeExport.tsx',
+		]);
+	});
+
+	it('reports retained React providers in reachable native template arms and rows', async () => {
+		const provider = '<State value={null}><b>ready</b></State>';
+		const cases = {
+			Ternary: [`return shown ? ${provider} : <i />;`, 1],
+			AndArm: [`return shown ? (Boolean(shown) && ${provider}) : <i />;`, 1],
+			Guard: [`if (shown) return ${provider}; return <i />;`, 1],
+			BothArms: [`if (shown) return ${provider}; return ${provider};`, 2],
+			Map: ['return [1, 2].map(n => <State key={n} value={null} />);', 1],
+			MapConditional: [`return [1, 2].map(n => shown ? ${provider} : null);`, 1],
+			Dead: [`return false ? ${provider} : <i />;`, 0],
+			DeadAnd: [`return shown ? (false && ${provider}) : <i />;`, 0],
+			TerminalGuard: [`if (true) return <i />; return ${provider};`, 0],
+			EmptyMap: ['return ([] as number[]).map(n => <State key={n} value={null} />);', 0],
+			DeadMapConditional: [`return [1, 2].map(n => false ? ${provider} : <i />);`, 0],
+			OutsideTemplate: [`return shown && ${provider};`, 0],
+			ForeignChildren: [
+				`function Discard() { return null; } return <Discard>{${provider}}</Discard>;`,
+				0,
+			],
+			ReactBoundary: [`return <ReactCompat component={() => ${provider}} />;`, 0],
+		};
+		const root = fs.realpathSync(
+			project({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { jsx: 'react-jsx', moduleResolution: 'bundler' },
+				}),
+				'owner.ts':
+					"import { createContext } from 'react'; export const State = createContext(null);",
+				...Object.fromEntries(
+					Object.entries(cases).map(([name, [body]]) => [
+						`${name}.tsx`,
+						`import { State } from './owner.ts';
+						${name === 'ReactBoundary' ? "import { ReactCompat } from 'octane/react';" : ''}
+						export function View({ shown }: { shown: boolean }) { ${body} }`,
+					]),
+				),
+			}),
+		);
+		fs.symlinkSync(
+			path.resolve(import.meta.dirname, '../node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const report = await runCodemod(
+			Object.keys(cases).map((name) => path.join(root, `${name}.tsx`)),
+			{ root, strong: true, verify: true, projectTypes: false, write: false },
+		);
+		for (const file of report.files) {
+			const name = file.file.slice(0, -4);
+			const notes = file.notes.filter((note) => note.rule === 'retained-react-context');
+			expect(notes, file.file).toHaveLength(cases[name][1]);
+			if (notes.length) {
+				expect(file.strong, file.file).toBe(true);
+				expect(
+					notes.every(({ severity }) => severity === 'warning'),
+					file.file,
+				).toBe(true);
+			}
+		}
 	});
 
 	it('reports a direct native template root that imports a React class', async () => {

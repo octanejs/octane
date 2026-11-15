@@ -2,4 +2,4 @@
 '@octanejs/codemod': patch
 ---
 
-Warn when a direct native template would render an unchanged React context provider. Keep the migration preview available so consumers can verify or migrate the context owner.
+Warn when a native template root, conditional arm or keyed row would render an unchanged React context provider. Keep the migration preview available so consumers can verify or migrate the context owner.
