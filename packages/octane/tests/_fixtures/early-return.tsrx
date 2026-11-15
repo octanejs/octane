@@ -1,4 +1,4 @@
-import { useState, withSlot, type OctaneNode } from 'octane';
+import { memo, useState, withSlot, type OctaneNode } from 'octane';
 
 // Simple early-return: render nothing when condition holds.
 // Old syntax: `if (props.hide) return;` before the JSX.
@@ -85,4 +85,38 @@ export function ShadowedStateAlias() @{
 	}
 	const [value, count] = cell(1);
 	<output>{value + ':' + count}</output>
+}
+
+// The named and memoized inner bodies own state separately from their parent.
+export function NestedAliasedState({ hide }: { hide: boolean }) @{
+	function Named({ hide }: { hide: boolean }) @{
+		if (hide) return null;
+		const [value, setValue, getValue] = cell(1);
+		<button onClick={() => setValue(getValue() + 1)}>{value as number}</button>
+	}
+	const Memoized = memo(function Memoized({ hide }: { hide: boolean }) @{
+		if (hide) return null;
+		const [value, setValue, getValue] = cell(10);
+		<button onClick={() => setValue(getValue() + 1)}>{value as number}</button>
+	});
+	<main>
+		<Named hide={hide} />
+		<Memoized hide={hide} />
+	</main>
+}
+
+const StaticMemoized = memo(function StaticMemoized() @{
+	const [value, setValue, getValue] = cell(10);
+	<button onClick={() => setValue(getValue() + 1)}>{value as number}</button>
+});
+
+export function NestedAliasedExpressions() @{
+	const Arrow = () => @{
+		const [value, setValue, getValue] = cell(1);
+		<button onClick={() => setValue(getValue() + 1)}>{value as number}</button>
+	};
+	<main>
+		<Arrow />
+		<StaticMemoized />
+	</main>
 }

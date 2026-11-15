@@ -14,6 +14,8 @@ import {
 	AliasedState,
 	ManualStateAlias,
 	ShadowedStateAlias,
+	NestedAliasedState,
+	NestedAliasedExpressions,
 } from './_fixtures/early-return.tsrx';
 import { App as HelperApp } from './_fixtures/return-from-helper.tsrx';
 
@@ -103,6 +105,42 @@ describe('early returns', () => {
 			expect(host.querySelector('button')).toBeNull();
 			flushSync(() => hydrated.render(AliasedState, props));
 			expect(host.querySelector('button')?.textContent).toBe('2:10');
+		} finally {
+			root?.unmount();
+			host.remove();
+		}
+	});
+
+	it.each([
+		['NestedAliasedState', NestedAliasedState, true],
+		['NestedAliasedExpressions', NestedAliasedExpressions, false],
+	] as const)('hydrates and updates the state in %s', (name, App, hasGuard) => {
+		const server = loadServerFixture(resolve(__dirname, '_fixtures/early-return.tsrx'));
+		const props = { hide: false };
+		const host = document.createElement('div');
+		host.innerHTML = renderToString(server[name], props).html;
+		document.body.append(host);
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+		try {
+			const [first, second] = host.querySelectorAll('button');
+			expect([first.textContent, second.textContent]).toEqual(['1', '10']);
+			const hydrated = hydrateRoot(host, App, props);
+			root = hydrated;
+			const buttons = host.querySelectorAll('button');
+			expect(buttons[0]).toBe(first);
+			expect(buttons[1]).toBe(second);
+			flushSync(() => first.click());
+			expect([first.textContent, second.textContent]).toEqual(['2', '10']);
+			flushSync(() => second.click());
+			expect([first.textContent, second.textContent]).toEqual(['2', '11']);
+			if (hasGuard) {
+				flushSync(() => hydrated.render(App, { hide: true }));
+				expect(host.querySelector('button')).toBeNull();
+				flushSync(() => hydrated.render(App, props));
+				expect(Array.from(host.querySelectorAll('button'), (button) => button.textContent)).toEqual(
+					['1', '10'],
+				);
+			}
 		} finally {
 			root?.unmount();
 			host.remove();

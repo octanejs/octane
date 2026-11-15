@@ -178,6 +178,7 @@ import {
 	collectOctaneImportLocals,
 	findDirectlyCalledNames,
 	findDirectlyCalledTemplateFunctions,
+	isLowerableTemplateFunction,
 	portalImportBinding,
 	soleRenderPropChild,
 } from './descriptor-lowering.js';
@@ -12799,13 +12800,17 @@ function compileInternal(
 	// and HMR share one DOM-range shape. HMR still emits the generic component
 	// call ABI, and invalidates normally if an edit introduces a value return.
 	const typescriptWeb = options?.output === 'ts' && options?.__valdiAbiGuard === undefined;
-	if (rendererBoundaryPreparation === null) ast = markLocalStateAliases(ast, filename, options);
+	const localStateAliases =
+		rendererBoundaryPreparation === null
+			? findLocalStateAliases(ast, filename, options)
+			: undefined;
+	ast = markLocalStateAliases(ast, localStateAliases);
 	ast = lowerNullishComponentExits(ast, typescriptWeb);
 	// Same contract for React-style conditional JSX returns: branch-selected
 	// output compiles as template control flow instead of de-opt descriptors.
 	ast = lowerJsxReturnBranchComponents(ast);
 	// A nested `@{ … }` function that code calls directly returns JSX instead.
-	ast = lowerDirectlyCalledTemplateFunctions(ast);
+	ast = lowerDirectlyCalledTemplateFunctions(ast, localStateAliases);
 	// Omitted dependency lists are compiler-owned: infer reactive captures
 	// before any component splitting/hoisting so every lexical binding is still
 	// visible to the shared TSRX/TSX analysis. Explicit arrays and `null` pass
@@ -14593,10 +14598,13 @@ function compileServer(
 	ast = splitDirectlyCalledComponents(ast);
 	// Mirror the client transform so SSR emits the same control-flow ranges
 	// hydration expects in both development and production.
-	if (canMarkLocalStateAliases) ast = markLocalStateAliases(ast, filename, options);
+	const localStateAliases = canMarkLocalStateAliases
+		? findLocalStateAliases(ast, filename, options)
+		: undefined;
+	ast = markLocalStateAliases(ast, localStateAliases);
 	ast = lowerNullishComponentExits(ast, options?.output === 'ts');
 	ast = lowerJsxReturnBranchComponents(ast);
-	ast = lowerDirectlyCalledTemplateFunctions(ast);
+	ast = lowerDirectlyCalledTemplateFunctions(ast, localStateAliases);
 	// Mirror the client transform exactly. Effects are server no-ops, but
 	// useMemo/useCallback execute during SSR and must receive the same inferred
 	// dependency shape as hydration's client compile.
@@ -39532,7 +39540,7 @@ function sourceError(code, ctx, node, message) {
 
 // A same-module const may read the exact imported Octane state function as a
 // value. Mark direct component setup before the early-exit pass moves slots.
-function markLocalStateAliases(ast, filename, options) {
+function findLocalStateAliases(ast, filename, options) {
 	if (
 		!cleanCompileFilename(filename).endsWith('.tsrx') ||
 		!domSignalTarget(options) ||
@@ -39540,7 +39548,7 @@ function markLocalStateAliases(ast, filename, options) {
 		options?.__rendererBoundariesLowered === true ||
 		options?.__valdiAbiGuard !== undefined
 	)
-		return ast;
+		return undefined;
 	let imports;
 	for (const node of ast.body) {
 		if (
@@ -39561,7 +39569,7 @@ function markLocalStateAliases(ast, filename, options) {
 				(imports ??= new Set()).add(specifier.local.name);
 		}
 	}
-	if (imports === undefined) return ast;
+	if (imports === undefined) return undefined;
 	let aliases;
 	for (const statement of ast.body) {
 		const node = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
@@ -39581,11 +39589,15 @@ function markLocalStateAliases(ast, filename, options) {
 		)
 			(aliases ??= new Set()).add(id.name);
 	}
-	if (aliases === undefined) return ast;
+	return aliases;
+}
+
+function localStateSetupMarker(ast, aliases) {
 	let lexical;
 	const mark = (node) => {
 		if (
 			node.type !== 'CallExpression' ||
+			node._octaneLocalStateAlias === true ||
 			node.optional === true ||
 			node.callee.type !== 'Identifier' ||
 			!aliases.has(node.callee.name) ||
@@ -39608,10 +39620,7 @@ function markLocalStateAliases(ast, filename, options) {
 			_octaneLocalStateAlias: true,
 		};
 	};
-	const bodyNodes = mapNodes(ast.body, (statement) => {
-		const component = moduleStatementDeclaration(statement);
-		if (!isComponentFunction(component)) return statement;
-		const body = component.body;
+	return (body) => {
 		const setup = mapNodes(body.body, (node) => {
 			if (node.type !== 'VariableDeclaration') return node;
 			const declarations = mapNodes(node.declarations, (declaration) => {
@@ -39620,8 +39629,19 @@ function markLocalStateAliases(ast, filename, options) {
 			});
 			return declarations === node.declarations ? node : { ...node, declarations };
 		});
-		if (setup === body.body) return statement;
-		const next = { ...component, body: { ...body, body: setup } };
+		return setup === body.body ? body : { ...body, body: setup };
+	};
+}
+
+function markLocalStateAliases(ast, aliases) {
+	if (aliases === undefined) return ast;
+	const markSetup = localStateSetupMarker(ast, aliases);
+	const bodyNodes = mapNodes(ast.body, (statement) => {
+		const component = moduleStatementDeclaration(statement);
+		if (!isComponentFunction(component)) return statement;
+		const body = markSetup(component.body);
+		if (body === component.body) return statement;
+		const next = { ...component, body };
 		return statement === component ? next : { ...statement, declaration: next };
 	});
 	return bodyNodes === ast.body ? ast : { ...ast, body: bodyNodes };
@@ -40186,15 +40206,30 @@ function lowerJsxReturnBranchComponents(ast) {
  * because their returned-JSX forms return a promise or an iterator instead of
  * JSX.
  */
-function lowerDirectlyCalledTemplateFunctions(ast) {
+function lowerDirectlyCalledTemplateFunctions(ast, localStateAliases) {
 	const portalBinding = portalImportBinding(ast);
 	const lowered = findDirectlyCalledTemplateFunctions(ast, portalBinding);
-	if (lowered.size === 0 && portalBinding === null) return ast;
-	const lower = (node) =>
+	if (lowered.size === 0 && portalBinding === null && localStateAliases === undefined) return ast;
+	const markSetup =
+		localStateAliases === undefined ? null : localStateSetupMarker(ast, localStateAliases);
+	const moduleStatements =
+		markSetup === null ? null : new Set(ast.body.map(moduleStatementDeclaration));
+	const lower = (node, markNested = markSetup !== null) =>
 		mapAst(node, (n) => {
-			if (lowered.has(n)) return returnedJsxFunction(n, lower);
+			if (lowered.has(n)) return returnedJsxFunction(n, (node) => lower(node, markNested));
+			if (markNested && n._octaneDirectCallTwin === true) return lower(n, false);
+			// Only template bodies that survive the returned-JSX ABI selection own slots.
+			if (
+				markNested &&
+				isFunctionNode(n) &&
+				isLowerableTemplateFunction(n) &&
+				!moduleStatements.has(n)
+			) {
+				const body = markSetup(n.body);
+				if (body !== n.body) return lower({ ...n, body }, markNested);
+			}
 			if (n.type === 'CallExpression' && portalBinding?.(n.callee) === 'createPortal')
-				return { ...n, arguments: lower(n.arguments), _octanePortalCall: true };
+				return { ...n, arguments: lower(n.arguments, markNested), _octanePortalCall: true };
 			return null;
 		});
 	return lower(ast);
