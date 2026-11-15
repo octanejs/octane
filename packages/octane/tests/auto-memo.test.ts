@@ -7642,6 +7642,58 @@ describe('compiler-owned component-region memoization', () => {
 		root.unmount();
 	});
 
+	it.each([
+		['deletes a later index', 'delete rows[1]', ['a', 'c']],
+		['assigns a shorter length', 'rows.length = 1', ['a']],
+		['decrements the length', 'rows.length--', ['a', 'b']],
+	])('keeps native map order when the JSX callback %s', (_, write, expected) => {
+		const source = `
+			export function App({ rows }) @{
+				<main>{rows.map(row => <i data-label={(${write}, row.label)}>{row.label as string}</i>)}</main>
+			}
+		`;
+		const id = 'map-callback-write.tsrx';
+		const compileOptions = { hmr: false, dev: false };
+		type Props = { rows: { label: string }[] };
+		const client = loadCompiledFixtureSource<{ App: (props: Props) => void }>(source, {
+			id,
+			mode: 'client',
+			compileOptions,
+		});
+		const server = loadCompiledFixtureSource<{ App: (props: Props) => string }>(source, {
+			id,
+			mode: 'server',
+			compileOptions,
+		});
+		const props = (): Props => ({ rows: ['a', 'b', 'c'].map((label) => ({ label })) });
+		const mounted = mount(client.App, props());
+		try {
+			expect(mounted.findAll('i').map((row) => row.textContent)).toEqual(expected);
+		} finally {
+			mounted.unmount();
+		}
+
+		const { html } = ServerRuntime.renderToString(server.App, props());
+		const container = document.body.appendChild(document.createElement('div'));
+		container.innerHTML = html;
+		const original = Array.from(container.querySelectorAll('i'));
+		const errors: unknown[] = [];
+		const hydrated = hydrateRoot(container, client.App, props(), {
+			onRecoverableError: (error) => errors.push(error),
+		});
+		try {
+			expect(original.map((row) => row.textContent)).toEqual(expected);
+			flushSync(() => {});
+			const adopted = container.querySelectorAll('i');
+			expect(adopted).toHaveLength(original.length);
+			original.forEach((row, index) => expect(adopted[index]).toBe(row));
+			expect(errors).toEqual([]);
+		} finally {
+			hydrated.unmount();
+			container.remove();
+		}
+	});
+
 	it('reads inherited sparse-array getters once without skipping their callback index', () => {
 		const events: string[] = [];
 		const first = { id: 1, label: 'first' };
