@@ -105,6 +105,7 @@ export const CONTEXT_ALIAS = 'context-path-alias';
 export const CONTEXT_PROVIDER_GETTER = 'context-provider-getter';
 export const ELEMENT_CHILD_ALIAS = 'element-child-path-alias';
 export const INTL_PROVIDER_DEFAULTS = 'intl-provider-defaults';
+export const REACT_TYPE_PROJECTION = 'react-type-projection';
 
 /** Rule names, as reported. */
 const RULE = {
@@ -3896,7 +3897,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 						mapped?.name !== name &&
 						mapReactImport(module, name, false)?.name !== name
 					)
-						this.note(RULE.unsupported, 'error', item, `Octane has no export \`${name}\`.`);
+						this.note(REACT_TYPE_PROJECTION, 'error', item, `Octane has no export \`${name}\`.`);
 					migrated.push(text);
 				}
 			}
@@ -4119,9 +4120,10 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		this.count(RULE.import);
 		const renamed = name === null ? null : mapQualifiedType(name);
 		if (name !== null && renamed === null) {
+			const unresolvedProjection = specifier.text === 'react' && !node.isTypeOf;
 			this.note(
-				RULE.unsupported,
-				specifier.text === 'react' && !node.isTypeOf ? 'error' : 'warning',
+				unresolvedProjection ? REACT_TYPE_PROJECTION : RULE.unsupported,
+				unresolvedProjection ? 'error' : 'warning',
 				node,
 				`Octane has no type \`${name}\`.`,
 			);
@@ -4596,9 +4598,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		const name = mapQualifiedType(node.right.text);
 		if (!name) {
 			if (namespace) this.used.add(namespace.local);
+			const unresolvedProjection =
+				namespace?.module === 'react' && ts.isTypeReferenceNode(node.parent);
 			this.note(
-				RULE.unsupported,
-				namespace?.module === 'react' && ts.isTypeReferenceNode(node.parent) ? 'error' : 'warning',
+				unresolvedProjection ? REACT_TYPE_PROJECTION : RULE.unsupported,
+				unresolvedProjection ? 'error' : 'warning',
 				node,
 				`Octane has no type \`${node.getText(this.sf)}\`.`,
 			);

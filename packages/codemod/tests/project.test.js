@@ -5684,6 +5684,69 @@ export * from './View.tsrx';`,
 		expect(second.files.filter((file) => file.changed)).toEqual([]);
 	});
 
+	it.each([
+		[
+			'namespace',
+			"import type * as React from 'react'; export type Props = React.ConsumerProps<React.ReactNode>;",
+		],
+		['inline', "export type Props = import('react').ConsumerProps<string>;"],
+		['re-export', "export type { ReactNode, ConsumerProps } from 'react';"],
+	])(
+		'previews and blocks an unresolved React type projection before writing (%s)',
+		(_kind, projection) => {
+			const sources = {
+				'package.json': '{"name":"app","type":"module"}',
+				'App.tsx': projection + '\nexport function App() { return <div />; }',
+				'Entry.ts': "export { App } from './App.tsx';",
+				'First.tsx': 'export const First = () => <b />;',
+			};
+			const root = project(sources);
+			const binary = path.join(import.meta.dirname, '../dist/bin.js');
+			const run = (/** @type {string[]} */ options) =>
+				spawnSync(
+					process.execPath,
+					[binary, 'First.tsx', 'App.tsx', '--no-project-types', '--json', ...options],
+					{ cwd: root, encoding: 'utf8' },
+				);
+			const preview = run(['--print']);
+			expect(preview.status).toBe(1);
+			const candidate = JSON.parse(preview.stdout).files.find(
+				(/** @type {import('../dist/types.js').FileResult} */ file) => file.file === 'App.tsx',
+			);
+			expect(candidate.output).toBe('App.tsrx');
+			expect(candidate.code).toMatch(/(?:from |import\()['"]octane['"]/);
+			expect(candidate.notes).toEqual([
+				expect.objectContaining({ rule: 'react-type-projection', severity: 'error' }),
+			]);
+			for (const target of [[], ['--target', 'tsx']]) {
+				const stopped = run(target);
+				expect(stopped.status).toBe(1);
+				expect(JSON.parse(stopped.stdout).files).toEqual([
+					expect.objectContaining({
+						file: 'App.tsx',
+						output: 'App.tsx',
+						changed: false,
+						notes: [expect.objectContaining({ rule: 'react-type-projection', severity: 'error' })],
+					}),
+				]);
+				expect(fs.readdirSync(root).sort()).toEqual(Object.keys(sources).sort());
+				for (const [file, text] of Object.entries(sources))
+					expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(text);
+			}
+		},
+	);
+
+	it('still writes an ordinary partial migration with an unsupported API', async () => {
+		const source =
+			"import { Profiler } from 'react'; export const App = () => <Profiler id='a' onRender={() => {}}><div /></Profiler>;";
+		const root = project({ 'App.tsx': source });
+		const result = await runCodemod([path.join(root, 'App.tsx')], { root, verify: false });
+		expect(result.files[0].notes).toContainEqual(
+			expect.objectContaining({ rule: 'unsupported-api', severity: 'error' }),
+		);
+		expect(fs.readFileSync(path.join(root, 'App.tsrx'), 'utf8')).toContain('<Profiler');
+	});
+
 	it('blocks a local React context Provider getter before writing', async () => {
 		const context =
 			"import { createContext as makeContext } from 'react'; const Theme = makeContext('default');";

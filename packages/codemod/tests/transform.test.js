@@ -1569,7 +1569,7 @@ export type Qualified = typeof R.createRef;`,
 			'types.ts',
 		);
 		expect(notes).toEqual([
-			expect.objectContaining({ rule: 'unsupported-api', severity: 'error', line: 2 }),
+			expect.objectContaining({ rule: 'react-type-projection', severity: 'error', line: 2 }),
 		]);
 		expect(code).toContain("export type Value = import('octane').OctaneNode;");
 	});
@@ -1584,7 +1584,7 @@ export type Qualified = typeof R.createRef;`,
 			'types.ts',
 		);
 		expect(notes).toEqual([
-			expect.objectContaining({ rule: 'unsupported-api', severity: 'error', line: 2 }),
+			expect.objectContaining({ rule: 'react-type-projection', severity: 'error', line: 2 }),
 		]);
 		expect(code).toContain('Props = R.ConsumerProps<OctaneNode>');
 		expect(code).toContain('Node = OctaneNode');
@@ -1599,17 +1599,17 @@ export type Qualified = typeof R.createRef;`,
 		);
 		expect(notes).toEqual([
 			expect.objectContaining({
-				rule: 'unsupported-api',
+				rule: 'react-type-projection',
 				severity: 'error',
 				message: expect.stringContaining('ConsumerProps'),
 			}),
 			expect.objectContaining({
-				rule: 'unsupported-api',
+				rule: 'react-type-projection',
 				severity: 'error',
 				message: expect.stringContaining('SyntheticEvent'),
 			}),
 			expect.objectContaining({
-				rule: 'unsupported-api',
+				rule: 'react-type-projection',
 				severity: 'error',
 				message: expect.stringContaining('TouchList'),
 			}),
