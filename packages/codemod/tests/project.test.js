@@ -759,7 +759,10 @@ export async function clipboard() {
 			[
 				'styled inline',
 				server.replace('OctaneCompat', 'OctaneCompatInline'),
-				owner.replace(' />', ' hostClassName="status" hostStyle={{ display: \'inline\' }} />'),
+				owner.replace(
+					' />',
+					' hostClassName="status" hostStyle={{ display: \'inline\' }} hostRole="img" hostAriaLabel="Status" />',
+				),
 			],
 			[
 				'namespace',
@@ -878,7 +881,7 @@ export async function clipboard() {
 			],
 			[
 				'styled inline element child',
-				`${server.replace('OctaneCompat', 'OctaneCompatInline')}\n${child}\nexport const App = () => <Host hostClassName="status" hostStyle={{ display: 'inline' }}><Leaf /></Host>;`,
+				`${server.replace('OctaneCompat', 'OctaneCompatInline')}\n${child}\nexport const App = () => <Host hostClassName="status" hostStyle={{ display: 'inline' }} hostRole="img" hostAriaLabel="Status"><Leaf /></Host>;`,
 				leaf,
 			],
 			[

@@ -334,6 +334,10 @@ hydration recovery.
   `hostClassName` and `hostStyle` to style the host. A supplied `hostStyle`
   replaces the default style. Use `hostStyle={{}}` to leave display to CSS
   and the element's default.
+- Use `hostRole` and `hostAriaLabel` to give either React-owned Octane host a
+  role and accessible name. A named icon can use `hostRole="img"`,
+  `hostAriaLabel="Status"`, and `hostStyle={{ display: 'inline-block' }}` for
+  a host with its own layout box.
 - React Server Components, Flight, and React's server `cache()` do not cross
   these boundaries.
 - Nested React→`OctaneCompat`→`ReactCompat` **server rendering** is unsupported.
