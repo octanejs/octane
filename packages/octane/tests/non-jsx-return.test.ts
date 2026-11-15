@@ -11,6 +11,7 @@ import {
 	EscapedGuardedMemoApp,
 	GuardedAliasedMemoApp,
 	GuardedMemoApp,
+	GuardedOwnerMemoApp,
 	Mixed,
 	MixedFragment,
 	MixedInline,
@@ -169,6 +170,7 @@ describe('generic component return reconciliation', () => {
 
 	it.each([
 		['GuardedMemoApp', GuardedMemoApp],
+		['GuardedOwnerMemoApp', GuardedOwnerMemoApp],
 		['GuardedAliasedMemoApp', GuardedAliasedMemoApp],
 	] as const)('keeps %s across an early null return', (_name, CounterApp) => {
 		const r = mount(CounterApp, { shown: false });
@@ -732,6 +734,7 @@ describe('non-JSX return on the server (props-first ABI)', () => {
 
 	it.each([
 		['GuardedMemoApp', GuardedMemoApp],
+		['GuardedOwnerMemoApp', GuardedOwnerMemoApp],
 		['GuardedAliasedMemoApp', GuardedAliasedMemoApp],
 	] as const)('adopts %s before switching to an early null return', async (name, App) => {
 		const server = serverModule();

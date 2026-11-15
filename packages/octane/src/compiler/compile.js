@@ -39858,7 +39858,15 @@ function privateMemoTagUses(ast) {
 	const componentInfo = [];
 	for (const statement of statements) {
 		const node = moduleStatementDeclaration(statement);
-		if (isVoidJsxCodeBlockFunction(node)) componentInfo.push({ node });
+		if (
+			isVoidJsxCodeBlockFunction(node) ||
+			(node?.type === 'FunctionDeclaration' &&
+				!node.async &&
+				!node.generator &&
+				node._octaneDirectCall == null &&
+				hasOnlyLowerableNullishExits(node))
+		)
+			componentInfo.push({ node });
 	}
 	let lexical;
 	const allowed = collectRenderedComponentReferences(componentInfo, null, (node, name) => {

@@ -202,6 +202,25 @@ export function GuardedMemoApp({ shown }: { shown: boolean }) @{
 	</main>
 }
 
+const NestedGuardedCounter = memo(function NestedGuardedCounter({ shown }: { shown: boolean }) @{
+	if (!shown) return null;
+	const [count, setCount] = useState(1);
+	<button onClick={() => setCount(count + 1)}>{count as number}</button>
+});
+
+export function GuardedOwnerMemoApp({
+	shown,
+	active = true,
+}: {
+	shown: boolean;
+	active?: boolean;
+}) @{
+	if (!active) return null;
+	<main>
+		<NestedGuardedCounter shown={shown} />
+	</main>
+}
+
 const guardedState = useState;
 const GuardedAliasedCounter = memo!(
 	function GuardedAliasedCounter({ shown }: { shown: boolean }) @{
