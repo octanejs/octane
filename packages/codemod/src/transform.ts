@@ -7361,7 +7361,9 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				operator === ts.SyntaxKind.QuestionQuestionToken
 			) {
 				const usesFallback =
-					operator === ts.SyntaxKind.BarBarToken ? condition !== 'truthy' : condition === 'nullish';
+					operator === ts.SyntaxKind.BarBarToken
+						? condition === 'falsy' || condition === 'nullish'
+						: condition === 'nullish';
 				if (!usesFallback) this.checkReactClassOutput(node.left);
 				if (usesFallback || condition === undefined) this.checkReactClassOutput(node.right);
 			}
