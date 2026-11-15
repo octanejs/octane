@@ -6,6 +6,7 @@ import {
 	nativeOutputOwner,
 	returnedTextReceiver,
 	renderUses,
+	rootHandleEscapes,
 	svgLocalReads,
 } from './forwarded-props.js';
 import { reactRenderer, staticReactProps, unreadServerStream } from './react-renderer.js';
@@ -23,6 +24,7 @@ import {
 import { isWrapper, literalCondition, skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
 import {
+	atInitializedModuleHandle,
 	effectHelpers,
 	effectReceivers,
 	fixedBinding,
@@ -6045,25 +6047,10 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				(ts.getCombinedNodeFlags(declaration) & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const
 			)
 				return;
-			const statement = declaration.parent.parent;
-			if (!ts.isVariableStatement(statement)) return;
-			const topLevel =
-				ts.isExpressionStatement(call.parent) &&
-				call.parent.parent === this.sf &&
-				statement.parent === this.sf &&
-				statement.end <= call.getStart(this.sf);
 			if (
-				(!topLevel && !initializedBefore(this.checker, receiver, call)) ||
-				renderUses(this.localUses(declaration.name)).some((ref) => {
-					const access = ref.parent;
-					return (
-						!ts.isPropertyAccessExpression(access) ||
-						access.expression !== ref ||
-						(access.name.text !== 'render' && access.name.text !== 'unmount') ||
-						!ts.isCallExpression(access.parent) ||
-						access.parent.expression !== access
-					);
-				})
+				(!atInitializedModuleHandle(declaration, call) &&
+					!initializedBefore(this.checker, receiver, call)) ||
+				rootHandleEscapes(this.localUses(declaration.name))
 			)
 				return;
 		}
