@@ -6,6 +6,7 @@ import {
 	createElement,
 	type OctaneNode,
 	use,
+	useContext,
 	useState,
 } from 'octane';
 
@@ -108,6 +109,38 @@ export function FunctionScopedKeyedRows(props: { rows: number[]; label: string; 
 			<li>{rowPrefix as string}</li>
 		}
 	</ul>
+}
+
+const RowContext = createContext('default');
+
+function ScopedRowLabel() @{
+	<b>{useContext(RowContext) as string}</b>
+}
+
+const scopedRowLabel = createElement(ScopedRowLabel);
+const rowContent = 'module:';
+
+export function OpaqueFunctionScopedKeyedRows(props: {
+	rows: { name: string }[];
+	label: string;
+	rich?: boolean;
+}) @{
+	if (props.label) {
+		var rowContent: OctaneNode = props.rich ? scopedRowLabel : props.label;
+		var item = props.label;
+	}
+	<RowContext value={props.label}>
+		<ul>
+			@for (const item of props.rows; key item.name) {
+				<li>
+					{rowContent}
+					{item.name}
+				</li>
+			} @empty {
+				<li>{item}</li>
+			}
+		</ul>
+	</RowContext>
 }
 
 // Product-style return fragment: the toolbar is a fixed sibling while a

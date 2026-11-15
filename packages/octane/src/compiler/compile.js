@@ -38498,6 +38498,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 
 	// Feed the same locals to key placement, row caches and captured helpers.
 	let rowLocals = ctx.currentComponentLocals;
+	let hoistedRowVars = null;
 	const hasNestedComp = rowLocals != null && containsComponentCallOrControlFlow(subStmts);
 	if (
 		rowLocals != null &&
@@ -38506,14 +38507,13 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		subStmts.length === 1 &&
 		isPlainHostRoot(subStmts[0]) &&
 		!hasNestedComp &&
-		!rendersOpaqueChild(subStmts, [], ctx) &&
 		(emptyStmts === null ||
 			(emptyStmts.length === 1 &&
 				isPlainHostRoot(emptyStmts[0]) &&
-				!containsComponentCallOrControlFlow(emptyStmts) &&
-				!rendersOpaqueChild(emptyStmts, [], ctx)))
+				!containsComponentCallOrControlFlow(emptyStmts)))
 	) {
-		rowLocals = new Set([...rowLocals, ...ctx.currentHoistedVars]);
+		hoistedRowVars = ctx.currentHoistedVars;
+		rowLocals = new Set([...rowLocals, ...hoistedRowVars]);
 	}
 
 	// Key fn is hoisted (it doesn't typically capture parent state). Synthetic
@@ -38569,6 +38569,36 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			]
 		: [];
 
+	const hasPerItemEventClosure =
+		node.nativeArrayMap !== undefined && mapCallbackHasEventClosure(node.nativeArrayMap.callback);
+	// Phase 2: ONE env tuple shared by the item + @empty helpers — it IS the
+	// forBlock `deps` array (deps was already the captured-locals snapshot for
+	// dep-pure promotion; the runtime additionally stamps it as `block.extra`
+	// on every item/empty block). The union may widen deps with @empty-only
+	// captures — a conservative, correct deps for promotion purposes.
+	const itemAllStmts = [...indexInjection, ...destructureInjection, ...subStmts];
+	// The synthetic item param maps to the authored for-of binding.
+	const itemParams = [b.id(itemName, leftDeclId)];
+	let envNames = unionEnv(
+		ctx,
+		[{ stmts: itemAllStmts, params: itemParams }, emptyStmts && { stmts: emptyStmts, params: [] }],
+		false,
+		rowLocals,
+	);
+	if (hasPerItemEventClosure && envNames !== null && envNames.length > 1) {
+		// The helper and its packed tuple share this internal ordering. Grouping
+		// event-row captures in the same order improves the compressed fragment.
+		envNames = [envNames[1], envNames[0], ...envNames.slice(2)];
+	}
+	// An opaque hole can still read a function-scoped binding. Its helper must
+	// capture that binding, but the row remains on the ordinary refresh paths.
+	const opaqueVarCapture =
+		hoistedRowVars !== null &&
+		(envNames === null ||
+			envNames.some((name) => hoistedRowVars.has(name) && !ctx.currentComponentLocals.has(name))) &&
+		(rendersOpaqueChild(subStmts, [], ctx) ||
+			(emptyStmts !== null && rendersOpaqueChild(emptyStmts, [], ctx)));
+
 	// ─── Body analysis: PURE vs DEP-PURE vs normal.
 	//
 	// - PURE: body closes over nothing parent-reactive, no hooks, no comps,
@@ -38591,9 +38621,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	let autoMemoDeps = null;
 	let autoMemoWitnesses = [];
 	let autoMemoContextAware = false;
-	const hasPerItemEventClosure =
-		node.nativeArrayMap !== undefined && mapCallbackHasEventClosure(node.nativeArrayMap.callback);
-	if (rowLocals) {
+	if (rowLocals && !opaqueVarCapture) {
 		const bodyScope = new Set([itemName]);
 		if (node.index) bodyScope.add(node.index.name);
 		// A destructured header runs in the item helper's synthesized prologue, so
@@ -38848,25 +38876,6 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		depNames.sort();
 	}
 
-	// Phase 2: ONE env tuple shared by the item + @empty helpers — it IS the
-	// forBlock `deps` array (deps was already the captured-locals snapshot for
-	// dep-pure promotion; the runtime additionally stamps it as `block.extra`
-	// on every item/empty block). The union may widen deps with @empty-only
-	// captures — a conservative, correct deps for promotion purposes.
-	const itemAllStmts = [...indexInjection, ...destructureInjection, ...subStmts];
-	// The synthetic item param maps to the authored for-of binding.
-	const itemParams = [b.id(itemName, leftDeclId)];
-	let envNames = unionEnv(
-		ctx,
-		[{ stmts: itemAllStmts, params: itemParams }, emptyStmts && { stmts: emptyStmts, params: [] }],
-		false,
-		rowLocals,
-	);
-	if (hasPerItemEventClosure && envNames !== null && envNames.length > 1) {
-		// The helper and its packed tuple share this internal ordering. Grouping
-		// event-row captures in the same order improves the compressed fragment.
-		envNames = [envNames[1], envNames[0], ...envNames.slice(2)];
-	}
 	// The helper reads only component-local captures (`envNames`) from the
 	// tuple prefix. Compiler memoization may additionally need live imported
 	// bindings as dependency witnesses; append them without disturbing that ABI.
@@ -38979,6 +38988,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	const ssrMarkerless = isSsrMarkerlessForItem(node, subStmts);
 	const hostRootTag = subStmts[0]?.id?.name ?? subStmts[0]?.openingElement?.name?.name;
 	const hostMountSafe =
+		!opaqueVarCapture &&
 		ctx.autoMemo === true &&
 		ctx._universalRuntimeUnit == null &&
 		(parentNs === 'html' || (parentNs === 'opaque' && HTML_ONLY_TAGS.has(hostRootTag))) &&

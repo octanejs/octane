@@ -33,6 +33,7 @@ import {
 	ValueTemplateSvg,
 	ValueTemplateMatrix,
 	FunctionScopedKeyedRows,
+	OpaqueFunctionScopedKeyedRows,
 } from './_fixtures/control-fold.tsrx';
 import {
 	DirectReturnedFragmentRefMailbox,
@@ -199,6 +200,49 @@ it('preserves block-declared var reads in keyed rows, keys and the empty arm', (
 		]);
 		flushSync(() => root.render(FunctionScopedKeyedRows, { ...reversed, rows: [] }));
 		expect(container.querySelector('li')?.textContent).toBe('B:');
+		expect(errors).toEqual([]);
+	} finally {
+		root.unmount();
+		container.remove();
+	}
+});
+
+it('preserves function-scoped values in renderable keyed rows and the empty arm', () => {
+	const props = { rows: [{ name: 'a' }, { name: 'b' }], label: 'A:' };
+	const cold = mount(OpaqueFunctionScopedKeyedRows, props);
+	try {
+		expect(cold.findAll('li').map((row) => row.textContent)).toEqual(['A:a', 'A:b']);
+	} finally {
+		cold.unmount();
+	}
+
+	const { html } = ServerRT.renderToString(serverModule().OpaqueFunctionScopedKeyedRows, props);
+	const container = document.createElement('div');
+	container.innerHTML = html;
+	document.body.appendChild(container);
+	const serverRows = [...container.querySelectorAll('li')];
+	expect(serverRows.map((row) => row.textContent)).toEqual(['A:a', 'A:b']);
+	const errors: unknown[] = [];
+	const root = hydrateRoot(container, OpaqueFunctionScopedKeyedRows, props, {
+		onRecoverableError: (error) => errors.push(error),
+	});
+	try {
+		flushSync(() => {});
+		expect(container.querySelectorAll('li')[0]).toBe(serverRows[0]);
+		expect(container.querySelectorAll('li')[1]).toBe(serverRows[1]);
+		for (const label of ['B:', 'C:']) {
+			flushSync(() => root.render(OpaqueFunctionScopedKeyedRows, { ...props, label, rich: true }));
+			expect(serverRows.map((row) => row.textContent)).toEqual([label + 'a', label + 'b']);
+			expect(container.querySelectorAll('li')[0]).toBe(serverRows[0]);
+			expect(container.querySelectorAll('li')[1]).toBe(serverRows[1]);
+		}
+		const rows: typeof props.rows = [];
+		flushSync(() => root.render(OpaqueFunctionScopedKeyedRows, { rows, label: 'D:' }));
+		const empty = container.querySelector('li');
+		expect(empty?.textContent).toBe('D:');
+		flushSync(() => root.render(OpaqueFunctionScopedKeyedRows, { rows, label: 'E:' }));
+		expect(container.querySelector('li')).toBe(empty);
+		expect(empty?.textContent).toBe('E:');
 		expect(errors).toEqual([]);
 	} finally {
 		root.unmount();
