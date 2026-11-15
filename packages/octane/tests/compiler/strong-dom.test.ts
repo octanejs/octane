@@ -182,6 +182,58 @@ describe('Strong managed DOM writes through refs', () => {
 		expectStrongError(effect(write, element), '/src/App.tsrx', RAW_HTML_WRITE);
 	});
 
+	it('admits plain empty HTML clears only through a childless widget root', () => {
+		const source = (
+			write: string,
+			root = '<div ref={r} />',
+			setup = 'const target = node;',
+		) => `${IMPORTS}export function Widget({ extra, other, html }) @{
+  const r = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const node = r.current;
+    if (!node) return;
+    ${setup}
+    ${write}
+  });
+  ${root}
+}`;
+		const filename = '/src/Widget.tsrx';
+		const safe = source(
+			`target.innerHTML = /* widget-owned */ ""; return () => { target.innerHTML = ''; };`,
+		);
+		expectStrongValid(safe, filename);
+		for (const options of MODES) {
+			expect(() => compile(safe, filename, { ...options, strong: true })).not.toThrow();
+		}
+		for (const [write, root] of [
+			['target.innerHTML = html;'],
+			['target.innerHTML = "<b>";'],
+			['target.innerHTML = ("");'],
+			['(target.innerHTML) = "";'],
+			['target.innerHTML = "" as string;'],
+			['target["innerHTML"] = "";'],
+			['target.innerHTML += "";'],
+			['target.outerHTML = "";'],
+			['target.innerHTML = "";', '<div ref={r}><span /></div>'],
+			['target.innerHTML = "";', '<div {...extra} ref={r} />'],
+			['target.innerHTML = "";', '<div ref={r} children={null} />'],
+			['target.innerHTML = "";', '<div ref={r} dangerouslySetInnerHTML={html} />'],
+			['target.innerHTML = "";', '<div ref={[r, other]} />'],
+			['target.innerHTML = "";', '<div ref={r} is="widget-host" />'],
+			['target.innerHTML = "";', '<div ref={r} iS="widget-host" />'],
+			['target.innerHTML = "";', '<><div ref={r} /></>'],
+			['target.innerHTML = "";', '<section><div ref={r} /></section>'],
+		] as const) {
+			expectStrongError(source(write, root), filename, RAW_HTML_WRITE);
+		}
+		expect(
+			compileToVolarMappings(
+				`"use strong";\n${source('target.innerHTML = ""; console.log(target.offsetWidth);')}`,
+				filename,
+			).diagnostics,
+		).toContainEqual(expect.objectContaining({ code: FORCED_LAYOUT, severity: 'hint' }));
+	});
+
 	it('names the replacement in each message', () => {
 		expect(
 			messageOf(
