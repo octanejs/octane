@@ -639,6 +639,54 @@ it('warns at existing standalone client roots when the migrated hook reads conte
 		const options = { onUncaughtError: (error: unknown) => errors.push(error), onRecoverableError: (error: unknown) => errors.push(error) };
 		export const render = (host: HTMLElement) => mount(host, options).render(Pane);
 		export const hydrate = (host: HTMLElement) => Octane.hydrateRoot(host, Pane, undefined, options);
+		export function fromHandle(host: HTMLElement) {
+			const root = mount(host, options);
+			root.render(Pane);
+			root.unmount();
+		}
+		export function escape(host: HTMLElement) {
+			const root = mount(host);
+			root.render(Pane);
+			return root;
+		}
+		export function replaced(host: HTMLElement) {
+			const root = mount(host);
+			root.render = () => {};
+			root.render(Pane);
+		}
+		export function beforeInit(host: HTMLElement) {
+			root.render(Pane);
+			const root = mount(host);
+		}
+		export function namespace(host: HTMLElement) {
+			const root = Octane.createRoot(host);
+			root.render(Pane);
+		}
+		export function optional(host: HTMLElement) {
+			const possible = mount?.(host);
+			possible?.render(Pane);
+			const root = mount(host);
+			root.render?.(Pane);
+		}
+		export function alias(host: HTMLElement) {
+			const root = mount(host);
+			const other = root;
+			other.render(Pane);
+		}
+		export function hoisted(host: HTMLElement) {
+			run();
+			const root = mount(host);
+			function run() { root.render(Pane); }
+		}
+		export function captured(host: HTMLElement) {
+			const root = mount(host);
+			root.render(Pane);
+			return () => root.unmount();
+		}
+		export function delayed(host: HTMLElement) {
+			const root = mount(host);
+			return class { field = root.render(Pane); };
+		}
 		export function deferred(host: HTMLElement, replacement: ReturnType<typeof mount>) {
 			mount(host).render(Plain);
 			mount(host).render(Other);
@@ -679,7 +727,7 @@ it('warns at existing standalone client roots when the migrated hook reads conte
 	const client = files.find((file) => file.file === 'src/client.ts');
 	expect(files.find((file) => file.file === 'src/unverified/client.ts')?.notes).toEqual([]);
 	expect(client.notes).toEqual(
-		[7, 8].map((line) => ({
+		[7, 8, 11, 30].map((line) => ({
 			rule: 'store-hook',
 			severity: 'warning',
 			line,
