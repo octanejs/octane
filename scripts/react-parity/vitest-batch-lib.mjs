@@ -105,10 +105,12 @@ export function buildParityVitestProjects({ baseProjects, lanes, root }) {
 	});
 }
 
-function describeVitestFailureDetails(testResults) {
+export function describeVitestFailureDetails(testResults, { failedOnly = false } = {}) {
 	const failures = testResults.flatMap((suite) =>
 		(suite.assertionResults ?? [])
-			.filter((assertion) => assertion.status !== 'passed')
+			.filter((assertion) =>
+				failedOnly ? assertion.status === 'failed' : assertion.status !== 'passed',
+			)
 			.map((assertion) => {
 				const detail = Array.isArray(assertion.failureMessages)
 					? assertion.failureMessages.join('\n')
