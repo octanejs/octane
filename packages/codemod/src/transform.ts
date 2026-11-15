@@ -6529,11 +6529,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return `@{ const ${param} = ${useContext}(${this.emit(tag.expression, PLAIN)}); ${output} }`;
 	}
 
-	/**
-	 * `<Suspense fallback={f}>…</Suspense>` is the template boundary
-	 * `@try { … } @pending { f }`.
-	 */
-	rewriteSuspense(node: ts.JsxElement) {
+	private suspenseFallback(node: ts.JsxElement) {
 		const attributes = node.openingElement.attributes.properties.filter(
 			(a) => !this.removed.has(a),
 		);
@@ -6546,8 +6542,20 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		) {
 			return null;
 		}
-		let pending: string;
 		const value = fallback.initializer;
+		return ts.isStringLiteral(value) || (ts.isJsxExpression(value) && value.expression)
+			? value
+			: null;
+	}
+
+	/**
+	 * `<Suspense fallback={f}>…</Suspense>` is the template boundary
+	 * `@try { … } @pending { f }`.
+	 */
+	rewriteSuspense(node: ts.JsxElement) {
+		const value = this.suspenseFallback(node);
+		if (!value) return null;
+		let pending: string;
 		if (ts.isStringLiteral(value)) pending = `<>{${value.getText(this.sf)}}</>`;
 		else if (ts.isJsxExpression(value) && value.expression) {
 			const expression = skipParens(value.expression);
@@ -6773,16 +6781,20 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	 * The template directive equivalent to a renderable expression, as
 	 * relative text, or null.
 	 */
-	directive(expression: ts.Expression): string | null {
+	directive(expression: ts.Expression, componentRoot = false): string | null {
 		const node = skipParens(expression);
-		if (ts.isConditionalExpression(node)) return this.ifDirective(node);
+		if (ts.isConditionalExpression(node)) return this.ifDirective(node, componentRoot);
 		if (
 			ts.isBinaryExpression(node) &&
 			node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
 			(this.isBoolean(node.left) ||
 				(this.strictTypes && isBooleanGuardType(this.typeOf(node.left))))
 		) {
-			const arm = this.arm(node.right);
+			const condition = componentRoot ? literalCondition(node.left) : undefined;
+			const arm = this.arm(
+				node.right,
+				componentRoot && (condition === undefined || condition === 'truthy'),
+			);
 			if (arm === null || arm === '') return null;
 			this.count(RULE.if);
 			return this.block(`@if (${this.emit(node.left, PLAIN)})`, arm);
@@ -6796,11 +6808,14 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	 * directive, or '' for nothing. An arm that is only a value is null; the
 	 * caller decides whether it may become a `{value}` hole.
 	 */
-	arm(expression: ts.Expression): string | null {
+	arm(expression: ts.Expression, componentRoot = false): string | null {
 		const node = skipParens(expression);
-		if (isJsx(node)) return this.relative(this.emit(node, TEMPLATE), node);
+		if (isJsx(node)) {
+			if (componentRoot) this.checkReactClassOutput(node);
+			return this.relative(this.emit(node, TEMPLATE), node);
+		}
 		if (isNullish(node)) return '';
-		const directive = this.directive(node);
+		const directive = this.directive(node, componentRoot);
 		// A retained map is a JSX hole, which needs a fragment inside a directive arm.
 		return directive?.startsWith('{') ? `<>${directive}</>` : directive;
 	}
@@ -6838,11 +6853,15 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return `<input defaultValue={${condition} ? ${JSON.stringify(yes)} : ${JSON.stringify(no)}} />`;
 	}
 
-	ifDirective(node: ts.ConditionalExpression) {
+	ifDirective(node: ts.ConditionalExpression, componentRoot = false) {
 		const shared = this.conditionalInputDefault(node);
 		if (shared !== null) return shared;
-		let whenTrue = this.arm(node.whenTrue);
-		let whenFalse = this.arm(node.whenFalse);
+		const literal = componentRoot ? literalCondition(node.condition) : undefined;
+		let whenTrue = this.arm(
+			node.whenTrue,
+			componentRoot && (literal === undefined || literal === 'truthy'),
+		);
+		let whenFalse = this.arm(node.whenFalse, componentRoot && literal !== 'truthy');
 		// A ternary between two values is a value; one with an element on
 		// either side is control flow, and a value arm is a hole in a fragment:
 		// a bare `{value}` arm is a JavaScript block, not a hole.
@@ -7528,7 +7547,17 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		// value early; the rest moves into arms, which may only return nothing.
 		const rest = statements.slice(first + 1, -1).filter((statement) => !guardReturn(statement));
 		if (returnsJsx(statements.slice(0, first)) || this.emptyArmExit(rest) === null) return null;
-		const output = this.arm(last.expression as ts.Expression);
+		const checkClass = this.options.localReactClass !== undefined;
+		const terminal = checkClass
+			? statements.findIndex(
+					(statement, index) =>
+						index >= first &&
+						ts.isIfStatement(statement) &&
+						guardReturn(statement) &&
+						literalCondition(statement.expression) === 'truthy',
+				)
+			: -1;
+		const output = this.arm(last.expression as ts.Expression, checkClass && terminal === -1);
 		if (output === null) return null;
 		const chain: (from: number) => string = (from) => {
 			let at = from;
@@ -7548,10 +7577,16 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					: '');
 			if (at === statements.length - 1) return prefix + output;
 			const guard = statements[at] as ts.IfStatement;
+			const condition = checkClass ? literalCondition(guard.expression) : undefined;
 			this.count(RULE.if);
 			const then = this.block(
 				`@if (${this.emit(guard.expression, PLAIN)})`,
-				this.arm(guardReturn(guard) as ts.Expression) as string,
+				this.arm(
+					guardReturn(guard) as ts.Expression,
+					checkClass &&
+						(terminal === -1 || at <= terminal) &&
+						(condition === undefined || condition === 'truthy'),
+				) as string,
 			);
 			const rest = chain(at + 1);
 			return prefix + (rest === '' ? then : then + ' ' + this.block('@else', rest));
@@ -7578,12 +7613,82 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	 * and indentation `node` had, or null when it is not a single renderable.
 	 */
 	output(node: ts.Expression) {
-		if (isJsx(node)) return this.emit(node, TEMPLATE);
+		if (isJsx(node)) {
+			this.checkReactClassOutput(node);
+			return this.emit(node, TEMPLATE);
+		}
 		if (ts.isConditionalExpression(node) || ts.isCallExpression(node)) {
-			const directive = this.directive(node);
+			const directive = this.directive(node, this.options.localReactClass !== undefined);
 			return directive === null ? null : this.absolute(directive, node);
 		}
 		return null;
+	}
+
+	private checkReactClassOutput(
+		node: ts.JsxElement | ts.JsxSelfClosingElement | ts.JsxFragment,
+		conditional = false,
+	) {
+		if (!this.options.localReactClass) return;
+		if (!ts.isJsxFragment(node)) {
+			if (
+				this.islands.has(node) ||
+				this.unrenderable.has(node) ||
+				this.reactRendererBodies.has(node)
+			)
+				return;
+			if (ts.isJsxSelfClosingElement(node)) return this.checkReactClassRoot(node, conditional);
+			const tag = node.openingElement.tagName;
+			const callee = this.callee(tag);
+			if (callee?.module !== 'react' && callee?.module !== 'octane')
+				return this.checkReactClassRoot(node, conditional);
+			if (callee.name === 'Fragment') {
+				const member = ts.isPropertyAccessExpression(tag);
+				const reference = member ? tag.expression : tag;
+				const declaration = ts.isIdentifier(reference) && this.declarationOf(reference);
+				if (
+					!declaration ||
+					this.imports.get(declaration)?.typeOnly !== false ||
+					(member && callee.module === 'octane' && !ts.isNamespaceImport(declaration))
+				)
+					return this.checkReactClassRoot(node, conditional);
+				const imp = ts.findAncestor(declaration, ts.isImportDeclaration);
+				if (!imp || imp.attributes) return this.checkReactClassRoot(node, conditional);
+			} else if (callee.name !== 'StrictMode') {
+				const fallback = callee.name === 'Suspense' && this.suspenseFallback(node);
+				if (!fallback) return this.checkReactClassRoot(node, conditional);
+				if (ts.isJsxExpression(fallback) && fallback.expression) {
+					const expression = skipParens(fallback.expression);
+					if (isJsx(expression)) this.checkReactClassOutput(expression, true);
+				}
+			}
+		}
+		for (const child of node.children) {
+			if (isJsx(child)) this.checkReactClassOutput(child, conditional);
+		}
+	}
+
+	private checkReactClassRoot(
+		node: ts.JsxElement | ts.JsxSelfClosingElement,
+		conditional: boolean,
+	) {
+		const check = this.options.localReactClass;
+		if (!check) return;
+		const tag = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
+		if (!ts.isIdentifier(tag) || !isComponentName(tag.text)) return;
+		const entry = this.importOf(tag);
+		if (!entry || entry.namespace || entry.typeOnly) return;
+		const declaration = ts.findAncestor(this.declarationOf(tag)!, ts.isImportDeclaration);
+		if (!declaration || declaration.attributes) return;
+		const severity = check(entry.module, entry.imported);
+		if (!severity) return;
+		this.note(
+			RULE.classComponent,
+			severity,
+			tag,
+			severity === 'error'
+				? `The migration resolves \`${entry.module}\` to the imported React class \`${tag.text}\`, which this native template ${conditional ? 'can render' : 'renders'}. Keep this render in React or replace the class with an Octane function component.`
+				: `If this native template renders the imported React class \`${tag.text}\` resolved from \`${entry.module}\`, the call will fail. Verify the runtime import, keep the render in React, or replace the class with an Octane function component.`,
+		);
 	}
 
 	startsLine(node: ts.Node) {
