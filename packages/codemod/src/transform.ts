@@ -3063,20 +3063,24 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					(!item.namespace && item.imported !== 'default'),
 			) &&
 			!(/eval|\\u/.test(this.source) && hasEval(this.sf)) &&
-			this.localUses(declaration.name).every((ref) => {
-				if (inTypeNode(ref)) return true;
-				const member = ref.parent;
-				return (
-					(ts.isPropertyAccessExpression(member) || ts.isElementAccessExpression(member)) &&
-					member.expression === ref &&
-					ts.isCallExpression(member.parent) &&
-					member.parent.expression === member &&
-					(ts.isPropertyAccessExpression(member)
-						? member.name.text !== 'default'
-						: ts.isStringLiteralLike(member.argumentExpression) &&
-							member.argumentExpression.text !== 'default')
-				);
-			}));
+			this.namespaceMemberCalls(declaration));
+	}
+
+	private namespaceMemberCalls(declaration: ts.NamespaceImport) {
+		return this.localUses(declaration.name).every((ref) => {
+			if (inTypeNode(ref)) return true;
+			const member = ref.parent;
+			return (
+				(ts.isPropertyAccessExpression(member) || ts.isElementAccessExpression(member)) &&
+				member.expression === ref &&
+				ts.isCallExpression(member.parent) &&
+				member.parent.expression === member &&
+				(ts.isPropertyAccessExpression(member)
+					? member.name.text !== 'default'
+					: ts.isStringLiteralLike(member.argumentExpression) &&
+						member.argumentExpression.text !== 'default')
+			);
+		});
 	}
 
 	line(node: ts.Node) {
@@ -6027,6 +6031,18 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			!this.options.automaticReactJsx ||
 			!this.options.originalReactServerEntry?.(module) ||
 			((this.source.includes('eval') || this.source.includes('\\')) && hasEval(this.sf))
+		)
+			return;
+		// Another import of the module can expose its mutable CommonJS exports.
+		if (
+			[...this.imports].some(
+				([decl, entry]) =>
+					REACT_MODULES[entry.module] === 'octane/server' &&
+					!entry.typeOnly &&
+					(ts.isNamespaceImport(decl)
+						? !this.namespaceMemberCalls(decl)
+						: entry.namespace || entry.imported === 'default'),
+			)
 		)
 			return;
 		const retained = (expression: ts.Expression) => {

@@ -142,7 +142,6 @@ export function shadow(render: (view: unknown, options: {}) => string) {
 		async (projectTypes) => {
 			const source = `import { renderToStaticMarkup as render } from 'react-dom/server.browser';
 import * as server from 'react-dom/server';
-import mutableServer from 'react-dom/server';
 import { Glyph } from './glyph';
 export function direct() { return render(<Glyph prefix="first" />); }
 export function local() { const view = <Glyph prefix="second" />; return server.renderToString(view); }
@@ -154,10 +153,6 @@ export function assigned(alternate: boolean) {
 export function native() { const view = <svg />; return render(view); }
 export function shadow(render: (view: unknown) => string) { return render(<Glyph prefix="first" />); }
 export function optional() { return server.renderToString?.(<Glyph prefix="first" />); }
-export function custom() {
-	mutableServer.renderToString = () => 'custom';
-	return mutableServer.renderToString(<Glyph prefix="first" />);
-}
 export function late() {
 	let view = <svg />;
 	const html = render(view);
@@ -194,7 +189,7 @@ export function Glyph(props: { prefix: string }) {
 				file.notes.filter(({ rule }) => rule === 'buffered-ssr-react-component');
 			const entry = preview.files.find((file) => file.file === 'entry.tsx');
 			expect(notes(entry)).toEqual(
-				[5, 6, 10].map((line) =>
+				[4, 5, 9].map((line) =>
 					expect.objectContaining({
 						line,
 						severity: 'error',
@@ -210,6 +205,27 @@ export function Glyph(props: { prefix: string }) {
 			expect(fs.readFileSync(files[0], 'utf8')).toBe(other);
 			expect(fs.readFileSync(files[1], 'utf8')).toBe(source);
 			expect(files.some((file) => fs.existsSync(file.replace('.tsx', '.tsrx')))).toBe(false);
+			for (const importServer of ['* as server', 'server']) {
+				fs.writeFileSync(
+					files[1],
+					`import ${importServer} from 'react-dom/server';
+import { Glyph } from './glyph';
+(server as { renderToString: () => string }).renderToString = () => 'custom';
+export function markup() { return server.renderToString(<Glyph prefix="first" />); }`,
+				);
+				const reassigned = await runCodemod(files, { ...options, write: false });
+				expect(notes(reassigned.files.find((file) => file.file === 'entry.tsx'))).toEqual([]);
+			}
+			fs.writeFileSync(
+				files[1],
+				`import { renderToStaticMarkup as render } from 'react-dom/server';
+import server from 'react-dom/server.node';
+import { Glyph } from './glyph';
+server.renderToStaticMarkup = () => 'custom';
+export function markup() { return render(<Glyph prefix="first" />); }`,
+			);
+			const sibling = await runCodemod(files, { ...options, write: false });
+			expect(notes(sibling.files.find((file) => file.file === 'entry.tsx'))).toEqual([]);
 		},
 	);
 
