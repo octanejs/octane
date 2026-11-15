@@ -36272,8 +36272,15 @@ function makePortalCall(callNode, ctx, componentName, inlinedSubs, parentNs, css
 // component-body locals minted AFTER collectComponentLocals ran, so they are
 // matched by name shape. Keep the helper inline when it needs a writable
 // capture or has no component context.
-function helperCaptures(ctx, stmts, params, checkWrites = false, branchVars = false) {
-	if (!ctx.currentComponentLocals) return null;
+function helperCaptures(
+	ctx,
+	stmts,
+	params,
+	checkWrites = false,
+	branchVars = false,
+	locals = ctx.currentComponentLocals,
+) {
+	if (!locals) return null;
 	const freeWrites = checkWrites ? new Set() : null;
 	const scope = new Set();
 	for (const p of params || []) collectBindings(p, scope);
@@ -36285,11 +36292,7 @@ function helperCaptures(ctx, stmts, params, checkWrites = false, branchVars = fa
 	const free = collectFreeIdentifiers(b.block(stmts), scope, null, freeWrites);
 	const env = [];
 	for (const n of free) {
-		if (
-			!ctx.currentComponentLocals.has(n) &&
-			!(branchVars && ctx.currentHoistedVars?.has(n)) &&
-			!/^__pu\$\d+$/.test(n)
-		)
+		if (!locals.has(n) && !(branchVars && ctx.currentHoistedVars?.has(n)) && !/^__pu\$\d+$/.test(n))
 			continue;
 		// An inline helper keeps the writable binding shared with other closures.
 		if (freeWrites?.has(n)) return null;
@@ -36304,11 +36307,11 @@ function helperCaptures(ctx, stmts, params, checkWrites = false, branchVars = fa
 // every helper reads from the same layout — so the emitted array is the
 // sorted UNION of each body's captures. If any arm requires inline placement,
 // all helpers in the construct stay inline.
-function unionEnv(ctx, bodies, branchVars = false) {
+function unionEnv(ctx, bodies, branchVars = false, locals = ctx.currentComponentLocals) {
 	let all = null;
 	for (const b of bodies) {
 		if (!b) continue;
-		const c = helperCaptures(ctx, b.stmts, b.params, true, branchVars);
+		const c = helperCaptures(ctx, b.stmts, b.params, true, branchVars, locals);
 		if (c === null) return null;
 		if (all === null) all = new Set();
 		for (const n of c) all.add(n);
@@ -36344,12 +36347,20 @@ function hoistBodyHelper(
 	keyedSelection = null,
 	inlineBindingGuards = false,
 	mappedItem = false,
+	locals = ctx.currentComponentLocals,
 ) {
 	const helperName = `${prefix}$${ctx.nextHelperId++}`;
 	const ownEnvNames =
 		envNames === null
 			? null
-			: helperCaptures(ctx, stmts, params, false, prefix === '__then' || prefix === '__else');
+			: helperCaptures(
+					ctx,
+					stmts,
+					params,
+					false,
+					prefix === '__then' || prefix === '__else',
+					locals,
+				);
 	const ownEnv = new Set(ownEnvNames || []);
 	let bodyStmts = stmts;
 	if (envNames && envNames.length > 0) {
@@ -38618,6 +38629,26 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		);
 	}
 
+	// Feed the same locals to key placement, row caches and captured helpers.
+	let rowLocals = ctx.currentComponentLocals;
+	let hoistedRowVars = null;
+	const hasNestedComp = rowLocals != null && containsComponentCallOrControlFlow(subStmts);
+	if (
+		rowLocals != null &&
+		ctx.currentHoistedVars != null &&
+		node.nativeArrayMap === undefined &&
+		subStmts.length === 1 &&
+		isPlainHostRoot(subStmts[0]) &&
+		!hasNestedComp &&
+		(emptyStmts === null ||
+			(emptyStmts.length === 1 &&
+				isPlainHostRoot(emptyStmts[0]) &&
+				!containsComponentCallOrControlFlow(emptyStmts)))
+	) {
+		hoistedRowVars = ctx.currentHoistedVars;
+		rowLocals = new Set([...rowLocals, ...hoistedRowVars]);
+	}
+
 	// Key fn is hoisted (it doesn't typically capture parent state). Synthetic
 	// loop nodes (legacy internal callers) may carry no position — fall back to
 	// the key arrow's own origin, then the module origin.
@@ -38625,7 +38656,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	const keyOrigin = node.loc ? node : keyFn.loc ? keyFn : ctx._moduleOrigin;
 	const keyBody = keyFn.body;
 	const keyCapturesParent = [...collectFreeIdentifiers(keyFn, new Set())].some((name) =>
-		ctx.currentComponentLocals?.has(name),
+		rowLocals?.has(name),
 	);
 	const inlineKey =
 		keyCapturesParent ||
@@ -38671,6 +38702,36 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			]
 		: [];
 
+	const hasPerItemEventClosure =
+		node.nativeArrayMap !== undefined && mapCallbackHasEventClosure(node.nativeArrayMap.callback);
+	// Phase 2: ONE env tuple shared by the item + @empty helpers — it IS the
+	// forBlock `deps` array (deps was already the captured-locals snapshot for
+	// dep-pure promotion; the runtime additionally stamps it as `block.extra`
+	// on every item/empty block). The union may widen deps with @empty-only
+	// captures — a conservative, correct deps for promotion purposes.
+	const itemAllStmts = [...indexInjection, ...destructureInjection, ...subStmts];
+	// The synthetic item param maps to the authored for-of binding.
+	const itemParams = [b.id(itemName, leftDeclId)];
+	let envNames = unionEnv(
+		ctx,
+		[{ stmts: itemAllStmts, params: itemParams }, emptyStmts && { stmts: emptyStmts, params: [] }],
+		false,
+		rowLocals,
+	);
+	if (hasPerItemEventClosure && envNames !== null && envNames.length > 1) {
+		// The helper and its packed tuple share this internal ordering. Grouping
+		// event-row captures in the same order improves the compressed fragment.
+		envNames = [envNames[1], envNames[0], ...envNames.slice(2)];
+	}
+	// An opaque hole can still read a function-scoped binding. Its helper must
+	// capture that binding, but the row remains on the ordinary refresh paths.
+	const opaqueVarCapture =
+		hoistedRowVars !== null &&
+		(envNames === null ||
+			envNames.some((name) => hoistedRowVars.has(name) && !ctx.currentComponentLocals.has(name))) &&
+		(rendersOpaqueChild(subStmts, [], ctx) ||
+			(emptyStmts !== null && rendersOpaqueChild(emptyStmts, [], ctx)));
+
 	// ─── Body analysis: PURE vs DEP-PURE vs normal.
 	//
 	// - PURE: body closes over nothing parent-reactive, no hooks, no comps,
@@ -38693,9 +38754,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	let autoMemoDeps = null;
 	let autoMemoWitnesses = [];
 	let autoMemoContextAware = false;
-	const hasPerItemEventClosure =
-		node.nativeArrayMap !== undefined && mapCallbackHasEventClosure(node.nativeArrayMap.callback);
-	if (ctx.currentComponentLocals) {
+	if (rowLocals && !opaqueVarCapture) {
 		const bodyScope = new Set([itemName]);
 		if (node.index) bodyScope.add(node.index.name);
 		// A destructured header runs in the item helper's synthesized prologue, so
@@ -38718,7 +38777,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			if (HOOK_NAMES.has(name) || name === 'use' || name === 'useContext') {
 				hasHook = true;
 			}
-			if (ctx.currentComponentLocals.has(name)) {
+			if (rowLocals.has(name)) {
 				hasParentClosure = true;
 				if (!seenDeps.has(name)) {
 					seenDeps.add(name);
@@ -38741,7 +38800,6 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			const renderFree = collectFreeIdentifiers(bodyAst, bodyScope, ignored);
 			hasAmbientRead = ambientCandidates.some((name) => renderFree.has(name));
 		}
-		const hasNestedComp = containsComponentCallOrControlFlow(subStmts);
 		// Compatibility mode keeps method calls live: an unchanged receiver can
 		// hide mutable state (`header.column.getIsSorted()` flips while `header`
 		// stays the same object). Strong production modules assert pure rendering
@@ -38763,7 +38821,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			].sort();
 			if (
 				itemMemoWitnesses.length > 0 ||
-				rendersOpaqueChild(bodyAst, [...ctx.currentComponentLocals, ...bodyScope], ctx)
+				rendersOpaqueChild(bodyAst, [...rowLocals, ...bodyScope], ctx)
 			)
 				itemMemoContextAware = true;
 			for (const name of free) {
@@ -38771,7 +38829,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 					itemMemo = false;
 					break;
 				}
-				if (ctx.currentComponentLocals.has(name)) continue;
+				if (rowLocals.has(name)) continue;
 				if (ctx.importedNames.has(name)) {
 					if (!seenDeps.has(name)) {
 						seenDeps.add(name);
@@ -38839,14 +38897,14 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		let listMayReadContext =
 			witnesses.size > 0 ||
 			autoMemoContextReads(regionAst, ctx) ||
-			rendersOpaqueChild(regionAst, [...ctx.currentComponentLocals, ...bodyScope], ctx);
+			rendersOpaqueChild(regionAst, [...rowLocals, ...bodyScope], ctx);
 		if (listSafe) {
 			for (const name of regionFree) {
 				if (ctx._octaneBoundaryNames.has(name) || ctx.importNamespaceNames.has(name)) {
 					listSafe = false;
 					break;
 				}
-				if (ctx.currentComponentLocals.has(name)) {
+				if (rowLocals.has(name)) {
 					listDeps.add(name);
 					continue;
 				}
@@ -38951,23 +39009,6 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		depNames.sort();
 	}
 
-	// Phase 2: ONE env tuple shared by the item + @empty helpers — it IS the
-	// forBlock `deps` array (deps was already the captured-locals snapshot for
-	// dep-pure promotion; the runtime additionally stamps it as `block.extra`
-	// on every item/empty block). The union may widen deps with @empty-only
-	// captures — a conservative, correct deps for promotion purposes.
-	const itemAllStmts = [...indexInjection, ...destructureInjection, ...subStmts];
-	// The synthetic item param maps to the authored for-of binding.
-	const itemParams = [b.id(itemName, leftDeclId)];
-	let envNames = unionEnv(ctx, [
-		{ stmts: itemAllStmts, params: itemParams },
-		emptyStmts && { stmts: emptyStmts, params: [] },
-	]);
-	if (hasPerItemEventClosure && envNames !== null && envNames.length > 1) {
-		// The helper and its packed tuple share this internal ordering. Grouping
-		// event-row captures in the same order improves the compressed fragment.
-		envNames = [envNames[1], envNames[0], ...envNames.slice(2)];
-	}
 	// The helper reads only component-local captures (`envNames`) from the
 	// tuple prefix. Compiler memoization may additionally need live imported
 	// bindings as dependency witnesses; append them without disturbing that ABI.
@@ -39004,6 +39045,10 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			cssHash,
 			envNames,
 			node.emptyKeyword ?? null,
+			null,
+			false,
+			false,
+			rowLocals,
 		);
 	}
 	// Single-root detection: when the body emits exactly one Element root and
@@ -39076,6 +39121,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	const ssrMarkerless = isSsrMarkerlessForItem(node, subStmts);
 	const hostRootTag = subStmts[0]?.id?.name ?? subStmts[0]?.openingElement?.name?.name;
 	const hostMountSafe =
+		!opaqueVarCapture &&
 		ctx.autoMemo === true &&
 		ctx._universalRuntimeUnit == null &&
 		(parentNs === 'html' || (parentNs === 'opaque' && HTML_ONLY_TAGS.has(hostRootTag))) &&
@@ -39085,7 +39131,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		subStmts.length === 1 &&
 		singleRoot &&
 		ssrMarkerless &&
-		!containsComponentCallOrControlFlow(subStmts) &&
+		!(rowLocals == null ? containsComponentCallOrControlFlow(subStmts) : hasNestedComp) &&
 		!containsRenderCall(subStmts) &&
 		!containsAutoMemoUnsafeStructure(subStmts) &&
 		isHostMountSafeTree(subStmts[0]);
@@ -39138,6 +39184,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		keyedSelection,
 		hostMountSafe,
 		node.nativeArrayMap != null,
+		rowLocals,
 	);
 
 	const mapCall = node.nativeArrayMap || null;
