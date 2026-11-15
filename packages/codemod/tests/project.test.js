@@ -297,6 +297,7 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 				['FragmentStrict.tsx', includeClass ? 'error' : 'warning'],
 				['Guard.tsx', includeClass ? 'error' : 'warning'],
 				['LogicalArm.tsx', includeClass ? 'error' : 'warning'],
+				['MapArm.tsx', includeClass ? 'error' : 'warning'],
 				['NestedFragment.tsx', includeClass ? 'error' : 'warning'],
 				['Relative.tsx', includeClass ? 'error' : 'warning'],
 				['Retained.tsx', includeClass ? 'error' : 'warning'],
@@ -311,15 +312,29 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 	});
 
 	it('reports imported React classes in ordinary native HTML children', async () => {
-		const view = (jsx) => `import { StrictMode } from 'react';
+		const view = (jsx) => `import React, { Fragment as Group, StrictMode } from 'react';
 import { Frame } from './Frame';
 import { ReactCompat } from 'octane/react';
 function Holder() { return <b>ignored</b>; }
-export function App({ enabled }) { return ${jsx}; }`;
+export function App({ enabled }: { enabled: boolean }) { return ${jsx}; }`;
 		const cases = {
 			'ClassName.tsx': '<article className={enabled ? "on" : "off"}><Frame /></article>',
 			'Composed.tsx':
 				'<main data-page="app"><><StrictMode><section><Frame /></section></StrictMode></></main>',
+			'DirectHole.tsx': '<div>{(<Frame />)}</div>',
+			'ConditionalHole.tsx': '<main>{enabled ? <Frame /> : null}</main>',
+			'LogicalHole.tsx': '<section>{enabled && <Frame />}</section>',
+			'NamedFragment.tsx': '<Group key="group"><Frame /></Group>',
+			'MemberFragment.tsx': '<main><React.Fragment>{enabled && <Frame />}</React.Fragment></main>',
+			'MapChild.tsx': '<main>{[1].map((row) => <Frame key={row} />)}</main>',
+			'MapRoot.tsx': '[1].map((row) => <Frame key={row} />)',
+			'DeadHole.tsx': '<div>{false && <Frame />}{true ? null : <Frame />}</div>',
+			'UnusedMap.tsx': '<main>{[].map((row) => <Frame key={row} />)}</main>',
+			'SpreadMap.tsx': '<main>{[...[]].map((row) => <Frame key={row} />)}</main>',
+			'OpaqueMap.tsx': '<main>{Array.from({ length: 1 }).map((row) => <Frame key={row} />)}</main>',
+			'OpaqueCall.tsx': '<div>{Boolean(<Frame />)}</div>',
+			'FragmentProps.tsx': '<Group {...{}}><Frame /></Group>',
+			'Attribute.tsx': '<article title={String(<Frame />)}>text</article>',
 			'Custom.tsx': '<main><Holder><Frame /></Holder></main>',
 			'Foreign.tsx': '<main><svg><g><Frame /></g></svg></main>',
 			'Template.tsx': '<main><template><Frame /></template></main>',
@@ -333,6 +348,10 @@ export function App({ enabled }) { return ${jsx}; }`;
 			'tsconfig.json': '{ "compilerOptions": { "jsx": "react-jsx" } }',
 			'Frame.tsx': `import { Component } from 'react';
 export class Frame extends Component { render() { return <b>ready</b>; } }`,
+			'ShadowedFragment.tsx': `import { Fragment as Group } from 'react';
+import { Frame } from './Frame';
+function Holder() { return <b>ignored</b>; }
+export function App() { const Group = Holder; return <div><Group><Frame /></Group></div>; }`,
 			...Object.fromEntries(Object.entries(cases).map(([name, jsx]) => [name, view(jsx)])),
 		});
 		fs.symlinkSync(
@@ -341,23 +360,33 @@ export class Frame extends Component { render() { return <b>ready</b>; } }`,
 		);
 
 		for (const includeClass of [true, false]) {
-			const inputs = Object.keys(cases).concat(includeClass ? ['Frame.tsx'] : []);
+			const inputs = [...Object.keys(cases), 'ShadowedFragment.tsx'];
+			if (includeClass) inputs.push('Frame.tsx');
 			const { files } = await runCodemod(
 				inputs.map((file) => path.join(root, file)),
 				{ root, strong: true, verify: true, projectTypes: false, write: false },
 			);
 			expect(
-				files.flatMap(({ file, notes }) =>
-					notes
-						.filter(
-							(note) =>
-								note.rule === 'class-component' && note.message.includes('imported React class'),
-						)
-						.map((note) => [file, note.severity]),
-				),
+				files
+					.flatMap(({ file, notes }) =>
+						notes
+							.filter(
+								(note) =>
+									note.rule === 'class-component' && note.message.includes('imported React class'),
+							)
+							.map((note) => [file, note.severity]),
+					)
+					.sort(),
 			).toEqual([
 				['ClassName.tsx', includeClass ? 'error' : 'warning'],
 				['Composed.tsx', includeClass ? 'error' : 'warning'],
+				['ConditionalHole.tsx', includeClass ? 'error' : 'warning'],
+				['DirectHole.tsx', includeClass ? 'error' : 'warning'],
+				['LogicalHole.tsx', includeClass ? 'error' : 'warning'],
+				['MapChild.tsx', includeClass ? 'error' : 'warning'],
+				['MapRoot.tsx', includeClass ? 'error' : 'warning'],
+				['MemberFragment.tsx', includeClass ? 'error' : 'warning'],
+				['NamedFragment.tsx', includeClass ? 'error' : 'warning'],
 			]);
 		}
 	});

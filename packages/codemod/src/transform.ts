@@ -740,6 +740,8 @@ class ModuleTransform {
 	readonly removed = new Set<ts.JsxAttributeLike>();
 	/** `<Fragment key>` rows whose key moved to the `@for` header. */
 	readonly bare = new Set<ts.Node>();
+	/** Map calls in output with a proven native renderer. */
+	classOutputMaps?: WeakSet<ts.CallExpression>;
 	/** Functions whose parameter list a rule replaced. */
 	readonly parameters = new Map<ts.Node, string>();
 	/** Rest props that give up `onChange` to a text field. */
@@ -6442,7 +6444,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			this.count(RULE.if);
 			return this.block(`@if (${this.emit(node.left, PLAIN)})`, arm);
 		}
-		if (ts.isCallExpression(node)) return this.forDirective(node);
+		if (ts.isCallExpression(node)) return this.forDirective(node, componentRoot);
 		return null;
 	}
 
@@ -6535,7 +6537,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	 * `items.map((item, i) => <Row key={item.id} />)` is
 	 * `@for (const item of items; index i; key item.id) { <Row /> }`.
 	 */
-	forDirective(node: ts.CallExpression) {
+	forDirective(node: ts.CallExpression, classOutput: boolean) {
 		const callee = node.expression;
 		if (!ts.isPropertyAccessExpression(callee) || callee.name.text !== 'map') return null;
 		const fn = node.arguments[0];
@@ -6704,6 +6706,12 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			)
 				this.bare.add(opening.parent);
 		}
+		if (
+			(classOutput || this.classOutputMaps?.has(node)) &&
+			!skipsRow &&
+			literal.elements.some((element) => !ts.isSpreadElement(element))
+		)
+			this.checkReactClassOutput(root);
 		const arm = ts.isConditionalExpression(root)
 			? this.ifDirective(root)
 			: this.relative(this.emit(root, TEMPLATE), root);
@@ -7287,22 +7295,55 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return null;
 	}
 
-	private checkReactClassOutput(node: ts.JsxElement | ts.JsxSelfClosingElement | ts.JsxFragment) {
+	private checkReactClassOutput(value: ts.Expression) {
 		if (!this.options.localReactClass) return;
-		const callee = ts.isJsxElement(node) && this.callee(node.openingElement.tagName);
-		if (
-			ts.isJsxFragment(node) ||
-			(ts.isJsxElement(node) &&
-				((callee && callee.module === 'react' && callee.name === 'StrictMode') ||
-					rendersOrdinaryHtmlChildren(node.openingElement)) &&
-				!this.islands.has(node) &&
-				!this.unrenderable.has(node) &&
-				!this.reactRendererBodies.has(node))
+		const node = skipParens(value);
+		if (ts.isConditionalExpression(node)) {
+			const condition = literalCondition(node.condition);
+			if (condition === undefined || condition === 'truthy')
+				this.checkReactClassOutput(node.whenTrue);
+			if (condition !== 'truthy') this.checkReactClassOutput(node.whenFalse);
+		} else if (
+			ts.isBinaryExpression(node) &&
+			node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
 		) {
-			for (const child of node.children) if (isJsx(child)) this.checkReactClassOutput(child);
+			const condition = literalCondition(node.left);
+			if (condition === undefined || condition === 'truthy') this.checkReactClassOutput(node.right);
+		} else if (ts.isCallExpression(node)) {
+			if (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'map')
+				(this.classOutputMaps ??= new WeakSet()).add(node);
+		} else if (
+			ts.isJsxFragment(node) ||
+			(ts.isJsxElement(node) && this.classOutputChildren(node))
+		) {
+			for (const child of node.children) {
+				if (isJsx(child)) this.checkReactClassOutput(child);
+				else if (ts.isJsxExpression(child) && child.expression && !child.dotDotDotToken)
+					this.checkReactClassOutput(child.expression);
+			}
 		} else if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
 			this.checkReactClassRoot(node);
 		}
+	}
+
+	private classOutputChildren(node: ts.JsxElement) {
+		if (this.islands.has(node) || this.unrenderable.has(node) || this.reactRendererBodies.has(node))
+			return false;
+		const opening = node.openingElement;
+		if (rendersOrdinaryHtmlChildren(opening)) return true;
+		const tag = opening.tagName;
+		if (ts.isIdentifier(tag) && !isComponentName(tag.text)) return false;
+		const callee = this.callee(tag);
+		if (callee?.module !== 'react') return false;
+		if (callee.name === 'StrictMode') return true;
+		const binding = this.importOf(ts.isPropertyAccessExpression(tag) ? tag.expression : tag);
+		return (
+			callee.name === 'Fragment' &&
+			!binding?.typeOnly &&
+			opening.attributes.properties.every(
+				(attr) => ts.isJsxAttribute(attr) && ts.isIdentifier(attr.name) && attr.name.text === 'key',
+			)
+		);
 	}
 
 	private checkReactClassRoot(node: ts.JsxElement | ts.JsxSelfClosingElement) {
