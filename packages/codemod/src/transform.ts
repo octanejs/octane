@@ -6488,11 +6488,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return `@{ const ${param} = ${useContext}(${this.emit(tag.expression, PLAIN)}); ${output} }`;
 	}
 
-	/**
-	 * `<Suspense fallback={f}>…</Suspense>` is the template boundary
-	 * `@try { … } @pending { f }`.
-	 */
-	rewriteSuspense(node: ts.JsxElement) {
+	private suspenseFallback(node: ts.JsxElement) {
 		const attributes = node.openingElement.attributes.properties.filter(
 			(a) => !this.removed.has(a),
 		);
@@ -6505,8 +6501,20 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		) {
 			return null;
 		}
-		let pending: string;
 		const value = fallback.initializer;
+		return ts.isStringLiteral(value) || (ts.isJsxExpression(value) && value.expression)
+			? value
+			: null;
+	}
+
+	/**
+	 * `<Suspense fallback={f}>…</Suspense>` is the template boundary
+	 * `@try { … } @pending { f }`.
+	 */
+	rewriteSuspense(node: ts.JsxElement) {
+		const value = this.suspenseFallback(node);
+		if (!value) return null;
+		let pending: string;
 		if (ts.isStringLiteral(value)) pending = `<>{${value.getText(this.sf)}}</>`;
 		else if (ts.isJsxExpression(value) && value.expression) {
 			const expression = skipParens(value.expression);
@@ -7575,34 +7583,42 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return null;
 	}
 
-	private checkReactClassOutput(node: ts.JsxElement | ts.JsxSelfClosingElement | ts.JsxFragment) {
+	private checkReactClassOutput(
+		node: ts.JsxElement | ts.JsxSelfClosingElement | ts.JsxFragment,
+		conditional = false,
+	) {
 		if (!this.options.localReactClass) return;
-		const callee = ts.isJsxElement(node) && this.callee(node.openingElement.tagName);
-		if (
-			ts.isJsxFragment(node) ||
-			(ts.isJsxElement(node) &&
-				callee &&
-				callee.module === 'react' &&
-				callee.name === 'StrictMode' &&
-				!this.islands.has(node) &&
-				!this.unrenderable.has(node) &&
-				!this.reactRendererBodies.has(node))
-		) {
-			for (const child of node.children) if (isJsx(child)) this.checkReactClassOutput(child);
-		} else if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
-			this.checkReactClassRoot(node);
+		if (!ts.isJsxFragment(node)) {
+			if (
+				this.islands.has(node) ||
+				this.unrenderable.has(node) ||
+				this.reactRendererBodies.has(node)
+			)
+				return;
+			if (ts.isJsxSelfClosingElement(node)) return this.checkReactClassRoot(node, conditional);
+			const callee = this.callee(node.openingElement.tagName);
+			if (callee?.module !== 'react' && callee?.module !== 'octane')
+				return this.checkReactClassRoot(node, conditional);
+			if (callee.name !== 'StrictMode') {
+				const fallback = callee.name === 'Suspense' && this.suspenseFallback(node);
+				if (!fallback) return this.checkReactClassRoot(node, conditional);
+				if (ts.isJsxExpression(fallback) && fallback.expression) {
+					const expression = skipParens(fallback.expression);
+					if (isJsx(expression)) this.checkReactClassOutput(expression, true);
+				}
+			}
+		}
+		for (const child of node.children) {
+			if (isJsx(child)) this.checkReactClassOutput(child, conditional);
 		}
 	}
 
-	private checkReactClassRoot(node: ts.JsxElement | ts.JsxSelfClosingElement) {
+	private checkReactClassRoot(
+		node: ts.JsxElement | ts.JsxSelfClosingElement,
+		conditional: boolean,
+	) {
 		const check = this.options.localReactClass;
-		if (
-			!check ||
-			this.islands.has(node) ||
-			this.unrenderable.has(node) ||
-			this.reactRendererBodies.has(node)
-		)
-			return;
+		if (!check) return;
 		const tag = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
 		if (!ts.isIdentifier(tag) || !isComponentName(tag.text)) return;
 		const entry = this.importOf(tag);
@@ -7616,7 +7632,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			severity,
 			tag,
 			severity === 'error'
-				? `The migration resolves \`${entry.module}\` to the imported React class \`${tag.text}\`, which this native template renders. Keep this render in React or replace the class with an Octane function component.`
+				? `The migration resolves \`${entry.module}\` to the imported React class \`${tag.text}\`, which this native template ${conditional ? 'can render' : 'renders'}. Keep this render in React or replace the class with an Octane function component.`
 				: `If this native template renders the imported React class \`${tag.text}\` resolved from \`${entry.module}\`, the call will fail. Verify the runtime import, keep the render in React, or replace the class with an Octane function component.`,
 		);
 	}

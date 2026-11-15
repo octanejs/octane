@@ -174,6 +174,33 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 					'<Frame><b>ready</b></Frame>',
 					'<Strict key="first"><Frame><b>ready</b></Frame></Strict>',
 				),
+			'NativeStrict.tsx':
+				"import { StrictMode as Strict } from 'octane';\n" +
+				entry('./Boundary').replace('<Frame><b>ready</b></Frame>', '<Strict><Frame /></Strict>'),
+			'SuspenseChild.tsx':
+				"import { Suspense } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Suspense fallback={<i />}><Frame /></Suspense>',
+				),
+			'NativeSuspenseFallback.tsx':
+				"import * as Native from 'octane';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Native.Suspense fallback={(<><Frame /></>)}><Other /></Native.Suspense>',
+				),
+			'UnevaluatedSuspenseFallback.tsx':
+				"import { Suspense } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Suspense fallback={Boolean(<Frame />)}><Other /></Suspense>',
+				),
+			'HostedSuspense.tsx':
+				"import { Suspense } from 'react';\nimport { ReactCompat } from 'octane/react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<ReactCompat><Suspense fallback={<Frame />}><Frame /></Suspense></ReactCompat>',
+				),
 			'FragmentRoot.tsx': entry('./Boundary').replace(
 				'<Frame><b>ready</b></Frame>',
 				'<><b>before</b><Frame /></>',
@@ -284,9 +311,12 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 				['KeyedStrict.tsx', includeClass ? 'error' : 'warning'],
 				['LogicalArm.tsx', includeClass ? 'error' : 'warning'],
 				['MetadataView.tsx', includeClass ? 'error' : 'warning'],
+				['NativeStrict.tsx', includeClass ? 'error' : 'warning'],
+				['NativeSuspenseFallback.tsx', includeClass ? 'error' : 'warning'],
 				['NestedRootStrict.tsx', includeClass ? 'error' : 'warning'],
 				['Relative.tsx', includeClass ? 'error' : 'warning'],
 				['Strict.tsx', includeClass ? 'error' : 'warning'],
+				['SuspenseChild.tsx', includeClass ? 'error' : 'warning'],
 				['Ternary.tsx', includeClass ? 'error' : 'warning'],
 				['TypeUsesView.tsx', includeClass ? 'error' : 'warning'],
 			]);
