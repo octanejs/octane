@@ -403,7 +403,7 @@
     },
     {
       "path": "packages/motion/tests/conformance/exit.test.ts",
-      "sha256": "0b27f6d201fe78402600854568860e1e53863f22d8777e957a21c32ad9a12b17",
+      "sha256": "8d21878997188bc4586fc96c6fa2f15b020de8773452f075774028bf541e5703",
       "cases": [
         {
           "id": "conformance:exit-cleanup-before-detach",
@@ -414,7 +414,7 @@
     },
     {
       "path": "packages/motion/tests/conformance/layout-edge-browser.test.ts",
-      "sha256": "7e57c1c146b19fdb2a1171a17f3f1fdf6c123b5ce5d7c9f4fb77c21ba4b12015",
+      "sha256": "c297efb110032994a139ae1f14ec5b4467d8009d1c29644f4d23ac9c83b98f7f",
       "cases": [
         {
           "id": "conformance:bounded-layout-flip",
@@ -425,7 +425,7 @@
     },
     {
       "path": "packages/motion/tests/conformance/layout-shared-browser.test.ts",
-      "sha256": "4202978f5e6f0be2d87e73badabc011ebc306441ce1bca74f9dd42885473a0d1",
+      "sha256": "800d7acbb6f3c487f4c4539e010016428f8ced3f598b10081f889c6eae03c65e",
       "cases": [
         {
           "id": "conformance:bounded-layoutId",
