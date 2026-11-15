@@ -38702,17 +38702,20 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	let rowLocals = ctx.currentComponentLocals;
 	let hoistedRowVars = null;
 	const hasNestedComp = rowLocals != null && containsComponentCallOrControlFlow(subStmts);
+	const hasConditionalRoot =
+		ctx.currentHoistedVars != null && subStmts.length === 1 && isIfDirective(subStmts[0]);
 	if (
 		rowLocals != null &&
 		ctx.currentHoistedVars != null &&
 		node.nativeArrayMap === undefined &&
 		subStmts.length === 1 &&
-		isPlainHostRoot(subStmts[0]) &&
-		!hasNestedComp &&
-		(emptyStmts === null ||
-			(emptyStmts.length === 1 &&
-				isPlainHostRoot(emptyStmts[0]) &&
-				!containsComponentCallOrControlFlow(emptyStmts)))
+		(hasConditionalRoot ||
+			(isPlainHostRoot(subStmts[0]) &&
+				!hasNestedComp &&
+				(emptyStmts === null ||
+					(emptyStmts.length === 1 &&
+						isPlainHostRoot(emptyStmts[0]) &&
+						!containsComponentCallOrControlFlow(emptyStmts)))))
 	) {
 		hoistedRowVars = ctx.currentHoistedVars;
 		rowLocals = new Set([...rowLocals, ...hoistedRowVars]);
@@ -38798,7 +38801,8 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		hoistedRowVars !== null &&
 		(envNames === null ||
 			envNames.some((name) => hoistedRowVars.has(name) && !ctx.currentComponentLocals.has(name))) &&
-		(rendersOpaqueChild(subStmts, [], ctx) ||
+		(hasConditionalRoot ||
+			rendersOpaqueChild(subStmts, [], ctx) ||
 			(emptyStmts !== null && rendersOpaqueChild(emptyStmts, [], ctx)));
 
 	// ─── Body analysis: PURE vs DEP-PURE vs normal.
