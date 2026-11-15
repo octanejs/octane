@@ -1103,7 +1103,7 @@ function walk(node, owner, st) {
 				// hooks keep their ABI.
 				st.edits.push({
 					pos: node.end - 1,
-					text: INITIAL_VALUE_HOOKS.has(imported) ? `undefined, ${sym}` : sym,
+					text: INITIAL_VALUE_HOOKS.has(imported) ? `void 0, ${sym}` : sym,
 				});
 			} else {
 				// `useState(0)` → `useState(0, _h$N)` — insert AFTER the last arg's end so
