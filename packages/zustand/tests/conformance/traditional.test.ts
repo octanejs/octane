@@ -12,6 +12,7 @@ import { shallow } from '@octanejs/zustand/shallow';
 import { mount, nextPaint } from '../_helpers';
 import { useEq, EqDefault, EqPerCall } from '../_fixtures/traditional.tsrx';
 import {
+	EndpointReader,
 	SelectionReader,
 	TraditionalErrors,
 	equalSelection,
@@ -60,6 +61,22 @@ describe('per-call equality function', () => {
 });
 
 describe('traditional selection updates', () => {
+	it('keeps a nested selected value stable while the store snapshot is current', async () => {
+		const r = mount(EndpointReader);
+		try {
+			await nextPaint();
+			expect(r.find('#endpoint').textContent).toBe('idle');
+			r.click('#advance-endpoint');
+			await nextPaint();
+			expect(r.find('#endpoint').textContent).toBe('2');
+			r.click('#advance-endpoint');
+			await nextPaint();
+			expect(r.find('#endpoint').textContent).toBe('3');
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('keeps an unchanged selection current across parent renders and later writes', async () => {
 		const api = createStore<SelectionState>(() => ({ first: 1, second: 10 }));
 		const props = { api, selector: selectFirst, equalityFn: equalSelection, generation: 0 };
