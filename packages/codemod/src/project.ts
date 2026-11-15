@@ -25,6 +25,7 @@ import { isReactMotion, PORTED_PACKAGES } from './mappings.js';
 import { strengthen } from './strong.js';
 import {
 	bind,
+	BUFFERED_SSR_OPTIONS,
 	CONTEXT_ALIAS,
 	CONTEXT_PROVIDER_GETTER,
 	ELEMENT_CHILD_ALIAS,
@@ -1458,6 +1459,7 @@ export async function runCodemod(
 			storeHookComponents.set(file, result.exports.storeHookComponents);
 		const blockedTransform = result.notes.find(
 			(note) =>
+				note.rule === BUFFERED_SSR_OPTIONS ||
 				note.rule === MAP_PARAMETER_WRITE ||
 				note.rule === MAP_PARAMETER_TDZ ||
 				note.rule === MAP_CALLBACK_SCOPE ||
