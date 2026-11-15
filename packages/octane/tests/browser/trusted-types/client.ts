@@ -7,6 +7,7 @@ import {
 	RawHtml,
 	StreamedPage,
 } from './app.tsrx';
+import { Widget } from './widget.tsrx';
 
 declare const trustedTypes: any;
 
@@ -81,6 +82,30 @@ function hydrate(page: string) {
 	};
 }
 
+function hydrateWidget() {
+	const inputs: string[] = [];
+	if (new URLSearchParams(location.search).has('defaultPolicy')) {
+		trustedTypes.createPolicy('default', {
+			createHTML(input: string) {
+				inputs.push(input);
+				return '<span>default policy</span>';
+			},
+		});
+	}
+	const server = document.getElementById('widget');
+	hydrateRoot(document.getElementById('root')!, Widget, {
+		ready(rejected: boolean) {
+			(window as any).__trustedTypes = {
+				adopted: document.getElementById('widget') === server,
+				rejected,
+				inputs,
+				text: server?.textContent,
+			};
+		},
+	});
+}
+
 const page = location.pathname.slice(1);
 if (page === '') clientRender();
+else if (page === 'widget') hydrateWidget();
 else hydrate(page);

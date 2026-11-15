@@ -981,7 +981,7 @@ A write through a ref to what the template owns on its element: its children, it
 	<code>OCTANE_STRONG_RAW_HTML_WRITE</code>
 </h4>
 
-`innerHTML`, `outerHTML`, `insertAdjacentHTML()`, or `setHTMLUnsafe()` on an element Octane renders.
+`innerHTML`, `outerHTML`, `insertAdjacentHTML()`, or `setHTMLUnsafe()` on an element Octane renders. A direct empty-string `innerHTML` assignment is allowed on a self-closing root `div` with one local object ref and no JSX spread, children, raw HTML, or custom-element props.
 
 **Replacement.** Use `dangerouslySetInnerHTML={trustHTML(html)}` for trusted or already sanitized HTML.
 
