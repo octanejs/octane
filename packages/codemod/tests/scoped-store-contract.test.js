@@ -739,17 +739,23 @@ it.each([
 	['direct', 'read(current)', false],
 	['nested', 'valueOf(read(current))', false],
 	['named alongside star', 'read(current)', true],
-])('warns about a retained wrapper through a %s linked hook', async (_case, read, named) => {
-	const view = (name) => `import { ${name} as read } from './helper';
+	['parent-relative barrel', 'read(current)', false, true],
+])(
+	'warns about a retained wrapper through a %s linked hook',
+	async (_case, read, named, parent) => {
+		const view = (name) => `import { ${name} as read } from './helper';
 export function Pane() { const value = read(); return <p>{String(value)}</p>; }`;
-	const { app, library } = project({
-		'observer/entry.ts': named
-			? "export * from './state'; export { useSnapshot, useMaybe } from './api';"
-			: "export * from './api'; export { valueOf } from './state';",
-		'observer/state.ts': `export function valueOf(x: number) { return x; }
+		const { app, library } = project({
+			'observer/entry.ts': named
+				? "export * from './state'; export { useSnapshot, useMaybe } from './api';"
+				: "export * from './api'; export { valueOf } from './state';",
+			'observer/state.ts': `export function valueOf(x: number) { return x; }
 export function useSnapshot() { return 0; }`,
-		'observer/api/index.ts': "export { useChannel as useSnapshot, useMaybe } from './hooks';",
-		'observer/api/hooks.ts': `import { use as read } from 'react';
+			'observer/api/index.ts': parent
+				? "export { useChannel as useSnapshot, useMaybe } from '../implementation/hooks';"
+				: "export { useChannel as useSnapshot, useMaybe } from './hooks';",
+			[parent ? 'observer/implementation/hooks.ts' : 'observer/api/hooks.ts']:
+				`import { use as read } from 'react';
 import { current } from '../renderer';
 import { valueOf } from '../state';
 export function useChannel(value: number) {
@@ -760,51 +766,67 @@ export function useChannel(value: number) {
 export function useMaybe(value: number) {
 	return valueOf(value ? read(current) : value);
 }`,
-		'app/src/helper.ts': `import { useSnapshot as reading, useMaybe as maybe, valueOf } from 'observer';
+			'app/src/helper.ts': `import { useSnapshot as reading, useMaybe as maybe, valueOf } from 'observer';
 export function useReading() { return reading(valueOf(1)); }
 export function useAsserted() { return ((reading(valueOf(1))! as number) satisfies number); }
 export function useProperty() { return (reading(valueOf(1)) as unknown[]).length; }
 export function useOptionalCall() { return (reading?.(1) as number); }
 export function useOptional() { return maybe(1); }`,
-		'app/src/asserted.tsx': view('useAsserted'),
-		'app/src/pane.tsx': view('useReading'),
-		'app/src/property.tsx': view('useProperty'),
-		'app/src/optional-call.tsx': view('useOptionalCall'),
-		'app/src/optional.tsx': view('useOptional'),
-	});
-	const run = (projectTypes) =>
-		runCodemod(
-			['asserted', 'pane', 'property', 'optional-call', 'optional'].map((name) =>
-				path.join(app, 'src', name + '.tsx'),
-			),
-			{
-				root: app,
-				strong: true,
-				verify: true,
-				write: false,
-				projectTypes,
-			},
-		);
-	const warnings = ({ files }) =>
-		files.flatMap((file) =>
-			file.notes
-				.filter((note) => note.message.includes('through the original workspace entry'))
-				.map((note) => [file.file, note.severity]),
-		);
-	for (const projectTypes of [true, false]) {
-		const result = await run(projectTypes);
-		expect(warnings(result)).toEqual([
-			['src/asserted.tsx', 'warning'],
-			['src/pane.tsx', 'warning'],
-		]);
-		expect(result.files.find((file) => file.file === 'src/pane.tsx')).toMatchObject({
-			strong: true,
-			code: expect.stringContaining("from './helper'"),
+			'app/src/asserted.tsx': view('useAsserted'),
+			'app/src/pane.tsx': view('useReading'),
+			'app/src/property.tsx': view('useProperty'),
+			'app/src/optional-call.tsx': view('useOptionalCall'),
+			'app/src/optional.tsx': view('useOptional'),
 		});
-	}
-	fs.writeFileSync(path.join(library, 'api.js'), 'export function useSnapshot() { return 1; }');
-	expect(warnings(await run(true))).toEqual([]);
-});
+		const run = (projectTypes) =>
+			runCodemod(
+				['asserted', 'pane', 'property', 'optional-call', 'optional'].map((name) =>
+					path.join(app, 'src', name + '.tsx'),
+				),
+				{
+					root: app,
+					strong: true,
+					verify: true,
+					write: false,
+					projectTypes,
+				},
+			);
+		const warnings = ({ files }) =>
+			files.flatMap((file) =>
+				file.notes
+					.filter((note) => note.message.includes('through the original workspace entry'))
+					.map((note) => [file.file, note.severity]),
+			);
+		for (const projectTypes of [true, false]) {
+			const result = await run(projectTypes);
+			expect(warnings(result)).toEqual([
+				['src/asserted.tsx', 'warning'],
+				['src/pane.tsx', 'warning'],
+			]);
+			expect(result.files.find((file) => file.file === 'src/pane.tsx')).toMatchObject({
+				strong: true,
+				code: expect.stringContaining("from './helper'"),
+			});
+		}
+		fs.writeFileSync(path.join(library, 'api.js'), 'export function useSnapshot() { return 1; }');
+		expect(warnings(await run(true))).toEqual([]);
+		if (parent) {
+			fs.unlinkSync(path.join(library, 'api.js'));
+			const outside = path.join(app, '../outside');
+			fs.mkdirSync(outside);
+			const hooks = path.join(library, 'implementation/hooks.ts');
+			fs.writeFileSync(
+				path.join(outside, 'hooks.ts'),
+				fs.readFileSync(hooks, 'utf8').replaceAll("from '../", "from '../observer/"),
+			);
+			fs.writeFileSync(
+				path.join(library, 'api/index.ts'),
+				"export { useChannel as useSnapshot, useMaybe } from '../../outside/hooks';",
+			);
+			expect(warnings(await run(true))).toEqual([]);
+		}
+	},
+);
 
 it('previews, writes and reuses hook helpers without changing a linked dependency', async () => {
 	const source = `import {useSnapshot as useReading, valueOf} from 'observer';

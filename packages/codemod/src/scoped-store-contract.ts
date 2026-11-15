@@ -719,7 +719,7 @@ function modulePlan(
 		const edge = edges[0]!;
 		if (edge.attributes || !edge.moduleSpecifier) return false;
 		const specifier = request(edge.moduleSpecifier);
-		if (!specifier?.startsWith('./')) return false;
+		if (!specifier || (!specifier.startsWith('./') && !specifier.startsWith('../'))) return false;
 		const stem = path.resolve(path.dirname(sf.fileName), specifier);
 		if (fs.existsSync(path.join(stem, 'package.json'))) return false;
 		const next = target(specifier, sf.fileName);
