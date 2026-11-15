@@ -52,6 +52,7 @@ import { parseModule as parseAuthoredModule } from '#octane/compiler-parser';
 import { declaresStrongMode } from './strong-mode.js';
 import { findStrongDependencies } from './strong-dependencies.js';
 import { lexStaticImportRequests, rewriteServerRuntimeRequests } from './runtime-requests.js';
+import { SERVER_RUNTIME_REQUESTS } from './server-runtime-requests.js';
 import { assertNativeReadOptions } from './native-read-diagnostics.js';
 import { findCssModuleImportRequests } from './css-module-imports.js';
 import {
@@ -97,7 +98,7 @@ const OCTANE_DEPENDENCY_FIELDS = [
 
 export const OCTANE_RUNTIME_REQUESTS = Object.freeze({
 	client: 'octane',
-	server: 'octane/server',
+	server: SERVER_RUNTIME_REQUESTS.octane,
 });
 
 // Vite can classify descriptor exports from its transform-local preflight AST,
@@ -163,17 +164,13 @@ export function canonicalModuleId(id, projectRoot) {
 }
 
 export function resolveOctaneRuntimeRequest(request, environment) {
-	if (request !== 'octane' && request !== 'octane/signals/client') return null;
+	if (!Object.hasOwn(SERVER_RUNTIME_REQUESTS, request)) return null;
 	if (environment !== 'client' && environment !== 'server') {
 		throw new Error(
 			`Unknown Octane environment ${JSON.stringify(environment)} — expected 'client' or 'server'.`,
 		);
 	}
-	return request === 'octane/signals/client'
-		? environment === 'server'
-			? 'octane/signals/server'
-			: request
-		: OCTANE_RUNTIME_REQUESTS[environment];
+	return environment === 'server' ? SERVER_RUNTIME_REQUESTS[request] : request;
 }
 
 function packageDeclaresOctane(pkg) {
