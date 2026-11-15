@@ -36,8 +36,10 @@ export function moduleCapturesForHydrateAst(ast) {
 	return splitModuleCaptures.get(ast);
 }
 
+// An independent boundary qualifies: its own root renders the children, so the
+// parent's entry only decides whether the general child renderer ships.
 function isCompiledSplitHydrateBoundary(boundary) {
-	if (boundary.disabled || boundary.independent || boundary.permanentStatic) return false;
+	if (boundary.disabled || boundary.permanentStatic) return false;
 	const opening = boundary.node.openingElement;
 	if (opening.name?.type !== 'JSXIdentifier') return false;
 	if (

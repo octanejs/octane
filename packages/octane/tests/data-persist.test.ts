@@ -1250,9 +1250,11 @@ describe('octane/data live updates and cache lifecycle', () => {
 		remote.faults.lose = 'reply';
 		await store.write(setRead, { id: 'a', read: true }).catch(() => {});
 		store.invalidate(['count']);
-		await saved();
-		const partitions = listPartitions(inner);
-		expect(partitions).toHaveLength(3);
+		const partitions = await vi.waitFor(() => {
+			const ready = listPartitions(inner);
+			expect(ready).toHaveLength(3);
+			return ready;
+		});
 
 		let release!: () => void;
 		state.held = new Promise((resolve) => (release = resolve));

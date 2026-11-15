@@ -1513,19 +1513,16 @@ export function increment() { count$.set((n) => n + 1); }`;
 		window.close();
 	});
 
-	const sizes = {};
-	for (const bindings of [true, false]) {
-		const server = await bundle(
-			`import { App } from './island-app.tsrx';
+	const serverEntry = `import { App } from './island-app.tsrx';
 import { renderToString } from 'octane/server';
 export function render() {
  return renderToString(App, undefined, {
   independentHydration: { buildId: 'island', resolve: (moduleId) => ({ moduleId, styles: [] }) },
  }).html;
-}`,
-			bindings,
-			'server',
-		);
+}`;
+	const sizes = {};
+	for (const bindings of [true, false]) {
+		const server = await bundle(serverEntry, bindings, 'server');
 		// The island chunk is exactly what the bootstrap loads for this boundary.
 		const island = await bundle(
 			`export { default } from './island-app.tsrx?octane-hydrate=0';
@@ -1566,6 +1563,62 @@ export { activations, count$ } from './island-state.tsrx';`,
 		host.remove();
 	}
 	t.diagnostic(JSON.stringify(sizes));
+	// The shell never renders an independent island's children, so hosting one
+	// must not bring the renderer for arbitrary child values.
+	await t.test('a hydrated shell hosts an island without arbitrary child rendering', async () => {
+		const shell = app.replace(
+			"import { Hydrate } from 'octane';",
+			`import { Hydrate, hydrateRoot } from 'octane';
+export function hydrate(container) {
+ const root = hydrateRoot(container, App);
+ return () => root.unmount();
+}`,
+		);
+		const server = await bundle(serverEntry, true, 'server');
+		// The shell's passive phase posts through a port that keeps Node alive.
+		const channels = [];
+		const HostMessageChannel = globalThis.MessageChannel;
+		globalThis.MessageChannel = class extends HostMessageChannel {
+			constructor() {
+				super();
+				channels.push(this);
+			}
+		};
+		try {
+			// Control: an authored fallback is an arbitrary child value.
+			for (const fallback of [false, true]) {
+				const client = await bundle(
+					"export { hydrate } from './island-app.tsrx';",
+					true,
+					'client',
+					fallback ? shell.replace('independent', 'independent fallback={null}') : shell,
+				);
+				assert.equal(
+					client.emitted.some((id) => id.endsWith('/runtime/child-slots.ts')),
+					fallback,
+					`fallback: ${fallback}`,
+				);
+				const host = window.document.createElement('div');
+				host.innerHTML = server.api.render();
+				window.document.body.append(host);
+				const button = host.querySelector('button');
+				const unmount = client.api.hydrate(host);
+				assert.ok(host.querySelector('button') === button);
+				assert.equal(button.textContent, '1');
+				unmount();
+				assert.equal(host.childNodes.length, 0);
+				host.remove();
+				// The unmount commits in a microtask, which is where that port opens.
+				await new Promise((resolve) => setTimeout(resolve, 0));
+			}
+		} finally {
+			globalThis.MessageChannel = HostMessageChannel;
+			for (const channel of channels) {
+				channel.port1.close();
+				channel.port2.close();
+			}
+		}
+	});
 	await t.test('ordinary islands retain arbitrary child rendering only when used', async () => {
 		for (const [value, needsChildSlots] of [
 			['String(n) as string', false],
