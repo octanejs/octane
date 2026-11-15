@@ -7,6 +7,7 @@ import path from 'node:path';
 
 import { compareTestIdentities, toPortablePath } from './harness-lib.mjs';
 import { verifyMaterializedUpstreamEvidence } from './materialized-upstream-lib.mjs';
+import { describeVitestFailureDetails } from './vitest-batch-lib.mjs';
 
 export const PRISTINE_SUITE_CONFIG_RELATIVE_PATH = 'audit/pristine-suite.json';
 
@@ -119,10 +120,15 @@ export function runConfiguredPristineSuite(
 			},
 		);
 		const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+		const status = result.status ?? 1;
 		return {
-			status: result.status ?? 1,
+			status,
 			stdout: result.stdout ?? '',
-			stderr: result.stderr ?? '',
+			stderr:
+				(result.stderr ?? '') +
+				(status === 0
+					? ''
+					: describeVitestFailureDetails(report.testResults ?? [], { failedOnly: true })),
 			report,
 			identities: pristineIdentitiesFromReport(report, { repoRoot, packagePath }),
 		};
