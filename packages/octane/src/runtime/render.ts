@@ -79,6 +79,7 @@ import {
 import {
 	signalDocumentEnabled,
 	streamedSignalOwnerActivator as STREAMED_SIGNAL_OWNER_ACTIVATOR,
+	signalOwnerFrame,
 } from '../signals/document-owner.js';
 import type { SignalOwner } from '../signals/types.js';
 import type {
@@ -138,6 +139,9 @@ import {
 	pruneSignalRetryVisit,
 	stampSignalInstance,
 	scopeSignalOwner,
+	deferredOwnerScope,
+	deferScopeSignalOwner,
+	restoreScopeSignalOwner,
 	runWithBlockSignalOwner,
 	beginActiveNativeReadScope,
 	acceptNativeCapture,
@@ -1053,25 +1057,41 @@ export function componentSlotLite<P>(
 	const outerClaim =
 		adoptedOpen === null ? undefined : hydration!.beginClaim(getNextSibling(adoptedOpen), scope);
 	let retryVisit: SignalRetryVisit | null = null;
+	// The owner frame this call replaced, as in renderBlock. It is restored as
+	// soon as the body returns or throws: the rest of the parent's template, such
+	// as a later sibling's props, evaluates in the parent's owner.
+	let previousSignalOwner: SignalOwner | null | undefined;
+	const previousOwnerScope = deferredOwnerScope;
 	try {
 		if (
-			signalDocumentEnabled ||
-			(registerRootOptions && scope.block.idState.renderOwner?.signalOwner !== undefined)
+			(signalDocumentEnabled ||
+				(registerRootOptions && scope.block.idState.renderOwner?.signalOwner !== undefined)) &&
+			(previousSignalOwner = deferScopeSignalOwner(scope)) === undefined
 		) {
-			// Same owner-resolution order as runWithBlockSignalOwner, but the
-			// per-mount closure only exists when the owner actually changes.
+			// Same owner-resolution order as runWithBlockSignalOwner.
 			const owner = scopeSignalOwner(scope);
 			if (owner !== undefined) STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
 			// A lite body renders in place, so its first render prunes here.
 			retryVisit = takeSignalRetryVisit(scope);
-			if (owner === undefined || currentSignalOwner() === owner) {
+			// A host carrier, or a root given an owner without the signal document,
+			// has no in-place frame and keeps the callback frame.
+			if (
+				owner === undefined ||
+				currentSignalOwner() === owner ||
+				(signalOwnerFrame !== undefined &&
+					(previousSignalOwner = signalOwnerFrame.enter(owner)) !== undefined)
+			)
 				comp(props, scope, undefined);
-			} else runWithSignalOwner(owner, () => comp(props, scope, undefined));
+			else runWithSignalOwner(owner, () => comp(props, scope, undefined));
 		} else comp(props, scope, undefined);
+		if (previousSignalOwner !== undefined)
+			restoreScopeSignalOwner(previousSignalOwner, previousOwnerScope);
 		if (retryVisit !== null) pruneSignalRetryVisit(retryVisit, false);
 		if (EFFECT_HOOKS && scope.effectSlots !== null) finishEffectRender(scope);
 		if (!scope.mounted) scope.mounted = true;
 	} catch (error) {
+		if (previousSignalOwner !== undefined)
+			restoreScopeSignalOwner(previousSignalOwner, previousOwnerScope);
 		if (retryVisit !== null && isSuspenseException(error)) pruneSignalRetryVisit(retryVisit, true);
 		profileDidThrow = true;
 		profileThrown = error;

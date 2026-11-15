@@ -27,8 +27,10 @@ import {
 	type SignalDeclarationStage,
 } from '../signals/read-protocol.js';
 import {
+	activeSynchronousSignalOwner,
 	supersedeSignalOwner,
 	currentSignalOwner,
+	DEFERRED_SIGNAL_OWNER,
 	runWithSignalOwner,
 } from '../signals/owner-context.js';
 import {
@@ -78,7 +80,9 @@ import {
 	type RenderPhaseSnapshot,
 	discardHookFolds,
 	restoreRenderPhaseUpdate,
+	BlockImpl,
 	LiteBlockImpl,
+	ScopeImpl,
 	unmountBlock,
 	registerSlot,
 	SLOT_FLAG_TEARDOWN,
@@ -134,6 +138,16 @@ export interface SignalRetryNode {
 // A replacement renders before the live slot may publish it. Only signal-owned
 // WIPs need this prospective location; the weak metadata never owns their life.
 export const SIGNAL_RETRY_LOCATIONS = /* @__PURE__ */ new WeakMap<Scope, SignalRetryLocation>();
+// Set once any attempt has retained an owner for its retry. Until then no scope
+// can claim one, so owner resolution skips the boundary walk.
+let SIGNAL_RETRY_OWNERS_RETAINED = false;
+
+function signalRetryOwners(holder: {
+	retrySignalOwners?: SignalRetryOwners | undefined;
+}): SignalRetryOwners {
+	SIGNAL_RETRY_OWNERS_RETAINED = true;
+	return (holder.retrySignalOwners ??= { paths: {}, owners: new Set() });
+}
 
 export function signalRetryBoundary(block: Block): TrySlot | undefined {
 	let current: Block | null = block;
@@ -241,7 +255,7 @@ export function retainSignalRetryScope(
 	if (owner) {
 		const path = signalRetryPath(scope, root);
 		if (path !== null) {
-			const cache = (holder.retrySignalOwners ??= { paths: {}, owners: new Set() });
+			const cache = signalRetryOwners(holder);
 			const node = signalRetryNode(cache, path, true)!;
 			const previous = node.owner;
 			node.owner = owner;
@@ -267,7 +281,7 @@ export function handOverSignalRetryScope(scope: Scope, root: Scope, state: TrySl
 	const owner = scope.signalOwner;
 	const path = owner ? signalRetryPath(scope, root) : null;
 	if (path !== null) {
-		const cache = (state.retrySignalOwners ??= { paths: {}, owners: new Set() });
+		const cache = signalRetryOwners(state);
 		const node = signalRetryNode(cache, path, true)!;
 		if (node.owner !== undefined && node.owner !== owner) {
 			cache.owners.delete(node.owner);
@@ -660,7 +674,7 @@ export function stampSignalInstance(
 	}
 }
 
-export function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
+export function scopeSignalOwner(scope: Scope | null, retry = true): SignalOwner | undefined {
 	if (!signalDocumentEnabled && !registerRootOptions) return;
 	if (scope === null) return;
 	const root = scope.block.idState.renderOwner;
@@ -696,11 +710,13 @@ export function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 	if (!owner || owner.documentOwner !== documentOwner) {
 		const ids = scope.block.idState;
 		owner = undefined;
-		const boundary = signalRetryBoundary(scope.block);
+		const boundary = SIGNAL_RETRY_OWNERS_RETAINED ? signalRetryBoundary(scope.block) : undefined;
 		const cache = boundary?.retrySignalOwners ?? root?.retrySignalOwners;
 		const retryRoot = boundary?.retrySignalOwners !== undefined ? boundary.tryBlock : root?.current;
 		let visit: SignalRetryVisit | null = null;
-		if (cache !== undefined && !retired && !scope.block.disposed && retryRoot != null) {
+		// A deferred frame resolves here (retry false) only where no cache existed
+		// when its render began, so it has no earlier attempt's owner to claim.
+		if (retry && cache !== undefined && !retired && !scope.block.disposed && retryRoot != null) {
 			const path = signalRetryPath(scope, retryRoot);
 			const node = path === null ? undefined : signalRetryNode(cache, path, false);
 			if (node?.owner !== undefined) {
@@ -758,9 +774,12 @@ export function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 			// itself, so it links the same way. Only a block has a body; the recorded
 			// owner can be any owner, and only a renderer of this document links.
 			const body = (scope as Block).body as any;
-			const children = (body?.$$kind === CONTEXT_TAG ? (scope as Block).props?.children : body)?.[
+			let children = (body?.$$kind === CONTEXT_TAG ? (scope as Block).props?.children : body)?.[
 				CHILDREN_SIGNAL_OWNER
 			];
+			// Children marked in a deferred frame recorded its scope (deferredOwnerToken).
+			if (children instanceof ScopeImpl || children instanceof BlockImpl)
+				children = scopeSignalOwner(children);
 			if (children?.documentOwner === documentOwner) identity.enclosingOwner = children;
 			else if (parent !== null)
 				identity.enclosingOwner = scopeSignalOwner(parent) as SignalRendererOwnerIdentity;
@@ -775,9 +794,62 @@ export function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 		// signals afterwards. Its invocation must remain retired, not fall back
 		// to a document owner or create fresh instance state.
 		if (retired) retireRendererSignalOwner(owner);
+		associateSignalOwnerDocument(owner, scope.block.parentNode.ownerDocument!);
 	}
-	associateSignalOwnerDocument(owner, scope.block.parentNode.ownerDocument!);
 	return owner;
+}
+
+/** The scope a deferred owner frame stands for (deferScopeSignalOwner). */
+export let deferredOwnerScope: Scope | null = null;
+
+function resolveDeferredOwner(): SignalOwner {
+	const owner = scopeSignalOwner(deferredOwnerScope, false)!;
+	STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
+	return owner;
+}
+
+/**
+ * Most renders declare, resolve and bind no signal, so a render enters its
+ * scope's owner deferred and the first request for the owner creates it. A
+ * render that may claim an earlier attempt's owner from a retry cache, and
+ * prune that cache, resolves it up front instead, as does one under a host
+ * carrier. Returns the frame to restore with restoreScopeSignalOwner, beside
+ * the deferredOwnerScope the caller read first, or undefined when the caller
+ * must resolve the owner itself. The root still records its document owner
+ * now, which marks it as a signal root for retry bookkeeping.
+ */
+export function deferScopeSignalOwner(scope: Scope): SignalOwner | null | undefined {
+	if (!signalDocumentEnabled) return;
+	const root = scope.block.idState.renderOwner;
+	if (
+		SIGNAL_RETRY_OWNERS_RETAINED &&
+		(root?.retrySignalOwners !== undefined ||
+			signalRetryBoundary(scope.block)?.retrySignalOwners !== undefined)
+	)
+		return;
+	const previous = signalOwnerFrame!.defer(resolveDeferredOwner);
+	if (previous === undefined) return;
+	if (root !== undefined) root.signalOwner ??= documentSignalOwner(scope.block.parentNode);
+	deferredOwnerScope = scope;
+	return previous;
+}
+
+export function restoreScopeSignalOwner(previous: SignalOwner | null, scope: Scope | null): void {
+	signalOwnerFrame!.restore(previous);
+	deferredOwnerScope = scope;
+}
+
+/**
+ * Where an owner can wait, as an event handler's or children's authority does,
+ * a deferred frame records the owner its scope already has, or else the scope
+ * as a token, as event tokens are: scopeSignalOwner resolves it when asked,
+ * and to a retired owner once the scope is deleted. Null outside a deferred
+ * frame.
+ */
+export function deferredOwnerToken(): SignalRendererOwnerIdentity | Scope | null {
+	return activeSynchronousSignalOwner !== DEFERRED_SIGNAL_OWNER
+		? null
+		: deferredOwnerScope!.signalOwner || deferredOwnerScope;
 }
 
 export function runWithBlockSignalOwner<T>(scope: Scope | null, callback: () => T): T {
@@ -1357,10 +1429,13 @@ export function renderBlock(block: Block): void {
 	// The synchronous owner this call replaced, or undefined when the block
 	// renders in its caller's owner frame.
 	let previousSignalOwner: SignalOwner | null | undefined;
+	const previousOwnerScope = deferredOwnerScope;
 	// Only the signal document or an options root can give a root its owner.
 	if (
-		signalDocumentEnabled ||
-		(registerRootOptions && block.idState.renderOwner?.signalOwner !== undefined)
+		(signalDocumentEnabled ||
+			(registerRootOptions && block.idState.renderOwner?.signalOwner !== undefined)) &&
+		// A rebuilt block's nested client build below enters the frame.
+		(rebuild || (previousSignalOwner = deferScopeSignalOwner(block)) === undefined)
 	) {
 		const owner = scopeSignalOwner(block);
 		if (owner !== undefined) {
@@ -1449,6 +1524,7 @@ export function renderBlock(block: Block): void {
 	} finally {
 		renderPhaseOwner = previousOwner;
 		renderPhaseUpdates = previousUpdates;
-		if (previousSignalOwner !== undefined) signalOwnerFrame!.restore(previousSignalOwner);
+		if (previousSignalOwner !== undefined)
+			restoreScopeSignalOwner(previousSignalOwner, previousOwnerScope);
 	}
 }

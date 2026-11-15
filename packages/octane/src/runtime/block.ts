@@ -1279,8 +1279,10 @@ function runScopeCleanups(scope: Scope, retireUnowned: boolean): void {
 			}
 		}
 	// A scope holds an owner only from a resolved root owner (the signal document
-	// or a root's options), and an escaped token only from event authority (see
-	// setEventHandler). Bundles with neither keep no retirement.
+	// or a root's options). One that never created its owner records its deletion
+	// too: a token it escaped as (deferredOwnerToken, setEventHandler), or a
+	// descendant's enclosing link, may ask for that owner afterwards and must not
+	// mint live instance state. Bundles with no owners keep no retirement.
 	if (
 		registerRootOptions ||
 		signalDocumentEnabled ||
@@ -1293,23 +1295,7 @@ function runScopeCleanups(scope: Scope, retireUnowned: boolean): void {
 			if (retireUnowned) scope.signalOwner = null;
 			else scope.signalOwner = undefined;
 			retireRendererSignalOwner(signalOwner);
-		} else if (
-			retireUnowned &&
-			(signalOwner === false || (signalOwner === undefined && scope.signalTokenEscaped))
-		) {
-			retireUnownedSignalScope(scope);
-		}
-	}
-}
-
-function retireUnownedSignalScope(scope: Scope): void {
-	// Resolve after the cleanups, which may read the first handle. Null records retirement without allocating speculative authority.
-	const owner = scope.signalOwner;
-	if (owner === false || (owner === undefined && scope.signalTokenEscaped))
-		scope.signalOwner = null;
-	else if (owner) {
-		scope.signalOwner = null;
-		retireRendererSignalOwner(owner);
+		} else if (retireUnowned) scope.signalOwner = null;
 	}
 }
 
