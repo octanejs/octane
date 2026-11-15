@@ -62,6 +62,7 @@ import {
 	applyHookDependencies,
 	collectReassignedBindings,
 	followsOptionalLink,
+	forEachHoistedVarPattern,
 	isInvariantLiteral,
 	methodDepFlags,
 } from './hook-deps.js';
@@ -3050,6 +3051,18 @@ function collectBindings(pattern, out) {
 	}
 }
 
+// Track hoisted JavaScript vars only for template branch captures.
+function renderedHoistedVars(ctx, statements) {
+	if (!ctx.mayHaveHoistedVars) return null;
+	let names = ctx.currentHoistedVars;
+	forEachHoistedVarPattern(statements, (pattern, declaration) => {
+		if (declaration.declare === true) return;
+		if (names === ctx.currentHoistedVars) names = new Set(names);
+		collectBindings(pattern, names);
+	});
+	return names;
+}
+
 /**
  * Names directly declared at the outer component body — params + top-level
  * `const`/`let`/`var` + `function` declarations. We DON'T recurse into nested
@@ -4199,6 +4212,14 @@ function replaceUnwrappedExpression(expression, replacement) {
 	};
 }
 
+function isRenderWrite(node) {
+	return (
+		node.type === 'AssignmentExpression' ||
+		node.type === 'UpdateExpression' ||
+		(node.type === 'UnaryExpression' && node.operator === 'delete')
+	);
+}
+
 // Does the render tree assign, update, or delete anything while it renders?
 // Function values run later and are skipped.
 function renderTreeWrites(nodes) {
@@ -4216,11 +4237,7 @@ function renderTreeWrites(nodes) {
 		if (seen.has(node)) return;
 		seen.add(node);
 		if (FN_TYPES.has(node.type)) return;
-		if (
-			node.type === 'AssignmentExpression' ||
-			node.type === 'UpdateExpression' ||
-			(node.type === 'UnaryExpression' && node.operator === 'delete')
-		) {
+		if (isRenderWrite(node)) {
 			found = true;
 			return;
 		}
@@ -9226,8 +9243,9 @@ function isJsxReturningMapCall(node) {
 	return false;
 }
 
-// These expressions can run user coercion or throw before the mapped JSX exists.
-function mapCoercionHasEffects(node) {
+// These expressions can write, run user coercion or throw before the mapped JSX exists.
+function mapCallbackHasEffects(node) {
+	if (isRenderWrite(node)) return true;
 	if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') return true;
 	if (node.type === 'TemplateLiteral') {
 		return node.expressions.some((expression) => !isInvariantLiteral(unwrapTsExpr(expression)));
@@ -9289,8 +9307,8 @@ function mapCallToForOf(expr, ctx) {
 	const body = arrow.body;
 	if (!body || (body.type !== 'JSXElement' && body.type !== 'Element')) return null;
 	// Fusion interleaves callbacks and row rendering. Preserve authored callback
-	// order when a call or coercion can be observed.
-	if (containsRenderCall([body], null, mapCoercionHasEffects)) return null;
+	// order when a write, call or coercion can be observed.
+	if (containsRenderCall([body], null, mapCallbackHasEffects)) return null;
 	// The row helper exposes a read-only position. A writable callback index
 	// needs its original binding, including when a handler captures it.
 	if (params[1] && collectReassignedBindings({ body: [b.stmt(arrow)] }).has(params[1])) {
@@ -13030,6 +13048,8 @@ function compileInternal(
 		// Source-map inputs, read by printNodeWithMap to ask esrap for real
 		// per-token mappings against the original .tsrx.
 		mapSource: source,
+		mayHaveHoistedVars: source.includes('var'),
+		currentHoistedVars: null,
 		mapSourceName: (filename || 'module.tsrx').split(/[\\/]/).pop(),
 		output: options?.output,
 		typescriptWeb: options?.output === 'ts' && options?.__valdiAbiGuard === undefined,
@@ -19433,6 +19453,8 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			} else statements.push(child);
 		}
 	}
+	const previousHoistedVars = ctx.currentHoistedVars;
+	ctx.currentHoistedVars = renderedHoistedVars(ctx, statements);
 	const hookMemoOpaqueOwner =
 		ctx.inlineHookMemo && hasInlineMemoOpaqueDirective({ body: b.block(statements) });
 	ctx.currentHookMemoOwnerSafe =
@@ -20048,6 +20070,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	ctx.currentHookMemoOwnerSafe = prevHookMemoOwnerSafe;
 	ctx.currentMapTemps = prevMapTemps;
 	ctx.currentComponentLocals = previousComponentLocals;
+	ctx.currentHoistedVars = previousHoistedVars;
 	// ONE FunctionDeclaration node — the caller prints it (once, with the full
 	// esrap map for top-level components) or embeds it in an enclosing body.
 	const presentationBody = preparePresentationHydration(
@@ -23670,6 +23693,8 @@ function compileReturnJsxFunction(node, ctx, options) {
 	// otherwise JSX `.map()` always misses the existing PURE and autoMemo paths.
 	const prevValueDirectiveLowering = ctx._valueDirectiveLowering;
 	const prevLocals = ctx.currentComponentLocals;
+	const previousHoistedVars = ctx.currentHoistedVars;
+	ctx.currentHoistedVars = renderedHoistedVars(ctx, node.body.body);
 	const prevAutoMemoCallsitesSafe = ctx.currentAutoMemoCallsitesSafe;
 	const prevAutoMemoLocalHazards = ctx.currentAutoMemoLocalHazards;
 	const prevAutoCalculatedRenderableRefs = ctx.currentAutoCalculatedRenderableRefs;
@@ -23822,6 +23847,7 @@ function compileReturnJsxFunction(node, ctx, options) {
 	} finally {
 		ctx._valueDirectiveLowering = prevValueDirectiveLowering;
 		ctx.currentComponentLocals = prevLocals;
+		ctx.currentHoistedVars = previousHoistedVars;
 		ctx.currentAutoMemoCallsitesSafe = prevAutoMemoCallsitesSafe;
 		ctx.currentAutoMemoLocalHazards = prevAutoMemoLocalHazards;
 		ctx.currentAutoCalculatedRenderableRefs = prevAutoCalculatedRenderableRefs;
@@ -36134,15 +36160,25 @@ function makePortalCall(callNode, ctx, componentName, inlinedSubs, parentNs, css
 // component-body locals minted AFTER collectComponentLocals ran, so they are
 // matched by name shape. Keep the helper inline when it needs a writable
 // capture or has no component context.
-function helperCaptures(ctx, stmts, params, checkWrites = false) {
+function helperCaptures(ctx, stmts, params, checkWrites = false, branchVars = false) {
 	if (!ctx.currentComponentLocals) return null;
 	const freeWrites = checkWrites ? new Set() : null;
 	const scope = new Set();
 	for (const p of params || []) collectBindings(p, scope);
+	if (branchVars && ctx.mayHaveHoistedVars) {
+		forEachHoistedVarPattern(stmts, (pattern, declaration) => {
+			if (declaration.declare !== true) collectBindings(pattern, scope);
+		});
+	}
 	const free = collectFreeIdentifiers(b.block(stmts), scope, null, freeWrites);
 	const env = [];
 	for (const n of free) {
-		if (!ctx.currentComponentLocals.has(n) && !/^__pu\$\d+$/.test(n)) continue;
+		if (
+			!ctx.currentComponentLocals.has(n) &&
+			!(branchVars && ctx.currentHoistedVars?.has(n)) &&
+			!/^__pu\$\d+$/.test(n)
+		)
+			continue;
 		// An inline helper keeps the writable binding shared with other closures.
 		if (freeWrites?.has(n)) return null;
 		env.push(n);
@@ -36156,11 +36192,11 @@ function helperCaptures(ctx, stmts, params, checkWrites = false) {
 // every helper reads from the same layout — so the emitted array is the
 // sorted UNION of each body's captures. If any arm requires inline placement,
 // all helpers in the construct stay inline.
-function unionEnv(ctx, bodies) {
+function unionEnv(ctx, bodies, branchVars = false) {
 	let all = null;
 	for (const b of bodies) {
 		if (!b) continue;
-		const c = helperCaptures(ctx, b.stmts, b.params, true);
+		const c = helperCaptures(ctx, b.stmts, b.params, true, branchVars);
 		if (c === null) return null;
 		if (all === null) all = new Set();
 		for (const n of c) all.add(n);
@@ -36198,7 +36234,10 @@ function hoistBodyHelper(
 	mappedItem = false,
 ) {
 	const helperName = `${prefix}$${ctx.nextHelperId++}`;
-	const ownEnvNames = envNames === null ? null : helperCaptures(ctx, stmts, params);
+	const ownEnvNames =
+		envNames === null
+			? null
+			: helperCaptures(ctx, stmts, params, false, prefix === '__then' || prefix === '__else');
 	const ownEnv = new Set(ownEnvNames || []);
 	let bodyStmts = stmts;
 	if (envNames && envNames.length > 0) {
@@ -36286,6 +36325,9 @@ function hoistBodyHelper(
 	// this helper's params, env bindings, and body-level locals. (A nested
 	// helper's env values are emitted as plain identifiers at its call site.)
 	const prevLocals = ctx.currentComponentLocals;
+	// The module helper has access to the values in its emitted environment.
+	const previousHoistedVars = ctx.currentHoistedVars;
+	ctx.currentHoistedVars = null;
 	const prevInvariantLocals = ctx.currentInvariantLocals;
 	const prevEventInvariantLocals = ctx.currentEventInvariantLocals;
 	const extended = new Set(prevLocals);
@@ -36302,6 +36344,7 @@ function hoistBodyHelper(
 		helperFn = compileFunctionBody(fake, ctx, helperName, parentNs, cssHash, helperOptions);
 	} finally {
 		ctx.currentComponentLocals = prevLocals;
+		ctx.currentHoistedVars = previousHoistedVars;
 		ctx.currentInvariantLocals = prevInvariantLocals;
 		ctx.currentEventInvariantLocals = prevEventInvariantLocals;
 	}
@@ -36443,10 +36486,11 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 			: [node.alternate]
 		: null;
 	// Phase 2: one shared env tuple for both branches (see unionEnv).
-	const envNames = unionEnv(ctx, [
-		thenStmts && { stmts: thenStmts, params: [] },
-		elseStmts && { stmts: elseStmts, params: [] },
-	]);
+	const envNames = unionEnv(
+		ctx,
+		[thenStmts && { stmts: thenStmts, params: [] }, elseStmts && { stmts: elseStmts, params: [] }],
+		true,
+	);
 	const thenHelperName = thenStmts
 		? hoistBodyHelper(
 				ctx,

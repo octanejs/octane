@@ -357,16 +357,14 @@ function readsCssToken(ref: ts.Identifier) {
 }
 
 /**
- * What a module's import of a package with no Octane port leaves to do.
+ * Describe a package import that the codemod keeps on React.
  */
 function portComment({ name, islands, blocked }: Unported) {
-	const missing = `No Octane port of \`${name}\` exists`;
-	if (blocked > 0) {
-		return `${missing}, and this module needs one: Octane cannot call its hooks, read its contexts, or pass Octane content to its components.`;
-	}
+	const retained = `Retained React import of \`${name}\``;
+	if (blocked > 0) return `${retained}. Review the uses that need a React renderer.`;
 	return islands > 0
-		? `${missing}, so its components render in React through ReactCompat.`
-		: `${missing}; React stays a dependency for it.`;
+		? `${retained}. Its components render in React through ReactCompat.`
+		: `${retained}. Keep React as a dependency.`;
 }
 
 /**
@@ -928,7 +926,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		// Added imports quote their module as the module's own imports do.
 		const first = this.sf.statements.find(ts.isImportDeclaration);
 		this.quote = first ? first.moduleSpecifier.getText(this.sf)[0] : "'";
-		/** Locals imported from a package with no Octane port. */
+		/** Locals whose package imports stay on React. */
 		const portLocals = new Set<string>();
 		const reactSvgImports = new Set<Import>();
 		for (const statement of this.sf.statements) {
@@ -944,7 +942,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 						RULE.bindings,
 						'warning',
 						statement,
-						`\`${port.name}\` has no Octane port: import its components from it where they render, so they can render in a \`ReactCompat\` island.`,
+						`\`${port.name}\` stays on React. Import its components directly where they render so they can render in a \`ReactCompat\` island.`,
 					);
 				}
 			}
@@ -1438,8 +1436,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 	}
 
 	/**
-	 * The package with no Octane port that a specifier names, or null. It
-	 * still runs on React, which only the codemod's report and a comment say.
+	 * The package that the codemod keeps on React for this specifier, or null.
 	 */
 	portOf(module: string) {
 		let port = this.ports.get(module);
@@ -1481,7 +1478,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 	}
 
 	/**
-	 * A component from a package with no Octane port renders in React, inside
+	 * A component from a retained React import renders in React, inside
 	 * a `ReactCompat` island, when its element hands React nothing Octane
 	 * renders. Its hooks and contexts cannot run in an Octane component, so
 	 * they are reported.
@@ -1506,7 +1503,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		const parent = member.parent;
 		const block = (message: string) => {
 			port.blocked++;
-			const error = `${message} \`${port.name}\` has no Octane port.`;
+			const error = `${message} \`${port.name}\` stays on React.`;
 			this.note(RULE.bindings, 'error', member, error);
 			return error;
 		};
@@ -1556,12 +1553,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			}
 		} else if (ts.isCallExpression(parent) && parent.expression === member) {
 			if (/^use[A-Z0-9]/.test(name))
-				block(`\`${text}\` is a React hook, which Octane cannot call.`);
+				block(`\`${text}\` is a React hook. Keep this hook call under a React renderer.`);
 		} else if (
 			ts.isCallExpression(parent) &&
 			/^(?:use|useContext)$/.test(this.calleeName(parent.expression) ?? '')
 		) {
-			block(`\`${text}\` is a React context, which Octane cannot read.`);
+			block(`\`${text}\` is a React context. Keep this context read under a React renderer.`);
 		}
 	}
 
@@ -3474,6 +3471,76 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 
 	// ---------------------------------------------------------------- imports
 
+	private retainedHookSetup() {
+		return {
+			calleeName: (callee: ts.Expression) => this.calleeName(callee),
+			nativeOutput: (element: ts.JsxElement | ts.JsxSelfClosingElement) =>
+				this.nativeOutput(element, this.localUses),
+			originalReact: () => this.options.originalReact === true,
+		};
+	}
+
+	private warnRetainedPrivateContext(module: string, name: string, site: ts.Expression) {
+		const resolution = module.endsWith('.js')
+			? ' and the import resolves to its TypeScript source'
+			: '';
+		this.note(
+			RULE.bindings,
+			'warning',
+			site,
+			`If native setup reaches the unchanged ${module} export ${name} after its module initializes${resolution}, its private helper calls React's useContext. Provide a compiled Octane hook or keep the component under React.`,
+		);
+	}
+
+	private warnRetainedStore(module: string, name: string, site: ts.Expression) {
+		this.note(
+			RULE.bindings,
+			'warning',
+			site,
+			`If native setup reaches the unchanged ${module} export ${name} through the original workspace entry, its store hook calls React. Provide a compiled Octane hook or keep the component under React.`,
+		);
+	}
+
+	private checkRetainedNamespaceHooks(module: string, binding: ts.Identifier) {
+		const retainedHook = this.options.localReactHook;
+		if (!retainedHook) return;
+		let reported: Set<string> | undefined;
+		for (const ref of renderUses(this.localUses(binding))) {
+			const member = ref.parent;
+			if (!ts.isPropertyAccessExpression(member) && !ts.isElementAccessExpression(member)) continue;
+			const call = member.parent;
+			if (
+				member.expression !== ref ||
+				ts.isOptionalChain(member) ||
+				!ts.isCallExpression(call) ||
+				call.expression !== member ||
+				ts.isOptionalChain(call)
+			)
+				continue;
+			const name = ts.isPropertyAccessExpression(member)
+				? member.name.text
+				: ts.isStringLiteralLike(member.argumentExpression) && member.argumentExpression.text;
+			if (!name || !/^use[A-Z0-9]/.test(name) || reported?.has(name)) continue;
+			const setup = this.retainedHookSetup();
+			if (
+				!nativeSetupHook(member, this.localUses, this.checker) &&
+				!nativeSetupHook(member, this.localUses, this.checker, setup) &&
+				!nativeSetupHook(member, this.localUses, this.checker, { ...setup, contextSetup: true })
+			)
+				continue;
+			const local = retainedHook(module, name, false);
+			if (!local || typeof local === 'string') continue;
+			if ('retainedStore' in local) this.warnRetainedStore(module, name, member);
+			else if (
+				'privateContext' in local &&
+				nativeSetupHook(member, this.localUses, this.checker, { ...setup, privateContext: true })
+			)
+				this.warnRetainedPrivateContext(module, name, member);
+			else continue;
+			(reported ??= new Set()).add(name);
+		}
+	}
+
 	rewriteImport(node: ts.ImportDeclaration) {
 		const native = this.pathSvgImports.get(node);
 		if (native) {
@@ -3501,12 +3568,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		}
 		const clause = node.importClause;
 		const bindings = clause?.namedBindings;
-		if (
-			bindings &&
-			ts.isNamespaceImport(bindings) &&
-			this.radixSlotImports?.get(bindings.name) === 'original'
-		)
-			return null;
+		if (clause && bindings && ts.isNamespaceImport(bindings)) {
+			if (this.radixSlotImports?.get(bindings.name) === 'original') return null;
+			if (!clause.isTypeOnly && !node.attributes)
+				this.checkRetainedNamespaceHooks(module, bindings.name);
+		}
 		if (clause && bindings && ts.isNamedImports(bindings)) {
 			const moved = new Map<string, string[]>();
 			const kept: ts.ImportSpecifier[] = [];
@@ -3539,12 +3605,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 							sites.length > 0 &&
 							sites.every(Boolean) &&
 							(!sites.includes('afterRefs') || this.options.originalReact === true);
-						const setup = {
-							calleeName: (callee: ts.Expression) => this.calleeName(callee),
-							nativeOutput: (element: ts.JsxElement | ts.JsxSelfClosingElement) =>
-								this.nativeOutput(element, this.localUses),
-							originalReact: () => this.options.originalReact === true,
-						};
+						const setup = this.retainedHookSetup();
 						const call =
 							refs[sites.indexOf('first')] ??
 							(nativeOnly
@@ -3584,17 +3645,9 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 									privateContext: true,
 								}),
 							);
-							const resolution = module.endsWith('.js')
-								? ' and the import resolves to its TypeScript source'
-								: '';
-							if (advisorySite)
-								this.note(
-									RULE.bindings,
-									'warning',
-									advisorySite,
-									`If native setup reaches the unchanged ${module} export ${name} after its module initializes${resolution}, its private helper calls React's useContext. Provide a compiled Octane hook or keep the component under React.`,
-								);
-						}
+							if (advisorySite) this.warnRetainedPrivateContext(module, name, advisorySite);
+						} else if (site && local && typeof local !== 'string' && 'retainedStore' in local)
+							this.warnRetainedStore(module, name, site);
 					}
 					if (!dest) {
 						kept.push(item);
@@ -3642,7 +3695,9 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			!port ||
 			ts
 				.getLeadingCommentRanges(this.source, node.pos)
-				?.some((range) => this.source.slice(range.pos, range.end).includes('No Octane port of'))
+				?.some(({ pos, end }) =>
+					/(?:No Octane port|Retained React import) of/.test(this.source.slice(pos, end)),
+				)
 		)
 			return text;
 		return `// ${portComment(port)}\n${text ?? node.getText(this.sf)}`;
@@ -4312,7 +4367,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		// the Strong fallback can find its own directive line again. The
 		// comment on an unported package's import stays with it.
 		const prologue =
-			/^(?:#![^\n]*\n)?(?:[ \t]*(?:\/\/(?! No Octane port of)[^\n]*|\/\*[\s\S]*?\*\/[ \t]*|(['"])use [a-z ]+\1;?[^\n]*)?\r?\n)*/.exec(
+			/^(?:#![^\n]*\n)?(?:[ \t]*(?:\/\/(?! (?:No Octane port|Retained React import) of)[^\n]*|\/\*[\s\S]*?\*\/[ \t]*|(['"])use [a-z ]+\1;?[^\n]*)?\r?\n)*/.exec(
 				code,
 			);
 		return prologue ? prologue[0].length : 0;
@@ -6488,11 +6543,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return `@{ const ${param} = ${useContext}(${this.emit(tag.expression, PLAIN)}); ${output} }`;
 	}
 
-	/**
-	 * `<Suspense fallback={f}>…</Suspense>` is the template boundary
-	 * `@try { … } @pending { f }`.
-	 */
-	rewriteSuspense(node: ts.JsxElement) {
+	private suspenseFallback(node: ts.JsxElement) {
 		const attributes = node.openingElement.attributes.properties.filter(
 			(a) => !this.removed.has(a),
 		);
@@ -6505,8 +6556,20 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		) {
 			return null;
 		}
-		let pending: string;
 		const value = fallback.initializer;
+		return ts.isStringLiteral(value) || (ts.isJsxExpression(value) && value.expression)
+			? value
+			: null;
+	}
+
+	/**
+	 * `<Suspense fallback={f}>…</Suspense>` is the template boundary
+	 * `@try { … } @pending { f }`.
+	 */
+	rewriteSuspense(node: ts.JsxElement) {
+		const value = this.suspenseFallback(node);
+		if (!value) return null;
+		let pending: string;
 		if (ts.isStringLiteral(value)) pending = `<>{${value.getText(this.sf)}}</>`;
 		else if (ts.isJsxExpression(value) && value.expression) {
 			const expression = skipParens(value.expression);
@@ -6732,16 +6795,20 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	 * The template directive equivalent to a renderable expression, as
 	 * relative text, or null.
 	 */
-	directive(expression: ts.Expression): string | null {
+	directive(expression: ts.Expression, componentRoot = false): string | null {
 		const node = skipParens(expression);
-		if (ts.isConditionalExpression(node)) return this.ifDirective(node);
+		if (ts.isConditionalExpression(node)) return this.ifDirective(node, componentRoot);
 		if (
 			ts.isBinaryExpression(node) &&
 			node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
 			(this.isBoolean(node.left) ||
 				(this.strictTypes && isBooleanGuardType(this.typeOf(node.left))))
 		) {
-			const arm = this.arm(node.right);
+			const condition = componentRoot ? literalCondition(node.left) : undefined;
+			const arm = this.arm(
+				node.right,
+				componentRoot && (condition === undefined || condition === 'truthy'),
+			);
 			if (arm === null || arm === '') return null;
 			this.count(RULE.if);
 			return this.block(`@if (${this.emit(node.left, PLAIN)})`, arm);
@@ -6755,11 +6822,14 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	 * directive, or '' for nothing. An arm that is only a value is null; the
 	 * caller decides whether it may become a `{value}` hole.
 	 */
-	arm(expression: ts.Expression): string | null {
+	arm(expression: ts.Expression, componentRoot = false): string | null {
 		const node = skipParens(expression);
-		if (isJsx(node)) return this.relative(this.emit(node, TEMPLATE), node);
+		if (isJsx(node)) {
+			if (componentRoot) this.checkReactClassOutput(node);
+			return this.relative(this.emit(node, TEMPLATE), node);
+		}
 		if (isNullish(node)) return '';
-		const directive = this.directive(node);
+		const directive = this.directive(node, componentRoot);
 		// A retained map is a JSX hole, which needs a fragment inside a directive arm.
 		return directive?.startsWith('{') ? `<>${directive}</>` : directive;
 	}
@@ -6797,11 +6867,15 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return `<input defaultValue={${condition} ? ${JSON.stringify(yes)} : ${JSON.stringify(no)}} />`;
 	}
 
-	ifDirective(node: ts.ConditionalExpression) {
+	ifDirective(node: ts.ConditionalExpression, componentRoot = false) {
 		const shared = this.conditionalInputDefault(node);
 		if (shared !== null) return shared;
-		let whenTrue = this.arm(node.whenTrue);
-		let whenFalse = this.arm(node.whenFalse);
+		const literal = componentRoot ? literalCondition(node.condition) : undefined;
+		let whenTrue = this.arm(
+			node.whenTrue,
+			componentRoot && (literal === undefined || literal === 'truthy'),
+		);
+		let whenFalse = this.arm(node.whenFalse, componentRoot && literal !== 'truthy');
 		// A ternary between two values is a value; one with an element on
 		// either side is control flow, and a value arm is a hole in a fragment:
 		// a bare `{value}` arm is a JavaScript block, not a hole.
@@ -7437,11 +7511,31 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		const last = statements[statements.length - 1];
 		if (!last || !ts.isReturnStatement(last) || !last.expression) return null;
 		const guard = statements.findIndex((s, i) => i < statements.length - 1 && guardReturn(s));
-		if (guard !== -1) return this.rewriteGuards(node, body, guard);
+		if (guard !== -1) {
+			const output = this.rewriteGuards(node, body, guard);
+			if (output !== null) return output;
+		}
+		const inner = skipParens(last.expression);
 		// A template body has one output; any other early `return <A />` would
 		// render through runtime descriptors, so the plain function stays.
-		if (returnsJsx(statements.slice(0, -1))) return null;
-		const inner = skipParens(last.expression);
+		const setupStatements = statements.slice(0, -1);
+		if (guard !== -1 || returnsJsx(setupStatements)) {
+			if (
+				this.options.localReactClass &&
+				isJsx(inner) &&
+				this.moduleComponent(node) &&
+				setupStatements.every(
+					(statement) =>
+						ts.isVariableStatement(statement) ||
+						(ts.isIfStatement(statement) &&
+							!statement.elseStatement &&
+							literalCondition(statement.expression) !== 'truthy'),
+				) &&
+				this.options.automaticReactJsx
+			)
+				this.checkReactClassOutput(inner, false, true);
+			return null;
+		}
 		let output = this.output(inner);
 		if (output === null) return null;
 		const head = this.head(node, body.getStart(this.sf));
@@ -7487,7 +7581,17 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		// value early; the rest moves into arms, which may only return nothing.
 		const rest = statements.slice(first + 1, -1).filter((statement) => !guardReturn(statement));
 		if (returnsJsx(statements.slice(0, first)) || this.emptyArmExit(rest) === null) return null;
-		const output = this.arm(last.expression as ts.Expression);
+		const checkClass = this.options.localReactClass !== undefined;
+		const terminal = checkClass
+			? statements.findIndex(
+					(statement, index) =>
+						index >= first &&
+						ts.isIfStatement(statement) &&
+						guardReturn(statement) &&
+						literalCondition(statement.expression) === 'truthy',
+				)
+			: -1;
+		const output = this.arm(last.expression as ts.Expression, checkClass && terminal === -1);
 		if (output === null) return null;
 		const chain: (from: number) => string = (from) => {
 			let at = from;
@@ -7507,10 +7611,16 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					: '');
 			if (at === statements.length - 1) return prefix + output;
 			const guard = statements[at] as ts.IfStatement;
+			const condition = checkClass ? literalCondition(guard.expression) : undefined;
 			this.count(RULE.if);
 			const then = this.block(
 				`@if (${this.emit(guard.expression, PLAIN)})`,
-				this.arm(guardReturn(guard) as ts.Expression) as string,
+				this.arm(
+					guardReturn(guard) as ts.Expression,
+					checkClass &&
+						(terminal === -1 || at <= terminal) &&
+						(condition === undefined || condition === 'truthy'),
+				) as string,
 			);
 			const rest = chain(at + 1);
 			return prefix + (rest === '' ? then : then + ' ' + this.block('@else', rest));
@@ -7537,16 +7647,132 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	 * and indentation `node` had, or null when it is not a single renderable.
 	 */
 	output(node: ts.Expression) {
-		if (isJsx(node)) return this.emit(node, TEMPLATE);
+		if (isJsx(node)) {
+			this.checkReactClassOutput(node);
+			return this.emit(node, TEMPLATE);
+		}
 		if (ts.isConditionalExpression(node) || ts.isCallExpression(node)) {
-			const directive = this.directive(node);
+			const directive = this.directive(node, this.options.localReactClass !== undefined);
 			return directive === null ? null : this.absolute(directive, node);
 		}
 		return null;
 	}
 
+	private checkReactClassOutput(
+		node: ts.JsxElement | ts.JsxSelfClosingElement | ts.JsxFragment,
+		conditional = false,
+		retained = false,
+	) {
+		if (!this.options.localReactClass) return;
+		if (!ts.isJsxFragment(node)) {
+			if (
+				this.islands.has(node) ||
+				this.unrenderable.has(node) ||
+				this.reactRendererBodies.has(node)
+			)
+				return;
+			if (ts.isJsxSelfClosingElement(node))
+				return this.checkReactClassRoot(node, conditional, retained);
+			const tag = node.openingElement.tagName;
+			const callee = this.callee(tag);
+			if (callee?.module !== 'react' && callee?.module !== 'octane')
+				return this.checkReactClassRoot(node, conditional, retained);
+			if (callee.name === 'Fragment') {
+				const member = ts.isPropertyAccessExpression(tag);
+				const reference = member ? tag.expression : tag;
+				const declaration = ts.isIdentifier(reference) && this.declarationOf(reference);
+				if (
+					!declaration ||
+					this.imports.get(declaration)?.typeOnly !== false ||
+					(member && callee.module === 'octane' && !ts.isNamespaceImport(declaration))
+				)
+					return this.checkReactClassRoot(node, conditional, retained);
+				const imp = ts.findAncestor(declaration, ts.isImportDeclaration);
+				if (!imp || imp.attributes) return this.checkReactClassRoot(node, conditional, retained);
+			} else if (callee.name !== 'StrictMode') {
+				const fallback = !retained && callee.name === 'Suspense' && this.suspenseFallback(node);
+				if (!fallback) return this.checkReactClassRoot(node, conditional, retained);
+				if (ts.isJsxExpression(fallback) && fallback.expression) {
+					const expression = skipParens(fallback.expression);
+					if (isJsx(expression)) this.checkReactClassOutput(expression, true);
+				}
+			}
+		}
+		for (const child of node.children) {
+			if (isJsx(child)) this.checkReactClassOutput(child, conditional, retained);
+		}
+	}
+
+	private checkReactClassRoot(
+		node: ts.JsxElement | ts.JsxSelfClosingElement,
+		conditional: boolean,
+		retained: boolean,
+	) {
+		const check = this.options.localReactClass;
+		if (!check) return;
+		const tag = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
+		if (!ts.isIdentifier(tag) || !isComponentName(tag.text)) return;
+		const entry = this.importOf(tag);
+		if (!entry || entry.namespace || entry.typeOnly) return;
+		const declaration = ts.findAncestor(this.declarationOf(tag)!, ts.isImportDeclaration);
+		if (!declaration || declaration.attributes) return;
+		const severity = check(entry.module, entry.imported);
+		if (!severity) return;
+		this.note(
+			RULE.classComponent,
+			severity,
+			tag,
+			severity === 'error'
+				? `The migration resolves \`${entry.module}\` to the imported React class \`${tag.text}\`, ${retained ? 'which fails if Octane renders this output' : `which this native template ${conditional ? 'can render' : 'renders'}`}. Keep this render in React or replace the class with an Octane function component.`
+				: `If ${retained ? 'Octane' : 'this native template'} renders the imported React class \`${tag.text}\` resolved from \`${entry.module}\`, the call will fail. Verify the runtime import, keep the render in React, or replace the class with an Octane function component.`,
+		);
+	}
+
 	startsLine(node: ts.Node) {
 		return this.linePrefix(node).trim() === '';
+	}
+
+	/** A direct module component, without going through an arbitrary wrapper or callback. */
+	private moduleComponent(node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction) {
+		const parent = node.parent;
+		if (ts.isExportAssignment(parent)) return !parent.isExportEquals && parent.parent === this.sf;
+		let statement: ts.FunctionDeclaration | ts.VariableStatement;
+		let name: ts.Identifier | undefined;
+		if (ts.isFunctionDeclaration(node)) {
+			statement = node;
+			name = node.name;
+		} else {
+			if (
+				!ts.isVariableDeclaration(parent) ||
+				parent.initializer !== node ||
+				!ts.isIdentifier(parent.name) ||
+				!isComponentName(parent.name.text) ||
+				(ts.getCombinedNodeFlags(parent) & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
+				!ts.isVariableStatement(parent.parent.parent)
+			)
+				return false;
+			statement = parent.parent.parent;
+			name = parent.name;
+		}
+		if (statement.parent !== this.sf) return false;
+		if (statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword))
+			return true;
+		if (!name) return false;
+		const refs = renderUses(this.localUses(name));
+		return (
+			refs.some((ref) =>
+				ts.isExportSpecifier(ref.parent)
+					? !ref.parent.parent.parent.moduleSpecifier
+					: ts.isExportAssignment(ref.parent) && !ref.parent.isExportEquals,
+			) ||
+			(refs.length > 0 &&
+				refs.every(
+					(ref) =>
+						!ts.isExportAssignment(ref.parent) &&
+						!ts.isExportSpecifier(ref.parent) &&
+						componentTagOrExport(ref),
+				))
+		);
 	}
 
 	/**

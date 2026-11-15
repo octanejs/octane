@@ -50,6 +50,450 @@ function typecheckProject(root) {
 }
 
 describe('runCodemod', () => {
+	it('reports a direct native template root that imports a React class', async () => {
+		const boundary = `import { Component as Base, type ReactNode } from 'react';
+class Frame extends Base<{ children: ReactNode }> {
+	render() { return this.props.children; }
+}
+export { Frame as Boundary };`;
+		const entry = (module) => `import { Boundary as Frame } from '${module}';
+export function App() { return <Frame><b>ready</b></Frame>; }`;
+		const sources = {
+			'tsconfig.json': JSON.stringify({
+				compilerOptions: {
+					jsx: 'react-jsx',
+					moduleResolution: 'bundler',
+					paths: { '@/*': ['./*'] },
+				},
+			}),
+			'Boundary.tsx': boundary,
+			'DefaultBase.tsx': boundary
+				.replace(
+					"import { Component as Base, type ReactNode } from 'react';",
+					"import React, { type ReactNode } from 'react';",
+				)
+				.replace('extends Base', 'extends React.PureComponent'),
+			'DefaultBaseTags.tsx': boundary
+				.replace(
+					"import { Component as Base, type ReactNode } from 'react';",
+					"import React, { type ReactNode } from 'react';",
+				)
+				.replace('extends Base', 'extends React.Component')
+				.replace(
+					'return this.props.children;',
+					'return <React.Fragment><React.StrictMode><React.Suspense fallback={<i />}><React.Fragment />{this.props.children}</React.Suspense></React.StrictMode></React.Fragment>;',
+				),
+			'DefaultBaseNamespaceEscape.tsx': boundary
+				.replace(
+					"import { Component as Base, type ReactNode } from 'react';",
+					"import React, { type ReactNode } from 'react';",
+				)
+				.replace('extends Base', 'extends React.Component')
+				.replace('class Frame', 'replaceReact(React);\nclass Frame'),
+			'DefaultExport.tsx': boundary.replace(
+				'export { Frame as Boundary };',
+				'export default Frame;',
+			),
+			'Metadata.tsx':
+				boundary +
+				'\nFrame.displayName = "Boundary"; Frame.defaultProps = { fallback: "error", attempts: 1, retry: true };',
+			'MetadataSetter.tsx': boundary
+				.replace('render() {', 'static set displayName(value: string) {}\n\trender() {')
+				.concat('\nFrame.displayName = "Boundary";'),
+			'MetadataEffect.tsx': boundary + '\nFrame.displayName = register();',
+			'MetadataGetter.tsx':
+				boundary + '\nFrame.defaultProps = { get fallback() { return "error"; } };',
+			'TypeUses.tsx':
+				boundary + '\nexport type Instance = Frame;\nexport type Factory = typeof Frame;',
+			'RuntimeBase.tsx': boundary + '\nexport class Other extends Frame {}',
+			'DecoratorMetadata.tsx': boundary + '\nclass Other { @capture field!: Frame; }',
+			'MutatedBase.tsx': boundary
+				.replace(
+					"import { Component as Base, type ReactNode } from 'react';",
+					"import React, { type ReactNode } from 'react';\nReact.PureComponent = class Fake {};",
+				)
+				.replace('extends Base', 'extends React.PureComponent'),
+			'DefaultEarly.tsx': boundary
+				.replace('class Frame', 'export default Frame;\nclass Frame')
+				.replace('export { Frame as Boundary };', ''),
+			'Ambiguous.tsx': boundary,
+			'Ambiguous.js': 'export function Boundary() { return null; }',
+			'Pure.tsx': 'export function Boundary() { return <b>ready</b>; }',
+			'Decorated.tsx': boundary.replace(
+				'class Frame',
+				'function replace() { return function Native() { return null; }; }\n@replace\nclass Frame',
+			),
+			'Relative.tsx': entry('./Boundary'),
+			'Alias.tsx': entry('@/Boundary'),
+			'Ternary.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean)')
+				.replace('return <Frame><b>ready</b></Frame>;', 'return show ? <Frame /> : <b />;'),
+			'Guard.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean)')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (show) return <Frame />; return <b />;',
+				),
+			'Retained.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean)')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+				),
+			'RetainedCompound.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean, enabled: boolean)')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } if (!enabled) return <b />; return <Frame />;',
+				),
+			'RetainedArrow.tsx': entry('./Boundary')
+				.replace('export function App()', 'export const App = (show: boolean) =>')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+				),
+			'RetainedArrowMetadata.tsx':
+				entry('./Boundary')
+					.replace('export function App()', 'export const App = (show: boolean) =>')
+					.replace(
+						'return <Frame><b>ready</b></Frame>;',
+						'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+					) + '; export type View = typeof App; App.displayName = "App";',
+			'RetainedDefaultArrow.tsx': entry('./Boundary')
+				.replace('export function App()', 'export default (show: boolean) =>')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+				),
+			'RetainedStrict.tsx':
+				"import { StrictMode } from 'react';\n" +
+				entry('./Boundary')
+					.replace('App()', 'App(show: boolean)')
+					.replace(
+						'return <Frame><b>ready</b></Frame>;',
+						'if (!show) { const text = "off"; return <i>{text}</i>; } return <StrictMode><Frame /></StrictMode>;',
+					),
+			'RetainedCallback.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'const Build = (show: boolean) => { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; }; return <Other render={Build} />;',
+			),
+			'RetainedNamedFactory.tsx': entry('./Boundary').replace(
+				'export function App() { return <Frame><b>ready</b></Frame>; }',
+				'const build = function Build(show: boolean) { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; }; export function App() { build(true); return <b />; }',
+			),
+			'RetainedImperative.tsx': entry('./Boundary').replace(
+				'export function App() { return <Frame><b>ready</b></Frame>; }',
+				'const Build = (show: boolean) => { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; }; export function App() { Build(true); return <b />; }',
+			),
+			'RetainedImperativeDeclaration.tsx': entry('./Boundary').replace(
+				'export function App() { return <Frame><b>ready</b></Frame>; }',
+				'function Build(show: boolean) { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; } export function App() { Build(true); return <b />; }',
+			),
+			'RetainedLocalComponent.tsx': entry('./Boundary').replace(
+				'export function App() { return <Frame><b>ready</b></Frame>; }',
+				'function Build({ show }: { show: boolean }) { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; } export function App() { return <Build show={true} />; }',
+			),
+			'RetainedSplitExport.tsx': entry('./Boundary').replace(
+				'export function App() { return <Frame><b>ready</b></Frame>; }',
+				'function Build(show: boolean) { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; } export { Build as App }; Build(true);',
+			),
+			'RetainedDead.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'if (true) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+			),
+			'RetainedUnconditional.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'return <i>off</i>; return <Frame />;',
+			),
+			'RetainedFactory.tsx': entry('./Boundary')
+				.replace(
+					'export function App()',
+					'declare function makeView(frame: typeof Frame): unknown;\nexport function App(show: boolean)',
+				)
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } return makeView(Frame);',
+				),
+			'RetainedCustom.tsx':
+				'/** @jsx custom */\ndeclare function custom(type: unknown, props: unknown): unknown;\n' +
+				entry('./Boundary')
+					.replace('App()', 'App(show: boolean)')
+					.replace(
+						'return <Frame><b>ready</b></Frame>;',
+						'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+					),
+			'RetainedFragment.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean)')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } return <><b /><Frame /></>;',
+				),
+			'RetainedNamedFragment.tsx':
+				"import { Fragment as Group } from 'react';\n" +
+				entry('./Boundary')
+					.replace('App()', 'App(show: boolean)')
+					.replace(
+						'return <Frame><b>ready</b></Frame>;',
+						'if (!show) { const text = "off"; return <i>{text}</i>; } return <Group key="stable"><Frame /></Group>;',
+					),
+			'RetainedSuspense.tsx':
+				"import { Suspense } from 'react';\n" +
+				entry('./Boundary')
+					.replace('App()', 'App(show: boolean)')
+					.replace(
+						'return <Frame><b>ready</b></Frame>;',
+						'if (!show) { const text = "off"; return <i>{text}</i>; } return <Suspense fallback={<Frame />}><b /></Suspense>;',
+					),
+			'LogicalArm.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean, enabled: boolean)')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'return show ? <b /> : (enabled === true && <Frame />);',
+				),
+			'NestedHole.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'return <Other>{true ? <Frame /> : null}</Other>;',
+			),
+			'MapArm.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'return [true].map((show) => show ? <Frame /> : <b />);',
+			),
+			'DeadTernary.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'return false ? <Frame /> : <b />;',
+			),
+			'DeadLogicalArm.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean)')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'return show ? <b /> : (false && <Frame />);',
+				),
+			'DeadGuards.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'if (false) return <Frame />; if (true) return <b />; if (true) return <Frame />; return <Frame />;',
+			),
+			'Strict.tsx':
+				"import { StrictMode as Strict } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Strict><span /><Frame><b>ready</b></Frame></Strict>',
+				),
+			'KeyedStrict.tsx':
+				"import { StrictMode as Strict } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Strict key="first"><Frame><b>ready</b></Frame></Strict>',
+				),
+			'NativeStrict.tsx':
+				"import { StrictMode as Strict } from 'octane';\n" +
+				entry('./Boundary').replace('<Frame><b>ready</b></Frame>', '<Strict><Frame /></Strict>'),
+			'NamedFragment.tsx':
+				"import { Fragment as Group } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Group key="stable"><Frame /></Group>',
+				),
+			'QualifiedFragment.tsx':
+				"import React from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<React.Fragment><Frame /></React.Fragment>',
+				),
+			'NativeFragment.tsx':
+				"import * as Native from 'octane';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Native.Fragment ref={null}><Frame /></Native.Fragment>',
+				),
+			'ShadowedNamedFragment.tsx':
+				"import { Fragment as Group } from 'react';\n" +
+				entry('./Boundary')
+					.replace('App()', 'App(Group: typeof Other)')
+					.replace('<Frame><b>ready</b></Frame>', '<Group><Frame /></Group>'),
+			'HostedNamedFragment.tsx':
+				"import { Fragment as Group } from 'react';\nimport { ReactCompat } from 'octane/react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<ReactCompat><Group><Frame /></Group></ReactCompat>',
+				),
+			'TypeOnlyFragmentNamespace.tsx':
+				"import type * as Native from 'octane';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Native.Fragment><Frame /></Native.Fragment>',
+				),
+			'DefaultOctaneFragmentNamespace.tsx':
+				"import Native from 'octane';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Native.Fragment><Frame /></Native.Fragment>',
+				),
+			'SuspenseChild.tsx':
+				"import { Suspense } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Suspense fallback={<i />}><Frame /></Suspense>',
+				),
+			'NativeSuspenseFallback.tsx':
+				"import * as Native from 'octane';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Native.Suspense fallback={(<><Frame /></>)}><Other /></Native.Suspense>',
+				),
+			'UnevaluatedSuspenseFallback.tsx':
+				"import { Suspense } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Suspense fallback={Boolean(<Frame />)}><Other /></Suspense>',
+				),
+			'HostedSuspense.tsx':
+				"import { Suspense } from 'react';\nimport { ReactCompat } from 'octane/react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<ReactCompat><Suspense fallback={<Frame />}><Frame /></Suspense></ReactCompat>',
+				),
+			'FragmentRoot.tsx': entry('./Boundary').replace(
+				'<Frame><b>ready</b></Frame>',
+				'<><b>before</b><Frame /></>',
+			),
+			'FragmentStrict.tsx':
+				"import { StrictMode as Strict } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<><Strict key="stable"><><Frame /></></Strict></>',
+				),
+			'NestedRootStrict.tsx':
+				"import React, { StrictMode as Strict } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Strict><React.StrictMode key="inner"><Frame /></React.StrictMode></Strict>',
+				),
+			'NestedHostedStrict.tsx':
+				"import { StrictMode as Strict } from 'react';\nimport { ReactCompat } from 'octane/react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Strict><ReactCompat><Strict><Frame /></Strict></ReactCompat></Strict>',
+				),
+			'NestedStrict.tsx':
+				"import { StrictMode as Strict } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Other><Strict><Frame /></Strict></Other>',
+				),
+			'AmbiguousView.tsx': entry('./Ambiguous'),
+			'PureView.tsx': entry('./Pure'),
+			'DecoratedView.tsx': entry('./Decorated'),
+			'DefaultBaseView.tsx': entry('./DefaultBase'),
+			'DefaultBaseTagsView.tsx': entry('./DefaultBaseTags'),
+			'DefaultBaseNamespaceEscapeView.tsx': entry('./DefaultBaseNamespaceEscape'),
+			'DefaultExportView.tsx': entry('./DefaultExport').replace('{ Boundary as Frame }', 'Frame'),
+			'MetadataView.tsx': entry('./Metadata'),
+			'MetadataSetterView.tsx': entry('./MetadataSetter'),
+			'MetadataEffectView.tsx': entry('./MetadataEffect'),
+			'MetadataGetterView.tsx': entry('./MetadataGetter'),
+			'TypeUsesView.tsx': entry('./TypeUses'),
+			'RuntimeBaseView.tsx': entry('./RuntimeBase'),
+			'DecoratorMetadataView.tsx': entry('./DecoratorMetadata'),
+			'DefaultEarlyView.tsx': entry('./DefaultEarly').replace('{ Boundary as Frame }', 'Frame'),
+			'MutatedBaseView.tsx': entry('./MutatedBase'),
+			'Shadow.tsx': entry('./Boundary').replace('App()', 'App(Frame: () => unknown)'),
+			'Hosted.tsx':
+				"import { ReactCompat } from 'octane/react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<ReactCompat><Frame /></ReactCompat>',
+				),
+			'Passed.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'return <Other render={() => <Frame><b>ready</b></Frame>} />;',
+			),
+		};
+		const root = project(sources);
+		fs.symlinkSync(
+			path.join(REPO, 'packages/codemod/node_modules'),
+			path.join(root, 'node_modules'),
+		);
+		for (const includeClass of [true, false]) {
+			const inputs = Object.keys(sources).filter(
+				(file) =>
+					file.endsWith('.tsx') &&
+					(includeClass ||
+						![
+							'Boundary.tsx',
+							'DefaultBase.tsx',
+							'DefaultBaseTags.tsx',
+							'DefaultExport.tsx',
+							'Hosted.tsx',
+							'Metadata.tsx',
+							'TypeUses.tsx',
+						].includes(file)),
+			);
+			const { files } = await runCodemod(
+				inputs.map((file) => path.join(root, file)),
+				{
+					root,
+					strong: true,
+					verify: true,
+					projectTypes: false,
+					write: false,
+				},
+			);
+			const callers = files.filter((file) =>
+				file.notes.some(
+					(note) =>
+						note.rule === 'class-component' && note.message.includes('imported React class'),
+				),
+			);
+			expect(
+				callers
+					.map(({ file, notes }) => [
+						file,
+						notes.find((note) => note.rule === 'class-component').severity,
+					])
+					.sort(),
+			).toEqual([
+				['Alias.tsx', includeClass ? 'error' : 'warning'],
+				['DefaultBaseTagsView.tsx', includeClass ? 'error' : 'warning'],
+				['DefaultBaseView.tsx', includeClass ? 'error' : 'warning'],
+				['DefaultExportView.tsx', includeClass ? 'error' : 'warning'],
+				['FragmentRoot.tsx', includeClass ? 'error' : 'warning'],
+				['FragmentStrict.tsx', includeClass ? 'error' : 'warning'],
+				['Guard.tsx', includeClass ? 'error' : 'warning'],
+				['KeyedStrict.tsx', includeClass ? 'error' : 'warning'],
+				['LogicalArm.tsx', includeClass ? 'error' : 'warning'],
+				['MetadataView.tsx', includeClass ? 'error' : 'warning'],
+				['NamedFragment.tsx', includeClass ? 'error' : 'warning'],
+				['NativeFragment.tsx', includeClass ? 'error' : 'warning'],
+				['NativeStrict.tsx', includeClass ? 'error' : 'warning'],
+				['NativeSuspenseFallback.tsx', includeClass ? 'error' : 'warning'],
+				['NestedRootStrict.tsx', includeClass ? 'error' : 'warning'],
+				['QualifiedFragment.tsx', includeClass ? 'error' : 'warning'],
+				['Relative.tsx', includeClass ? 'error' : 'warning'],
+				['Retained.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedArrow.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedArrowMetadata.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedCompound.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedDefaultArrow.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedFragment.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedLocalComponent.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedNamedFragment.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedSplitExport.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedStrict.tsx', includeClass ? 'error' : 'warning'],
+				['Strict.tsx', includeClass ? 'error' : 'warning'],
+				['SuspenseChild.tsx', includeClass ? 'error' : 'warning'],
+				['Ternary.tsx', includeClass ? 'error' : 'warning'],
+				['TypeUsesView.tsx', includeClass ? 'error' : 'warning'],
+			]);
+			for (const { file, notes, code } of callers) {
+				if (!file.startsWith('Retained')) continue;
+				expect(notes.find((note) => note.rule === 'class-component').message).toMatch(
+					/if octane renders/i,
+				);
+				expect(code).toContain('return <i>');
+			}
+		}
+	});
+
 	it('reports opaque map methods that receive JSX from a callback switch', async () => {
 		const setup = `function makeRows() {
 	const rows = ['a', 'b'];
@@ -486,7 +930,10 @@ export async function clipboard() {
 			[
 				'styled inline',
 				server.replace('OctaneCompat', 'OctaneCompatInline'),
-				owner.replace(' />', ' hostClassName="status" hostStyle={{ display: \'inline\' }} />'),
+				owner.replace(
+					' />',
+					' hostClassName="status" hostStyle={{ display: \'inline\' }} hostRole="img" hostAriaLabel="Status" />',
+				),
 			],
 			[
 				'namespace',
@@ -605,7 +1052,7 @@ export async function clipboard() {
 			],
 			[
 				'styled inline element child',
-				`${server.replace('OctaneCompat', 'OctaneCompatInline')}\n${child}\nexport const App = () => <Host hostClassName="status" hostStyle={{ display: 'inline' }}><Leaf /></Host>;`,
+				`${server.replace('OctaneCompat', 'OctaneCompatInline')}\n${child}\nexport const App = () => <Host hostClassName="status" hostStyle={{ display: 'inline' }} hostRole="img" hostAriaLabel="Status"><Leaf /></Host>;`,
 				leaf,
 			],
 			[
@@ -2362,7 +2809,13 @@ export function View() {
 			const context = "const Theme = createContext('unset');";
 			const helper = 'function readTheme() { const label = readContext(Theme); return label; }';
 			const hook = 'export function useLabel() { return readTheme(); }';
-			const owner = [imports, context, helper, hook].join('\n');
+			const owner = [
+				imports,
+				context,
+				helper,
+				hook,
+				'export function useOtherLabel() { return readTheme(); }',
+			].join('\n');
 			const namespaceOwner = [
 				"import * as React from 'react';",
 				"import { createContext } from 'react';",
@@ -2371,6 +2824,8 @@ export function View() {
 				hook,
 			].join('\n');
 			const view = (file, call = 'useLabel()') => `import { useLabel } from './${file}';
+export function View() { const label = ${call}; return <b>{label}</b>; }`;
+			const consumer = (call, file = 'owner') => `import * as producer from './${file}';
 export function View() { const label = ${call}; return <b>{label}</b>; }`;
 			const localNamespace = namespaceOwner.replace(
 				"import * as React from 'react';",
@@ -2393,6 +2848,25 @@ export function View() { const label = ${call}; return <b>{label}</b>; }`;
 				}),
 				'owner.ts': owner,
 				'View.tsx': view('owner'),
+				'ConsumerBracket.tsx': consumer("producer['useLabel']()", 'owner.js'),
+				'ConsumerDot.tsx': consumer('producer.useLabel()'),
+				'ConsumerRepeated.tsx': consumer('producer.useLabel()') + '\nexport { producer };',
+				'ConsumerMultiple.tsx': `import * as producer from './owner';
+export function View() {
+	const label = producer.useLabel();
+	const other = producer['useOtherLabel']();
+	const again = producer['useLabel']();
+	return <b>{label}{other}{again}</b>;
+}`,
+				'ConsumerDynamic.tsx': consumer("producer['use' + 'Label']()"),
+				'ConsumerOptionalMember.tsx': consumer('producer?.useLabel()'),
+				'ConsumerOptionalCall.tsx': consumer('producer.useLabel?.()'),
+				'ConsumerShadow.tsx': consumer('producer.useLabel()').replace(
+					'function View()',
+					'function View(producer: { useLabel(): string })',
+				),
+				'ConsumerPure.tsx': consumer('producer.useLabel()', 'pure'),
+				'pure.ts': "export function useLabel() { return 'local'; }",
 				'JsSpecifier.tsx': view('owner.js'),
 				'CompetingJsSpecifier.tsx': view('competing.js'),
 				'competing.ts': owner,
@@ -2485,6 +2959,21 @@ export function View() { const label = ${call}; return <b>{label}</b>; }`;
 					.map((note) => [file.file, note.line, note.severity, note.message]),
 			);
 			expect(findings).toEqual([
+				[
+					'ConsumerBracket.tsx',
+					2,
+					'warning',
+					expect.stringContaining('the import resolves to its TypeScript source'),
+				],
+				['ConsumerDot.tsx', 2, 'warning', expect.stringContaining('after its module initializes')],
+				['ConsumerMultiple.tsx', 3, 'warning', expect.stringContaining('export useLabel')],
+				['ConsumerMultiple.tsx', 4, 'warning', expect.stringContaining('export useOtherLabel')],
+				[
+					'ConsumerRepeated.tsx',
+					2,
+					'warning',
+					expect.stringContaining('after its module initializes'),
+				],
 				['Cycle.tsx', 3, 'warning', expect.stringContaining('after its module initializes')],
 				[
 					'Direct.tsx',
@@ -4486,6 +4975,72 @@ export function Inspector({ children }: { children: Child }) { return isValidEle
 		]);
 	});
 
+	it('renames relative HTML module paths without rewriting their URL suffix or other text', async () => {
+		const src = "./Page.tsx?mode=warm&amp;label=it's#section";
+		const script = `<script data-src="${src}" TYPE="module" SRC = "${src}"></script>`;
+		const html = [
+			`<!-- ${script} -->`,
+			`<script>const example = ${JSON.stringify(script.replace('</script>', ''))};</script>`,
+			`<script type="module" vite-ignore src="${src}"></script>`,
+			`<svg><script xlink:type="module" src="${src}"></script></svg>`,
+			`<script type="module" src="//cdn.example/Page.tsx?mode=warm"></script>`,
+			script,
+		].join('\n');
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'index.html': html,
+			'src/nested.html': '<script type="module" src=\'../Page.tsx#section\'></script>',
+			'public/redirect.html':
+				'<base href="./elsewhere/"><script type="module" src="../Page.tsx?mode=warm"></script>',
+			'Page.tsx': 'export const Page = () => <h1 />;',
+		});
+
+		const result = await runCodemod([path.join(root, 'Page.tsx')], { verify: false });
+
+		const read = (/** @type {string} */ name) => fs.readFileSync(path.join(root, name), 'utf8');
+		expect(result.html.sort()).toEqual(['index.html', 'src/nested.html']);
+		expect(read('index.html')).toBe(
+			html.slice(0, -script.length) +
+				script.replace(`SRC = "${src}`, 'SRC = "' + src.replace('.tsx', '.tsrx')),
+		);
+		expect(read('src/nested.html')).toBe(
+			'<script type="module" src=\'../Page.tsrx#section\'></script>',
+		);
+		expect(read('public/redirect.html')).toBe(
+			'<base href="./elsewhere/"><script type="module" src="../Page.tsx?mode=warm"></script>',
+		);
+		expect(fs.existsSync(path.join(root, 'Page.tsrx'))).toBe(true);
+		expect(fs.existsSync(path.join(root, 'Page.tsx'))).toBe(false);
+	});
+
+	it('follows nested Vite entry scripts without treating inactive bases as document bases', async () => {
+		const html = [
+			'<html><head><noscript><base href="/elsewhere/"></noscript></head><body>',
+			'<template><template><base href="/elsewhere/"><script type="module" src="./Page.tsx"></script></template></template>',
+			'<noscript><base href="/elsewhere/"><script type="module" src="./Page.tsx#other"></script></noscript>',
+			'<svg><script type="module" src="./Page.tsx"></script></svg>',
+			'<script type="module" src="./Page.tsx?mode=warm"></script>',
+			'</body></html>',
+		].join('\n');
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'index.html': html,
+			'public/redirect.html':
+				'<base href="/elsewhere/"><script type="module" src="../Page.tsx"></script>',
+			'Page.tsx': 'export const Page = () => <h1 />;',
+		});
+
+		const result = await runCodemod([path.join(root, 'Page.tsx')], { verify: false });
+
+		expect(result.html.sort()).toEqual(['index.html', 'public/redirect.html']);
+		expect(fs.readFileSync(path.join(root, 'index.html'), 'utf8')).toBe(
+			html.replaceAll('./Page.tsx', './Page.tsrx'),
+		);
+		expect(fs.readFileSync(path.join(root, 'public/redirect.html'), 'utf8')).toContain(
+			'src="../Page.tsrx"',
+		);
+	});
+
 	it('renames template modules and rewrites every import of them', async () => {
 		const root = project({
 			'package.json':
@@ -5856,9 +6411,25 @@ export function Animation() { return useLottie({ animationData: {}, autoplay: fa
 		});
 		expect(result.files[0]?.code).toContain("from 'lottie-react'");
 		expect(result.files[0]?.notes).toContainEqual(
-			expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+			expect.objectContaining({
+				rule: 'bindings',
+				severity: 'error',
+				message: expect.stringContaining('Keep this hook call under a React renderer'),
+			}),
 		);
+		expect(result.files[0]?.code).toContain('Retained React import of `lottie-react`');
 		expect(result.dependencies).toEqual([]);
+		expect(result.missing).toEqual([{ name, modules: 1, islands: 0, blocked: 1 }]);
+
+		const preview = spawnSync(
+			process.execPath,
+			[path.join(REPO, 'packages/codemod/dist/bin.js'), 'Animation.tsx', '--strong', '--print'],
+			{ cwd: root, encoding: 'utf8' },
+		);
+		expect(preview.status).toBe(1);
+		expect(preview.stdout).toContain('Retained React imports');
+		expect(preview.stdout).toContain('1 use(s) need review');
+		expect(preview.stdout).not.toContain('no Octane port');
 	});
 
 	it('maps @effect/atom-react to its binding', async () => {
@@ -5883,7 +6454,7 @@ export function Animation() { return useLottie({ animationData: {}, autoplay: fa
 		);
 		for (const file of [provider, query]) {
 			expect(file?.code).not.toContain("'@effect/atom-react'");
-			expect(file?.code).not.toContain('No Octane port');
+			expect(file?.code).not.toContain('Retained React import');
 			expect(file?.diagnostics).toEqual([]);
 		}
 		expect(result.packages).toEqual([{ from: '@effect/atom-react', to: '@octanejs/effect-atom' }]);
@@ -5913,7 +6484,7 @@ export function Animation() { return useLottie({ animationData: {}, autoplay: fa
 		for (const file of [diffTree, browser]) {
 			expect(file?.code).toContain("from '@pierre/trees';");
 			expect(file?.code).not.toContain("'@pierre/trees/react'");
-			expect(file?.code).not.toContain('No Octane port');
+			expect(file?.code).not.toContain('Retained React import');
 			expect(file?.notes.filter((note) => note.rule === 'bindings')).toEqual([]);
 		}
 		expect(result.packages).toEqual([
@@ -6598,7 +7169,7 @@ export const views = [Motion, motion.div];`,
 			{ name: 'morphicons/react', modules: 1, islands: 0, blocked: 1 },
 		]);
 		expect(file.notes.map((note) => note.message)).toEqual([
-			'`<BaseMorphIcon>` takes children or props that Octane renders, which cannot cross into a React island. `morphicons/react` has no Octane port.',
+			'`<BaseMorphIcon>` takes children or props that Octane renders, which cannot cross into a React island. `morphicons/react` stays on React.',
 		]);
 		// It throws that error where it would render, not as its module loads:
 		// T3's Clerk shell imports `<ClerkProvider>` but renders it only with a key.
