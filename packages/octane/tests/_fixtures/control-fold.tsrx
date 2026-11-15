@@ -93,6 +93,23 @@ export function ConditionalInsideKeyedRows({ show }: { show: boolean }) @{
 	</main>
 }
 
+const rowPrefix = 'module:';
+const rowKey: ((row: number) => number) | undefined = undefined;
+
+export function FunctionScopedKeyedRows(props: { rows: number[]; label: string; offset: number }) @{
+	if (props.label) {
+		var rowPrefix = props.label + ':';
+		var rowKey = (row: number) => props.offset + row;
+	}
+	<ul>
+		@for (const row of props.rows; key rowKey!(row)) {
+			<li>{String(row) + rowPrefix}</li>
+		} @empty {
+			<li>{rowPrefix as string}</li>
+		}
+	</ul>
+}
+
 // Product-style return fragment: the toolbar is a fixed sibling while a
 // top-level @if selects a mailbox view, whose drafts arm owns a keyed @for.
 // Directives need template Block scopes even though the outer component uses

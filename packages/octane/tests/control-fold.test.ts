@@ -32,6 +32,7 @@ import {
 	ClonedValueTemplateSlot,
 	ValueTemplateSvg,
 	ValueTemplateMatrix,
+	FunctionScopedKeyedRows,
 } from './_fixtures/control-fold.tsrx';
 import {
 	DirectReturnedFragmentRefMailbox,
@@ -161,6 +162,48 @@ describe('function-scoped bindings across @if branches', () => {
 			view.unmount();
 		}
 	});
+});
+
+it('preserves block-declared var reads in keyed rows, keys and the empty arm', () => {
+	const props = { rows: [1, 2], label: 'A', offset: 0 };
+	const container = document.createElement('div');
+	document.body.appendChild(container);
+	const { html } = ServerRT.renderToString(serverModule().FunctionScopedKeyedRows, props);
+	const cold = mount(FunctionScopedKeyedRows, props);
+	try {
+		expect(cold.findAll('li').map((row) => row.textContent)).toEqual(['1A:', '2A:']);
+	} finally {
+		cold.unmount();
+	}
+	container.innerHTML = html;
+	const serverRows = [...container.querySelectorAll('li')];
+	expect(serverRows.map((row) => row.textContent)).toEqual(['1A:', '2A:']);
+	const errors: unknown[] = [];
+	const root = hydrateRoot(container, FunctionScopedKeyedRows, props, {
+		onRecoverableError: (error) => errors.push(error),
+	});
+	try {
+		flushSync(() => {});
+		expect(container.querySelector('li')).toBe(serverRows[0]);
+		const updated = { ...props, label: 'B' };
+		flushSync(() => root.render(FunctionScopedKeyedRows, updated));
+		expect(serverRows.map((row) => row.textContent)).toEqual(['1B:', '2B:']);
+		const reversed = { ...updated, rows: [2, 1] };
+		flushSync(() => root.render(FunctionScopedKeyedRows, reversed));
+		expect(container.querySelector('li')).toBe(serverRows[1]);
+		flushSync(() => root.render(FunctionScopedKeyedRows, { ...reversed, offset: 10 }));
+		expect(serverRows.every((row) => !row.isConnected)).toBe(true);
+		expect([...container.querySelectorAll('li')].map((row) => row.textContent)).toEqual([
+			'2B:',
+			'1B:',
+		]);
+		flushSync(() => root.render(FunctionScopedKeyedRows, { ...reversed, rows: [] }));
+		expect(container.querySelector('li')?.textContent).toBe('B:');
+		expect(errors).toEqual([]);
+	} finally {
+		root.unmount();
+		container.remove();
+	}
 });
 
 describe('template directives in a returned fragment', () => {
