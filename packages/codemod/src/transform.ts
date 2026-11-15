@@ -86,8 +86,21 @@ function isValueTypeQuery(name: ts.EntityName) {
 	return ts.isTypeQueryNode(name.parent) && name.parent.exprName === name;
 }
 
+/** The lexical root of an interface base or class implements type. */
+function typeHeritageRoot(node: ts.ExpressionWithTypeArguments) {
+	if (!ts.isPartOfTypeNode(node)) return;
+	let root = node.expression;
+	while (ts.isPropertyAccessExpression(root) && !root.questionDotToken) root = root.expression;
+	if (ts.isIdentifier(root) && root !== node.expression) return root;
+}
+
 function needsTouchValueOrNamespace(ref: ts.Identifier) {
-	return isValueTypeQuery(ref) || (ts.isQualifiedName(ref.parent) && ref.parent.left === ref);
+	if (isValueTypeQuery(ref) || (ts.isQualifiedName(ref.parent) && ref.parent.left === ref))
+		return true;
+	let access: ts.Node = ref;
+	while (ts.isPropertyAccessExpression(access.parent) && access.parent.expression === access)
+		access = access.parent;
+	return ts.isExpressionWithTypeArguments(access.parent) && typeHeritageRoot(access.parent) === ref;
 }
 
 type Severity = Note['severity'];
@@ -4812,6 +4825,27 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		node: ts.TypeReferenceNode | ts.ExpressionWithTypeArguments,
 		name: ts.EntityName | ts.Expression,
 	) {
+		if (ts.isExpressionWithTypeArguments(node)) {
+			const root = typeHeritageRoot(node);
+			const entry = root && this.importOf(root);
+			const member = root && directMember(root);
+			if (root && entry && member && (entry.module === 'react' || entry.module === 'react-dom')) {
+				if (entry.namespace && member.text === 'Touch' && member.parent !== name) {
+					const decl = this.declarationOf(root);
+					const clause = decl && (ts.isNamespaceImport(decl) ? decl.parent : decl);
+					if (clause && ts.isImportClause(clause)) {
+						this.reportRetainedTouchType(entry.module, member, false, true);
+						this.retainedTypeNamespaces.add(clause);
+						return name.getText(this.sf) + this.span(node, name.end, node.end, PLAIN);
+					}
+				}
+				if (entry.module === 'react' && entry.imported === 'Touch') {
+					this.used.add(entry.local);
+					return name.getText(this.sf) + this.span(node, name.end, node.end, PLAIN);
+				}
+			}
+		}
+
 		// Type heritage parses a qualified name as a property access expression.
 		if (
 			ts.isExpressionWithTypeArguments(node) &&
