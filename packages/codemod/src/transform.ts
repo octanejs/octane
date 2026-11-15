@@ -76,6 +76,11 @@ function directMember(receiver: ts.Node) {
 	return null;
 }
 
+// React Router applications can augment this loader type on the original module.
+function routerLoadContext(module: string, name: string) {
+	return name === 'AppLoadContext' && (module === 'react-router' || module === 'react-router-dom');
+}
+
 function firstQualifiedName(name: ts.EntityName): ts.Identifier {
 	while (ts.isQualifiedName(name)) name = name.left;
 	return name;
@@ -3883,6 +3888,20 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		const type = clause.isTypeOnly ? 'type ' : '';
 		const bindings = ts.isImportClause(clause) ? clause.namedBindings : clause.exportClause;
 		if (bindings && ts.isNamespaceImport(bindings)) {
+			if (
+				next === '@octanejs/remix-router' &&
+				clause.isTypeOnly &&
+				this.localUses(bindings.name).some((ref) => {
+					const member = ref.parent;
+					return (
+						ts.isQualifiedName(member) &&
+						member.left === ref &&
+						!isValueTypeQuery(member) &&
+						routerLoadContext(module, member.right.text)
+					);
+				})
+			)
+				return node.getText(this.sf);
 			if (namespace === null) return null;
 			const local = bindings.name.text;
 			this.count(RULE.import);
@@ -3892,10 +3911,21 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		const kept: string[] = [];
 		const values: string[] = [];
 		const types: string[] = [];
+		let retainedRouterTypes: Set<ts.ImportSpecifier | ts.ExportSpecifier> | undefined;
 		let renamed = false;
 		for (const element of bindings.elements) {
 			const imported = (element.propertyName ?? element.name).text;
 			const local = element.name.text;
+			if (
+				next === '@octanejs/remix-router' &&
+				(clause.isTypeOnly || element.isTypeOnly) &&
+				routerLoadContext(module, imported)
+			) {
+				(retainedRouterTypes ??= new Set()).add(element);
+				const name = element.propertyName ?? element.name;
+				kept.push(this.source.slice(name.getStart(this.sf), element.end));
+				continue;
+			}
 			if (module === 'radix-ui' && imported === 'Slot' && next === '@octanejs/radix') {
 				if (!ts.isImportSpecifier(element)) {
 					this.note(
@@ -3935,9 +3965,19 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			}
 		}
 		if (namespace === null && kept.length === 0 && !renamed) return null;
+		if (retainedRouterTypes) {
+			if (values.length === 0 || node.attributes) return node.getText(this.sf);
+			const available = this.options.bindingExports?.(module, next);
+			if (available && !this.hasBindingExports(node, next, available, retainedRouterTypes))
+				return node.getText(this.sf);
+		}
 		this.count(RULE.import);
 		const lines =
-			kept.length > 0 ? [`${keyword} ${type}{ ${kept.join(', ')} } ${from(module)}`] : [];
+			kept.length > 0
+				? [
+						`${keyword} ${retainedRouterTypes ? 'type ' : type}{ ${kept.join(', ')} } ${from(module)}`,
+					]
+				: [];
 		if (values.length > 0) {
 			lines.push(
 				namespace === null
@@ -4042,6 +4082,18 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		if (!ts.isStringLiteral(specifier)) return null;
 		const next = this.resolve(specifier.text);
 		if (next === null || next === specifier.text) return null;
+		if (
+			next === '@octanejs/remix-router' &&
+			ts.isModuleDeclaration(node) &&
+			node.body &&
+			ts.isModuleBlock(node.body) &&
+			node.body.statements.some(
+				(statement) =>
+					ts.isInterfaceDeclaration(statement) &&
+					routerLoadContext(specifier.text, statement.name.text),
+			)
+		)
+			return null;
 		const available = this.options.bindingExports?.(specifier.text, next);
 		if (available && !this.hasBindingExports(node, next, available)) return null;
 		const namespace = radixNamespace(specifier.text);
@@ -4079,7 +4131,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 	}
 
 	/** Check known exports without guessing at a whole namespace. */
-	hasBindingExports(node: ts.Node, binding: string, available: ReadonlySet<string>) {
+	hasBindingExports(
+		node: ts.Node,
+		binding: string,
+		available: ReadonlySet<string>,
+		retained?: ReadonlySet<ts.ImportSpecifier | ts.ExportSpecifier>,
+	) {
 		const hasDifferentType = (name: string | undefined) =>
 			binding === '@octanejs/motion' && name === 'MotionConfigContext';
 		const check = (site: ts.Node, name?: string, needsType = false) => {
@@ -4101,6 +4158,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			if (!elements.length) return check(node);
 			let supported = true;
 			for (const element of elements) {
+				if (retained?.has(element)) continue;
 				const name = (element.propertyName ?? element.name).text;
 				// A re-export can expose both the type and the value to another module.
 				const typeUse =
@@ -4217,8 +4275,17 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		if (!ts.isLiteralTypeNode(argument) || !ts.isStringLiteral(argument.literal)) return null;
 		const specifier = argument.literal;
 		const module = REACT_MODULES[specifier.text];
-		if (module === undefined) return this.rewriteSpecifier(node, specifier);
 		const qualifier = node.qualifier;
+		if (module === undefined) {
+			if (
+				!node.isTypeOf &&
+				qualifier &&
+				routerLoadContext(specifier.text, firstQualifiedName(qualifier).text) &&
+				this.resolve(specifier.text) === '@octanejs/remix-router'
+			)
+				return null;
+			return this.rewriteSpecifier(node, specifier);
+		}
 		if (
 			qualifier &&
 			firstQualifiedName(qualifier).text === 'Touch' &&
