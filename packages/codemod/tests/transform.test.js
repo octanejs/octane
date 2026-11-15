@@ -535,6 +535,47 @@ export type Qualified = typeof R.createRef;`,
 		expect(code).toContain(`export type Qualified = typeof ${imported?.[1] ?? 'createRef'};`);
 	});
 
+	it('migrates React Touch annotations without changing the touch point type', () => {
+		const { code, notes } = transformModule(
+			`import { type Touch as Point, useRef } from 'react';
+			import type * as R from 'react';
+			export type { Touch as PublicPoint } from 'react';
+			export type Saved = [R.Touch, import('react').Touch];
+			export function Pad() {
+				const start = useRef<Point | null>(null);
+				return <div onTouchStart={event => { start.current = event.touches[0] ?? null; }} />;
+			}`,
+			'pad.tsx',
+		);
+		expect(notes).toEqual([]);
+		expect(code).toContain(
+			"import { type Touch as Point, useRef, type Touch as OctaneTouch } from 'octane';",
+		);
+		expect(code).toContain("export type { Touch as PublicPoint } from 'octane';");
+		expect(code).toContain("Saved = [OctaneTouch, import('octane').Touch]");
+	});
+
+	it.each([
+		"import { Touch } from 'react'; export const View = Touch;",
+		"import * as R from 'react'; export const View = R.Touch;",
+	])('does not migrate the Touch type as a value', (source) => {
+		const { code, notes } = transformModule(source, 'touch.js');
+		expect(code).not.toContain("import { Touch } from 'octane'");
+		expect(notes).toContainEqual(
+			expect.objectContaining({ rule: 'unsupported-api', severity: 'error' }),
+		);
+	});
+
+	it('keeps Touch references outside the React type export unmapped', () => {
+		const { notes } = transformModule(
+			`import * as R from 'react';
+			import type * as RD from 'react-dom';
+			export type Points = [typeof R.Touch, typeof import('react').Touch, RD.Touch, import('react-dom').Touch];`,
+			'points.ts',
+		);
+		expect(notes.filter((note) => note.rule === 'unsupported-api')).toHaveLength(4);
+	});
+
 	it("imports `useSyncExternalStore` from Octane, not React's shim for it", () => {
 		const { code } = transformModule(
 			"import { useEffect } from 'react';\nimport { useSyncExternalStore } from 'use-sync-external-store/shim';\nexport const useOnline = (s: { on(f: () => void): () => void; get(): boolean }) => {\n\tuseEffect(() => {}, []);\n\treturn useSyncExternalStore(s.on, s.get);\n};\n",

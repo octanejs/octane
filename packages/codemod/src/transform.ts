@@ -4117,7 +4117,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			}
 		}
 		this.count(RULE.import);
-		const renamed = name === null ? null : mapQualifiedType(name);
+		const renamed = name === null ? null : mapQualifiedType(name, specifier.text, node.isTypeOf);
 		if (name !== null && renamed === null) {
 			this.note(
 				RULE.unsupported,
@@ -4593,7 +4593,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				return this.require(mapped.module, mapped.name, true);
 			}
 		}
-		const name = mapQualifiedType(node.right.text);
+		const name = mapQualifiedType(
+			node.right.text,
+			namespace?.module ?? 'react',
+			ts.isTypeQueryNode(node.parent),
+		);
 		if (!name) {
 			if (namespace) this.used.add(namespace.local);
 			this.note(
