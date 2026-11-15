@@ -4970,6 +4970,76 @@ export function View() { return <b title={provide()}><Badge.Consumer>{(value) =>
 		},
 	);
 
+	it('blocks an eager capture of a locally replaced React context provider before writing', async () => {
+		const context =
+			"import { createContext } from 'react'; const Theme = createContext('default');";
+		const replacement =
+			'function Replacement({ value }: { value: string }) { return "replacement:" + value; }';
+		const assignment = 'Object.assign(Theme, { Provider: Replacement });';
+		const capture = 'export const Provider = Theme.Provider;';
+		const source = [context, replacement, assignment, capture].join('\n');
+		const view = `import { Provider } from './provider';
+export function View() { return <b><Provider value="supplied"><i>supplied</i></Provider></b>; }`;
+		const sources = {
+			'provider.ts': source,
+			'View.tsx': view,
+			'Inline.ts': source.replace('Provider: Replacement', 'Provider: () => "inline"'),
+			'Late.ts': [context, replacement, capture, assignment].join('\n'),
+			'Shadowed.ts': source.replace(assignment, 'const Object = { assign() {} }; ' + assignment),
+			'Self.ts': source.replace('Provider: Replacement', 'Provider: Theme'),
+			'Sibling.ts': source.replace('Provider: Replacement', 'Other: Replacement'),
+			'Optional.ts': source.replace('Object.assign(', 'Object.assign?.('),
+			'Patched.ts': source.replace(assignment, 'Object.assign = () => Theme; ' + assignment),
+			'Eval.ts': source.replace(assignment, "eval('Object.assign = () => Theme'); " + assignment),
+			'PatchedInFunction.ts':
+				source.replace(assignment, 'patch(); ' + assignment) +
+				'\nfunction patch() { Object.assign = () => Theme; }',
+			'ContextPatchedInFunction.ts':
+				source.replace(assignment, 'patch(); ' + assignment) +
+				"\nfunction patch() { Reflect.defineProperty(Theme, 'Provider', { get: () => Theme, set() {} }); }",
+			'Restored.ts': source.replace(
+				capture,
+				'Object.assign(Theme, { Provider: Theme }); ' + capture,
+			),
+			'RestoredInDeclaration.ts': source.replace(
+				capture,
+				'export const reset = (Theme.Provider = Theme), Provider = Theme.Provider;',
+			),
+			'Reassigned.ts': source.replace(assignment, 'Replacement = Theme as never; ' + assignment),
+		};
+		const root = project({ 'package.json': '{"type":"module"}', ...sources });
+		const options = { root, strong: true, verify: true };
+		const note = expect.objectContaining({
+			rule: 'context-provider-getter',
+			severity: 'error',
+			line: 4,
+			message: expect.stringContaining('authored Provider replacement'),
+		});
+		const preview = await runCodemod(
+			Object.keys(sources).map((file) => path.join(root, file)),
+			{ ...options, write: false },
+		);
+		const diagnosed = preview.files.filter((row) =>
+			row.notes.some(
+				(note) =>
+					note.rule === 'context-provider-getter' &&
+					note.message.includes('authored Provider replacement'),
+			),
+		);
+		expect(diagnosed.map((row) => row.file).sort()).toEqual(['Inline.ts', 'provider.ts']);
+		for (const row of diagnosed) expect(row.notes).toContainEqual(note);
+		const write = await runCodemod([path.join(root, 'provider.ts'), path.join(root, 'View.tsx')], {
+			...options,
+			write: true,
+		});
+		expect(write.files).toEqual([
+			expect.objectContaining({ file: 'provider.ts', changed: false, notes: [note] }),
+		]);
+		expect(fs.readFileSync(path.join(root, 'provider.ts'), 'utf8')).toBe(source);
+		expect(fs.readFileSync(path.join(root, 'View.tsx'), 'utf8')).toBe(view);
+		expect(fs.existsSync(path.join(root, 'View.tsrx'))).toBe(false);
+	});
+
 	it('uses an unselected TSX object only when the relative import identifies that source', async () => {
 		const root = project({
 			'package.json': '{"name":"app","type":"module"}',
