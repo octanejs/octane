@@ -1626,6 +1626,50 @@ export type Qualified = typeof R.createRef;`,
 		expect(code).toContain('const other: typeof R.Profiler = R.Profiler;');
 	});
 
+	it('preserves nested value queries for an original React export', () => {
+		const source = `import type * as R from 'react';
+			import type Original from 'react' with { 'resolution-mode': 'require' };
+			export type Inline = typeof import('react').createRef.length;
+			export type Qualified = typeof R.createRef.length;
+			export type StaticDeep = typeof R.createRef.prototype.more;
+			export type Attributed = typeof Original /* keep */ .createRef.prototype.more;`;
+		const { code, notes } = transformModule(source, 'types.ts');
+		expect(notes).toEqual([]);
+		expect(code).toContain("Inline = typeof import('react').createRef.length;");
+		expect(code).toContain("import type * as R from 'react';");
+		expect(code).toContain('Qualified = typeof R.createRef.length;');
+		expect(code).toContain('StaticDeep = typeof R.createRef.prototype.more;');
+		expect(code).toContain(
+			"import type Original from 'react' with { 'resolution-mode': 'require' };",
+		);
+		expect(code).toContain('Attributed = typeof Original /* keep */ .createRef.prototype.more;');
+	});
+
+	it('keeps the owner of a nested ref query when a named allocator is shadowed', () => {
+		const { code, notes } = transformModule(
+			`import React, { createRef, useState } from 'react';
+			 export type Allocator = typeof createRef;
+			 export function useCounter() {
+			   const createRef = true;
+			   type RefLength = typeof React.createRef.length;
+			   return [useState(0), createRef, null as unknown as RefLength];
+			 }`,
+			'types.ts',
+		);
+		expect(notes).toEqual([]);
+		expect(code).toContain("import React from 'react';");
+		expect(code).toContain("import { useState } from 'octane';");
+		expect(code).toContain('type RefLength = typeof React.createRef.length;');
+	});
+
+	it('preserves combined default and namespace owners for nested retained queries', () => {
+		const source = `import React, * as R from 'react';
+			export type Queries = [typeof React.createRef.prototype.more, typeof R.createRef.prototype.more];`;
+		const { code, notes } = transformModule(source, 'types.ts');
+		expect(code).toBe(source);
+		expect(notes).toEqual([]);
+	});
+
 	it('reports explicit React type re-exports when Octane lacks the authored spelling', () => {
 		const { code, notes } = transformModule(
 			`export type { ConsumerProps as Props, SyntheticEvent, ReactNode, useState } from 'react';
