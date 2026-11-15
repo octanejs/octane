@@ -310,6 +310,58 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 		}
 	});
 
+	it('reports imported React classes in ordinary native HTML children', async () => {
+		const view = (jsx) => `import { StrictMode } from 'react';
+import { Frame } from './Frame';
+import { ReactCompat } from 'octane/react';
+function Holder() { return <b>ignored</b>; }
+export function App({ enabled }) { return ${jsx}; }`;
+		const cases = {
+			'ClassName.tsx': '<article className={enabled ? "on" : "off"}><Frame /></article>',
+			'Composed.tsx':
+				'<main data-page="app"><><StrictMode><section><Frame /></section></StrictMode></></main>',
+			'Custom.tsx': '<main><Holder><Frame /></Holder></main>',
+			'Foreign.tsx': '<main><svg><g><Frame /></g></svg></main>',
+			'Template.tsx': '<main><template><Frame /></template></main>',
+			'Spread.tsx': '<main {...{ className: "app" }}><Frame /></main>',
+			'Children.tsx': '<main children={null}><Frame /></main>',
+			'RawHtml.tsx': '<main dangerouslySetInnerHTML={{ __html: "html" }}><Frame /></main>',
+			'Hosted.tsx': '<main><ReactCompat><Frame /></ReactCompat></main>',
+			'Customized.tsx': '<main IS="x-main"><Frame /></main>',
+		};
+		const root = project({
+			'tsconfig.json': '{ "compilerOptions": { "jsx": "react-jsx" } }',
+			'Frame.tsx': `import { Component } from 'react';
+export class Frame extends Component { render() { return <b>ready</b>; } }`,
+			...Object.fromEntries(Object.entries(cases).map(([name, jsx]) => [name, view(jsx)])),
+		});
+		fs.symlinkSync(
+			path.join(REPO, 'packages/codemod/node_modules'),
+			path.join(root, 'node_modules'),
+		);
+
+		for (const includeClass of [true, false]) {
+			const inputs = Object.keys(cases).concat(includeClass ? ['Frame.tsx'] : []);
+			const { files } = await runCodemod(
+				inputs.map((file) => path.join(root, file)),
+				{ root, strong: true, verify: true, projectTypes: false, write: false },
+			);
+			expect(
+				files.flatMap(({ file, notes }) =>
+					notes
+						.filter(
+							(note) =>
+								note.rule === 'class-component' && note.message.includes('imported React class'),
+						)
+						.map((note) => [file, note.severity]),
+				),
+			).toEqual([
+				['ClassName.tsx', includeClass ? 'error' : 'warning'],
+				['Composed.tsx', includeClass ? 'error' : 'warning'],
+			]);
+		}
+	});
+
 	it('reports opaque map methods that receive JSX from a callback switch', async () => {
 		const setup = `function makeRows() {
 	const rows = ['a', 'b'];

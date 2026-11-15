@@ -261,6 +261,20 @@ function isDOMTag(tag: string) {
 	return domTagNames.has(tag);
 }
 
+/** Follow direct JSX children only through ordinary HTML hosts with no content override. */
+function rendersOrdinaryHtmlChildren(opening: ts.JsxOpeningElement) {
+	return (
+		ts.isIdentifier(opening.tagName) &&
+		/^(?:article|aside|div|footer|header|main|nav|section)$/.test(opening.tagName.text) &&
+		opening.attributes.properties.every(
+			(attr) =>
+				ts.isJsxAttribute(attr) &&
+				ts.isIdentifier(attr.name) &&
+				!/^(?:children|dangerouslySetInnerHTML|is)$/i.test(attr.name.text),
+		)
+	);
+}
+
 function scriptKind(filename: string) {
 	if (filename.endsWith('.tsx')) return ts.ScriptKind.TSX;
 	if (filename.endsWith('.jsx')) return ts.ScriptKind.JSX;
@@ -7279,9 +7293,8 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		if (
 			ts.isJsxFragment(node) ||
 			(ts.isJsxElement(node) &&
-				callee &&
-				callee.module === 'react' &&
-				callee.name === 'StrictMode' &&
+				((callee && callee.module === 'react' && callee.name === 'StrictMode') ||
+					rendersOrdinaryHtmlChildren(node.openingElement)) &&
 				!this.islands.has(node) &&
 				!this.unrenderable.has(node) &&
 				!this.reactRendererBodies.has(node))
