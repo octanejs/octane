@@ -6,6 +6,7 @@ import {
 	renderUses,
 } from './forwarded-props.js';
 import type { TransformOptions } from './types.js';
+import { isWrapper } from './expression-wrappers.js';
 import { localUses, portableArguments, scalar } from './local-uses.js';
 import ts from 'typescript';
 
@@ -19,6 +20,19 @@ const scalarMethods = new Set([
 	'formatDisplayName',
 ]);
 const descriptor = new Set(['id', 'description', 'defaultMessage', 'ignoreTag']);
+
+function isImmediatelyCalled(node: ts.Node): boolean {
+	if (
+		!(ts.isArrowFunction(node) || ts.isFunctionExpression(node)) ||
+		node.asteriskToken ||
+		node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword)
+	)
+		return false;
+	let expression: ts.Expression = node;
+	while (isWrapper(expression.parent)) expression = expression.parent;
+	const call = expression.parent;
+	return ts.isCallExpression(call) && call.expression === expression;
+}
 
 /** Select whole named imports that the shared adapter can replace without changing renderer-owned values. */
 export function intlImports(
@@ -228,7 +242,7 @@ export function intlImports(
 		const call = access.parent;
 		if (!ts.isCallExpression(call) || call.expression !== access) return false;
 		if (scalarMethods.has(access.name.text)) {
-			// In the original React render, JSX attributes and children evaluate eagerly.
+			// React also evaluates directly invoked synchronous functions during render.
 			if (
 				!owner.asteriskToken &&
 				!owner.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword) &&
@@ -236,7 +250,7 @@ export function intlImports(
 					call,
 					(node) =>
 						node === owner.body ||
-						ts.isFunctionLike(node) ||
+						(ts.isFunctionLike(node) && !isImmediatelyCalled(node)) ||
 						ts.isClassLike(node) ||
 						ts.isInterfaceDeclaration(node) ||
 						ts.isTypeNode(node),

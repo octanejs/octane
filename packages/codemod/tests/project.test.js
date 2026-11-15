@@ -10311,7 +10311,7 @@ export function View() { return <Provider locale=""><Language /></Provider>; }`;
 	});
 
 	it.each([false, true])(
-		'reports direct render-phase scalar formatters (projectTypes=%s)',
+		'reports scalar formatters evaluated during render (projectTypes=%s)',
 		async (projectTypes) => {
 			const methods = {
 				formatDate: '0',
@@ -10342,10 +10342,18 @@ export function View() { return <Provider locale=""><Language /></Provider>; }`;
 						const date = ${date};
 						return <b title={${time}}>{date}${others.map((call) => `{${call}}`).join('')}</b>;
 					}`,
+				'Immediate.tsx': `import {useIntl} from 'react-intl';
+					export function Immediate() {
+						const intl = useIntl();
+						const value = (() => intl.formatNumber(12))();
+						return <b title={(function (date = ((() => intl.formatDate(0)) as () => string)?.()) { return date; })()}>{String(value)}</b>;
+					}`,
 				'Deferred.tsx': `import {useIntl} from 'react-intl';
 					export function Deferred() {
 						const intl = useIntl();
-						return <button onClick={() => { ${calls.map((call) => `${call};`).join(' ')} }}>Later</button>;
+						const later = (() => () => intl.formatNumber(12))();
+						const paused = (function* () { yield intl.formatNumber(12); })();
+						return <button onClick={() => { (() => intl.formatTime(0))(); later(); paused.next(); ${calls.map((call) => `${call};`).join(' ')} }}>Later</button>;
 					}`,
 			});
 			const types = path.join(root, 'node_modules/@types');
@@ -10356,8 +10364,8 @@ export function View() { return <Provider locale=""><Language /></Provider>; }`;
 				'dir',
 			);
 			const { files } = await runCodemod(
-				['Direct.tsx', 'Deferred.tsx', 'OtherFactory.tsx', 'nested/View.tsx'].map((f) =>
-					path.join(root, f),
+				['Direct.tsx', 'Immediate.tsx', 'Deferred.tsx', 'OtherFactory.tsx', 'nested/View.tsx'].map(
+					(f) => path.join(root, f),
 				),
 				{
 					root,
@@ -10377,6 +10385,15 @@ export function View() { return <Provider locale=""><Language /></Provider>; }`;
 					}),
 				),
 			);
+			const immediate = files.find((f) => f.file === 'Immediate.tsx');
+			expect(immediate.notes.filter((n) => n.severity === 'error')).toEqual(
+				['formatNumber', 'formatDate'].map((method) =>
+					expect.objectContaining({
+						rule: 'bindings',
+						message: expect.stringContaining(`this ${method} call`),
+					}),
+				),
+			);
 			expect(deferred.notes.filter((n) => n.severity === 'error')).toEqual([]);
 			for (const file of ['OtherFactory.tsx', 'nested/View.tsx']) {
 				const result = files.find((f) => f.file === file);
@@ -10384,7 +10401,7 @@ export function View() { return <Provider locale=""><Language /></Provider>; }`;
 					expect.objectContaining({ message: expect.stringContaining('this formatNumber call') }),
 				);
 			}
-			for (const selected of [direct, deferred])
+			for (const selected of [direct, immediate, deferred])
 				expect(selected.code).toContain('octane-react-intl.tsrx');
 		},
 	);
