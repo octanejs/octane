@@ -57,6 +57,7 @@ export type {
 import * as React from 'react';
 import { hasOwnProp } from '../has-own.js';
 import { installHostedRefDriver } from '../runtime/drivers.js';
+import { createElementFromConfig } from '../runtime/elements.js';
 import { attachLiveFragmentRef } from '../runtime/engine.js';
 import { discardSubtreeRefAttachesFrom, type FragmentInstance } from '../runtime/refs.js';
 import type { RefAttach } from '../runtime/types.js';
@@ -64,7 +65,6 @@ import {
 	Activity,
 	bindRendererRegionOwner,
 	createContext as createOctaneContext,
-	createElement as createOctaneElement,
 	createHostContextRequest,
 	createRoot as createOctaneRoot,
 	hydrateRoot as hydrateOctaneRoot,
@@ -202,9 +202,11 @@ function hostedRootEnvelope(props: {
 			: { ...(props.bodyProps as object), key: props.bodyKey };
 	// Octane's own Activity carries a React Activity hide into the island: it
 	// disconnects effects, refs, and store subscriptions while keeping state and DOM.
-	return createOctaneElement(Activity, {
+	// We wrap a validated component and the Activity sentinel. Descendants enable
+	// optional descriptor capabilities where they create their own descriptors.
+	return createElementFromConfig(undefined, Activity, {
 		mode: props.mode,
-		children: createOctaneElement(props.body, config as never),
+		children: createElementFromConfig(undefined, props.body, config as never),
 	});
 }
 
