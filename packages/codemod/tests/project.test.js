@@ -301,6 +301,59 @@ function unused(add: (pattern: string, file: string) => unknown) { return add('f
 		expect(registry.code).toContain("add('reference', 'reference.tsrx')");
 	});
 
+	it.each([
+		['inline default arrow', 'export default () => <main />;', true],
+		['local const default assignment', 'const Page = () => <main />; export default Page;', true],
+		['local const export alias', 'const Page = () => <main />; export { Page as default };', true],
+		['null arrow default', 'export default () => null;', false],
+		[
+			'mutable default binding',
+			'let Page = () => <main />; Page = () => null; export default Page;',
+			false,
+		],
+		[
+			'type-only default export',
+			'const Page = () => <main />; export type { Page as default };',
+			false,
+		],
+		[
+			'type-only default specifier',
+			'const Page = () => <main />; export { type Page as default };',
+			false,
+		],
+		[
+			're-export from another file',
+			'const Page = () => <main />; export { Page as default } from "./other";',
+			false,
+		],
+	])('checks a registered route with a %s', async (_, route, warns) => {
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'react-router.config.ts': 'export default { ssr: true };',
+			'app/root.tsx': 'export default function Root() { return <main />; }',
+			'app/routes.ts':
+				"import { index } from '@react-router/dev/routes'; export default [index('page.tsx')];",
+			'app/page.tsx': route,
+			'app/other.ts': 'export const Page = () => null;',
+			'node_modules/@react-router/dev/package.json': JSON.stringify({
+				name: '@react-router/dev',
+				version: '7.18.1',
+				exports: { './routes': './routes.js' },
+			}),
+			'node_modules/@react-router/dev/routes.js': 'exports.index = () => ({});',
+		});
+		const result = await runCodemod([path.join(root, 'app/page.tsx')], { root, write: false });
+		const warned = result.files
+			.filter((file) =>
+				file.notes.some(
+					(note) => note.rule === 'react-compat' && /React Router/.test(note.message),
+				),
+			)
+			.map((file) => file.file)
+			.sort();
+		expect(warned).toEqual(warns ? ['app/page.tsx', 'app/routes.ts'] : []);
+	});
+
 	it('uses the default React Router directory when config omits it', async () => {
 		const root = project({
 			'node_modules/@react-router/dev/package.json': JSON.stringify({

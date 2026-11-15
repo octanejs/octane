@@ -1653,6 +1653,15 @@ export async function runCodemod(
 			const { program, errors } = parseSync(file.output, file.code);
 			if (program && !errors.length) {
 				let defaultLocal: string | undefined;
+				const templateLocals = new Set<string>();
+				const isTemplateBody = (body: unknown) => isRecord(body) && body.type === 'JSXCodeBlock';
+				// The TSRX parser does not expose the type-only flag on local export lists.
+				const scanner = ts.createScanner(
+					ts.ScriptTarget.Latest,
+					true,
+					ts.LanguageVariant.JSX,
+					file.code,
+				);
 				for (const statement of program.body) {
 					const defaultExport = statement.type === 'ExportDefaultDeclaration';
 					let fn =
@@ -1662,26 +1671,51 @@ export async function runCodemod(
 					if (defaultExport) {
 						while (fn?.type === 'ParenthesizedExpression') fn = fn.expression;
 						if (fn?.type === 'Identifier') defaultLocal = fn.name;
-					} else if (statement.type === 'ExportNamedDeclaration' && !statement.source) {
+					} else if (
+						statement.type === 'ExportNamedDeclaration' &&
+						!statement.source &&
+						statement.specifiers.length
+					) {
+						scanner.setTextPos(statement.start);
+						scanner.scan();
+						const typeOnly = scanner.scan() === ts.SyntaxKind.TypeKeyword;
 						for (const specifier of statement.specifiers) {
 							if (
+								!typeOnly &&
 								(specifier.exported.type === 'Identifier'
 									? specifier.exported.name === 'default'
 									: specifier.exported.value === 'default') &&
-								specifier.local.type === 'Identifier'
+								specifier.local.type === 'Identifier' &&
+								specifier.start === specifier.local.start
 							)
 								defaultLocal = specifier.local.name;
 						}
 					}
-					if (fn?.type !== 'FunctionDeclaration') continue;
-					// The parser exposes TSRX code blocks through its ESTree body type.
-					const body: unknown = fn.body;
-					if (isRecord(body) && body.type === 'JSXCodeBlock') {
+					if (fn?.type === 'FunctionDeclaration' && isTemplateBody(fn.body)) {
 						if (defaultExport) names.add('default');
 						else if (fn.id) names.add(fn.id.name);
+					} else if (
+						defaultExport &&
+						fn?.type === 'ArrowFunctionExpression' &&
+						isTemplateBody(fn.body)
+					) {
+						names.add('default');
+					} else if (fn?.type === 'VariableDeclaration' && fn.kind === 'const') {
+						for (const declaration of fn.declarations) {
+							if (
+								declaration.id.type === 'Identifier' &&
+								declaration.init?.type === 'ArrowFunctionExpression' &&
+								isTemplateBody(declaration.init.body)
+							)
+								templateLocals.add(declaration.id.name);
+						}
 					}
 				}
-				if (defaultLocal !== undefined && names.has(defaultLocal)) names.add('default');
+				if (
+					defaultLocal !== undefined &&
+					(names.has(defaultLocal) || templateLocals.has(defaultLocal))
+				)
+					names.add('default');
 			}
 			templateExports.set(file.output, names);
 		}
