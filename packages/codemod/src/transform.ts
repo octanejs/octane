@@ -7267,7 +7267,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		) {
 			for (const child of node.children)
 				if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child))
-					this.checkReactClassRoot(child);
+					this.checkReactClassOutput(child);
 		} else if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
 			this.checkReactClassRoot(node);
 		}

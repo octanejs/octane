@@ -153,6 +153,18 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 					'<Frame><b>ready</b></Frame>',
 					'<Strict key="first"><Frame><b>ready</b></Frame></Strict>',
 				),
+			'NestedRootStrict.tsx':
+				"import React, { StrictMode as Strict } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Strict><React.StrictMode key="inner"><Frame /></React.StrictMode></Strict>',
+				),
+			'NestedHostedStrict.tsx':
+				"import { StrictMode as Strict } from 'react';\nimport { ReactCompat } from 'octane/react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Strict><ReactCompat><Strict><Frame /></Strict></ReactCompat></Strict>',
+				),
 			'NestedStrict.tsx':
 				"import { StrictMode as Strict } from 'react';\n" +
 				entry('./Boundary').replace(
@@ -231,6 +243,7 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 				['KeyedStrict.tsx', includeClass ? 'error' : 'warning'],
 				['LogicalArm.tsx', includeClass ? 'error' : 'warning'],
 				['MetadataView.tsx', includeClass ? 'error' : 'warning'],
+				['NestedRootStrict.tsx', includeClass ? 'error' : 'warning'],
 				['Relative.tsx', includeClass ? 'error' : 'warning'],
 				['Strict.tsx', includeClass ? 'error' : 'warning'],
 				['Ternary.tsx', includeClass ? 'error' : 'warning'],
