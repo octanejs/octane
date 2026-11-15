@@ -3096,6 +3096,17 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 		const wrapper =
 			'function Child() { return <button>Original</button>; } export default function Leaf() { return <Child />; }';
 		it.each([
+			['extensionless JSX', 'render(<Leaf />)', 'extensionless', true],
+			['extensionless element', 'render(h(Leaf))', 'extensionless', true],
+			['extensionless wrapper', 'render(<Leaf />)', 'extensionless', true, wrapper],
+			[
+				'extensionless named alias',
+				'render(<Leaf />)',
+				'named',
+				true,
+				'export function View() { return <button>Original</button>; }',
+			],
+			['extensionless JSX with a physical JS sibling', 'render(<Leaf />)', 'js shadow', false],
 			['direct JSX', 'render(<Leaf />)', '', true],
 			['empty JSX pair', 'render(<Leaf></Leaf>)', '', true],
 			['comment-only JSX pair', 'render(<Leaf>{/* comment */}</Leaf>)', '', true],
@@ -3127,6 +3138,13 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 				wrapper.replace('<Child />', '<Child /> as React.ReactElement'),
 			],
 		])('reports the %s in a retained issuer', async (_, call, alias, warns, leaf) => {
+			const ext = ['extensionless', 'named', 'js shadow'].includes(alias)
+				? ''
+				: alias === 'jsx sibling'
+					? '.jsx'
+					: '.tsx';
+			const importName =
+				alias === 'named' ? '{ View as Leaf }' : call.includes('<leaf') ? 'leaf' : 'Leaf';
 			const files = {
 				'package.json': '{"name":"app","type":"module"}',
 				'tsconfig.json': JSON.stringify({
@@ -3140,12 +3158,13 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 				'Owner.tsx': `${alias === 'pragma' ? '/** @jsxImportSource octane */\n' : ''}
 					import { renderToStaticMarkup as render } from 'react-dom/server';
 					import { createElement as h } from 'react';
-					import ${call.includes('<leaf') ? 'leaf' : 'Leaf'} from './Leaf.${alias === 'jsx sibling' ? 'jsx' : 'tsx'}';
+					import ${importName} from './Leaf${ext}';
 					export function page() { return ${call}; }`,
 				'Leaf.tsx': leaf ?? 'export default function Leaf() { return <button>Original</button>; }',
 				'index.html': '<script type="module" src="./Leaf.tsx"></script>',
 			};
 			if (alias === 'jsx sibling') files['Leaf.jsx'] = "export default () => 'retained';";
+			if (alias === 'js shadow') files['Leaf.js'] = "export default () => 'retained';";
 			const root = project(files);
 			fs.mkdirSync(path.join(root, 'node_modules'));
 			for (const name of ['octane', 'react', 'react-dom'])

@@ -1683,6 +1683,15 @@ export async function runCodemod(
 	const jsxFactories = new Map<string, ReadonlySet<string>>();
 	const renamedJsx = [...renames.keys()].some((file) => file.endsWith('.tsx'));
 	const namedReexports = new Map<string, Map<string, { module: string; name: string }>>();
+	const isPlainFile = (file: string) => {
+		const stat = fs.lstatSync(file, { throwIfNoEntry: false });
+		return (
+			!!stat?.isFile() &&
+			stat.nlink === 1 &&
+			fs.realpathSync(file) ===
+				path.join((physicalRoot ??= fs.realpathSync(root)), path.relative(root, file))
+		);
+	};
 	function retainedJsxTarget(from: string, specifier: string, name: string) {
 		if (
 			!/^\.{1,2}\//.test(specifier) ||
@@ -1691,15 +1700,6 @@ export async function runCodemod(
 			config?.moduleSuffixes?.some(Boolean)
 		)
 			return;
-		const isPlainFile = (file: string) => {
-			const stat = fs.lstatSync(file, { throwIfNoEntry: false });
-			return (
-				!!stat?.isFile() &&
-				stat.nlink === 1 &&
-				fs.realpathSync(file) ===
-					path.join((physicalRoot ??= fs.realpathSync(root)), path.relative(root, file))
-			);
-		};
 		const direct = (issuer: string, spec: string) => {
 			if (!/^\.{1,2}\//.test(spec) || /[!%?#\\]/.test(spec)) return;
 			const original = path.resolve(path.dirname(issuer), spec);
@@ -1989,10 +1989,23 @@ export async function runCodemod(
 				const match = proven ?? direct;
 				if (!match || (edge.renderer === 'createElement' && proven?.indirect)) continue;
 				const exportName = proven?.name ?? edge.name;
+				const extensionlessServer =
+					edge.renderer === 'server render' &&
+					path.posix.extname(edge.module) === '' &&
+					(config?.moduleResolution === undefined ||
+						config.moduleResolution === ts.ModuleResolutionKind.Bundler) &&
+					/^\.{1,2}\//.test(edge.module) &&
+					!/[!%?#\\]/.test(edge.module) &&
+					!config?.rootDirs &&
+					!config?.moduleSuffixes?.some(Boolean) &&
+					match.file.endsWith('.tsx') &&
+					unambiguousJsxPath(match.file, original) &&
+					isPlainFile(match.file);
 				const explicit =
 					match.file === original && (edge.renderer !== 'JSX' || /\.[jt]sx$/.test(edge.module));
 				if (
 					!explicit &&
+					!extensionlessServer &&
 					!proven &&
 					(factory ||
 						edge.renderer !== 'JSX' ||
@@ -2028,7 +2041,7 @@ export async function runCodemod(
 							exportName === 'default' &&
 							originalExports.splitIntrinsicDefault;
 						if (
-							(!explicit && edge.renderer !== 'createElement') ||
+							(!explicit && !extensionlessServer && edge.renderer !== 'createElement') ||
 							edge.lazy ||
 							(!splitIntrinsicDefault && !originalExports.wrappers.has(edge.name)) ||
 							!hasTemplateExport(leaf, edge.name)
