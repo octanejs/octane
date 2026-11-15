@@ -91,6 +91,7 @@ export async function runCodemod(
 	);
 	const known = new Set(paths.flatMap((entry) => collect(path.resolve(entry))));
 	const files = [...known];
+	let selectedRealpaths: Set<string> | undefined;
 	const renames: Map<string, string> = new Map();
 	const exports: Map<string, TransformResult['exports']> = new Map();
 	const owners: Map<string, string> = new Map();
@@ -1157,6 +1158,39 @@ export async function runCodemod(
 						: undefined,
 				get originalReact() {
 					return installedReact(file);
+				},
+				retainedReactBridgeComponent: (bridge, module, name) => {
+					if (
+						!reactCompat ||
+						!module.startsWith('.') ||
+						!module.endsWith('.tsx') ||
+						bindingOptions(file)?.rootDirs?.length ||
+						bindingOptions(file)?.moduleSuffixes?.some(Boolean) ||
+						resolveRename(file, module) ||
+						!originalOctaneBridge(file, bridge) ||
+						!originalReactEntry(file, 'react', bindingOptions(file))
+					)
+						return false;
+					const owner = localFile(file, module, true);
+					if (!owner?.endsWith('.tsx') || owner !== path.resolve(path.dirname(file), module))
+						return false;
+					const stat = fs.lstatSync(owner, { throwIfNoEntry: false });
+					if (
+						!stat?.isFile() ||
+						stat.nlink !== 1 ||
+						known.has(owner) ||
+						!automaticReactJsx(owner) ||
+						!originalReactEntry(owner, 'react/jsx-runtime')
+					)
+						return false;
+					// An alternate spelling or parent symlink can reach a selected source.
+					selectedRealpaths ??= new Set(files.map((file) => fs.realpathSync.native(file)));
+					if (selectedRealpaths.has(fs.realpathSync.native(owner))) return false;
+					const source = fs.readFileSync(owner, 'utf8');
+					return (
+						/^\s*\/\*\*\s*@jsxImportSource\s+react\s*\*\//.test(source) &&
+						directReactExports(owner, source).intrinsics.has(name)
+					);
 				},
 				originalReactServerEntry: (module) =>
 					originalReactEntry(file, module, bindingOptions(file)) &&
