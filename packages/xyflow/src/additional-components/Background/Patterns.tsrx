@@ -6,7 +6,7 @@ type LinePatternProps = {
 	dimensions: [number, number];
 	variant: BackgroundVariant;
 	lineWidth?: number;
-	className?: string;
+	className?: string | undefined;
 };
 
 export function LinePattern({ dimensions, lineWidth, variant, className }: LinePatternProps) {
@@ -21,7 +21,7 @@ export function LinePattern({ dimensions, lineWidth, variant, className }: LineP
 
 type DotPatternProps = {
 	radius: number;
-	className?: string;
+	className?: string | undefined;
 };
 
 export function DotPattern({ radius, className }: DotPatternProps) {
