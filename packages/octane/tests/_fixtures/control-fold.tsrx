@@ -93,6 +93,80 @@ export function ConditionalInsideKeyedRows({ show }: { show: boolean }) @{
 	</main>
 }
 
+export function SwitchScopedBranch({ label }: { label: string }) @{
+	if (label) {
+		var BranchAction = CapturedAction;
+	}
+
+	<main>
+		@switch (label) {
+			@case 'ready': {
+				@if (label) {
+					<BranchAction label={label} />
+				}
+			}
+			@default: {
+				@if (label) {
+					<BranchAction label={label} />
+				} @else {
+					<b>empty</b>
+				}
+			}
+		}
+	</main>
+}
+
+export function TryScopedBranch({ label }: { label: string }) @{
+	if (label) {
+		var BranchAction = CapturedAction;
+	}
+
+	<main>
+		@try {
+			@if (label === 'fail') {
+				<FailedBranch />
+			} @else {
+				@if (label) {
+					<BranchAction label={label} />
+				} @else {
+					<b>empty</b>
+				}
+			}
+		} @catch (error) {
+			<b>{(error as Error).message as string}</b>
+		}
+	</main>
+}
+
+export function PendingScopedBranch({
+	promise,
+	useLatest,
+}: {
+	promise: Promise<string>;
+	useLatest: boolean;
+}) @{
+	if (promise) {
+		var WakeAction = useLatest ? CapturedAction : BranchAction;
+	}
+
+	<main>
+		@try {
+			const label = use(promise);
+			@if (label) {
+				<WakeAction label={label} />
+			}
+		} @pending {
+			<b>waiting</b>
+		} @catch (error) {
+			<b>{(error as Error).message as string}</b>
+		}
+	</main>
+}
+
+function FailedBranch(): never {
+	throw new Error('branch failed');
+}
+
 // Product-style return fragment: the toolbar is a fixed sibling while a
 // top-level @if selects a mailbox view, whose drafts arm owns a keyed @for.
 // Directives need template Block scopes even though the outer component uses
