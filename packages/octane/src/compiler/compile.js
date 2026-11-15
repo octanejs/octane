@@ -7569,7 +7569,11 @@ function collectPrivateUnescapedComponents(body, ctx) {
 function collectPrivateRenderedComponents(body, ctx, candidates, acceptSite) {
 	if (candidates.size === 0) return candidates;
 
-	const allowed = collectRenderedComponentReferences(ctx, candidates, acceptSite);
+	const allowed = collectRenderedComponentReferences(
+		ctx.componentInfo.values(),
+		candidates,
+		acceptSite,
+	);
 	// An array deliberately does not introduce a synthetic module Block scope:
 	// sibling function references must remain free for the escape proof.
 	const escaped = collectFreeIdentifiers(body, [], allowed);
@@ -7586,7 +7590,7 @@ function collectPrivateRenderedComponents(body, ctx, candidates, acceptSite) {
 	return candidates;
 }
 
-function collectRenderedComponentReferences(ctx, candidates, acceptSite) {
+function collectRenderedComponentReferences(componentInfo, candidates, acceptSite) {
 	const allowed = new Set();
 	const visitOutput = (node, returnedOwner = null) => {
 		if (node == null) return;
@@ -7596,7 +7600,7 @@ function collectRenderedComponentReferences(ctx, candidates, acceptSite) {
 			if (!isComponentTag(node)) visitOutput(node.children, returnedOwner);
 			else {
 				const name = tagBindingName(node);
-				if (candidates.has(name) && acceptSite(node, name, returnedOwner))
+				if ((candidates === null || candidates.has(name)) && acceptSite(node, name, returnedOwner))
 					allowed.add(node.openingElement?.name ?? node.id);
 			}
 		} else if (node.type === 'JSXFragment' || node.type === 'Fragment') {
@@ -7620,7 +7624,7 @@ function collectRenderedComponentReferences(ctx, candidates, acceptSite) {
 			visitOutput(node.pending, returnedOwner);
 		}
 	};
-	for (const info of ctx.componentInfo.values()) {
+	for (const info of componentInfo) {
 		if (info.node.body?.type === 'JSXCodeBlock') visitOutput(info.node.body);
 		if (!info.returnJsx) continue;
 		for (const statement of info.node.body.body || []) {
@@ -8213,17 +8217,21 @@ function hydrationPropsPlans(ctx) {
 	}
 	if (candidates.size === 0) return plans;
 	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
-	collectRenderedComponentReferences(ctx, candidates, (node, name, returnedOwner) => {
-		if (returnedOwner !== null || node.children?.length) return false;
-		const plan = plans.get(name);
-		const attrs = node.attributes || node.openingElement?.attributes || [];
-		if (!warmCallsiteOwnsRequiredProps(plan.required, attrs)) return false;
-		const tag = node.openingElement?.name ?? node.id;
-		if (lexical.resolveBinding(lexical.nodeScopes.get(tag), name)?.scope !== lexical.rootScope)
-			return false;
-		plan.sites.add(tag);
-		return true;
-	});
+	collectRenderedComponentReferences(
+		ctx.componentInfo.values(),
+		candidates,
+		(node, name, returnedOwner) => {
+			if (returnedOwner !== null || node.children?.length) return false;
+			const plan = plans.get(name);
+			const attrs = node.attributes || node.openingElement?.attributes || [];
+			if (!warmCallsiteOwnsRequiredProps(plan.required, attrs)) return false;
+			const tag = node.openingElement?.name ?? node.id;
+			if (lexical.resolveBinding(lexical.nodeScopes.get(tag), name)?.scope !== lexical.rootScope)
+				return false;
+			plan.sites.add(tag);
+			return true;
+		},
+	);
 	// A private plan needs an admitted local callsite. HMR can also rebind the
 	// exported wrapper after definition-site initialization.
 	// Keep the existing same-module proof there; do not issue a cross-module
@@ -12800,12 +12808,11 @@ function compileInternal(
 	// and HMR share one DOM-range shape. HMR still emits the generic component
 	// call ABI, and invalidates normally if an edit introduces a value return.
 	const typescriptWeb = options?.output === 'ts' && options?.__valdiAbiGuard === undefined;
-	const localStateAliases =
-		rendererBoundaryPreparation === null
-			? findLocalStateAliases(ast, filename, options)
-			: undefined;
+	const canLowerLocalTemplates =
+		rendererBoundaryPreparation === null && canLowerLocalDomTemplates(filename, options);
+	const localStateAliases = canLowerLocalTemplates ? findLocalStateAliases(ast) : undefined;
 	ast = markLocalStateAliases(ast, localStateAliases);
-	ast = lowerNullishComponentExits(ast, typescriptWeb);
+	ast = lowerNullishComponentExits(ast, typescriptWeb, canLowerLocalTemplates, localStateAliases);
 	// Same contract for React-style conditional JSX returns: branch-selected
 	// output compiles as template control flow instead of de-opt descriptors.
 	ast = lowerJsxReturnBranchComponents(ast);
@@ -14569,7 +14576,7 @@ function compileServer(
 	analyzedAst = null,
 	hasStringChildProofs = false,
 	strongModeEnabled = false,
-	canMarkLocalStateAliases = false,
+	canLowerUnsplitTemplates = false,
 ) {
 	const parsedAst = analyzedAst ?? adoptParserAst(parseModule(source, filename));
 	const nativeChangeAnalysis =
@@ -14598,11 +14605,16 @@ function compileServer(
 	ast = splitDirectlyCalledComponents(ast);
 	// Mirror the client transform so SSR emits the same control-flow ranges
 	// hydration expects in both development and production.
-	const localStateAliases = canMarkLocalStateAliases
-		? findLocalStateAliases(ast, filename, options)
-		: undefined;
+	const canLowerLocalTemplates =
+		canLowerUnsplitTemplates && canLowerLocalDomTemplates(filename, options);
+	const localStateAliases = canLowerLocalTemplates ? findLocalStateAliases(ast) : undefined;
 	ast = markLocalStateAliases(ast, localStateAliases);
-	ast = lowerNullishComponentExits(ast, options?.output === 'ts');
+	ast = lowerNullishComponentExits(
+		ast,
+		options?.output === 'ts',
+		canLowerLocalTemplates,
+		localStateAliases,
+	);
 	ast = lowerJsxReturnBranchComponents(ast);
 	ast = lowerDirectlyCalledTemplateFunctions(ast, localStateAliases);
 	// Mirror the client transform exactly. Effects are server no-ops, but
@@ -39538,17 +39550,19 @@ function sourceError(code, ctx, node, message) {
 	return codedError(code, message + at);
 }
 
+function canLowerLocalDomTemplates(filename, options) {
+	return (
+		cleanCompileFilename(filename).endsWith('.tsrx') &&
+		domSignalTarget(options) &&
+		options?.universalRuntime === undefined &&
+		options?.__rendererBoundariesLowered !== true &&
+		options?.__valdiAbiGuard === undefined
+	);
+}
+
 // A same-module const may read the exact imported Octane state function as a
 // value. Mark direct component setup before the early-exit pass moves slots.
-function findLocalStateAliases(ast, filename, options) {
-	if (
-		!cleanCompileFilename(filename).endsWith('.tsrx') ||
-		!domSignalTarget(options) ||
-		options?.universalRuntime !== undefined ||
-		options?.__rendererBoundariesLowered === true ||
-		options?.__valdiAbiGuard !== undefined
-	)
-		return undefined;
+function findLocalStateAliases(ast) {
 	let imports;
 	for (const node of ast.body) {
 		if (
@@ -39647,6 +39661,35 @@ function markLocalStateAliases(ast, aliases) {
 	return bodyNodes === ast.body ? ast : { ...ast, body: bodyNodes };
 }
 
+// A memo wrapper can be called directly or pass its .type along. Keep
+// authored JS exits unless the private binding is only rendered by templates.
+function privateMemoTagUses(ast) {
+	const statements = ast.body;
+	const privateTags = new Set();
+	if (hasInlineMemoDirectEval(statements)) return privateTags;
+	const componentInfo = [];
+	for (const statement of statements) {
+		const node = moduleStatementDeclaration(statement);
+		if (isVoidJsxCodeBlockFunction(node)) componentInfo.push({ node });
+	}
+	let lexical;
+	const allowed = collectRenderedComponentReferences(componentInfo, null, (node, name) => {
+		if (name === null) return false;
+		const tag = node.openingElement?.name ?? node.id;
+		lexical ??= createLexicalAnalysis(ast);
+		if (lexical.resolveBinding(lexical.nodeScopes.get(tag), name)?.scope !== lexical.rootScope)
+			return false;
+		privateTags.add(name);
+		return true;
+	});
+	const escaped = collectFreeIdentifiers(statements, [], allowed);
+	const exported = collectExportedLocals(statements);
+	for (const name of privateTags) {
+		if (escaped.has(name) || exported.has(name)) privateTags.delete(name);
+	}
+	return privateTags;
+}
+
 /**
  * Turn compiler-proven shorthand guards into ordinary template control flow:
  *
@@ -39658,20 +39701,55 @@ function markLocalStateAliases(ast, aliases) {
  * generic return-value ABI. HMR continues to invoke every component through
  * its generic slot and invalidates if a later edit introduces a value return.
  */
-function lowerNullishComponentExits(ast, typescriptWeb) {
+function lowerNullishComponentExits(ast, typescriptWeb, canLowerLocalTemplates, localStateAliases) {
 	const statements = ast.body || [];
 	let out = null;
 	// Compiler-name allocation for retainTailHookState, before the compile
 	// context exists. That context later collects these names from the AST.
 	let names = null;
+	let memoLocals;
+	let privateTags;
+	let markMemoSetup;
 	for (let i = 0; i < statements.length; i++) {
 		const statement = statements[i];
+		const node = moduleStatementDeclaration(statement);
+		const memoItem =
+			canLowerLocalTemplates &&
+			statement === node &&
+			node?.type === 'VariableDeclaration' &&
+			node.kind === 'const' &&
+			node.declarations.length === 1 &&
+			node.declarations[0].id.type === 'Identifier'
+				? node.declarations[0]
+				: null;
+		const call = memoItem?.init;
+		const callback = call?.type === 'CallExpression' && call.arguments[0];
+		// A memo body can also render in a shared scope that ignores return values.
+		const memoBody =
+			(callback?.type === 'FunctionExpression' || callback?.type === 'ArrowFunctionExpression') &&
+			!callback.async &&
+			!callback.generator &&
+			call.optional !== true &&
+			call.callee.type === 'Identifier' &&
+			callback.body?.type === 'JSXCodeBlock' &&
+			(memoLocals ??= collectOctaneImportLocals(statements, ['memo'], true)).has(
+				call.callee.name,
+			) &&
+			hasOnlyLowerableNullishExits(callback) &&
+			(privateTags ??= privateMemoTagUses(ast)).has(memoItem.id.name) &&
+			(callback.id == null ||
+				!collectFreeIdentifiers([callback.body, ...callback.params], []).has(callback.id.name))
+				? callback
+				: null;
+		const component = memoBody ?? node;
 		let replacement = statement;
-		const isExport =
-			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration';
-		const node = isExport ? statement.declaration : statement;
-		if (hasOnlyLowerableNullishExits(node)) {
-			const body = node.body;
+		if (memoBody !== null || hasOnlyLowerableNullishExits(component)) {
+			// A proven alias is recognized only in direct setup. Mark it before
+			// lifting the guarded tail into template control flow.
+			const body =
+				memoBody !== null && localStateAliases !== undefined
+					? (markMemoSetup ??= localStateSetupMarker(ast, localStateAliases))(component.body)
+					: component.body;
 			const sequence = [...(body.body || []), ...(body.render ? [body.render] : [])];
 			const tail = hookedTailStart(sequence);
 			const rewritten =
@@ -39684,11 +39762,23 @@ function lowerNullishComponentExits(ast, typescriptWeb) {
 						);
 			const renderIndex = rewritten.findIndex(isJsxNode);
 			if (renderIndex !== -1 && !rewritten.slice(renderIndex + 1).some(isJsxNode)) {
-				const loweredNode = {
-					...node,
+				const lowered = {
+					...component,
 					body: { ...body, body: rewritten.slice(0, renderIndex), render: rewritten[renderIndex] },
 				};
-				replacement = isExport ? { ...statement, declaration: loweredNode } : loweredNode;
+				const declaration =
+					memoBody === null
+						? lowered
+						: {
+								...node,
+								declarations: [
+									{
+										...memoItem,
+										init: { ...call, arguments: [lowered, ...call.arguments.slice(1)] },
+									},
+								],
+							};
+				replacement = statement === node ? declaration : { ...statement, declaration };
 			}
 		}
 		if (out === null && replacement !== statement) out = statements.slice(0, i);
