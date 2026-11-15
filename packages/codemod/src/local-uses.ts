@@ -1211,6 +1211,34 @@ export function componentTagOrExport(ref: ts.Identifier) {
 		: ts.isExportSpecifier(p) || ts.isExportAssignment(p);
 }
 
+/** Lexical context reads allowed by the retained Provider advisory. */
+export function unchangedContextProviderUse(
+	ref: ts.Identifier,
+	isReactContextRead: (callee: ts.Expression) => boolean,
+) {
+	if (inTypeNode(ref) || componentTagOrExport(ref)) return true;
+	const member = ref.parent;
+	if (ts.isCallExpression(member)) {
+		return (
+			!ts.isOptionalChain(member) &&
+			member.arguments[0] === ref &&
+			member.arguments.length === 1 &&
+			isReactContextRead(member.expression)
+		);
+	}
+	if (!ts.isPropertyAccessExpression(member) || member.expression !== ref) return false;
+	const use = member.parent;
+	return (
+		((ts.isJsxOpeningElement(use) ||
+			ts.isJsxSelfClosingElement(use) ||
+			ts.isJsxClosingElement(use)) &&
+			use.tagName === member) ||
+		(member.name.text === 'displayName' &&
+			((ts.isVariableDeclaration(use) && use.initializer === member) ||
+				(ts.isReturnStatement(use) && use.expression === member)))
+	);
+}
+
 export function localUses(file: ts.SourceFile, checker: ts.TypeChecker) {
 	const refs = new Map<ts.Symbol, ts.Identifier[]>();
 
