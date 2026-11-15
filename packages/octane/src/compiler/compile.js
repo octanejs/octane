@@ -22484,7 +22484,7 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 				b.id(
 					ctx.compiledSplitHydrateTags?.has(w.origin.openingElement?.name) &&
 						isCompiledHydrateTemplate(w.origin, ctx, w.origin.openingElement.attributes)
-						? requireCompiledHydrateAlias(ctx)
+						? requireCompiledHydrateAlias(ctx, w.origin.openingElement.name)
 						: w.compName,
 				),
 				b.object(
@@ -37218,8 +37218,12 @@ function collectAutoMemoDependencyExpressions(nodes, templateControlFlow = false
 	};
 }
 
-function requireCompiledHydrateAlias(ctx) {
-	const helper = '__HydrateCompiled';
+// The hosting render never renders an independent island's children, so its
+// entry is the one that names no content body.
+function requireCompiledHydrateAlias(ctx, tag) {
+	const helper = ctx.compiledSplitHydrateTags?.get(tag)
+		? '__HydrateIndependent'
+		: '__HydrateCompiled';
 	let alias = ctx.privateRuntimeAliases?.get(helper);
 	if (alias === undefined) {
 		alias = allocCompilerName(ctx, rtAlias(helper));
@@ -37648,10 +37652,8 @@ function makeCompCall(
 		(compiledChildren || ctx.compiledSplitHydrateTags?.has(node.openingElement?.name ?? node.id)) &&
 		isCompiledHydrateTemplate(node, ctx, attrs)
 	) {
-		compNode = inheritOriginLoc(
-			b.id(requireCompiledHydrateAlias(ctx)),
-			node.openingElement?.name ?? node.id,
-		);
+		const tag = node.openingElement?.name ?? node.id;
+		compNode = inheritOriginLoc(b.id(requireCompiledHydrateAlias(ctx, tag)), tag);
 		voidComponent = true;
 	} else if (node.openingElement?.metadata?.staticFragmentRenderer) {
 		// Keep the renderer's existing memo policy: a new memo boundary could hide
