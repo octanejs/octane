@@ -1,5 +1,5 @@
 import { createContext, type OctaneNode, useCallback, useContext, useMemo } from 'octane';
-import type { EdgeChange, NodeChange } from '@xyflow/system';
+import type { EdgeChange } from '@xyflow/system';
 
 import { useStoreApi } from '../../hooks/useStore';
 import { getElementsDiffChanges } from '../../utils';
@@ -55,7 +55,7 @@ export function BatchProvider<NodeType extends Node = Node, EdgeType extends Edg
 		let changes = getElementsDiffChanges({
 			items: next,
 			lookup: nodeLookup,
-		}) as NodeChange<NodeType>[];
+		});
 
 		for (const middleware of onNodesChangeMiddlewareMap.values()) {
 			changes = middleware(changes);

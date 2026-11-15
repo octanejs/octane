@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
 	EdgeLookup,
-	NodeLookup,
 	EdgeChange,
 	NodeChange,
 	NodeSelectionChange,
@@ -9,7 +8,7 @@ import {
 	NodeRemoveChange,
 	EdgeRemoveChange,
 } from '@xyflow/system';
-import type { Node, Edge, InternalNode } from '../types';
+import type { Node, Edge, ReactFlowStore } from '../types';
 
 /*
  * This function applies changes to nodes or edges that are triggered by React Flow internally.
@@ -271,13 +270,13 @@ export function getSelectionChanges(
  * @param params.lookup = a lookup map of the current store elements
  * @returns an array of changes
  */
-export function getElementsDiffChanges({
+export function getElementsDiffChanges<NodeType extends Node>({
 	items,
 	lookup,
 }: {
-	items: Node[] | undefined;
-	lookup: NodeLookup<InternalNode<Node>>;
-}): NodeChange[];
+	items: NodeType[] | undefined;
+	lookup: ReactFlowStore<NodeType>['nodeLookup'];
+}): NodeChange<NodeType>[];
 export function getElementsDiffChanges({
 	items,
 	lookup,
