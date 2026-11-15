@@ -4199,6 +4199,14 @@ function replaceUnwrappedExpression(expression, replacement) {
 	};
 }
 
+function isRenderWrite(node) {
+	return (
+		node.type === 'AssignmentExpression' ||
+		node.type === 'UpdateExpression' ||
+		(node.type === 'UnaryExpression' && node.operator === 'delete')
+	);
+}
+
 // Does the render tree assign, update, or delete anything while it renders?
 // Function values run later and are skipped.
 function renderTreeWrites(nodes) {
@@ -4216,11 +4224,7 @@ function renderTreeWrites(nodes) {
 		if (seen.has(node)) return;
 		seen.add(node);
 		if (FN_TYPES.has(node.type)) return;
-		if (
-			node.type === 'AssignmentExpression' ||
-			node.type === 'UpdateExpression' ||
-			(node.type === 'UnaryExpression' && node.operator === 'delete')
-		) {
+		if (isRenderWrite(node)) {
 			found = true;
 			return;
 		}
@@ -9226,8 +9230,9 @@ function isJsxReturningMapCall(node) {
 	return false;
 }
 
-// These expressions can run user coercion or throw before the mapped JSX exists.
-function mapCoercionHasEffects(node) {
+// These expressions can write, run user coercion or throw before the mapped JSX exists.
+function mapCallbackHasEffects(node) {
+	if (isRenderWrite(node)) return true;
 	if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') return true;
 	if (node.type === 'TemplateLiteral') {
 		return node.expressions.some((expression) => !isInvariantLiteral(unwrapTsExpr(expression)));
@@ -9289,8 +9294,8 @@ function mapCallToForOf(expr, ctx) {
 	const body = arrow.body;
 	if (!body || (body.type !== 'JSXElement' && body.type !== 'Element')) return null;
 	// Fusion interleaves callbacks and row rendering. Preserve authored callback
-	// order when a call or coercion can be observed.
-	if (containsRenderCall([body], null, mapCoercionHasEffects)) return null;
+	// order when a write, call or coercion can be observed.
+	if (containsRenderCall([body], null, mapCallbackHasEffects)) return null;
 	// The row helper exposes a read-only position. A writable callback index
 	// needs its original binding, including when a handler captures it.
 	if (params[1] && collectReassignedBindings({ body: [b.stmt(arrow)] }).has(params[1])) {
