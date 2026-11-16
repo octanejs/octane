@@ -1117,6 +1117,12 @@ export function reactServerComponents(
 		if (!selected) ts.forEachChild(node, visit);
 	}
 	if (selected) {
+		function exportedRoot(expression: ts.Expression | undefined) {
+			const value = expression && skipParens(expression);
+			return value && (ts.isArrowFunction(value) || ts.isFunctionExpression(value))
+				? singleReturn(value)
+				: expression;
+		}
 		function visitDirectRoot(expression: ts.Expression | undefined) {
 			const call = expression && skipParens(expression);
 			if (!call || !ts.isCallExpression(call)) return;
@@ -1153,18 +1159,10 @@ export function reactServerComponents(
 				(statement.declarationList.flags & ts.NodeFlags.BlockScoped) === ts.NodeFlags.Const &&
 				statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
 			) {
-				for (const { name, initializer } of statement.declarationList.declarations) {
-					const value = initializer && skipParens(initializer);
-					if (
-						ts.isIdentifier(name) &&
-						value &&
-						(ts.isArrowFunction(value) || ts.isFunctionExpression(value))
-					) {
-						visitDirectRoot(singleReturn(value));
-					} else {
-						visitDirectRoot(initializer);
-					}
-				}
+				for (const { name, initializer } of statement.declarationList.declarations)
+					visitDirectRoot(ts.isIdentifier(name) ? exportedRoot(initializer) : initializer);
+			} else if (ts.isExportAssignment(statement) && !statement.isExportEquals) {
+				visitDirectRoot(exportedRoot(statement.expression));
 			} else if (ts.isIfStatement(statement)) {
 				const condition = skipParens(statement.expression);
 				if (
