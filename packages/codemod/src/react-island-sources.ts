@@ -64,7 +64,11 @@ function isReactWrapper(name: string) {
 	return name === 'Fragment' || name === 'Suspense' || name === 'StrictMode';
 }
 
-function closedReactReceiver(receiver: ts.Identifier, uses: ReturnType<typeof localUses>) {
+function closedReactReceiver(
+	receiver: ts.Identifier,
+	uses: ReturnType<typeof localUses>,
+	proveWrapper = false,
+) {
 	return uses(receiver).every((ref) => {
 		if (ts.isImportClause(ref.parent) || ts.isNamespaceImport(ref.parent) || inTypeNode(ref))
 			return true;
@@ -72,7 +76,8 @@ function closedReactReceiver(receiver: ts.Identifier, uses: ReturnType<typeof lo
 		if (!ts.isPropertyAccessExpression(member) || member.expression !== ref) return false;
 		const parent = member.parent;
 		return (
-			ts.isExpressionWithTypeArguments(parent) ||
+			(ts.isExpressionWithTypeArguments(parent) &&
+				(!proveWrapper || ts.isHeritageClause(parent.parent))) ||
 			((ts.isJsxOpeningElement(parent) ||
 				ts.isJsxClosingElement(parent) ||
 				ts.isJsxSelfClosingElement(parent)) &&
@@ -80,7 +85,9 @@ function closedReactReceiver(receiver: ts.Identifier, uses: ReturnType<typeof lo
 				isReactWrapper(member.name.text)) ||
 			(ts.isCallExpression(parent) &&
 				parent.expression === member &&
-				member.name.text !== 'default')
+				member.name.text !== 'default' &&
+				// React's mutable CommonJS object inherits methods that can replace a wrapper.
+				(!proveWrapper || !Object.hasOwn(Object.prototype, member.name.text)))
 		);
 	});
 }
@@ -881,7 +888,7 @@ export function reactClientComponents(
 			return (
 				ts.isIdentifier(tag.expression) &&
 				soleReactReceiver(checker, tag.expression) &&
-				closedReactReceiver(tag.expression, (uses ??= localUses(sf, checker)))
+				closedReactReceiver(tag.expression, (uses ??= localUses(sf, checker)), true)
 			);
 		if (!ts.isIdentifier(tag)) return false;
 		const declaration = checker.getSymbolAtLocation(tag)?.declarations?.[0];
