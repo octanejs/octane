@@ -43,10 +43,7 @@ function migrate(source, strong = true) {
 		expect(result.error).toBeUndefined();
 		const file = JSON.parse(result.stdout).files[0];
 		const ownership = file.notes.some(
-			(note) =>
-				note.severity === 'error' &&
-				note.rule === 'hook-dependencies' &&
-				note.message.includes('getter owned by React'),
+			(note) => note.severity === 'error' && note.rule === 'hook-dependencies',
 		);
 		expect(result.status, result.stdout + result.stderr).toBe(ownership ? 1 : 0);
 		return file;
@@ -652,9 +649,65 @@ it('reports React SSR effects from object properties in hook dependencies', () =
 	}
 }, 20_000);
 
+it('reports getters invoked by object spread in hook dependencies', () => {
+	function Reference() {
+		const source = {
+			get value() {
+				preinit('/dependency-copy.css', { as: 'style' });
+				return 1;
+			},
+		};
+		useMemo(() => 1, [{ ...source }]);
+		return createElement('b', null, 'ok');
+	}
+	expect(renderToStaticMarkup(createElement(Reference))).toContain(
+		'<link rel="stylesheet" href="/dependency-copy.css"',
+	);
+	const input = (dep, properties = 'get value() { return probe.value; }', setup = '') =>
+		`import { useMemo } from 'react';
+		export function Probe({ probe }) {
+			const source = { ${properties} };
+			${setup}
+			useMemo(() => 1, [${dep}]);
+			return <b>ok</b>;
+		}`;
+	const error = expect.objectContaining({
+		rule: 'hook-dependencies',
+		severity: 'error',
+		message: expect.stringContaining('can invoke an own getter while spreading'),
+	});
+	for (const strong of [false, true]) {
+		for (const source of [
+			input('{ ...source }'),
+			input('{ ...{ get value() { return probe.value; } } }'),
+			input('{ ...source }', 'get value() { return probe.value; }, set value(next) {}'),
+			input('{ ...source }', 'get __proto__() { return probe.value; }'),
+			input('{ ...source }', 'get [probe.key]() { return probe.value; }'),
+			input('{ ...source, value: 1 }'),
+			input('{ ...source }', 'get ["value"]() { return probe.value; }, other: 1'),
+		])
+			expect(migrate(source, strong).notes).toContainEqual(error);
+		for (const source of [
+			input('{ ...source }', 'value: 1'),
+			input('{ ...source }', 'set value(next) { probe.value; }'),
+			input('{ ...source }', 'get value() { return probe.value; }, value: 1'),
+			input('{ ...source }', 'get "1"() { return probe.value; }, 1: 2'),
+			input('{ ...source }', 'get "1"() { return probe.value; }, [1]: 2'),
+			input('{ ...source }', 'get __proto__() { return probe.value; }, ["__proto__"]: 2'),
+			input('{ ...source }', 'get [probe.key]() { return probe.value; }, value: 2'),
+			input('{ ...source }', '__proto__: { get value() { return probe.value; } }'),
+			input('{ ...source }', undefined, 'Object.defineProperty(source, "value", { value: 1 });'),
+			input('{ ...probe.value }'),
+			input('false && { ...source }'),
+			input('{ deferred() { return { ...source }; } }'),
+		])
+			expect(migrate(source, strong).notes).not.toContainEqual(error);
+	}
+}, 20_000);
+
 it('checks property visibility for nested arrays of component state', () => {
 	const input = (dependencies, field = '2') => `import { useMemo, useState } from 'react';
-		export function Probe() {
+		export function Probe({ probe }) {
 			const [state, setState] = useState({ first: 1, next: ${field} });
 			useMemo(() => {}, ${dependencies});
 			return <button onClick={() => { setState({ first: 1, next: ${field} }); }}>ok</button>;
@@ -662,6 +715,10 @@ it('checks property visibility for nested arrays of component state', () => {
 	for (const dependencies of ['[state.first, [state.next]]', '[state.first, ...[state.next]]']) {
 		expect(migrate(input(dependencies)).notes).not.toContainEqual(dependencyError);
 	}
+	expect(
+		migrate(input('[state.first, { ...state.next }]', '{ get value() { return probe.value; } }'))
+			.notes,
+	).toContainEqual(dependencyError);
 	expect(migrate(input('[+[state.next]]', '{ toString() { return "2"; } }')).notes).toEqual(
 		expect.arrayContaining([
 			expect.objectContaining({ rule: 'hook-dependencies', severity: 'error' }),

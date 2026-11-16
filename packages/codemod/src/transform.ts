@@ -5888,10 +5888,52 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		return owns;
 	}
 
+	private copiesOwnGetter(spread: ts.SpreadAssignment, hook: ts.CallExpression) {
+		let object = skipWrappers(spread.expression);
+		if (ts.isIdentifier(object)) {
+			const owner = ts.findAncestor(hook, ts.isFunctionLike);
+			const init = this.constValue(object);
+			if (
+				!init ||
+				!owner ||
+				!fixedBinding(this.checker, object, hook) ||
+				!initializedBefore(this.checker, object, hook) ||
+				this.localUses(object).some((name) => !declaresName(name) && !inTypeNode(name)) ||
+				reads(owner, (name) => name.text === 'eval')
+			)
+				return false;
+			object = skipWrappers(init);
+		}
+		if (!ts.isObjectLiteralExpression(object)) return false;
+		const overwritten = new Set<string>();
+		for (let i = object.properties.length - 1; i >= 0; i--) {
+			const field = object.properties[i];
+			// A later setter preserves an existing getter for its key.
+			if (ts.isSetAccessorDeclaration(field)) continue;
+			if (ts.isGetAccessorDeclaration(field) && overwritten.size === 0) return true;
+			const computed = field.name && ts.isComputedPropertyName(field.name);
+			const name = computed ? skipWrappers(field.name.expression) : field.name;
+			if (
+				!name ||
+				!(
+					(!computed && ts.isIdentifier(name)) ||
+					ts.isStringLiteralLike(name) ||
+					ts.isNumericLiteral(name)
+				)
+			)
+				return false;
+			if (!computed && ts.isPropertyAssignment(field) && name.text === '__proto__') continue;
+			if (ts.isGetAccessorDeclaration(field) && !overwritten.has(name.text)) return true;
+			overwritten.add(name.text);
+		}
+		return false;
+	}
+
 	private checkHookDependencyReads(node: ts.CallExpression, deps: ts.Expression) {
 		const list = skipWrappers(deps);
 		if (!this.emitsTsrx || !ts.isArrayLiteralExpression(list)) return;
 		type Member = ts.PropertyAccessExpression | ts.ElementAccessExpression;
+		type Read = Member | ts.SpreadAssignment;
 		let memberReads: Map<Member, boolean> | undefined;
 		const recordStateRead = (member: Member, coercesValue: boolean) => {
 			memberReads?.set(member, coercesValue);
@@ -5901,7 +5943,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			expr: ts.Expression,
 			visit: (member: Member, coercesValue: boolean) => Member | undefined,
 			coercesValue = false,
-		): Member | undefined => {
+		): Read | undefined => {
 			const member = skipWrappers(expr);
 			if (ts.isSpreadElement(member)) {
 				const value = skipWrappers(member.expression);
@@ -5919,6 +5961,10 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			}
 			if (ts.isObjectLiteralExpression(member)) {
 				for (const property of member.properties) {
+					if (ts.isSpreadAssignment(property)) {
+						if (visit !== recordStateRead && this.copiesOwnGetter(property, node)) return property;
+						continue;
+					}
 					const name = property.name;
 					if (name && ts.isComputedPropertyName(name)) {
 						const found = read(name.expression, visit, true);
@@ -6018,7 +6064,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				return member;
 			}
 		};
-		let opaque: Member | undefined;
+		let opaque: Read | undefined;
 		for (const entry of list.elements) {
 			opaque = read(entry, check);
 			if (opaque) break;
@@ -6028,9 +6074,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				RULE.deps,
 				'error',
 				opaque,
-				opaqueCoercion
-					? 'This hook dependency reads a property during render. It may run a getter owned by React or execute user code during value coercion. Keep the component in React or verify the property before moving it to native SSR.'
-					: 'This hook dependency reads a property during render and may run a getter owned by React. Keep the component in React or verify the getter before moving it to native SSR.',
+				ts.isSpreadAssignment(opaque)
+					? 'This hook dependency can invoke an own getter while spreading an object. Keep the component in React or verify the getter before moving it to native SSR.'
+					: opaqueCoercion
+						? 'This hook dependency reads a property during render. It may run a getter owned by React or execute user code during value coercion. Keep the component in React or verify the property before moving it to native SSR.'
+						: 'This hook dependency reads a property during render and may run a getter owned by React. Keep the component in React or verify the getter before moving it to native SSR.',
 			);
 	}
 
