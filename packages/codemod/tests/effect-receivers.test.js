@@ -415,6 +415,44 @@ it('reports getters evaluated by unary dependency expressions', () => {
 	expect(migrate(ownData).notes).not.toContainEqual(dependencyError);
 }, 20_000);
 
+it('reports getters evaluated by strict comparisons in hook dependencies', () => {
+	function Reference({ probe }) {
+		useMemo(() => 1, [probe.value === 1]);
+		return createElement('b', null, 'ok');
+	}
+	const probe = {
+		get value() {
+			preinit('/comparison.css', { as: 'style' });
+			return 1;
+		},
+	};
+	expect(renderToStaticMarkup(createElement(Reference, { probe }))).toContain(
+		'<link rel="stylesheet" href="/comparison.css"',
+	);
+	const input = (hook, dependency) => `import { ${hook} } from 'react';
+		export function Probe({ probe }: { probe: { value: number } }) {
+			${hook}(() => {}, [${dependency}]);
+			return <b>ok</b>;
+		}`;
+	for (const [hook, dependency, strong] of [
+		['useMemo', 'probe.value === 1', true],
+		['useEffect', '1 !== probe.value', false],
+		['useMemo', '!(probe.value === 1)', true],
+	]) {
+		expect(migrate(input(hook, dependency), strong).notes, dependency).toContainEqual(
+			dependencyError,
+		);
+	}
+	const ownData = input('useMemo', '+(probe.value === 1)').replace(
+		'({ probe }: { probe: { value: number } }) {',
+		'() { const probe = { value: { valueOf() { throw new Error("not coerced"); } } };',
+	);
+	expect(migrate(ownData).notes).not.toContainEqual(dependencyError);
+	expect(migrate(input('useMemo', 'false && (probe.value === 1)')).notes).not.toContainEqual(
+		dependencyError,
+	);
+}, 20_000);
+
 it('reports a getter in a short-circuit dependency that can register a React SSR stylesheet', () => {
 	function Reference({ enabled, probe }) {
 		useLayoutEffect(() => {}, [enabled && probe.value]);

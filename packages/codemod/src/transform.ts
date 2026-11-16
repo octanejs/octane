@@ -5836,6 +5836,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			}
 			if (ts.isBinaryExpression(member)) {
 				const op = member.operatorToken.kind;
+				// Strict comparison reads both operands and does not coerce either.
+				if (
+					op === ts.SyntaxKind.EqualsEqualsEqualsToken ||
+					op === ts.SyntaxKind.ExclamationEqualsEqualsToken
+				)
+					return read(member.left, visit) ?? read(member.right, visit);
 				if (
 					op === ts.SyntaxKind.AmpersandAmpersandToken ||
 					op === ts.SyntaxKind.BarBarToken ||
