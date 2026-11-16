@@ -30,6 +30,7 @@ import {
 	type PersistentStorage,
 	type ReadHandle,
 	type StandardSchema,
+	type Transport,
 } from '../src/data/index.js';
 
 interface Book {
@@ -208,10 +209,69 @@ async function value<T>(store: ReturnType<typeof createDataStore>, contract: any
 
 afterEach(() => {
 	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
 	vi.useRealTimers();
 });
 
 describe('octane/data persistent cache', () => {
+	it('keeps a confirmed read on an immediate dispose and reopen', async () => {
+		const storage = memoryStorage();
+		const before = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada'),
+		});
+		await before.prefetch(shelf, undefined);
+		await before.publish(shelf, undefined, books());
+		await before.dispose();
+		const offline: Transport = () => Promise.reject(new Error('unsaved value'));
+		const after = createDataStore({ transport: offline, persist: cache(storage, 'ada') });
+		expect((await value<Book[]>(after, shelf)).value).toHaveLength(3);
+	});
+
+	it('disposes one store without erasing another window’s saved account cache', async () => {
+		const storage = memoryStorage();
+		const first = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada'),
+		});
+		const second = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada'),
+		});
+		const shown = await value<Book[]>(second, shelf);
+		await saved();
+		await first.dispose();
+		expect(first.retired).toBe(true);
+		const offline: Transport = () => Promise.reject(new Error('cache was erased'));
+		const restarted = createDataStore({ transport: offline, persist: cache(storage, 'ada') });
+		expect((await value<Book[]>(restarted, shelf)).value).toEqual(shown.value);
+
+		// An actual account retirement still erases the partition.
+		await second.retire();
+		const next = server(books());
+		await value<Book[]>(
+			createDataStore({ transport: next.transport, persist: cache(storage, 'ada') }),
+			shelf,
+		);
+		expect(next.log).toEqual(['read shelf']);
+	});
+
+	it('does not wait for device quota hints when the persistence budget is fixed', async () => {
+		const estimate = vi.fn(() => new Promise(() => {}));
+		vi.stubGlobal('navigator', { storage: { estimate } });
+		const remote = server(books());
+		const store = createDataStore({
+			transport: remote.transport,
+			persist: cache(memoryStorage(), 'ada', { budget: 4096 }),
+		});
+		const handle = store.read(shelf);
+		const stop = handle.subscribe(() => {});
+		await vi.waitFor(() => expect(handle.getSnapshot().status).toBe('ready'), { timeout: 250 });
+		expect(estimate).not.toHaveBeenCalled();
+		stop();
+		vi.unstubAllGlobals();
+	});
+
 	it('starts a fresh value from storage without loading it again', async () => {
 		const storage = memoryStorage();
 		const first = server(books());
