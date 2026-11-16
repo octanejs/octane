@@ -53,6 +53,7 @@ import {
 	directReactExports,
 	migratedJsxFactories,
 	octaneRootComponents,
+	reactClientComponents,
 	reactClassExports,
 	reactServerComponents,
 	retainedReactComponentReturns,
@@ -2004,6 +2005,47 @@ export async function runCodemod(
 				host.notes.push(note);
 				if (!leaf.notes.some((existing) => existing.message === note.message))
 					leaf.notes.push({ ...note, line: 1 });
+			}
+		}
+		if (
+			paths &&
+			!edited.has(file) &&
+			!isTsrx(file) &&
+			(source.includes('react-dom/client') || source.includes('\\')) &&
+			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) === rootProject &&
+			originalReactEntry(file, 'react-dom/client')
+		) {
+			for (const edge of reactClientComponents(file, source, (module) =>
+				module === 'react'
+					? originalReactEntry(file, module)
+					: automaticReactJsx(file) && originalReactEntry(file, module),
+			)) {
+				if (!edge.module.endsWith('.tsx')) continue;
+				const match = retainedJsxTarget(file, edge.module, edge.name);
+				if (
+					!match ||
+					match.indirect ||
+					match.file !== path.resolve(path.dirname(file), edge.module) ||
+					!automaticReactJsx(match.file) ||
+					!originalReactEntry(match.file, 'react/jsx-runtime')
+				)
+					continue;
+				const leaf = byFile.get(match.file);
+				if (
+					!leaf?.output.endsWith('.tsrx') ||
+					!originalReactExports(match.file).intrinsics.has(edge.name) ||
+					!hasTemplateExport(leaf, edge.name)
+				)
+					continue;
+				const note: Note = {
+					rule: 'react-compat',
+					severity: 'error',
+					line: edge.line,
+					message: `The retained React DOM client root in ${name} renders ${leaf.file}. Migrate the root too or keep this component in React.`,
+				};
+				if (write) return blockedWrite(root, unchangedFile(name, source, note), compiler?.from);
+				host.notes.push(note);
+				leaf.notes.push({ ...note, line: 1 });
 			}
 		}
 		const retainedServer =

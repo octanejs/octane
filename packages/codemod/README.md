@@ -100,6 +100,13 @@ whose local component returns an intrinsic element. Migrate the server entry
 with that component or keep the component in React. Review custom bundler
 resolution, indirect calls, and dynamic imports.
 
+A retained React DOM client root also keeps ownership of its elements.
+The codemod blocks writes when a direct `createRoot(...).render(...)`, a local
+root handle, or `hydrateRoot(...)` renders an explicit relative `.tsx` import
+that would become an Octane template. Migrate the root and component
+together, keep the component in React, or give React an authored
+`OctaneCompatInline` boundary.
+
 ### Element-only children
 
 A nested component call in a DOM template supplies a render block. When a

@@ -3248,6 +3248,69 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 		},
 	);
 
+	describe('retained React client roots', () => {
+		it.each([
+			['a direct root', 'DOM.createRoot(container).render(<Leaf />)', true],
+			['a local root', 'const root = make(container); root.render(<Leaf />);', true],
+			['hydration', 'hydrate(container, <Leaf />, options)', true],
+			['a React element factory', 'make(container).render(h(Leaf, { label: "ready" }))', true],
+			['a shadowed root', '((make) => make(container).render(<Leaf />))(other)', false],
+			[
+				'an escaping handle',
+				'const root = make(container); observe(root); root.render(<Leaf />)',
+				false,
+			],
+			['a different JSX runtime', 'make(container).render(<Leaf />)', false],
+			['a React bridge', 'make(container).render(<OctaneCompatInline component={Leaf} />)', false],
+		])('protects a migrated leaf rendered by %s', async (name, body, blocked) => {
+			const root = project({
+				'package.json': '{"name":"app","type":"module"}',
+				'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"Bundler"}}',
+				'Entry.tsx': `${name === 'a different JSX runtime' ? '/** @jsxImportSource octane */' : ''}
+					import * as DOM from 'react-dom/client';
+					import { createRoot as make, hydrateRoot as hydrate } from 'react-dom/client';
+					import { createElement as h } from 'react';
+					import { OctaneCompatInline } from 'octane/react';
+					import { Leaf } from './Leaf.tsx';
+					${body};`,
+				'Leaf.tsx': 'export function Leaf({ label = "ready" }) { return <small>{label}</small>; }',
+			});
+			fs.mkdirSync(path.join(root, 'node_modules/@types'), { recursive: true });
+			for (const name of ['octane', 'react', 'react-dom'])
+				fs.symlinkSync(
+					fs.realpathSync(path.join(import.meta.dirname, '../node_modules', name)),
+					path.join(root, 'node_modules', name),
+					'dir',
+				);
+			for (const name of ['react', 'react-dom']) {
+				const source = createRequire(path.join(REPO, 'packages/octane/package.json')).resolve(
+					`@types/${name}/package.json`,
+				);
+				fs.symlinkSync(path.dirname(source), path.join(root, 'node_modules/@types', name), 'dir');
+			}
+			const selected = [path.join(root, 'Leaf.tsx')];
+			const options = { root, strong: true, verify: true };
+			const preview = await runCodemod(selected, { ...options, write: false });
+			const note = expect.objectContaining({
+				rule: 'react-compat',
+				severity: 'error',
+				message: expect.stringContaining('retained React DOM client root'),
+			});
+			for (const file of ['Leaf.tsx', 'Entry.tsx']) {
+				const findings = preview.files.find((result) => result.file === file)?.notes ?? [];
+				if (blocked) expect(findings).toContainEqual(note);
+				else expect(findings).not.toContainEqual(note);
+			}
+			if (!blocked) return;
+			const source = fs.readFileSync(path.join(root, 'Entry.tsx'), 'utf8');
+			const result = await runCodemod(selected, { ...options, write: true });
+			expect(result.files[0].notes).toContainEqual(note);
+			expect(fs.readFileSync(path.join(root, 'Entry.tsx'), 'utf8')).toBe(source);
+			expect(fs.existsSync(path.join(root, 'Leaf.tsx'))).toBe(true);
+			expect(fs.existsSync(path.join(root, 'Leaf.tsrx'))).toBe(false);
+		});
+	});
+
 	describe('retained React server rendering', () => {
 		const wrapper =
 			'function Child() { return <button>Original</button>; } export default function Leaf() { return <Child />; }';
