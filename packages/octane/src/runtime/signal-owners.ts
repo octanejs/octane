@@ -857,6 +857,20 @@ export function deferredOwnerToken(): SignalRendererOwnerIdentity | Scope | null
 }
 
 export function runWithBlockSignalOwner<T>(scope: Scope | null, callback: () => T): T {
+	// An effect, cleanup or commit of a scope that has created no owner enters
+	// it deferred, as the scope's render does: most ask for none, and a deleted
+	// scope would otherwise build an owner only to retire it.
+	if (signalDocumentEnabled && scope !== null && !scope.signalOwner) {
+		const previousScope = deferredOwnerScope;
+		const previous = deferScopeSignalOwner(scope);
+		if (previous !== undefined) {
+			try {
+				return callback();
+			} finally {
+				restoreScopeSignalOwner(previous, previousScope);
+			}
+		}
+	}
 	const owner = scopeSignalOwner(scope);
 	if (owner !== undefined) STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
 	return owner === undefined || currentSignalOwner() === owner
