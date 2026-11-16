@@ -18082,15 +18082,22 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	const mappedRow = mapCall?.callback.body;
 	const mappedAttrs = mappedRow?.openingElement?.attributes ?? mappedRow?.attributes;
 	const mapKey = unwrapTsExpr(explicitKey);
-	// Even a static map row evaluates its authored key. A key-only empty row
-	// has no prop or deferred child evaluation to reorder.
+	// Even a static map row evaluates its authored key. Text and JSX comments
+	// add no expression evaluation to reorder.
 	const evaluateMapKey =
 		!itemNeedsIdentity &&
 		!bindingSite &&
 		explicitKey !== null &&
 		itemId.type === 'Identifier' &&
 		mappedAttrs?.length === 1 &&
-		!mappedRow.children?.length &&
+		(!mappedRow.children?.length ||
+			(markerlessItem &&
+				mappedRow.children.every(
+					(child) =>
+						child.type === 'JSXText' ||
+						(child.type === 'JSXExpressionContainer' &&
+							child.expression?.type === 'JSXEmptyExpression'),
+				))) &&
 		!isInvariantLiteral(mapKey) &&
 		(mapKey.type !== 'Identifier' || mapKey.name !== node.index?.name) &&
 		!hasInlineMemoDirectEval(mapKey);
