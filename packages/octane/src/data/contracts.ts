@@ -105,6 +105,8 @@ export interface Read<Input, Output> {
 	readonly expire: number;
 	/** Whether a store with `persist` saves this read's value. */
 	readonly persist: boolean;
+	/** Whether a load is aborted once nothing observes the read or waits on it. */
+	readonly cancel: boolean;
 	/** Change it when a saved value would mean something else, such as a view's new rule. */
 	readonly version: string;
 }
@@ -333,6 +335,7 @@ export function view<T, P = void, const W extends ViewRelations<T> = {}>(options
 	keep?: number;
 	expire?: number;
 	persist?: boolean;
+	cancel?: boolean;
 	version?: string;
 }): View<P, T, ViewRow<T, W>> {
 	const {
@@ -401,6 +404,12 @@ export function read<Output, Input = void>(options: {
 	expire?: number;
 	/** Set to false to keep a value out of persistent storage, such as one holding secrets. */
 	persist?: boolean;
+	/**
+	 * Abort a load in flight when its last observer leaves, unless a `prefetch`
+	 * or a `refresh` is waiting on it. The value already confirmed stays, and a
+	 * later observer loads again. For a read that follows what a user types.
+	 */
+	cancel?: boolean;
 	/** Saved values from another version are discarded. */
 	version?: string;
 }): Read<Input, Output> {
@@ -415,6 +424,7 @@ export function read<Output, Input = void>(options: {
 		keep: options.keep ?? 300_000,
 		expire: options.expire ?? Infinity,
 		persist: options.persist ?? true,
+		cancel: options.cancel ?? false,
 		version: options.version ?? '',
 	};
 }
@@ -547,8 +557,17 @@ export type DataReply =
 /**
  * Carries one request to wherever its handler runs. Resolving with a reply is
  * definitive. Rejecting means the outcome is unknown: a write may have landed.
+ *
+ * A read that learns its value in parts may call `preview` with each
+ * provisional value, a whole value of the read's output, before it resolves.
+ * Readers with no confirmed value see the newest one until the reply replaces
+ * it. A wrapper that passes no `preview` on shows the reply alone.
  */
-export type Transport = (request: DataRequest, signal: AbortSignal) => Promise<DataReply>;
+export type Transport = (
+	request: DataRequest,
+	signal: AbortSignal,
+	preview?: (value: unknown) => void,
+) => Promise<DataReply>;
 
 /** A request to listen to a feed, from just after `cursor` when the store has one. */
 export interface FeedRequest {
