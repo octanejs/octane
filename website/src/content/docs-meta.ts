@@ -309,13 +309,12 @@ export const docsMeta: DocMeta[] = [
 			},
 			{ id: 'optimistic', title: 'Optimistic edits and rollback', level: 3 },
 			{ id: 'uncertain', title: 'When the reply is lost', level: 3 },
-			{ id: 'views', title: 'Views and pagination', searchTerms: ['view', 'usePages', 'pages'] },
 			{
-				id: 'joins',
-				title: 'Join records from other entities',
-				level: 3,
-				searchTerms: ['with', 'join', 'relation'],
+				id: 'views',
+				title: 'Views and pagination',
+				searchTerms: ['view', 'usePages', 'pages', 'join', 'relation'],
 			},
+			{ id: 'joins', title: 'Join records from other entities', level: 3 },
 			{ id: 'forms', title: 'Forms that work before JavaScript', searchTerms: ['useForm'] },
 			{
 				id: 'server',
