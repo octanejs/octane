@@ -292,8 +292,21 @@ export const docsMeta: DocMeta[] = [
 			{
 				id: 'reading',
 				title: 'Reading data',
-				searchTerms: ['suspend', 'snapshot', 'prefetch', 'invalidate', 'fresh', 'keep', 'expire'],
+				searchTerms: [
+					'suspend',
+					'snapshot',
+					'prefetch',
+					'invalidate',
+					'fresh',
+					'keep',
+					'expire',
+					'preview',
+					'streaming',
+					'cancel',
+				],
 			},
+			{ id: 'progressive-reads', title: 'Show results as they arrive', level: 3 },
+			{ id: 'cancel', title: 'Stop a load nobody is waiting for', level: 3 },
 			{ id: 'read-handles', title: 'Read outside a component', level: 3 },
 			{
 				id: 'writing',
@@ -309,7 +322,12 @@ export const docsMeta: DocMeta[] = [
 			},
 			{ id: 'optimistic', title: 'Optimistic edits and rollback', level: 3 },
 			{ id: 'uncertain', title: 'When the reply is lost', level: 3 },
-			{ id: 'views', title: 'Views and pagination', searchTerms: ['view', 'usePages', 'pages'] },
+			{
+				id: 'views',
+				title: 'Views and pagination',
+				searchTerms: ['view', 'usePages', 'pages', 'cursor', 'loadMore'],
+			},
+			{ id: 'cursor-pages', title: 'Pages from a cursor', level: 3 },
 			{ id: 'forms', title: 'Forms that work before JavaScript', searchTerms: ['useForm'] },
 			{
 				id: 'server',

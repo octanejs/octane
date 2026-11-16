@@ -10,6 +10,12 @@
  *   uncertain, with its edit still shown, until `settle` names the outcome.
  * - Only a reply for the entry's current attempt, in a store that has not been
  *   retired, can change confirmed state.
+ * - A preview belongs to the attempt that sent it. It shows only where the read
+ *   has no confirmed value to show, the newest emitted replaces the one before,
+ *   and the attempt's reply, failure or end removes it. It is never saved,
+ *   seeded, or shared with another read.
+ * - A read that cancels stops its load when its last observer leaves, unless a
+ *   `prefetch` or a `refresh` joined that load. What it confirmed stays.
  * - Writes to a record its own create has not confirmed wait for that create.
  *   They are refused unsent if it is refused, and they carry the server's ID
  *   if the server assigned one.
@@ -78,6 +84,12 @@ export interface ReadSnapshot<T> {
 	 * window has rows. Always false for any other read.
 	 */
 	readonly more: boolean;
+	/**
+	 * Whether `value` is a provisional value its transport sent ahead of the
+	 * reply, shown because the read has no confirmed one. The reply replaces it;
+	 * a failed load removes it.
+	 */
+	readonly preview: boolean;
 }
 
 export interface ReadHandle<T> {
@@ -341,6 +353,10 @@ export interface Entry {
 	abort: AbortController | null;
 	keepTimer: unknown | undefined;
 	expireTimer: unknown | undefined;
+	/** The newest provisional value of the load in flight. */
+	preview: { readonly value: unknown } | null;
+	/** The load a `prefetch` or a `refresh` waits on, which a read that cancels then leaves running. */
+	wanted: Promise<void> | null;
 	snapshot: ReadSnapshot<any> | null;
 	/** A view entry's span; null for a read and for a view with no value. */
 	span: Span | null;
@@ -374,6 +390,7 @@ const PENDING: ReadSnapshot<any> = {
 	refreshing: false,
 	stale: false,
 	more: false,
+	preview: false,
 };
 
 /** What a retired store's reads wait on: nothing will arrive. */
@@ -1011,14 +1028,23 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 
 	function buildSnapshot(entry: Entry): ReadSnapshot<any> {
 		const usable = entry.hasBase && hostDateNow() - entry.fetchedAt < entry.read.expire;
+		// A confirmed value is never replaced by a provisional one.
+		const preview = !usable && entry.preview !== null;
 		return {
-			status: usable ? 'ready' : entry.error === undefined ? 'pending' : 'error',
-			value: usable ? (entry.span ? evaluate(entry) : project(entry)) : undefined,
+			status: usable || preview ? 'ready' : entry.error === undefined ? 'pending' : 'error',
+			value: usable
+				? entry.span
+					? evaluate(entry)
+					: project(entry)
+				: preview
+					? entry.preview!.value
+					: undefined,
 			error: entry.error,
 			refreshing: usable && entry.inflight !== null,
 			stale: usable && isStale(entry),
 			// After `value`, whose evaluation sets it.
 			more: usable && entry.span !== null && entry.span.more,
+			preview,
 		};
 	}
 
@@ -1040,7 +1066,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				previous.error === next.error &&
 				previous.refreshing === next.refreshing &&
 				previous.stale === next.stale &&
-				previous.more === next.more
+				previous.more === next.more &&
+				previous.preview === next.preview
 			) {
 				continue;
 			}
@@ -1277,12 +1304,21 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	 * state it updates, must not run inside that render. A transport that throws
 	 * synchronously still reports through the promise.
 	 */
-	async function request(payload: DataRequest, signal: AbortSignal): Promise<DataReply> {
+	async function request(
+		payload: DataRequest,
+		signal: AbortSignal,
+		preview?: (value: unknown) => void,
+	): Promise<DataReply> {
 		await undefined;
 		// Read after the feeds' positions, so no change falls between them and a value.
 		if (positions) await positions;
 		assertLive();
-		return transport(payload, signal);
+		return transport(payload, signal, preview);
+	}
+
+	/** Whether a load of `entry` would serve no one: it cancels, nothing observes it, and no caller waits on it. */
+	function unwanted(entry: Entry): boolean {
+		return entry.read.cancel && entry.subscribers.size === 0 && entry.wanted !== entry.inflight;
 	}
 
 	/**
@@ -1323,9 +1359,16 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			})
 			.then(() => {
 				if (retired || entry.inflight !== done) return;
+				const pinned = entry.wanted === done;
+				const dropped = unwanted(entry);
 				fly(entry, null);
 				commitReached([entry]);
-				if (!entry.hasBase) return load(entry);
+				if (!entry.hasBase && !dropped) {
+					const loading = load(entry);
+					// A caller that waited on the restore waits on the load it led to.
+					if (pinned) entry.wanted = loading;
+					return loading;
+				}
 				if (entry.subscribers.size > 0 && isStale(entry)) void load(entry);
 				else idle(entry);
 			});
@@ -1349,7 +1392,35 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		entry.keepTimer = undefined;
 		const current = () => !retired && entry.attempt === attempt;
 		let requestedAt: number | undefined;
-		const done = request({ kind: 'read', name: read.name, input: wireInput(entry) }, abort.signal)
+		/** How many previews the attempt has sent, and which of them is shown. */
+		let sent = 0;
+		let shown = 0;
+		let settled = false;
+		// A view's rows are placed by its window's bounds, which only its reply carries.
+		const preview = isView(read)
+			? undefined
+			: (raw: unknown) => {
+					const order = ++sent;
+					// A validator that answers later must not put its value over one sent after it.
+					const show = (value: unknown) => {
+						if (settled || order < shown || !current()) return;
+						shown = order;
+						entry.preview = { value };
+						touch(entry);
+					};
+					try {
+						const value = parse(read.output, raw);
+						if (value instanceof Promise) void value.then(show, () => {});
+						else show(value);
+					} catch {
+						// An invalid preview shows nothing; the reply still decides the read.
+					}
+				};
+		const done = request(
+			{ kind: 'read', name: read.name, input: wireInput(entry) },
+			abort.signal,
+			preview,
+		)
 			.then((reply) => {
 				if (!reply.ok) throw new DataError(reply.code, reply.data, reply.issues);
 				requestedAt = requestTimes.get(reply);
@@ -1357,13 +1428,18 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			})
 			.then(
 				(value) => {
+					settled = true;
 					if (!current()) return;
+					entry.preview = null;
 					adopt(entry, value, startedSeq, hostDateNow() - startedAt);
 					entry.requestedAt = requestedAt;
 					save(entry);
 				},
 				(error) => {
-					if (current()) entry.error = error;
+					settled = true;
+					if (!current()) return;
+					entry.preview = null;
+					entry.error = error;
 				},
 			)
 			.then(() => {
@@ -1382,6 +1458,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	function supersede(entry: Entry): number {
 		entry.abort?.abort();
 		entry.abort = null;
+		entry.preview = null;
 		fly(entry, null);
 		return (entry.attempt = ++sequence);
 	}
@@ -1471,14 +1548,19 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 					if (!created.hasBase || created.stale || aged) void load(created);
 					return () => {
 						created.subscribers.delete(notify);
-						if (!retired) idle(created);
+						if (retired) return;
+						if (created.abort && unwanted(created)) {
+							supersede(created);
+							touch(created);
+						}
+						idle(created);
 					};
 				},
 				refresh() {
 					if (retired) return NEVER;
 					const current = entryFor(read, input);
 					invalidateEntry(current);
-					return load(current);
+					return (current.wanted = load(current));
 				},
 			},
 			base: undefined,
@@ -1495,6 +1577,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			abort: null,
 			keepTimer: undefined,
 			expireTimer: undefined,
+			preview: null,
+			wanted: null,
 			snapshot: null,
 			span: null,
 			checkedStorage: false,
@@ -1880,7 +1964,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		// A suspended reader waits for the account to be confirmed, then shows what is held.
 		if (fenced) return fenced.lifted;
 		const entry = entryFor(read, input);
-		return entry.hasBase && !isStale(entry) ? Promise.resolve() : load(entry);
+		return entry.hasBase && !isStale(entry) ? Promise.resolve() : (entry.wanted = load(entry));
 	}
 
 	function end(): void {

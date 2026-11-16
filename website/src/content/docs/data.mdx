@@ -330,6 +330,76 @@ A snapshot has these fields:
 | `refreshing` | A reload is in flight while the current value stays on screen.                                    |
 | `stale`      | The value is older than the read allows, or a write marked it stale; it reloads when observed.    |
 | `more`       | For a [view](#views), whether rows follow the ones shown.                                         |
+| `preview`    | `value` is a provisional value of the load in flight. See [below](#progressive-reads).            |
+
+<h3 id="progressive-reads">Show results as they arrive</h3>
+
+Some requests learn their answer in parts: a search that streams its first
+matches, then corrects and completes them. A **transport** can pass those
+parts to the store as **previews** while its reply is still pending. A read
+with nothing confirmed to show becomes `ready` with the newest preview, and
+its snapshot's `preview` is `true`. The reply then replaces the preview in one
+update, so a reader sees the early results and then the final ones, with no
+empty state between.
+
+The transport is yours: you make the request and parse what comes back. This
+one streams one read and sends everything else over HTTP:
+
+```ts
+import { httpTransport, type Transport } from 'octane/data';
+import { search } from './contracts.data.ts';
+import { searchStream } from './search-stream.ts';
+
+const http = httpTransport('/api/data');
+
+export const transport: Transport = async (request, signal, preview) => {
+	if (request.kind !== 'read' || request.name !== search.name) return http(request, signal);
+	// Your own request and parser: each part is the whole result so far.
+	for await (const part of searchStream(request.input, signal)) {
+		if (part.done) return { ok: true, value: part.value };
+		preview?.(part.value);
+	}
+	// The stream ended without its final part.
+	throw new Error('The search was interrupted');
+};
+```
+
+- Each preview is a whole value of the read's `output`, and is validated by
+  it. An invalid preview is skipped.
+- A preview is never cached: it is not saved, not sent in a server render's
+  seed, and not shared with other reads through [entities](#entities). Only
+  the reply is.
+- If the load fails, the preview disappears and the read shows its error
+  until you call `refresh()`.
+- A read that already has a confirmed value keeps showing it while it
+  reloads. A preview never replaces a confirmed value.
+- A [view](#views) takes no previews.
+
+`useRead(handle)` returns a preview as it returns a value, so a component
+that suspends shows its fallback until the first preview. Read with
+`{ suspend: false }` to tell a preview from a confirmed value.
+
+<h3 id="cancel">Stop a load nobody is waiting for</h3>
+
+By default a load runs to its end even if the component that started it has
+gone, so the next reader finds the value cached. For a read that follows what
+a user types, that is wasted work. Set `cancel: true`, and the store aborts
+the transport's `signal` when the read's last observer leaves:
+
+```ts
+export const search = read({
+	name: 'books.search',
+	input: z.object({ q: z.string(), after: z.string().optional() }),
+	output: z.object({ books: z.array(bookShape), next: z.string().nullable() }),
+	cancel: true,
+});
+```
+
+When the query changes from `fern` to `moss`, the component stops reading
+`fern`, and its request stops with it. Anything `fern` sends late is ignored.
+What a read has already confirmed stays cached. A load that a `prefetch()` or
+a `refresh()` is waiting on is not stopped. Across [tabs](#cross-tab), a
+request stops once the last tab waiting on it lets go.
 
 <h3 id="freshness">How long values last</h3>
 
@@ -765,6 +835,56 @@ other and with every other view, and an edit moves a row from one page to the
 next exactly as it moves rows within one. Outside a component,
 `pages(store, view, params?, size?)` returns the same list as a handle with
 `getSnapshot`, `subscribe`, `loadMore` and `refresh`.
+
+<h3 id="cursor-pages">Pages from a cursor</h3>
+
+Some lists only the server can order, such as search results, and the server
+returns each page with a **cursor** for the next. Describe the page as an
+ordinary `read`, and give `pages` the two things it cannot know: where a
+page's rows are, and the input that reads the page after it.
+
+```tsrx
+import { pages } from 'octane/data';
+import { useDataStore, usePages } from 'octane/data/octane';
+import { search } from './contracts.data.ts';
+
+const byCursor = {
+	rows: (page: { books: Book[] }) => page.books,
+	next: (page: { next: string | null }, input: { q: string; after?: string }) =>
+		page.next ? { ...input, after: page.next } : null,
+};
+
+export function Results(props: { q: string }) @{
+	const list = usePages(pages(useDataStore(), search, { q: props.q }, byCursor));
+	<section>
+		<ul>
+			@for (const book of list.value ?? []; key book.id) {
+				<li>{book.title as string}</li>
+			}
+		</ul>
+		@if (list.more) {
+			<button type="button" disabled={list.loadingMore} onClick={() => void list.loadMore()}>
+				Show more
+			</button>
+		}
+	</section>
+}
+```
+
+- `next` returns `null` or `undefined` at the last page. A cursor the list
+  has already followed ends it too. An empty page with a new cursor does not.
+- Calling `loadMore()` again while the next page loads joins that load. If
+  the page fails, the list keeps its rows, and `loadMore()` tries the same
+  cursor again.
+- The page being added shows its [previews](#progressive-reads) among the
+  rows, with `list.preview` true.
+- `list.value` is the same array until a row changes, so a component that
+  depends on the rows alone does no work when only `loadingMore` or
+  `refreshing` changes.
+- `refresh()` reads the list again from its first page, following the cursor
+  each page now returns. The rows on screen stay until every replacement page
+  is confirmed, then change together. The same happens when a write marks the
+  pages stale and the first one comes back with another cursor.
 
 <h2 id="forms">Forms that work before JavaScript</h2>
 
@@ -1833,14 +1953,14 @@ moment, and a rollback reaches both.
 Both bindings export the same names with the same behavior, so moving a
 component between renderers changes only the import:
 
-| Hook or component                       | What it does                                                                                             |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `DataProvider`                          | Puts a store in context for the components below it: `<DataProvider store={store}>`.                     |
-| `useDataStore()`                        | Returns the store from context: `read` gives the handles below, `write` sends a write, and so on.        |
-| `useRead(store.read(read, input?))`     | Returns the value, suspending until the first one arrives; with `{ suspend: false }`, the live snapshot. |
-| `usePages(pages(store, view, params?))` | Returns a view's pages so far as one list, with `more`, `loadingMore` and `loadMore`.                    |
-| `useForm(write, key?)`                  | Returns a native form for a write that declares `form` fields.                                           |
-| `useFeed(listen(store, feed, params?))` | Listens to a feed while mounted, and returns its connection status.                                      |
+| Hook or component                       | What it does                                                                                                            |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `DataProvider`                          | Puts a store in context for the components below it: `<DataProvider store={store}>`.                                    |
+| `useDataStore()`                        | Returns the store from context: `read` gives the handles below, `write` sends a write, and so on.                       |
+| `useRead(store.read(read, input?))`     | Returns the value, suspending until the first one arrives; with `{ suspend: false }`, the live snapshot.                |
+| `usePages(pages(store, view, params?))` | Returns the pages so far of a view, or of a read with a cursor, as one list, with `more`, `loadingMore` and `loadMore`. |
+| `useForm(write, key?)`                  | Returns a native form for a write that declares `form` fields.                                                          |
+| `useFeed(listen(store, feed, params?))` | Listens to a feed while mounted, and returns its connection status.                                                     |
 
 The only difference is the host renderer's rules. In Octane, hooks are keyed
 by where they are written, not by call order, so a `useRead` may sit behind a
@@ -1942,7 +2062,7 @@ reply, and in two tabs at once.
 
 | Export               | What it is for                                                                                                                |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `read`               | Describe a read: `name`, `input`, `output`, `entities`, `tags`, `fresh`, `keep`, `expire`, `persist`, `version`.              |
+| `read`               | Describe a read: `name`, `input`, `output`, `entities`, `tags`, `fresh`, `keep`, `expire`, `persist`, `cancel`, `version`.    |
 | `write`              | Describe a write: `creates`, `patches` or `removes` an entity, with `draft`, `serverId`, `record`, `form` and `invalidates`.  |
 | `entity`             | Name a record type and its key, so every read holding a record shares its fields.                                             |
 | `view`               | Describe a list by a rule over an entity: `where`, `order`, `limit`, `max`.                                                   |
@@ -1958,7 +2078,7 @@ reply, and in two tabs at once.
 | `pubSubListener`     | Listen to feeds through a message broker the page already uses.                                                               |
 | `listen`             | Listen to a feed from plain code; returns a handle with `getSnapshot` and `subscribe`.                                        |
 | `receive`            | Apply changes from your own subscription, as a feed event would.                                                              |
-| `pages`              | Read a view a page at a time from plain code.                                                                                 |
+| `pages`              | Read a view, or a read that returns a cursor, a page at a time from plain code.                                               |
 | `indexedDBStorage`   | Persistent storage in IndexedDB.                                                                                              |
 | `memoryStorage`      | Storage in memory, for tests and hosts without persistent storage.                                                            |
 | `autoBudget`         | A storage budget sized by the device's memory, data saver and quota.                                                          |
@@ -1985,6 +2105,6 @@ flag.
 | `DataProvider` | Provide a store to the components below it.                                                                    |
 | `useDataStore` | Read the store from context.                                                                                   |
 | `useRead`      | Show a read handle's value, suspending until the first one arrives, or its snapshot with `{ suspend: false }`. |
-| `usePages`     | Show a pages handle: a view a page at a time.                                                                  |
+| `usePages`     | Show a pages handle: a view, or a read with a cursor, a page at a time.                                        |
 | `useForm`      | Render a native form for a write.                                                                              |
 | `useFeed`      | Listen to a feed handle while mounted.                                                                         |
