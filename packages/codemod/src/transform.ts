@@ -5945,6 +5945,14 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					op === ts.SyntaxKind.ExclamationEqualsEqualsToken
 				)
 					return read(member.left, visit) ?? read(member.right, visit);
+				// Relational comparison can coerce either operand through user code.
+				if (
+					op === ts.SyntaxKind.LessThanToken ||
+					op === ts.SyntaxKind.LessThanEqualsToken ||
+					op === ts.SyntaxKind.GreaterThanToken ||
+					op === ts.SyntaxKind.GreaterThanEqualsToken
+				)
+					return read(member.left, visit, true) ?? read(member.right, visit, true);
 				if (
 					op === ts.SyntaxKind.AmpersandAmpersandToken ||
 					op === ts.SyntaxKind.BarBarToken ||
