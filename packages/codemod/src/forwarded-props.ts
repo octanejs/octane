@@ -118,21 +118,22 @@ export function renderUses(refs: ts.Identifier[]) {
 }
 
 /** A local root handle stays owned while callers only invoke its two root methods. */
+export function callsRootMethod(root: ts.Expression) {
+	const member = root.parent;
+	return (
+		ts.isPropertyAccessExpression(member) &&
+		member.expression === root &&
+		(member.name.text === 'render' || member.name.text === 'unmount') &&
+		ts.isCallExpression(member.parent) &&
+		member.parent.expression === member
+	);
+}
+
 export function rootHandleEscapes(
 	refs: ts.Identifier[],
 	inOwner?: (ref: ts.Identifier) => boolean,
 ) {
-	return renderUses(refs).some((ref) => {
-		const member = ref.parent;
-		return (
-			!ts.isPropertyAccessExpression(member) ||
-			member.expression !== ref ||
-			(member.name.text !== 'render' && member.name.text !== 'unmount') ||
-			!ts.isCallExpression(member.parent) ||
-			member.parent.expression !== member ||
-			inOwner?.(ref) === false
-		);
-	});
+	return renderUses(refs).some((ref) => !callsRootMethod(ref) || inOwner?.(ref) === false);
 }
 
 type RenderTypes = {

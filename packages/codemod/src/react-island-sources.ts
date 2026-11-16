@@ -3,7 +3,14 @@ import { parseSync } from '@tsrx/oxc/parser';
 import { hasRuntimeDependency } from './scoped-store-contract.js';
 import { literalCondition, skipWrappers } from './expression-wrappers.js';
 import { atInitializedModuleHandle, initializedBefore } from './effect-receivers.js';
-import { hasEval, rendersElementChildren, rootHandleEscapes } from './forwarded-props.js';
+import {
+	callsRootMethod,
+	contains,
+	hasEval,
+	hasPrototypeAccess,
+	rendersElementChildren,
+	rootHandleEscapes,
+} from './forwarded-props.js';
 import {
 	componentTagOrExport,
 	inTypeNode,
@@ -217,7 +224,7 @@ export function reactClassExports(file: string, source: string) {
 	return names;
 }
 
-function hasSingleReactImport(sf: ts.SourceFile, source: string) {
+function hasSingleRuntimeImport(sf: ts.SourceFile, source: string, module = 'react') {
 	const erased = new Set<number>();
 	for (const statement of sf.statements) {
 		if (
@@ -232,7 +239,7 @@ function hasSingleReactImport(sf: ts.SourceFile, source: string) {
 	return (
 		ts
 			.preProcessFile(source, true, true)
-			.importedFiles.filter(({ fileName, pos }) => fileName === 'react' && !erased.has(pos))
+			.importedFiles.filter(({ fileName, pos }) => fileName === module && !erased.has(pos))
 			.length === 1
 	);
 }
@@ -269,7 +276,7 @@ export function retainedReactContextExports(file: string, source: string) {
 		if (entry?.module !== 'react' || entry.name !== 'createContext') continue;
 		if (ts.isPropertyAccessExpression(factory)) {
 			// With interop the default and namespace can share the same mutable React object.
-			singleReactImport ??= !(dynamicScope ??= hasEval(sf)) && hasSingleReactImport(sf, source);
+			singleReactImport ??= !(dynamicScope ??= hasEval(sf)) && hasSingleRuntimeImport(sf, source);
 			if (
 				!singleReactImport ||
 				!ts.isIdentifier(factory.expression) ||
@@ -761,6 +768,83 @@ export function retainedReactElementReturns(file: string, source: string) {
 	return edges;
 }
 
+function privateRootField(access: ts.Expression) {
+	if (
+		ts.isPropertyAccessExpression(access) &&
+		ts.isPrivateIdentifier(access.name) &&
+		access.expression.kind === ts.SyntaxKind.ThisKeyword
+	)
+		return access.name;
+}
+
+/** Find the createRoot initializer of a closed, branded instance field. */
+function privateRootInitializer(name: ts.PrivateIdentifier, checker: ts.TypeChecker) {
+	const symbol = checker.getSymbolAtLocation(name);
+	const field = symbol?.valueDeclaration;
+	if (!field || !ts.isPropertyDeclaration(field) || field.initializer) return;
+	const owner = field.parent;
+	if (
+		!ts.isClassDeclaration(owner) ||
+		owner.heritageClauses?.length ||
+		field.modifiers?.some((modifier) => modifier.kind !== ts.SyntaxKind.ReadonlyKeyword)
+	)
+		return;
+	const constructor = owner.members.find(ts.isConstructorDeclaration);
+	const first = constructor?.body?.statements[0];
+	const assignment = first && ts.isExpressionStatement(first) && first.expression;
+	if (
+		!assignment ||
+		!ts.isBinaryExpression(assignment) ||
+		assignment.operatorToken.kind !== ts.SyntaxKind.EqualsToken
+	)
+		return;
+	const initialized = privateRootField(assignment.left);
+	if (!initialized || checker.getSymbolAtLocation(initialized) !== symbol) return;
+	if (
+		contains(owner, (node) => {
+			if (ts.isDecorator(node)) return true;
+			if (
+				!ts.isPrivateIdentifier(node) ||
+				node.text !== name.text ||
+				node === field.name ||
+				node === initialized
+			)
+				return false;
+			// An any-typed receiver can still access the current class brand at runtime.
+			const accessed = checker.getSymbolAtLocation(node);
+			if (accessed && accessed !== symbol) return false;
+			const use = node.parent;
+			const method = ts.findAncestor(use, ts.isFunctionLike);
+			return (
+				!ts.isPropertyAccessExpression(use) ||
+				privateRootField(use) !== node ||
+				!method ||
+				!ts.isMethodDeclaration(method) ||
+				method.parent !== owner ||
+				!method.body ||
+				use.pos < method.body.pos ||
+				!!(ts.getCombinedModifierFlags(method) & ts.ModifierFlags.Static) ||
+				!callsRootMethod(use)
+			);
+		})
+	)
+		return;
+	return skipWrappers(assignment.right);
+}
+
+function closedNamedImport(checker: ts.TypeChecker, reference: ts.Node) {
+	const declaration =
+		ts.isIdentifier(reference) && checker.getSymbolAtLocation(reference)?.declarations?.[0];
+	return (
+		declaration &&
+		ts.isImportSpecifier(declaration) &&
+		!declaration.parent.parent.name &&
+		!declaration.parent.elements.some(
+			(item) => !item.isTypeOnly && (item.propertyName ?? item.name).text === 'default',
+		)
+	);
+}
+
 /** Direct createRoot handles and hydrateRoot calls with verified import provenance. */
 function clientRootArgument(
 	{ sf, checker }: ReturnType<typeof bind>,
@@ -768,6 +852,7 @@ function clientRootArgument(
 	runtime: 'octane' | 'react-dom/client',
 ) {
 	let uses: ReturnType<typeof localUses> | undefined;
+	let closedClientImport: boolean | undefined;
 	return (call: ts.CallExpression, callee: ts.Expression) => {
 		const entry = imported(checker, callee);
 		if (entry?.module === runtime && entry.name === 'hydrateRoot') {
@@ -782,6 +867,7 @@ function clientRootArgument(
 		)
 			return;
 		const receiver = skipWrappers(callee.expression);
+		const privateField = runtime === 'react-dom/client' && privateRootField(receiver);
 		let root = receiver;
 		let handle: ts.Identifier | undefined;
 		if (ts.isIdentifier(receiver)) {
@@ -799,6 +885,18 @@ function clientRootArgument(
 				return;
 			handle = declaration.name;
 			root = skipWrappers(declaration.initializer);
+		} else if (privateField) {
+			const initializer = privateRootInitializer(privateField, checker);
+			// A CommonJS export or root prototype can be changed through another reference.
+			if (
+				!initializer ||
+				!ts.isCallExpression(initializer) ||
+				!closedNamedImport(checker, initializer.expression) ||
+				!(closedClientImport ??=
+					!hasEval(sf) && !hasPrototypeAccess(sf) && hasSingleRuntimeImport(sf, source, runtime))
+			)
+				return;
+			root = initializer;
 		}
 		if (
 			!ts.isCallExpression(root) ||
@@ -881,7 +979,7 @@ export function reactClientComponents(
 			entry?.module !== 'react' ||
 			!isReactWrapper(entry.name) ||
 			!isReact() ||
-			!(singleReactImport ??= !hasEval(sf) && hasSingleReactImport(sf, source))
+			!(singleReactImport ??= !hasEval(sf) && hasSingleRuntimeImport(sf, source))
 		)
 			return false;
 		if (ts.isPropertyAccessExpression(tag))
@@ -890,17 +988,8 @@ export function reactClientComponents(
 				soleReactReceiver(checker, tag.expression) &&
 				closedReactReceiver(tag.expression, (uses ??= localUses(sf, checker)), true)
 			);
-		if (!ts.isIdentifier(tag)) return false;
-		const declaration = checker.getSymbolAtLocation(tag)?.declarations?.[0];
 		// A CJS React member can be mutated through a default import from the same clause.
-		return (
-			!!declaration &&
-			ts.isImportSpecifier(declaration) &&
-			!declaration.parent.parent.name &&
-			!declaration.parent.elements.some(
-				(item) => !item.isTypeOnly && (item.propertyName ?? item.name).text === 'default',
-			)
-		);
+		return closedNamedImport(checker, tag);
 	}
 	function rendered(expression: ts.Node, line: number) {
 		const value = ts.isExpression(expression) ? skipWrappers(expression) : expression;
@@ -935,14 +1024,26 @@ export function reactClientComponents(
 		const leaf = ref && imported(checker, ref);
 		if (leaf?.module.startsWith('.')) edges.push({ ...leaf, line });
 	}
+	const closedPrivateRootElement = (value: ts.Expression) =>
+		ts.isCallExpression(value) &&
+		closedNamedImport(checker, skipWrappers(value.expression)) &&
+		!!value.arguments[0] &&
+		imported(checker, skipWrappers(value.arguments[0]))?.module.startsWith('.') &&
+		(singleReactImport ??= !hasEval(sf) && hasSingleRuntimeImport(sf, source));
 	function visit(node: ts.Node) {
 		if (
 			ts.isCallExpression(node) &&
 			!ts.isOptionalChain(node) &&
 			!node.arguments.some(ts.isSpreadElement)
 		) {
-			const argument = clientArgument(node, skipWrappers(node.expression));
-			if (argument)
+			const callee = skipWrappers(node.expression);
+			const argument = clientArgument(node, callee);
+			if (
+				argument &&
+				(!ts.isPropertyAccessExpression(callee) ||
+					!privateRootField(skipWrappers(callee.expression)) ||
+					closedPrivateRootElement(skipWrappers(argument)))
+			)
 				rendered(argument, sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1);
 		}
 		ts.forEachChild(node, visit);

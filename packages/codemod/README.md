@@ -102,8 +102,11 @@ resolution, indirect calls, and dynamic imports.
 
 A retained React DOM client root also keeps ownership of its elements.
 The codemod blocks writes when a direct `createRoot(...).render(...)`, a local
-root handle, or `hydrateRoot(...)` renders an explicit relative `.tsx` import
-that would become an Octane template. Migrate the root and component
+root handle, or `hydrateRoot(...)` renders a direct local TSX import that would
+become an Octane template. It also covers a root stored in a JavaScript private
+field when the constructor starts by assigning `createRoot(...)`, the field is
+used only for direct `render` and `unmount` calls, and React's named
+`createElement` creates the element. Migrate the root and component
 together, keep the component in React, or give React an authored
 `OctaneCompatInline` boundary.
 
