@@ -41091,6 +41091,27 @@ function printImportType(node, context) {
 	if (node.typeArguments) context.visit(node.typeArguments);
 }
 
+function printEmptyTypeImport(node, context) {
+	if (node.loc) context.location(node.loc.start.line, node.loc.start.column);
+	context.write('import');
+	if (node.loc) context.location(node.loc.start.line, node.loc.start.column + 6);
+	context.write(' type {} from ');
+	context.visit(node.source);
+	const attributes = node.attributes ?? node.assertions;
+	if (attributes?.length) {
+		context.write(node.attributes ? ' with { ' : ' assert { ');
+		for (let index = 0; index < attributes.length; index++) {
+			if (index > 0) context.write(', ');
+			context.visit(attributes[index].key);
+			context.write(': ');
+			context.visit(attributes[index].value);
+		}
+		context.write(' }');
+	}
+	context.write(';');
+	if (node.loc) context.location(node.loc.end.line, node.loc.end.column);
+}
+
 /**
  * Perform the compiler's ONE generated-program print and return esrap's real
  * per-token mappings (decoded, not VLQ-encoded) plus the exact printable AST
@@ -41118,8 +41139,19 @@ function printNodeWithMap(node, ctx) {
 	if (assertPrintedLocs()) assertNodeLocs(printable);
 	const commentOptions =
 		ctx.output === 'ts' ? typescriptCommentOptions(ctx.mapSource) : esrapCommentOptions;
-	const visitors = withDeferredImports(esrapTsx(commentOptions));
-	if (ctx.output === 'ts') visitors.TSImportType = printImportType;
+	const baseVisitors = esrapTsx(commentOptions);
+	if (ctx.output === 'ts') {
+		const printImportDeclaration = baseVisitors.ImportDeclaration;
+		baseVisitors.ImportDeclaration = (node, context) => {
+			if (node.importKind === 'type' && node.specifiers.length === 0) {
+				printEmptyTypeImport(node, context);
+			} else {
+				printImportDeclaration(node, context);
+			}
+		};
+		baseVisitors.TSImportType = printImportType;
+	}
+	const visitors = withDeferredImports(baseVisitors);
 	const { code, map } = esrapPrint(printable, visitors, {
 		// esrap indents every continuation of a block comment. TS consumers need
 		// authored annotation bytes, including indentation inside nested comments.

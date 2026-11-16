@@ -232,6 +232,60 @@ const Specialized = Generic<{ label: string; count: number }>;`;
 for (const parserName of ['native', 'javascript']) {
 	for (const mode of ['client', 'server'] as const) {
 		describe(`web TypeScript output with the ${parserName} parser in ${mode} mode`, () => {
+			it('keeps empty type imports erased while preserving side-effect imports', () => {
+				parser.javascript = parserName === 'javascript';
+				const source = `// Keep this augmentation type-only.
+import type {} from './augmentation' with { 'resolution-mode': 'import' };
+import './startup';
+export function App() @{ <p>ready</p> }`;
+				const result = compile(source, '/src/empty-import.tsrx', {
+					mode,
+					hmr: false,
+					output: 'ts',
+				});
+				expect(result.diagnostics).toEqual([]);
+				const parsed = ts.createSourceFile(
+					'empty-import.ts',
+					result.code,
+					ts.ScriptTarget.Latest,
+					true,
+				);
+				const imports = parsed.statements.filter(ts.isImportDeclaration);
+				const augmentation = imports.find(
+					(node) => node.moduleSpecifier.getText(parsed) === "'./augmentation'",
+				);
+				expect(augmentation?.importClause?.isTypeOnly).toBe(true);
+				expect(
+					augmentation?.attributes?.elements.map(({ name, value }) => [
+						name.getText(parsed),
+						value.getText(parsed),
+					]),
+				).toEqual([["'resolution-mode'", "'import'"]]);
+				expect(result.code).toContain('// Keep this augmentation type-only.');
+				const outputLines = result.code.split('\n');
+				const importLine = outputLines.findIndex((line) => line.includes("'./augmentation'"));
+				const mappings = decodeMappings(result.map.mappings)[importLine];
+				expect(mappings).toContainEqual([outputLines[importLine].indexOf('import type'), 0, 1, 0]);
+				expect(mappings).toContainEqual([
+					outputLines[importLine].indexOf("'./augmentation'"),
+					0,
+					1,
+					source.split('\n')[1].indexOf("'./augmentation'"),
+				]);
+				const emitted = ts.transpileModule(result.code, {
+					compilerOptions: { module: ts.ModuleKind.ESNext, verbatimModuleSyntax: true },
+				}).outputText;
+				expect(emitted).not.toContain('./augmentation');
+				expect(emitted).toContain('./startup');
+				const runtime = compile(source, '/src/empty-import.tsrx', {
+					mode,
+					hmr: false,
+					output: 'js',
+				});
+				expect(runtime.code).not.toContain('./augmentation');
+				expect(runtime.code).toContain('./startup');
+			});
+
 			it('keeps the existing Fragment lowering for type-only Octane imports', () => {
 				parser.javascript = parserName === 'javascript';
 				const cases = [
