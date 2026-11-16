@@ -1809,6 +1809,8 @@ export function List() { return <main>{makeRows().map(row => {
 	it.each([
 		['a single TS registration', 'ts', '', ''],
 		['a single TSX registration', 'tsx', '', ''],
+		['a TS registration with a block return', 'ts', '', '', true],
+		['a TSX registration with a block return', 'tsx', '', '', true],
 		[
 			'unrelated primitive exports',
 			'ts',
@@ -1823,12 +1825,14 @@ export function List() { return <main>{makeRows().map(row => {
 		],
 	])(
 		'keeps a typed callback factory for a retained React registry with %s',
-		async (_case, extension, before, after) => {
+		async (_case, extension, before, after, block = false) => {
 			const name = `register.${extension}`;
 			const output = extension === 'tsx' ? 'register.tsrx' : name;
+			const icon = "createIcon('b', { className: 'icon' }, 'Notes')";
+			const factory = block ? `{ return (${icon}); }` : icon;
 			const registration = `import { createElement as createIcon } from 'react';
 import { register } from './registry';
-${before}export const tab = register('notes', { getIcon: () => createIcon('b', { className: 'icon' }, 'Notes') });${after}`;
+${before}export const tab = register('notes', { getIcon: () => ${factory} });${after}`;
 			const registry = `/** @jsxImportSource react */
 import React, { type ReactNode } from 'react';
 type Entry = { getIcon(): ReactNode };
