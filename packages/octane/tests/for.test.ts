@@ -131,6 +131,40 @@ it('evaluates mapped JSX keys on the server even when row markup is static', () 
 	expect(trace).toEqual(['key a', 'coerce a default', 'key c', 'coerce c default']);
 });
 
+it.each([
+	['text and entities', 'A &amp; B &#x1f4a1;', 'A &amp; B 💡'],
+	['text with an embedded comment', 'A{/* comment */}Z', 'AZ'],
+	['comment only', '{/* comment */}', ''],
+])('evaluates mapped JSX keys with %s in server rows', (_kind, children, html) => {
+	const source = `export function List({ rows }) @{
+		<ul>{rows.map((row, index) => <li key={row.id}>${children}</li>)}</ul>
+	}`;
+	const { List } = loadCompiledFixtureSource(source, {
+		id: 'static-mapped-key-reads.tsrx',
+		mode: 'server',
+	});
+	const reads: string[] = [];
+	const rows = ['a', 'b', 'c'].map((id) => ({
+		get id() {
+			reads.push('key ' + id);
+			return {
+				[Symbol.toPrimitive](hint: string) {
+					reads.push('coerce ' + id + ' ' + hint);
+					if (id === 'a') {
+						Reflect.deleteProperty(rows, 1);
+						rows.push({ id: 'later' });
+					}
+					return id;
+				},
+			} as unknown as string;
+		},
+	}));
+
+	const result = ServerRuntime.renderToStaticMarkup(List, { rows });
+	expect(reads).toEqual(['key a', 'coerce a default', 'key c', 'coerce c default']);
+	expect(stripComments(result.html)).toBe(`<ul><li>${html}</li><li>${html}</li></ul>`);
+});
+
 describe('manual keyed lists', () => {
 	it.each([
 		['string', 'b'],
