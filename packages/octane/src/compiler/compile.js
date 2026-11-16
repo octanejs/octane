@@ -9283,10 +9283,20 @@ function mapCallbackHasEffects(node) {
 	if (node.type === 'TemplateLiteral') {
 		return node.expressions.some((expression) => !isInvariantLiteral(unwrapTsExpr(expression)));
 	}
-	if (node.type !== 'BinaryExpression' || node.operator !== '+') return false;
+	if (node.type !== 'BinaryExpression') return false;
+	const operator = node.operator;
+	if (
+		operator !== '+' &&
+		operator !== '<' &&
+		operator !== '<=' &&
+		operator !== '>' &&
+		operator !== '>='
+	)
+		return false;
 	const left = unwrapTsExpr(node.left);
 	const right = unwrapTsExpr(node.right);
 	if (!isInvariantLiteral(left) || !isInvariantLiteral(right)) return true;
+	if (operator !== '+') return false;
 	const leftType = typeof left.value;
 	const rightType = typeof right.value;
 	return (
