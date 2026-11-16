@@ -3253,6 +3253,8 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 			['a direct root', 'DOM.createRoot(container).render(<Leaf />)', true],
 			['a local root', 'const root = make(container); root.render(<Leaf />);', true],
 			['hydration', 'hydrate(container, <Leaf />, options)', true],
+			['a template wrapper', 'make(container).render(<Leaf />)', true],
+			['a scalar export beside a template', 'make(container).render(<Leaf />)', false],
 			['a React element factory', 'make(container).render(h(Leaf, { label: "ready" }))', true],
 			['a shadowed root', '((make) => make(container).render(<Leaf />))(other)', false],
 			[
@@ -3273,7 +3275,12 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 					import { OctaneCompatInline } from 'octane/react';
 					import { Leaf } from './Leaf.tsx';
 					${body};`,
-				'Leaf.tsx': 'export function Leaf({ label = "ready" }) { return <small>{label}</small>; }',
+				'Leaf.tsx':
+					name === 'a template wrapper'
+						? 'function Panel() { return <small>ready</small>; } export function Leaf() { return <Panel />; }'
+						: name === 'a scalar export beside a template'
+							? 'export function Panel() { return <small>ready</small>; } export function Leaf() { return "ready"; }'
+							: 'export function Leaf({ label = "ready" }) { return <small>{label}</small>; }',
 			});
 			fs.mkdirSync(path.join(root, 'node_modules/@types'), { recursive: true });
 			for (const name of ['octane', 'react', 'react-dom'])

@@ -2031,9 +2031,10 @@ export async function runCodemod(
 				)
 					continue;
 				const leaf = byFile.get(match.file);
+				if (!leaf?.output.endsWith('.tsrx')) continue;
+				const { intrinsics, wrappers } = originalReactExports(match.file);
 				if (
-					!leaf?.output.endsWith('.tsrx') ||
-					!originalReactExports(match.file).intrinsics.has(edge.name) ||
+					(!intrinsics.has(edge.name) && !wrappers.has(edge.name)) ||
 					!hasTemplateExport(leaf, edge.name)
 				)
 					continue;
