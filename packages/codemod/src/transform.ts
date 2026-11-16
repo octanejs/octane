@@ -5890,6 +5890,14 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 
 	private copiesOwnGetter(spread: ts.SpreadAssignment, hook: ts.CallExpression) {
 		let object = skipWrappers(spread.expression);
+		// An inline operand can invoke a getter before the outer copy begins.
+		if (
+			ts.isObjectLiteralExpression(object) &&
+			object.properties.some(
+				(field) => ts.isSpreadAssignment(field) && this.copiesOwnGetter(field, hook),
+			)
+		)
+			return true;
 		if (ts.isIdentifier(object)) {
 			const owner = ts.findAncestor(hook, ts.isFunctionLike);
 			const init = this.constValue(object);

@@ -649,37 +649,41 @@ it('reports React SSR effects from object properties in hook dependencies', () =
 	}
 }, 20_000);
 
-it('reports getters invoked by object spread in hook dependencies', () => {
-	function Reference() {
-		const source = {
-			get value() {
-				preinit('/dependency-copy.css', { as: 'style' });
-				return 1;
-			},
-		};
-		useMemo(() => 1, [{ ...source }]);
-		return createElement('b', null, 'ok');
-	}
-	expect(renderToStaticMarkup(createElement(Reference))).toContain(
-		'<link rel="stylesheet" href="/dependency-copy.css"',
-	);
-	const input = (dep, properties = 'get value() { return probe.value; }', setup = '') =>
-		`import { useMemo } from 'react';
+it.each([false, true])(
+	'reports getters invoked by object spread in hook dependencies (Strong %s)',
+	(strong) => {
+		function Reference() {
+			const source = {
+				get value() {
+					preinit('/dependency-copy.css', { as: 'style' });
+					return 1;
+				},
+			};
+			useMemo(() => 1, [{ ...source }]);
+			return createElement('b', null, 'ok');
+		}
+		expect(renderToStaticMarkup(createElement(Reference))).toContain(
+			'<link rel="stylesheet" href="/dependency-copy.css"',
+		);
+		const input = (dep, properties = 'get value() { return probe.value; }', setup = '') =>
+			`import { useMemo } from 'react';
 		export function Probe({ probe }) {
 			const source = { ${properties} };
 			${setup}
 			useMemo(() => 1, [${dep}]);
 			return <b>ok</b>;
 		}`;
-	const error = expect.objectContaining({
-		rule: 'hook-dependencies',
-		severity: 'error',
-		message: expect.stringContaining('can invoke an own getter while spreading'),
-	});
-	for (const strong of [false, true]) {
+		const error = expect.objectContaining({
+			rule: 'hook-dependencies',
+			severity: 'error',
+			message: expect.stringContaining('can invoke an own getter while spreading'),
+		});
 		for (const source of [
 			input('{ ...source }'),
 			input('{ ...{ get value() { return probe.value; } } }'),
+			input('{ ...{ ...source } }'),
+			input('{ ...{ ...source, value: 0 } }'),
+			input('{ ...{ ...{ ...{ get value() { return probe.value; } } } } }'),
 			input('{ ...source }', 'get value() { return probe.value; }, set value(next) {}'),
 			input('{ ...source }', 'get __proto__() { return probe.value; }'),
 			input('{ ...source }', 'get [probe.key]() { return probe.value; }'),
@@ -698,12 +702,17 @@ it('reports getters invoked by object spread in hook dependencies', () => {
 			input('{ ...source }', '__proto__: { get value() { return probe.value; } }'),
 			input('{ ...source }', undefined, 'Object.defineProperty(source, "value", { value: 1 });'),
 			input('{ ...probe.value }'),
+			input('{ ...{ ...probe.value } }'),
+			input('{ ...{ ...source } }', 'value: 1'),
+			input('{ ...intermediate }', undefined, 'const intermediate = { ...source };'),
+			input('{ ...{ deferred() { return { ...source }; } } }'),
 			input('false && { ...source }'),
 			input('{ deferred() { return { ...source }; } }'),
 		])
 			expect(migrate(source, strong).notes).not.toContainEqual(error);
-	}
-}, 20_000);
+	},
+	20_000,
+);
 
 it('checks property visibility for nested arrays of component state', () => {
 	const input = (dependencies, field = '2') => `import { useMemo, useState } from 'react';
