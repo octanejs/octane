@@ -1,5 +1,57 @@
 # octane
 
+## 0.19.0
+
+### Minor Changes
+
+- bdd71fa: Let React-hosted Octane islands borrow an explicit signal owner in the browser with `clientSignalOwner`. Both `OctaneCompat` and `OctaneCompatInline` preserve historical hydration reads and then subscribe to the borrowed owner's live signals.
+
+### Patch Changes
+
+- aa7068e: Keep compiler-generated memo cache checks independent of authored bindings named `undefined`.
+- d3994e6: Allow `flushSync()` to commit already scheduled updates without a callback. Both client and server also accept `undefined` or `null` and still return a supplied callback's result.
+- 801df5d: Fix `octane/data`'s shared owner saving an older value over a newer one. When two tabs reloaded the same read and the reply to the older request landed last, the owner saved that tab's value over the newer one, so the next session started from stale data while the live tabs showed the newer value. The owner now keeps the value of the newest request it made for each read.
+- 82828d1: Stop a tab that shares an `octane/data` owner from sending a read's value back to it to be saved. A read fetched in the data worker crossed to the page for validation and then crossed back in full, so the page paid for a second structured clone of it. Where the read's output validator returns the value it was given, the tab now tells the owner it validated and the owner saves its own copy. A validator that returns another representation still has that representation saved.
+- a588f5d: Make components that use no signals cheaper once `octane/signals` is loaded. A component no longer creates its signal owner on its first render: it creates one the first time its render declares, reads or binds a signal, and an event handler or the children it passes record the component until then. Trees where few components read signals mount, hydrate and re-render faster and allocate less. Ownership, retries and streamed values are unchanged.
+- 901e2c5: Make signal writes, subscriptions and owner retirement cheaper. A write that reaches many derived values or subscribers does about half the work it did, `scope.get(handle$)` and reads of current values skip state they never needed, and retiring an owner no longer builds an error for nodes nothing reads again.
+- 1005f7d: Assign independent hook slots to direct local aliases of useState in compiled component setup.
+- e452908: Fix client `@if` branch capture of component-scoped JavaScript `var` declarations inside ordinary JavaScript blocks.
+- 51227c8: Preserve function-scoped JavaScript `var` bindings in the keys, host rows, and empty arms of authored keyed `@for` directives.
+- d058a1c: Preserve omitted state and ref initializers in plain TypeScript modules that define a local `undefined` binding.
+- 8274f84: Preserve function-scoped JavaScript `var` bindings in compiled `@switch` and `@try` arms, including nested template directives.
+- 349a168: Keep compiler-generated hook captures valid in TypeScript output when a component returns early.
+- f4f9658: Compile independent `<Hydrate>` islands to the compiler-owned boundary entry in production builds. A hydrated page that hosts only independent islands no longer ships the general child renderer.
+- ecf05ed: Give compiler-proven independent `<Hydrate>` islands their own boundary entry in production builds. The page that hosts them never renders their children, so a hydrated page with only independent islands no longer ships the Suspense implementation.
+- 1247dfd: Fix native JSX tags that shadow a same-named module component so the renderer switches to the current local component when the binding changes.
+- 6fd588c: Preserve ordinary calls to locally bound functions named `use`. These calls keep their JavaScript argument order and no longer introduce a conflicting server runtime import.
+- 4f51cc8: Preserve local components named `Fragment` in TSRX, including during server rendering and DOM binding extraction.
+- 1950df7: Preserve writable top-level template component bindings in client and server output, including JavaScript initialization order and separate names for function expressions.
+- f35440d: `OctaneCompat` islands now disconnect under a React `<Activity mode="hidden">` the way React components do: layout and passive effects clean up, refs detach, and `useSyncExternalStore` subscriptions unsubscribe while state and DOM are kept, and the reveal reconnects them against the latest store value.
+- b1d701b: Keep JSX map rows without an authored key at their array positions across rendering and hydration, without reading an implicit `id` from each item.
+- 69eafbb: Preserve ordinary map evaluation for eager writes inside JSX map callbacks. An indexed delete or change to the array length can affect which remaining entries are visited.
+- 5fa8210: Preserve native host mounting and binding updates when a component defines a local `undefined` binding.
+- cc568ff: Preserve a private memo component's state when its guarded parent stays visible and the child hides and reveals.
+- df79854: Preserve hook state when a directly rendered inline template exits early with `null` or `undefined`.
+- 1ada0a3: Preserve state and reconcile output when an inline memoized TSRX component takes an early null return.
+- 28b5ebf: Preserve function-scoped captures in conditionals rendered by keyed template rows.
+- aba2955: Preserve omitted useState initializers and their optional value types when the compiler adds hook slots.
+- 523bf0e: Preserve adjacent and empty root text slots during server rendering so hydration adopts the original fragment DOM.
+- f5a9920: Preserve JSX return branches that read a local binding named `undefined`.
+- d6b46e7: Write a `<form action>` or `formAction` value that is a primitive by syntax, such as `eager ? '/eager' : '/'`, as the native URL attribute in production builds. A page whose form actions are all strings no longer ships submit interception and the transition engine it pulls in.
+- 489470f: Preserve React JSX in installed and linked Octane packages when a .tsx file declares React as its JSX source and the build uses `requireDirective`. Native .tsrx exports in the same package still compile with Octane.
+- 271454d: Refresh a keyed `@empty` arm when an enclosing value changes and a row binding shadows its name.
+- 10bf0fa: Allow React to set a role and accessible name on the existing OctaneCompat and OctaneCompatInline hosts.
+- bc63bc3: Reduce the client bundle cost of hosting Octane components in React. OctaneCompat no longer pulls in host element descriptors, function form actions, or fragment refs unless the hosted code uses those capabilities.
+- 4706e9c: Preserve React `Touch` annotations when migrating handlers that consume native touch points.
+- 15c0987: Preserve string children as script text when server-rendering HTML scripts and adopt the same script nodes during hydration.
+- e811e62: Allow a direct empty-string innerHTML assignment in Strong mode on a childless root div with a single proven local ref. Preserve the browser’s Trusted Types enforcement.
+- ff666bb: Refresh Strong components when a context read through an imported custom hook changes, even when the component's props have stayed equal.
+- 6b8a3b3: Accept nullable and renderable component outputs in generated server TypeScript while retaining the compiled-only outlet check.
+- 9c2054c: Preserve inline TypeScript import types in compiler TypeScript output, including `typeof` queries, qualifiers, generic arguments, and resolution-mode attributes.
+- ef249e7: Resolve the Octane React compatibility entry in Vite SSR graphs, including React-owned TSX that hosts an Octane component. The server now includes the hosted component's HTML for client hydration.
+- f16b371: Let keyed `@for` rows wrapped in a named `ViewTransition` import skip unchanged survivors, as host-only rows already do.
+- 7cde992: Stop a view transition from playing `enter` on an unchanged `ViewTransition` boundary in an unrelated part of the tree. A transition that updates one subtree left other subtrees' boundaries out of its old capture, then counted them as newly mounted when it measured the new state.
+
 ## 0.18.0
 
 ### Minor Changes

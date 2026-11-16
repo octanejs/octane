@@ -12,8 +12,8 @@
     }
   ],
   "dependencies": [
-    "@octanejs/base-ui@0.1.72",
-    "@octanejs/lucide@0.1.64",
+    "@octanejs/base-ui@0.1.73",
+    "@octanejs/lucide@0.1.65",
     "class-variance-authority",
     "cn"
   ]

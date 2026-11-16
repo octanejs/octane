@@ -1,5 +1,146 @@
 # @octanejs/codemod
 
+## 0.2.2
+
+### Patch Changes
+
+- 5c9b2ae: Keep React's element factory in direct callbacks whose output belongs to an explicitly authored React island.
+- 21fd89b: Block JSX map conversion when a parameter default reaches a binary operand that reads the callback index before initialization.
+- 2926f1c: Migrate direct literal-bracket React namespace hook calls and preserve React's `createRef` allocator for the same syntax. Report computed hook accesses that need a manual migration.
+- 6851329: Block JSX map conversions when a `delete` operand in a parameter default reads the callback index before initialization.
+- a23e594: Keep authored OctaneCompat hosts in React when a selected component returns one after local setup or inside a plain JSX wrapper.
+- 1d0902e: Generate new native external-store helpers as `.tsrx` files so builds that compile only TSRX apply the correct hook slots and runtime imports.
+- 206d5b3: Report unsupported React namespace APIs when an application accesses them through a literal computed property.
+- 64228dd: Report nested element-only children on path-alias calls and stop writes until the component’s runtime import target is verified.
+- 95f1958: Report when an automatically inserted React island can attach a ref after the parent layout effect reads it.
+- 6cb9e93: Detect reads of an uninitialized map index in a destructuring default that immediately invokes an arrow with a single return statement.
+- 96be027: Block JSX map conversions when a safe `void` expression is followed by a read of the uninitialized callback index in a parameter default.
+- ea0101c: Report imported React classes that a migrated native template renders as direct children of ordinary HTML containers.
+- 4c35afc: Enable the React Intl and scoped-store migration adapters when the project uses Octane 0.18.
+- 9c5a0c9: Enable the React Intl and scoped-store migration adapters when the project uses Octane 0.19.
+- 814c800: Accept hook dependencies that read a proven own data field on a component-owned state record.
+- 33e4655: Warn when a parenthesized server render reaches a migrated store hook that may need its original provider.
+- 2086891: Report a rename conflict when a native CommonJS `require('./Component.js')` uses a JavaScript runtime file with separate TypeScript types and the migration would rename either file.
+- bcbdeb6: Preserve React Intl’s message comparison in the generated adapter. Equal substitutions keep the previous output, and context updates still refresh the catalog.
+- 596d0a3: Warn when a retained React JSX caller has an unambiguous extensionless import that the codemod redirects to an Octane component.
+- d29040c: Include directly exported constant arrow functions in the retained React hook diagnostic.
+- fd98195: Warn when a retained React JSX child calls a migrated factory that now returns an Octane renderable.
+- 174fed1: Warn when a native template directly renders an unchanged local component that returns React JSX under the project's JSX settings.
+- da6efe8: Warn when the codemod redirects a retained React lazy component's literal import to TSRX.
+- 731b0ec: Warn when a retained React caller renders a migrated component whose intrinsic JSX return follows straight-line const setup.
+- 872fd9b: Warn when a directly migrated React server render passes a linked-store component to `React.createElement` without a standalone Octane provider.
+- a2b09d2: Report potentially React-owned property reads in reachable operands of `&&`, `||`, and `??` in hook dependency arrays.
+- 653d363: Report when an opaque `.map()` receiver can inspect renderer-specific JSX elements returned directly by a callback’s final `switch`.
+- f562e27: Migrate text input change handlers when the input type is written as a JSX string expression, such as `type={'text'}`, and the attributes allow the same rewrite as a quoted type.
+- b9cdc3a: Block a top-level alias rewrite that would skip a local React context provider replacement installed through `Object.assign`.
+- da22162: Block migration when reading a React context Provider into a top-level variable would skip an authored getter.
+- b2e1f51: Warn when a migrated server function directly renders a scoped-store consumer that may need its original provider during standalone rendering.
+- b10318f: Preserve proven ordinary context-like members and report ambiguous selected context aliases in ES2015, ES2020 and ES2022 TypeScript projects.
+- 39e5146: Preserve React element factories in typed retained-registry callbacks that contain a single return statement.
+- bdde6b1: Block a JSX map conversion when a literal array spread or a completing void expression can lead a parameter default to read the callback index before initialization.
+- d60a994: Stop write mode before editing a project with an unresolved React type projection, including a `typeof` query on a missing React export. Preview mode still shows proposed changes and reports the blocker as `react-type-projection`.
+- f01e68f: Block writes that would migrate buffered React server renders called with an options argument.
+- 0f982cb: Block buffered server render migrations when the new renderer would invoke a retained React component with a proven React hook.
+- e3341a7: Use the inline React host for generated React Intl message fallbacks inside paragraphs when the installed Octane runtime supports it. The formatter ownership check still applies.
+- a78cb2d: Keep proven implicit React Router 7 root and route configuration entry files at their existing extensions so React Router can still discover them after migration.
+- cb61df7: Preserve React `Touch` namespace references in interface `extends` and class `implements` clauses.
+- 7edf0b2: Preserve React root identity and reserve `key` when JSX root props include a spread.
+- f3fc6e3: Block JSX map conversions when copying a fresh object literal leads a parameter default to read the callback index before initialization.
+- 7476d36: Detect early JSX map index reads reached through literal conditions in short-circuit expressions and ternaries, including signed numbers, bigint literals, simple `void` expressions, and arrays and objects with safe literal contents.
+- 08303f1: Add Motion's `useInView` hook to `@octanejs/motion` and enable the codemod to migrate it when the binding exports it.
+- 9a6894a: Render plain React Intl message parts directly in the generated adapter so React-hosted Octane components can server-render scalar substitutions.
+- 0811815: Preserve React factory props when a root call uses a local binding named `undefined`.
+- 0224a5c: Preserve createElement configuration when migrating React root calls, including component keys and the factory's props snapshot.
+- 8e2a962: Report a rename conflict when an executable relative import names an existing `.js` or `.jsx` path and TypeScript resolves it to a selected `.tsx` source. Preserve the JavaScript path and its type source together. Explicitly type-only references in TypeScript files can still follow the rename.
+- b39404d: Keep query strings and fragments on quoted page-relative HTML module entries when renaming their source files. Locate actual script attributes so comments, inline JavaScript and unrelated attributes are preserved.
+- 92b70b9: Preserve entity references, literal backslashes, and line breaks in quoted JSX props when migrating React roots.
+- 803bfa9: Preserve the explicit element type argument in qualified and inline ReactElement types during migration.
+- 1b48b8a: Preserve a React element factory when a typed registration file also declares immutable exported primitive constants.
+- c39a9a5: Keep the application-owned React Router `AppLoadContext` type on its original module while migrating other supported imports.
+- 5e26016: Preserve a selected JavaScript file when an executable relative import names that file but TypeScript resolves the request to a different source. The rename conflict keeps the original runtime path and its separate types together.
+- e6d4726: Preserve a plain leading SVG title when migrating a supported static icon with `--svg-paths`.
+- 9828d36: Preserve React element factories when migrating a JSX-free TSX registration whose retained registry expects React's `ReactNode`.
+- f65c42e: Allow static SVG adapters inside a selected component passed directly to the installed Octane server renderer.
+- 9ccab60: Emit an empty callback for direct React DOM `flushSync()` and `flushSync(null)` calls so migrated code can drain queued updates on Octane versions that require a callback.
+- 0b5acbc: Warn when a retained React server renderer directly renders a migrated component imported through an unambiguous extensionless path.
+- 6bb9544: Report native template roots that directly render an imported React class component.
+- c6f3bff: Report inline arrow and function-expression getters that replace the Provider of a local React context.
+- e92e53e: Report imported React classes rendered through native Fragment and Suspense children.
+- 71aa550: Report a retained React context read through a directly called private module-level arrow when a migrated component can reach it.
+- 284ae03: Report retained private React context hooks called through static namespace members.
+- 08c0df5: Report React class components in the final JSX return of a component that stays in plain JSX after an early return, including returns inside fragments or StrictMode.
+- 8a14695: Report React imports that the codemod keeps under their original renderer. Direct blocked hooks and context reads to their React renderer without claiming that no Octane binding exists.
+- 00c08d1: Report renderer-owned hook dependency getters inside eager unary expressions.
+- 017e280: Keep authored React `OctaneCompat` client hosts under their original renderer during migration.
+- 5b8da66: Warn when a relative `.js` import resolves to an unchanged TypeScript hook that reads React context through a private helper.
+- 4b08b19: Warn when a retained React JSX caller's explicit relative import now points to a migrated component wrapper template.
+- 3c4c246: Report React DOM resource hints from retained TypeScript callbacks that an automatically migrated React Intl provider can call for an empty locale.
+- d30cc10: Warn when a native template root, conditional arm or keyed row would render an unchanged React context provider. Keep the migration preview available so consumers can verify or migrate the context owner.
+- 1864b1a: Report retained React JSX that reaches a migrated component through an ordinary JavaScript specifier or a direct named TypeScript re-export.
+- 25af6d4: Report retained React DOM server calls that render migrated wrapper components through JSX or React.createElement.
+- 4e4296a: Keep the original React `createElement` import when a separately selected plain TypeScript registration module passes a literal element callback to a retained function that requires React's `ReactNode`.
+- 1025df8: Warn when native setup calls a retained TypeScript wrapper whose original linked workspace export reaches a React hook.
+- c9e663c: Report React Intl scalar formatter calls in inline React memo calculators and lazy state initializers. These callbacks can call into the original React renderer during render.
+- 2d74d36: Migrate direct scoped-store hook imports from linked packages that use local named exports or aliases. Preserve the resolved runtime export when generating the native store hook.
+- dd9d755: Warn when migrated code awaits a React DOM server stream's `allReady` before reading the body. Octane may need the reader to pull deferred content before that promise settles.
+- 1e5a8f3: Block an Intl provider migration when another import of the same React Intl class is assigned defaults in the same module.
+- 97c81fa: Report React Intl scalar formatter calls inside synchronous functions invoked inline during render. The formatter can depend on the original React renderer even when it returns plain text.
+- 4706e9c: Preserve React `Touch` annotations when migrating handlers that consume native touch points.
+- 7d342f0: Warn about migrated standalone server render calls that pass literal props to a component with a generated scoped-store hook.
+- 2520254: Report React types that have no matching Octane declaration in direct type references and explicit type re-exports.
+- 85bb861: Report conflicting Unicode spellings that would leave an import or HTML entry pointing to a renamed file on macOS.
+- 6a65a3c: Report the NativeStoreProvider requirement when an existing native root renders a migrated store consumer through a local root handle.
+- 961a648: Warn when a registered React Router route would hand its migrated Octane default component to React.
+- 65924ee: Warn when a retained TypeScript function returns React's `createElement` with a directly imported component selected for Octane migration.
+- c9f39b3: Report the existing standalone server provider warning for direct module expressions, default exports, and `import.meta.main` entry guards.
+- Updated dependencies [aa7068e]
+- Updated dependencies [bdd71fa]
+- Updated dependencies [d3994e6]
+- Updated dependencies [801df5d]
+- Updated dependencies [82828d1]
+- Updated dependencies [a588f5d]
+- Updated dependencies [901e2c5]
+- Updated dependencies [1005f7d]
+- Updated dependencies [e452908]
+- Updated dependencies [51227c8]
+- Updated dependencies [d058a1c]
+- Updated dependencies [8274f84]
+- Updated dependencies [349a168]
+- Updated dependencies [f4f9658]
+- Updated dependencies [ecf05ed]
+- Updated dependencies [1247dfd]
+- Updated dependencies [6fd588c]
+- Updated dependencies [4f51cc8]
+- Updated dependencies [08303f1]
+- Updated dependencies [1950df7]
+- Updated dependencies [f35440d]
+- Updated dependencies [b1d701b]
+- Updated dependencies [69eafbb]
+- Updated dependencies [5fa8210]
+- Updated dependencies [cc568ff]
+- Updated dependencies [df79854]
+- Updated dependencies [1ada0a3]
+- Updated dependencies [28b5ebf]
+- Updated dependencies [aba2955]
+- Updated dependencies [523bf0e]
+- Updated dependencies [f5a9920]
+- Updated dependencies [d6b46e7]
+- Updated dependencies [489470f]
+- Updated dependencies [271454d]
+- Updated dependencies [10bf0fa]
+- Updated dependencies [bc63bc3]
+- Updated dependencies [4706e9c]
+- Updated dependencies [15c0987]
+- Updated dependencies [e811e62]
+- Updated dependencies [ff666bb]
+- Updated dependencies [6b8a3b3]
+- Updated dependencies [9c2054c]
+- Updated dependencies [ef249e7]
+- Updated dependencies [f16b371]
+- Updated dependencies [7cde992]
+  - octane@0.19.0
+  - @octanejs/cli@0.3.6
+
 ## 0.2.1
 
 ### Patch Changes

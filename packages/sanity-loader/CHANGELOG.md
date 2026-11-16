@@ -1,5 +1,55 @@
 # @octanejs/sanity-loader
 
+## 0.1.20
+
+### Patch Changes
+
+- Updated dependencies [aa7068e]
+- Updated dependencies [bdd71fa]
+- Updated dependencies [d3994e6]
+- Updated dependencies [801df5d]
+- Updated dependencies [82828d1]
+- Updated dependencies [a588f5d]
+- Updated dependencies [901e2c5]
+- Updated dependencies [1005f7d]
+- Updated dependencies [e452908]
+- Updated dependencies [51227c8]
+- Updated dependencies [d058a1c]
+- Updated dependencies [8274f84]
+- Updated dependencies [349a168]
+- Updated dependencies [f4f9658]
+- Updated dependencies [ecf05ed]
+- Updated dependencies [1247dfd]
+- Updated dependencies [6fd588c]
+- Updated dependencies [4f51cc8]
+- Updated dependencies [1950df7]
+- Updated dependencies [f35440d]
+- Updated dependencies [b1d701b]
+- Updated dependencies [69eafbb]
+- Updated dependencies [5fa8210]
+- Updated dependencies [cc568ff]
+- Updated dependencies [df79854]
+- Updated dependencies [1ada0a3]
+- Updated dependencies [28b5ebf]
+- Updated dependencies [aba2955]
+- Updated dependencies [523bf0e]
+- Updated dependencies [f5a9920]
+- Updated dependencies [d6b46e7]
+- Updated dependencies [489470f]
+- Updated dependencies [271454d]
+- Updated dependencies [10bf0fa]
+- Updated dependencies [bc63bc3]
+- Updated dependencies [4706e9c]
+- Updated dependencies [15c0987]
+- Updated dependencies [e811e62]
+- Updated dependencies [ff666bb]
+- Updated dependencies [6b8a3b3]
+- Updated dependencies [9c2054c]
+- Updated dependencies [ef249e7]
+- Updated dependencies [f16b371]
+- Updated dependencies [7cde992]
+  - octane@0.19.0
+
 ## 0.1.19
 
 ### Patch Changes
