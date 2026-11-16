@@ -67,6 +67,7 @@ export const BENCHMARK_SUITES = [
 	'recursive-context',
 	'spa-navigation',
 	'scoped-signals',
+	'alien-signals-upstream',
 	'scoped-signals-trace',
 	'scoped-native-reads',
 	'signal-dom-bindings',
