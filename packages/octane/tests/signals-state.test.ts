@@ -382,13 +382,24 @@ describe('scoped synchronous signals', () => {
 		expect(result$.get()).toEqual([101, 300]);
 	});
 
-	it('uses Object.is equality for NaN and signed zero', () => {
+	it.each(['value', null])('uses Object.is equality for NaN and signed zero (key %s)', (key) => {
 		const scope = owner();
-		const value$ = scope.signal$('value', Number.NaN);
+		const value$ = scope.signal$(key, Number.NaN);
 		const values: number[] = [];
 		value$.subscribe(() => values.push(value$.get()));
+		let runs = 0;
+		scope.effect(() => {
+			value$.get();
+			runs++;
+		});
 		value$.set(Number.NaN);
+		// A batch that ends where it began tells a subscriber nothing.
+		scope.batch(() => {
+			value$.set(1);
+			value$.set(Number.NaN);
+		});
 		expect(values).toEqual([]);
+		expect(runs).toBe(2);
 		value$.set(0);
 		value$.set(-0);
 		expect(values).toHaveLength(2);
@@ -396,24 +407,27 @@ describe('scoped synchronous signals', () => {
 		expect(Object.is(values[1], -0)).toBe(true);
 	});
 
-	it('does not rerun readers of a derived value that recomputes equal', () => {
-		const scope = owner();
-		const count$ = scope.signal$('count', 1);
-		const parity$ = scope.derived$('parity', () =>
-			scope.get(count$) < 0 ? Number.NaN : scope.get(count$) % 2,
-		);
-		const runs: number[] = [];
-		const label$ = scope.derived$('label', () => {
-			const parity = scope.get(parity$);
-			runs.push(parity);
-			return parity;
-		});
-		const stop = label$.subscribe(() => {});
-		expect(label$.get()).toBe(1);
-		for (const count of [3, -1, -3, 2, 4, 6]) count$.set(count);
-		expect(runs).toEqual([1, Number.NaN, 0]);
-		stop();
-	});
+	it.each(['parity', null])(
+		'does not rerun readers of a derived value that recomputes equal (key %s)',
+		(key) => {
+			const scope = owner();
+			const count$ = scope.signal$(key && 'count', 1);
+			const parity$ = scope.derived$(key, () =>
+				scope.get(count$) < 0 ? Number.NaN : scope.get(count$) % 2,
+			);
+			const runs: number[] = [];
+			const label$ = scope.derived$('label', () => {
+				const parity = scope.get(parity$);
+				runs.push(parity);
+				return parity;
+			});
+			const stop = label$.subscribe(() => {});
+			expect(label$.get()).toBe(1);
+			for (const count of [3, -1, -3, 2, 4, 6]) count$.set(count);
+			expect(runs).toEqual([1, Number.NaN, 0]);
+			stop();
+		},
+	);
 
 	it('does not turn undefined, null, empty text, or false into pending', () => {
 		const scope = owner();
