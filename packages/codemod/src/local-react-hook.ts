@@ -142,8 +142,8 @@ export function nativeSetupHook(
 		contextSetup?: boolean;
 		privateContext?: boolean;
 	},
-	// Store-root diagnostics can prove an anonymous declaration's default export.
-	allowAnonymousDefault = false,
+	// These shapes are used for store-root diagnostics, without adapting a hook.
+	storeRoot = false,
 ) {
 	const call = ref.parent;
 	if (!ts.isCallExpression(call) || call.expression !== ref) return false;
@@ -228,10 +228,14 @@ export function nativeSetupHook(
 		owner = fn;
 		name = fn.name;
 	} else {
-		if (!diagnostic || (ts.isFunctionExpression(fn) && fn.name && renderUses(uses(fn.name)).length))
+		if (
+			(!diagnostic && !storeRoot) ||
+			(ts.isFunctionExpression(fn) && fn.name && renderUses(uses(fn.name)).length)
+		)
 			return false;
 		let value: ts.Expression = fn;
 		while (
+			diagnostic &&
 			ts.isCallExpression(value.parent) &&
 			value.parent.arguments[0] === value &&
 			/^(?:memo|forwardRef)$/.test(diagnostic.calleeName(value.parent.expression) ?? '')
@@ -253,8 +257,7 @@ export function nativeSetupHook(
 	if (
 		(name
 			? !/^[A-Z]/.test(name.text)
-			: !allowAnonymousDefault ||
-				!owner.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword)) ||
+			: !storeRoot || !owner.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword)) ||
 		!ts.isSourceFile(owner.parent) ||
 		!owner.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ||
 		(name &&
