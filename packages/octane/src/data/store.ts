@@ -24,6 +24,10 @@
  * - A read only the server can order keeps the order and membership it was
  *   sent, but shares records with the views: its load gives them any newer
  *   copy, and it shows any copy newer than its own load.
+ * - A change reaches the reads that can show it and no others: the reads whose
+ *   confirmed value selects the record, the lists and views of its entity
+ *   where it can add or move a row, and the read it replaces. What a change
+ *   costs does not grow with the reads the store holds.
  * - A seed from a server render is adopted when its read is first asked for,
  *   so hydration finds the server's value without waiting or loading. It keeps
  *   its age: freshness and expiry count from when the server loaded it.
@@ -34,6 +38,7 @@ import {
 	parse,
 	type DataReply,
 	type Entity,
+	type EntitySelection,
 	type DataRequest,
 	type Feed,
 	type Listener,
@@ -205,6 +210,10 @@ export interface StoreInternals {
 	invalidateSeeds(tags: Iterable<string>): void;
 	discardSeed(key: string): void;
 	readonly entries: ReadonlyMap<string, Entry>;
+	/** The reads with a load, restore or publish in flight. */
+	readonly inflight: ReadonlySet<Entry>;
+	/** The reads, other than views, whose confirmed value selects the record `id`. */
+	holding(entity: Entity<any>, id: string): Entry[];
 	/** Whether a view holds the record `id`, or would show `value` or move its rows for it. */
 	viewed(entity: Entity<any>, id: string, value?: unknown): boolean;
 	/** Take a record into the views, newer than every load already started; `null` removes it. */
@@ -258,7 +267,10 @@ export interface StoreInternals {
 	fence(on: boolean): void;
 	/** What a suspending reader of one of this store's handles waits on. */
 	loading(handle: ReadHandle<unknown>): Promise<void>;
-	/** Reload `reload`, then notify the readers of `changed` and of every read showing a record of `names`. */
+	/**
+	 * Reload `reload`, then notify the readers of `changed` and of every read a changed record
+	 * reached. A reply that predates this change to `names` is treated as overtaken.
+	 */
 	finish(reload: Set<Entry>, changed: readonly Entry[], names: ReadonlySet<string>): void;
 }
 
@@ -529,8 +541,27 @@ export function withPersistence<T>(factory: PersistenceFactory, build: () => T):
 	}
 }
 
+/** Whether two values of one read select the same records in the same places. */
+function sameRecords(before: EntitySelection[], after: EntitySelection[]): boolean {
+	return (
+		before.length === after.length &&
+		before.every(({ entity, source }, at) => {
+			const next = after[at]!.source;
+			if (after[at]!.entity !== entity || Array.isArray(source) !== Array.isArray(next))
+				return false;
+			if (!Array.isArray(source)) return entity.id(source) === entity.id(next);
+			return (
+				source.length === next.length &&
+				source.every(
+					(item, index) => item === next[index] || entity.id(item) === entity.id(next[index]),
+				)
+			);
+		})
+	);
+}
+
 /** @internal */
-export function selections(read: Read<any, any>, value: unknown) {
+export function selections(read: Read<any, any>, value: unknown): EntitySelection[] {
 	const selected = read.entities ? read.entities(value) : [];
 	return Array.isArray(selected) ? selected : [selected];
 }
@@ -563,6 +594,17 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	const records = new Map<string, Map<string, StoredRecord>>();
 	/** The entries holding a view's span, by entity name. */
 	const views = new Map<string, Set<Entry>>();
+	/**
+	 * The reads, other than views, that show an entity's records: by `name\nid`, those whose
+	 * confirmed value selects that record, and by `name`, those that select a list of the entity,
+	 * which a created record joins.
+	 */
+	const selecting = new Map<string, Entry | Set<Entry>>();
+	const inflight = new Set<Entry>();
+	/** Reads a change to a shared record or an edit has reached since the last commit. */
+	const reached = new Set<Entry>();
+	/** The store sequence of the last change `finish` applied to each entity. */
+	const touched = new Map<string, number>();
 	let operations: Operation[] = [];
 	let sequence = 0;
 	let retired = false;
@@ -709,6 +751,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const old = table.get(id);
 		if (old && old.seq > seq) return;
 		table.set(id, { value, seq });
+		reach(entity.name, id);
 		const moved = old !== undefined || created;
 		for (const entry of viewEntries(entity.name)) {
 			const { rows, start } = entry.span!;
@@ -725,7 +768,77 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	/** Delete a record from the shared table and from every view's index. */
 	function dropRecord(name: string, id: string): void {
 		records.get(name)!.delete(id);
+		reach(name, id);
 		for (const entry of viewEntries(name)) entry.span!.rows.delete(id);
+	}
+
+	/** Have the next commit reach every read that can show a record: its holders and its entity's views. */
+	function reach(name: string, id: string): void {
+		for (const entry of selectors(`${name}\n${id}`)) reached.add(entry);
+		for (const entry of viewEntries(name)) reached.add(entry);
+	}
+
+	/** Reach the reads an edit can show in. An edit to a record not yet confirmed shows in its entity's lists. */
+	function reachEdit(operation: Operation): void {
+		const { effect } = operation.write;
+		if (!effect) return;
+		const { name } = effect.entity;
+		reach(name, operation.entityId);
+		const drafted =
+			effect.kind === 'create' ||
+			operations.some(
+				({ write, entityId }) =>
+					write.effect?.kind === 'create' &&
+					write.effect.entity.name === name &&
+					entityId === operation.entityId,
+			);
+		if (drafted) for (const entry of selectors(name)) reached.add(entry);
+	}
+
+	/** The reads listed under `key`. Most records have one, so a set is made only for a second. */
+	function selectors(key: string): Iterable<Entry> {
+		const held = selecting.get(key);
+		return held === undefined ? NO_VIEWS : held instanceof Set ? held : [held];
+	}
+
+	/** The keys of `selecting` a read whose value selects `selected` is listed under. */
+	function selectionKeys(selected: EntitySelection[]): string[] {
+		const keys: string[] = [];
+		for (const { entity, source } of selected) {
+			if (Array.isArray(source)) keys.push(entity.name);
+			for (const item of Array.isArray(source) ? source : [source])
+				keys.push(`${entity.name}\n${entity.id(item)}`);
+		}
+		return keys;
+	}
+
+	/** Move `entry` from the records and lists its last value selected to those its next one does. */
+	function relist(entry: Entry, before: EntitySelection[], after: EntitySelection[]): void {
+		for (const key of selectionKeys(before)) {
+			const held = selecting.get(key);
+			if (held === entry) selecting.delete(key);
+			else if (held instanceof Set && held.delete(entry) && held.size === 0) selecting.delete(key);
+		}
+		for (const key of selectionKeys(after)) {
+			const held = selecting.get(key);
+			if (held === undefined) selecting.set(key, entry);
+			else if (held instanceof Set) held.add(entry);
+			else if (held !== entry) selecting.set(key, new Set([held, entry]));
+		}
+	}
+
+	/** An entry's attempt, where a change `finish` applied to an entity it selects counts as one. */
+	function attemptOf(entry: Entry): number {
+		let { attempt } = entry;
+		if (touched.size > 0)
+			for (const name of entry.names) attempt = Math.max(attempt, touched.get(name) ?? 0);
+		return attempt;
+	}
+
+	function fly(entry: Entry, done: Promise<void> | null): void {
+		entry.inflight = done;
+		if (done) inflight.add(entry);
+		else inflight.delete(entry);
 	}
 
 	/** Delete a record a confirmed write removed; views that counted it above their span reload. */
@@ -912,9 +1025,12 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	 * snapshot is current before any reader runs, so a reader of one view never
 	 * sees another mid-change.
 	 */
-	function commit(changed: Iterable<Entry>): void {
+	function commit(changed: Iterable<Entry> = EMPTY as Entry[]): void {
+		const all = new Set(changed);
+		for (const entry of reached) all.add(entry);
+		reached.clear();
 		const notify: Entry[] = [];
-		for (const entry of changed) {
+		for (const entry of all) {
 			const previous = entry.snapshot;
 			const next = buildSnapshot(entry);
 			if (
@@ -938,31 +1054,10 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		commit([entry]);
 	}
 
-	function touchEntities(): void {
-		commit([...entries.values()].filter((entry) => entry.read.entities));
-	}
-
-	/** Commit `entry`, and with it every view that reads the records its value carried. */
-	function touchWithViews(entry: Entry): void {
-		commit(withSharing([entry]));
-	}
-
-	/** These entries, and every read that shares a record their values may have changed. */
-	function withSharing(changed: readonly Entry[]): Set<Entry> {
-		const all = new Set(changed);
-		const names = new Set<string>();
-		for (const entry of changed)
-			if (entry.read.entities) for (const name of entry.names) names.add(name);
-		if (names.size === 0) return all;
-		for (const other of entries.values()) {
-			for (const name of other.names) {
-				if (names.has(name)) {
-					all.add(other);
-					break;
-				}
-			}
-		}
-		return all;
+	/** Commit the reads `operation`'s edit shows in, after it was added, removed or settled. */
+	function touchEdit(operation: Operation): void {
+		reachEdit(operation);
+		commit();
 	}
 
 	function reloadAll(reload: Set<Entry>): void {
@@ -972,6 +1067,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	/** Drop the confirmed value, so every later reader loads a new one. */
 	function forget(entry: Entry): void {
 		clearHostTimeout(entry.expireTimer);
+		if (entry.hasBase && !isView(entry.read)) relist(entry, selections(entry.read, entry.base), []);
 		entry.base = undefined;
 		entry.hasBase = false;
 		entry.names = new Set();
@@ -1021,6 +1117,12 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		reload?: Set<Entry>,
 		bounds?: Pick<Span, 'start' | 'first' | 'last'>,
 	): void {
+		const selected = selections(entry.read, value);
+		if (!isView(entry.read)) {
+			// An edit or a reload usually selects the records the last value did.
+			const before = entry.hasBase ? selections(entry.read, entry.base) : [];
+			if (!sameRecords(before, selected)) relist(entry, before, selected);
+		}
 		if (isView(entry.read)) {
 			const rows = value as unknown[];
 			const { offset, limit } = wireInput(entry) as { offset: number; limit: number };
@@ -1056,7 +1158,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			// nothing else moves. A record no view holds stays out: the views' own loads say
 			// which records they show, and this one may be older than theirs.
 			const later = reload ?? new Set();
-			for (const { entity, source } of selections(entry.read, value)) {
+			for (const { entity, source } of selected) {
 				const table = records.get(entity.name);
 				if (table === undefined) continue;
 				let shared = false;
@@ -1071,7 +1173,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		}
 		entry.base = value;
 		entry.hasBase = true;
-		entry.names = new Set(selections(entry.read, value).map(({ entity }) => entity.name));
+		entry.names = new Set(selected.map(({ entity }) => entity.name));
 		entry.fetchedAt = hostDateNow() - age;
 		entry.requestedAt = undefined;
 		entry.baseSeq = startedSeq;
@@ -1209,13 +1311,13 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			})
 			.then(() => {
 				if (retired || entry.inflight !== done) return;
-				entry.inflight = null;
-				touchWithViews(entry);
+				fly(entry, null);
+				touch(entry);
 				if (!entry.hasBase) return load(entry);
 				if (entry.subscribers.size > 0 && isStale(entry)) void load(entry);
 				else idle(entry);
 			});
-		entry.inflight = done;
+		fly(entry, done);
 		touch(entry);
 		return done;
 	}
@@ -1254,12 +1356,12 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			)
 			.then(() => {
 				if (!current()) return;
-				entry.inflight = null;
+				fly(entry, null);
 				entry.abort = null;
-				touchWithViews(entry);
+				touch(entry);
 				idle(entry);
 			});
-		entry.inflight = done;
+		fly(entry, done);
 		touch(entry);
 		return done;
 	}
@@ -1268,7 +1370,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	function supersede(entry: Entry): number {
 		entry.abort?.abort();
 		entry.abort = null;
-		entry.inflight = null;
+		fly(entry, null);
 		return (entry.attempt = ++sequence);
 	}
 
@@ -1460,7 +1562,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			if (!entry) continue;
 			// Another request, invalidation or write reply overtook this write. The server
 			// gives no ordering between them, so reload rather than publishing an older value.
-			const overtaken = entry.attempt > dispatchedAt;
+			const overtaken = attemptOf(entry) > dispatchedAt;
 			if (
 				overtaken &&
 				(entry.baseSeq <= dispatchedAt || entry.stale || entry.inflight || entry.span)
@@ -1470,11 +1572,11 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			}
 			refreshed.add(entry);
 			// The refreshed value supersedes any load that preceded this write.
-			const attempt = overtaken ? entry.attempt : supersede(entry);
+			const attempt = overtaken ? attemptOf(entry) : supersede(entry);
 			const startedSeq = ++sequence;
 			const current = () => {
 				if (retired || entries.get(entry.key) !== entry) return false;
-				if (entry.attempt === attempt) return true;
+				if (attemptOf(entry) === attempt) return true;
 				// A partial feed edit can supersede the refresh while its schema validates.
 				// The edit cannot account for the rest of the reply; a later full load can.
 				if (!entry.inflight && !entry.stale && entry.baseSeq < startedSeq) invalidateEntry(entry);
@@ -1506,7 +1608,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		if (pending.length > 0) {
 			void Promise.all(pending).then((commits) => {
 				const adopted = commits.map((adopt) => adopt());
-				commit(withSharing(adopted.filter((entry): entry is Entry => entry !== undefined)));
+				commit(adopted.filter((entry): entry is Entry => entry !== undefined));
 			});
 		}
 		const tags = writeTags(operation.write);
@@ -1539,7 +1641,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 
 	function remove(operation: Operation): void {
 		operations = operations.filter((item) => item !== operation);
-		touchEntities();
+		touchEdit(operation);
 		if (durable.has(operation.write)) persisted!.unjournal(operation.id);
 	}
 
@@ -1547,7 +1649,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	function settleOperation(operation: Operation, confirmed: boolean, value: unknown): void {
 		if (confirmed) {
 			confirm(operation, undefined, value);
-			touchEntities();
+			touchEdit(operation);
 		} else {
 			remove(operation);
 			operation.gate?.reject(new DependencyError());
@@ -1601,7 +1703,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		// Recovered writes were submitted before anything this session submitted.
 		if (recovered.length) {
 			operations = [...recovered, ...operations];
-			touchEntities();
+			for (const operation of recovered) reachEdit(operation);
+			commit();
 		}
 		for (const operation of recovered) settleByReceipt(operation);
 		// Obsolete writes have no usable effect metadata. Check one receipt at a time.
@@ -1684,7 +1787,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const operation = operationFor(id, write, input, raw, 'pending');
 		const { effect } = write;
 		operations.push(operation);
-		if (effect) touchEntities();
+		touchEdit(operation);
 		// A durable write is in the journal before it can reach the server.
 		const journaled = durable.has(write)
 			? persisted!.journal({ id, name: write.name, raw: operation.raw })
@@ -1741,7 +1844,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				}
 				if (retired) throw new DataRetiredError();
 				confirm(operation, reply, output, dispatchedAt);
-				if (write.serverId || settlesLocally(write)) touchEntities();
+				if (write.serverId || settlesLocally(write)) touchEdit(operation);
 				return output;
 			},
 			(error) => {
@@ -1861,13 +1964,13 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				)
 				.then(() => {
 					if (!current()) return;
-					entry.inflight = null;
-					touchWithViews(entry);
+					fly(entry, null);
+					touch(entry);
 					// A refused value leaves an observer the load it superseded.
 					if (entry.subscribers.size > 0 && (!entry.hasBase || entry.stale)) void load(entry);
 					else idle(entry);
 				});
-			entry.inflight = done;
+			fly(entry, done);
 			touch(entry);
 			return done.then(() => {
 				if (refused) throw reason;
@@ -1922,6 +2025,9 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			assigned.clear();
 			records.clear();
 			views.clear();
+			selecting.clear();
+			inflight.clear();
+			reached.clear();
 			seeds.clear();
 			staleSeedTags = undefined;
 			forms.clear();
@@ -1945,6 +2051,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		invalidateSeeds,
 		discardSeed,
 		entries,
+		inflight,
+		holding: (entity, id) => [...selectors(`${entity.name}\n${id}`)],
 		viewed: (entity, id, value) =>
 			!!records.get(entity.name)?.has(id) ||
 			(value !== undefined &&
@@ -1990,13 +2098,13 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			// Edits here to another tab's new record wait for its outcome, as they would there.
 			if (effect?.kind === 'create')
 				hold(operation, `${effect.entity.name}\n${operation.entityId}`, NEVER);
-			touchEntities();
+			touchEdit(operation);
 		},
 		operation: (id) => operations.find((item) => item.id === id),
 		operationFor,
 		confirm(operation, reply, output) {
 			confirm(operation, reply, output);
-			touchEntities();
+			touchEdit(operation);
 		},
 		remove(operation) {
 			remove(operation);
@@ -2028,19 +2136,11 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		},
 		finish(reload, changed, names) {
 			reloadAll(reload);
-			const all = new Set(changed);
-			for (const entry of entries.values()) {
-				for (const name of names) {
-					if (!entry.names.has(name)) continue;
-					// A pending reply can introduce a row this event already removed from the server,
-					// even if the current read or view has never held that row.
-					// In-flight reads have already restarted with their own newer attempts.
-					if (!entry.inflight) entry.attempt = ++sequence;
-					all.add(entry);
-					break;
-				}
-			}
-			commit(all);
+			// A pending reply can introduce a row this event already removed from the server,
+			// even if the current read or view has never held that row, so a reply that
+			// predates the change is overtaken. In-flight reads have already restarted.
+			for (const name of names) touched.set(name, ++sequence);
+			commit(changed);
 		},
 	});
 	return store;

@@ -204,8 +204,18 @@ function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P, key: st
  */
 export function receive(store: DataStore, changes: readonly FeedChange[]): void {
 	if (store.retired) throw new DataRetiredError();
-	const { entries, persisted, invalidateSeeds, discardSeed, viewed, record, rebase, finish } =
-		internals.get(store)!;
+	const {
+		entries,
+		inflight,
+		holding,
+		persisted,
+		invalidateSeeds,
+		discardSeed,
+		viewed,
+		record,
+		rebase,
+		finish,
+	} = internals.get(store)!;
 	const reload = new Set<Entry>();
 	const changed: Entry[] = [];
 	const names = new Set<string>();
@@ -238,11 +248,11 @@ export function receive(store: DataStore, changes: readonly FeedChange[]): void 
 		const id = 'put' in change ? entity.id(change.value) : change.id;
 		names.add(entity.name);
 		if (viewed(entity, id, value ?? undefined)) record(entity, id, value, reload);
-		for (const entry of entries.values()) {
-			if (!entry.read.entities || (entry.hasBase && !entry.names.has(entity.name))) continue;
-			if (entry.inflight) reload.add(entry);
-			else if (!entry.span && entry.hasBase) edit(entry, entity, id, value);
-		}
+		// A load in flight may predate the change, whether or not its value will select the record.
+		for (const entry of inflight)
+			if (entry.read.entities && (!entry.hasBase || entry.names.has(entity.name)))
+				reload.add(entry);
+		for (const entry of holding(entity, id)) if (!entry.inflight) edit(entry, entity, id, value);
 	}
 	if (tags.length > 0) store.invalidate(tags);
 	// A saved value of these records that is not in memory, and so not saved again now, is restored stale.
