@@ -4145,6 +4145,16 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					retained.push(text);
 					continue;
 				}
+				if (!typeOnly && !mapped && Object.hasOwn(UNSUPPORTED_VALUES, name)) {
+					retained.push(text);
+					this.note(
+						RULE.unsupported,
+						'error',
+						item,
+						`${UNSUPPORTED_VALUES[name]} This re-export stays on React.`,
+					);
+					continue;
+				}
 				if (
 					name === 'SubmitEvent' ||
 					name === 'SubmitEventHandler' ||

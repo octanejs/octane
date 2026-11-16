@@ -1213,6 +1213,26 @@ declare module 'react' {
 		},
 	);
 
+	it('retains unsupported React value re-exports and migrates supported siblings', () => {
+		const { code, notes } = transformModule(
+			"export { /* retained */ Profiler as ProfileRender, useState as useValue, createRef } from 'react';\n" +
+				"export { Component as Base } from 'react';",
+			'barrel.ts',
+		);
+		expect(code).toMatch(
+			/export \{\s*\/\* retained \*\/ Profiler as ProfileRender,\s*createRef\s*\} from 'react';/,
+		);
+		expect(code).toMatch(/export \{\s*useState as useValue,?\s*\} from 'octane';/);
+		expect(code).toContain("export { Component as Base } from 'react';");
+		expect(notes.filter(({ rule }) => rule === 'unsupported-api')).toEqual([
+			expect.objectContaining({
+				severity: 'error',
+				message: expect.stringContaining('This re-export stays on React.'),
+			}),
+			expect.objectContaining({ severity: 'error', message: expect.stringContaining('Class') }),
+		]);
+	});
+
 	it('migrates sibling exports and keeps comments on the React submit type re-export', () => {
 		const { code, notes } = transformModule(
 			"export { /* hook */ useState, /* event */ type SubmitEvent as Submission } from 'react';\n" +
