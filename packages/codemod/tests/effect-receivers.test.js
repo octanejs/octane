@@ -453,6 +453,67 @@ it('reports getters evaluated by strict comparisons in hook dependencies', () =>
 	);
 }, 20_000);
 
+it('reports getter and coercion effects from relational hook dependencies', async () => {
+	function Reference({ probe }) {
+		useMemo(() => 1, [probe.value < 2]);
+		return createElement('b', null, 'ok');
+	}
+	const getProbe = (reads) => ({
+		get value() {
+			reads.push('get');
+			return {
+				[Symbol.toPrimitive]() {
+					reads.push('coerce');
+					preinit('/relational-dependency.css', { as: 'style' });
+					return 1;
+				},
+			};
+		},
+	});
+	const originalReads = [];
+	expect(
+		renderToStaticMarkup(createElement(Reference, { probe: getProbe(originalReads) })),
+	).toContain('<link rel="stylesheet" href="/relational-dependency.css"');
+	expect(originalReads).toEqual(['get', 'coerce']);
+
+	const input = (dependency) => `import { useMemo } from 'react';
+		export function Probe({ probe }: { probe: { value: number } }) {
+			useMemo(() => 1, [${dependency}]);
+			return <b>ok</b>;
+		}`;
+	const migrated = migrate(input('probe.value < 2'));
+	const server = loadCompiledFixtureSource(migrated.code, { id: 'Probe.tsrx', mode: 'server' });
+	const nativeReads = [];
+	const { html } = await prerender(() =>
+		serverElement(server.Probe, { probe: getProbe(nativeReads) }),
+	);
+	expect(html).toContain('<b>ok</b>');
+	expect(html).not.toContain('/relational-dependency.css');
+	expect(nativeReads).toEqual(originalReads);
+	expect(migrated.notes).toContainEqual(dependencyError);
+
+	for (const dependency of ['2 > probe.value', 'probe["value"] <= 2', '2 >= probe.value']) {
+		expect(migrate(input(dependency)).notes, dependency).toContainEqual(dependencyError);
+	}
+	const owned = (value) =>
+		input('probe.value < 2').replace(
+			'({ probe }: { probe: { value: number } }) {',
+			`() { const probe = { value: ${value} };`,
+		);
+	expect(migrate(owned('1')).notes).not.toContainEqual(dependencyError);
+	expect(migrate(owned('{ valueOf() { return 1; } }')).notes).toContainEqual(dependencyError);
+	expect(migrate(input('false && probe.value < 2')).notes).not.toContainEqual(dependencyError);
+
+	const state = (next) => `import { useMemo, useState } from 'react';
+		export function Probe() {
+			const [state, setState] = useState({ value: 1 });
+			useMemo(() => 1, [2 >= state.value]);
+			return <button onClick={() => { setState({ value: ${next} }); }}>ok</button>;
+		}`;
+	expect(migrate(state('3')).notes).not.toContainEqual(dependencyError);
+	expect(migrate(state('{ valueOf() { return 3; } }')).notes).toContainEqual(dependencyError);
+}, 20_000);
+
 it('reports getters evaluated while building array hook dependencies', () => {
 	function Reference({ probe }) {
 		useMemo(() => 1, [...[probe.value]]);
