@@ -1,5 +1,6 @@
 import { svgDataAttribute, svgLiteralRootOverride } from './path-svg.js';
 import {
+	contains,
 	forwardedProps,
 	hasEval,
 	literalJsxAttribute,
@@ -953,6 +954,8 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		const isExported = (statement: ts.Statement) =>
 			ts.canHaveModifiers(statement) &&
 			ts.getModifiers(statement)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+		const elementChildren = [...this.elementChildren];
+		let safeElementAliases: boolean | undefined;
 		const descriptorChildren = [...this.descriptorComponents].flatMap((d) => {
 			const statement = ts.isVariableDeclaration(d) ? d.parent.parent : d;
 			return d.name && isExported(statement) ? [d.name.getText(this.sf)] : [];
@@ -979,7 +982,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					for (const element of statement.exportClause.elements) {
 						if (contexts.has((element.propertyName ?? element.name).text))
 							exported.add(element.name.text);
-						if (!this.descriptorComponents.size || statement.isTypeOnly || element.isTypeOnly)
+						if (
+							(!this.descriptorComponents.size && !this.elementChildren.length) ||
+							statement.isTypeOnly ||
+							element.isTypeOnly
+						)
 							continue;
 						const local =
 							this.checker.getExportSpecifierLocalTargetSymbol(element)?.valueDeclaration;
@@ -989,6 +996,28 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 							this.descriptorComponents.has(local)
 						) {
 							descriptorChildren.push(element.name.text);
+						}
+						if (local && ts.isFunctionDeclaration(local) && local.name) {
+							const start = local.getStart(this.sf);
+							if (
+								this.elementChildren.some((slot) => slot.start === start) &&
+								this.localUses(local.name).every(
+									(ref) => inTypeNode(ref) || componentTagOrExport(ref),
+								) &&
+								(safeElementAliases ??=
+									this.options.mutableExports?.() !== true &&
+									!contains(
+										this.sf,
+										(node) =>
+											node.kind === ts.SyntaxKind.ThisKeyword ||
+											(ts.isIdentifier(node) &&
+												/^(?:eval|module|exports|require|arguments)$/.test(node.text) &&
+												!isPropertyName(node) &&
+												!declaresName(node) &&
+												!inTypeNode(node)),
+									))
+							)
+								elementChildren.push({ start, exported: element.name.text });
 						}
 					}
 				}
@@ -1028,7 +1057,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			reexports,
 			...(descriptorChildren.length ? { descriptorChildren } : {}),
 			...(storeHookComponents.size ? { storeHookComponents: [...storeHookComponents] } : {}),
-			...(this.elementChildren.length ? { elementChildren: this.elementChildren } : {}),
+			...(elementChildren.length ? { elementChildren } : {}),
 		};
 	}
 
