@@ -617,6 +617,16 @@ export function mount(host) { createRoot(host).render(Pane); }`,
 				message: expect.stringMatching(/standalone.*migrated Pane.*NativeStoreProvider/),
 			}),
 		);
+		expect(result.files.find((file) => file.file === 'src/client.ts')?.notes).toContainEqual(
+			expect.objectContaining({
+				rule: 'store-hook',
+				severity: 'warning',
+				line: 3,
+				message: expect.stringMatching(
+					/If the migrated Pane's store hook reads context.*NativeStoreProvider/,
+				),
+			}),
+		);
 	},
 );
 
@@ -645,13 +655,6 @@ it('reports the context of a standalone server root that keeps a React factory c
 			severity: 'warning',
 			line: 5,
 			message: expect.stringMatching(/standalone.*migrated Pane.*NativeStoreProvider/),
-		}),
-	);
-	expect(result.files.find((file) => file.file === 'src/client.ts')?.notes).toContainEqual(
-		expect.objectContaining({
-			rule: 'store-hook',
-			severity: 'warning',
-			message: expect.stringMatching(/standalone.*NativeStoreProvider/),
 		}),
 	);
 });
