@@ -60,6 +60,7 @@ import {
 	SIGNAL_RETRY_LOCATIONS,
 	stampSignalInstanceKey,
 	renderBlock,
+	deferredOwnerToken,
 } from './signal-owners.js';
 import { storeSyncQueue, refDetachQueue } from './refs.js';
 import {
@@ -184,7 +185,8 @@ export const CHILDREN_CAPTURES: unique symbol = Symbol.for('octane.childrenCaptu
 // are part of the template that authored them, as `.tsx` children evaluated by
 // their parent are. markChildrenBlock records the signal owner that template
 // renders in, and scopeSignalOwner links the children's owner to it. A render
-// runs in an owner identity, which never retains its renderer tree. Unlike
+// that has not created its owner records its scope instead (deferredOwnerToken);
+// an owner identity never retains its renderer tree. Unlike
 // CHILDREN_BLOCK, the key is local to this runtime copy: another copy's owner
 // belongs to another document owner, which scopeSignalOwner never links.
 export const CHILDREN_SIGNAL_OWNER: unique symbol = Symbol() as any;
@@ -226,7 +228,7 @@ export function markChildrenBlock<T>(
 		if (body !== undefined) (fn as any)[CHILDREN_BODY] = body;
 		if (captures !== undefined) (fn as any)[CHILDREN_CAPTURES] = captures;
 		if (activeSynchronousSignalOwner !== null || activeSignalOwnerEnvironment !== undefined)
-			(fn as any)[CHILDREN_SIGNAL_OWNER] = currentExplicitSignalOwner();
+			(fn as any)[CHILDREN_SIGNAL_OWNER] = deferredOwnerToken() ?? currentExplicitSignalOwner();
 	}
 	return fn;
 }

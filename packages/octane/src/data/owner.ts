@@ -20,6 +20,9 @@
  *   started for a key replaces the value of each replica that holds it and is
  *   not loading it itself; an older one finishing later does not, and its value
  *   is never saved over the newer one's.
+ * - A read's value crosses to a tab once. Where the tab's validator returns the
+ *   value it was given, the owner saves its own copy of it and the tab sends
+ *   none back.
  * - Each write's receipt is looked up once per owner, and every tab that asks
  *   for it settles the write by that answer.
  * - One upstream connection serves every replica listening to a feed with
@@ -101,6 +104,8 @@ type ToOwner =
 			readonly fresh: boolean;
 			/** A write's receipt, which every tab asking for it shares. */
 			readonly receipt: boolean;
+			/** This tab saves the read's value, so the owner keeps its reply to save for it. */
+			readonly keep?: boolean;
 	  }
 	| { readonly t: 'listen'; readonly id: number; readonly request: FeedRequest }
 	| { readonly t: 'unlisten'; readonly id: number }
@@ -143,6 +148,8 @@ type ToReplica =
 			readonly reply: DataReply;
 			/** When a read's request started; a write's reply and an owner from an older build leave it out. */
 			readonly at?: number;
+			/** The owner kept the value: a tab that validates it unchanged saves it without sending it back. */
+			readonly kept?: boolean;
 	  }
 	| { readonly t: 'failed'; readonly id: number; readonly error: unknown }
 	| { readonly t: 'frame'; readonly id: number; readonly frame: FeedFrame }
@@ -155,6 +162,8 @@ type ToReplica =
 			readonly value: unknown;
 			/** When the request that read it started; an owner from an older build leaves it out. */
 			readonly at?: number;
+			/** The owner kept the value, as for a reply. */
+			readonly kept?: boolean;
 	  }
 	/** A value another replica holds, which the owner passes on as it came. */
 	| Offer
@@ -204,7 +213,7 @@ export function createDataOwner(options: {
 	/** When each shared read started, and the replicas that asked for it; the rest are told its value. */
 	const asked = new WeakMap<
 		Promise<DataReply>,
-		{ readonly at: number; readonly ports: Set<OwnerPort> }
+		{ readonly at: number; readonly ports: Set<OwnerPort>; keep: boolean }
 	>();
 	/** When the last read started: each starts later than every read before it, so they have an order. */
 	let lastStart = 0;
@@ -275,6 +284,13 @@ export function createDataOwner(options: {
 	const saves = new Map<string, Saving | null>();
 	/** When the newest request whose value was saved for each key started. */
 	const newestSaved = new Map<string, number>();
+	/**
+	 * A reply to each read a tab saves, and when its request started, until a
+	 * tab saves it or a newer request's value: one that validated it unchanged
+	 * says so, and the owner saves this copy. A reply that lands while another
+	 * is still kept is not kept, so its tabs send it back.
+	 */
+	const kept = new Map<string, { readonly at: number; readonly value: unknown }>();
 	/** Keys some tab restored or saved this session, which purging leaves alone. */
 	const shown = new Set<string>();
 	/** Only the first tab to ask recovers the journal, so each write is looked up once. */
@@ -305,9 +321,17 @@ export function createDataOwner(options: {
 		if (!p) return answer(nothing(op));
 		if (op === 'save' || op === 'restore') shown.add(key);
 		if (op === 'save') {
-			const saving = args[1] as Saving | null;
+			let saving = args[1] as Saving | null;
 			const at = saving?.requestedAt;
 			if (at !== undefined) {
+				const held = kept.get(key);
+				if (args[2]) {
+					// The tab validated the reply unchanged and sent no value. Unless it is still
+					// kept, a save of it, or of a newer request's value, came first.
+					if (held?.at !== at) return;
+					saving = { ...saving!, stored: { ...saving!.stored, value: held.value } };
+				}
+				if (held && held.at <= at) kept.delete(key);
 				// A reply to an older request can land after a newer one's value was saved.
 				if (at < (newestSaved.get(key) ?? 0)) return;
 				newestSaved.set(key, at);
@@ -342,6 +366,7 @@ export function createDataOwner(options: {
 		persistence = null;
 		saves.clear();
 		newestSaved.clear();
+		kept.clear();
 		shown.clear();
 		journaled.clear();
 		receipts.clear();
@@ -423,7 +448,7 @@ export function createDataOwner(options: {
 
 	function request(
 		from: OwnerPort,
-		{ id, request: payload, fresh, receipt }: Extract<ToOwner, { t: 'request' }>,
+		{ id, request: payload, fresh, receipt, keep }: Extract<ToOwner, { t: 'request' }>,
 	): void {
 		const answer = (reply: DataReply) => post(from, { t: 'reply', id, reply });
 		const fail = (error: unknown) => post(from, { t: 'failed', id, error });
@@ -442,14 +467,17 @@ export function createDataOwner(options: {
 			);
 			return;
 		}
-		const key = `${payload.kind}\n${entryKey(payload.name, payload.input)}`;
+		/** The key a tab saves the read under. */
+		const cacheKey = entryKey(payload.name, payload.input);
+		const key = `${payload.kind}\n${cacheKey}`;
 		let shared = receipt ? receipts.get(key) : fresh ? undefined : reading.get(key);
 		if (!shared) {
 			const at = (lastStart = Math.max(lastStart + 1, hostDateNow()));
 			const started = (shared = Promise.resolve().then(() =>
 				transport(payload, new AbortController().signal),
 			));
-			asked.set(started, { at, ports: new Set() });
+			const asking = { at, ports: new Set<OwnerPort>(), keep: false };
+			asked.set(started, asking);
 			reading.set(key, started);
 			newest.set(key, started);
 			const done = () => {
@@ -468,8 +496,15 @@ export function createDataOwner(options: {
 			if (payload.kind === 'read') {
 				started.then(
 					(reply) => {
+						if (!reply.ok) return;
+						// Kept for the tabs that save it. One kept before it may be the only value a tab
+						// can save, so it stays; one saved from a newer request needs no older one.
+						const saves = asking.keep && !receipt && options.persist && !kept.has(cacheKey);
+						if (saves && (newestSaved.get(cacheKey) ?? 0) < at) {
+							kept.set(cacheKey, { at, value: reply.value });
+						}
 						// A newer read has replaced this one; its value is the one to share.
-						if (!reply.ok || newest.get(key) !== started) return;
+						if (newest.get(key) !== started) return;
 						// Every replica holding this read takes the value; the ones that asked already have it.
 						const value: ToReplica = {
 							t: 'value',
@@ -477,18 +512,23 @@ export function createDataOwner(options: {
 							input: payload.input,
 							value: reply.value,
 							at,
+							kept: kept.get(cacheKey)?.at === at,
 						};
-						for (const port of replicas)
-							if (!asked.get(started)!.ports.has(port)) post(port, value);
+						for (const port of replicas) if (!asking.ports.has(port)) post(port, value);
 					},
 					() => {},
 				);
 			}
 			started.then(done, done);
 		}
-		const { at, ports } = asked.get(shared)!;
-		ports.add(from);
-		shared.then((reply) => post(from, { t: 'reply', id, reply, at }), fail);
+		const asking = asked.get(shared)!;
+		const { at } = asking;
+		asking.ports.add(from);
+		asking.keep ||= !!keep;
+		shared.then(
+			(reply) => post(from, { t: 'reply', id, reply, at, kept: kept.get(cacheKey)?.at === at }),
+			fail,
+		);
 	}
 
 	function subscribe(from: OwnerPort, id: number, payload: FeedRequest): void {
@@ -653,13 +693,29 @@ export function createReplica(
 	const askedFor = new Set<string>();
 
 	const receiptName = local.persist?.journal?.receipt.name;
+	/** The reads whose values this tab saves as loaded; a view saves its rows, not its reply. */
+	const saved = new Set<string>();
+	if (local.persist) {
+		for (const contract of contracts)
+			if (contract.kind === 'read' && contract.persist && !('view' in contract))
+				saved.add(contract.name);
+	}
+	/**
+	 * Values the owner kept its own copy of, with when their request started: one
+	 * still held unchanged when it is saved is not sent back.
+	 */
+	let kept = new WeakMap<object, number>();
+	const ownerKept = (value: unknown, at: number) => {
+		if (typeof value === 'object' && value !== null) kept.set(value, at);
+	};
 	/** Ask the owner to make `request`. */
 	const ask = (request: DataRequest, fresh: boolean) =>
 		new Promise<DataReply>((resolve, reject) => {
 			const id = ++next;
 			replies.set(id, { request, fresh, resolve, reject });
 			const receipt = request.kind === 'read' && request.name === receiptName;
-			send({ t: 'request', id, request, fresh, receipt });
+			const saves = request.kind === 'read' && saved.has(request.name);
+			send({ t: 'request', id, request, fresh, receipt, keep: saves });
 		});
 
 	const transport: Transport = (request, signal) => {
@@ -740,7 +796,17 @@ export function createReplica(
 				continue;
 			}
 			const saving = collect(key);
-			if (saving !== undefined) send({ t: 'persist', id: 0, op: 'save', args: [key, saving] });
+			if (saving === undefined) continue;
+			const value = saving?.stored.value;
+			const at = typeof value === 'object' && value !== null ? kept.get(value) : undefined;
+			if (at === undefined || at !== saving!.requestedAt) {
+				send({ t: 'persist', id: 0, op: 'save', args: [key, saving] });
+				continue;
+			}
+			// The owner kept this very value: say it validated, in place of cloning it back.
+			kept.delete(value as object);
+			const unchanged = { ...saving, stored: { ...saving!.stored, value: undefined } };
+			send({ t: 'persist', id: 0, op: 'save', args: [key, unchanged, true] });
 		}
 	};
 	const forwarded: PersistenceFactory = (collectSaving, keyInUse) => {
@@ -998,6 +1064,8 @@ export function createReplica(
 	function connect(next: OwnerPort) {
 		port = next;
 		unanswered = 0;
+		// What an earlier owner kept went with it.
+		kept = new WeakMap();
 		next.addEventListener('message', ({ data }) => {
 			if (port !== next) return;
 			unanswered = 0;
@@ -1027,6 +1095,7 @@ export function createReplica(
 					replies.delete(message.id);
 					if (message.t === 'reply') {
 						if (message.at !== undefined) requestTimes.set(message.reply, message.at);
+						if (message.kept && message.reply.ok) ownerKept(message.reply.value, message.at!);
 						pending?.resolve(message.reply);
 					} else pending?.reject(message.error);
 					break;
@@ -1038,6 +1107,7 @@ export function createReplica(
 					feeds.get(message.id)?.end(message.error);
 					break;
 				case 'value':
+					if (message.kept) ownerKept(message.value, message.at!);
 					void value(message.name, message.input, message.value, message.at);
 					break;
 				case 'offer':

@@ -5,7 +5,9 @@ import {
 	currentSignalOwner,
 	installSignalOwnerEnvironment,
 	runWithSignalOwner,
+	ScopeDisposedError,
 	signal$,
+	type SignalHandle,
 	type SignalOwner,
 } from 'octane/signals';
 import { act } from './_helpers';
@@ -286,5 +288,220 @@ export function Parent(props) @{
 			expect(isRendererOwner(owner)).toBe(true);
 			expect(entered).toContain(owner);
 		}
+	});
+});
+
+// A render creates its owner when something first asks for it. These
+// components ask for none until told to, so what they record meanwhile (a
+// handler, the children they pass, the frame a later sibling's props evaluate
+// in) must still resolve to the owner their own render gets once it asks.
+// Compiled directly, as above, so that production keeps each component slot:
+// a lightweight scope there, a Block in development.
+const QUIET = `import { signal$ } from 'octane/signals';
+function Tag(props) @{
+	if (props.loud) props.record('tag ' + props.id);
+	<em>{props.label as string}</em>
+}
+export function Siblings(props) @{
+	if (props.loud) props.record('siblings');
+	<p>
+		<Tag id="a" loud={props.loud} record={props.record} label="a" />
+		<Tag id="b" loud={props.loud} record={props.record} label={props.record('between')} />
+	</p>
+}
+function Press(props) @{
+	if (props.loud) props.record('press');
+	<button onClick={props.press}>{'press'}</button>
+}
+export function Panel(props) @{
+	if (props.loud) props.record('panel');
+	<section>
+		<Press loud={props.loud} record={props.record} press={props.press} />
+	</section>
+}
+function Remove(props) @{
+	<button onClick={props.remove}>{'remove'}</button>
+}
+function Bubble(props) @{
+	<main>
+		@if (props.remove) {
+			<div onClick={props.bubble}>
+				<Remove remove={props.remove} />
+			</div>
+		}
+	</main>
+}
+export function Removable(props) @{
+	<section>
+		<Bubble remove={props.remove} bubble={props.bubble} />
+	</section>
+}
+function Card(props) @{
+	<div>{props.children}</div>
+}
+function Author(props) @{
+	<section>
+		<button onClick={() => props.count$.set(props.count$.get() + 1)}>{'add'}</button>
+		<Card>
+			<output>{String(props.count$.get())}</output>
+		</Card>
+	</section>
+}
+export function Counter() @{
+	const count$ = signal$(1);
+	<Author count$={count$} />
+}
+function Hand(props) @{
+	props.take(props.children);
+	<i />
+}
+export function Lender(props) @{
+	<Hand take={props.take}>
+		<output>{String(props.value$.get())}</output>
+	</Hand>
+}
+export function Outlet(props) @{
+	<aside>
+		@try {
+			<div>{props.content}</div>
+		} @catch (error) {
+			<p>{props.caught(error) as string}</p>
+		}
+	</aside>
+}
+export function Source(props) @{
+	const value$ = signal$(5);
+	props.expose$(value$);
+	<i />
+}`;
+
+describe.each([
+	{ name: 'development', dev: true },
+	{ name: 'production', dev: false },
+])('deferred owner of a render that asks for none ($name)', ({ name, dev }) => {
+	const quiet = () =>
+		loadCompiledFixtureSource(QUIET, {
+			id: `/src/quiet-owner-frame-${name}.tsrx`,
+			mode: 'client',
+			compileOptions: { dev, hmr: false },
+			runtimeModules: { 'octane/signals': signals },
+		});
+
+	function mountRoot(): { host: HTMLElement; root: ReturnType<typeof createRoot> } {
+		const host = container();
+		const root = createRoot(host);
+		cleanups.push(() => root.unmount());
+		return { host, root };
+	}
+
+	it("evaluates a later sibling's props in the parent owner, not the earlier sibling's", () => {
+		const { Siblings } = quiet();
+		const log: Log = [];
+		const record = (label: string) => mark(log, label);
+		const ambient = currentSignalOwner();
+		const { host, root } = mountRoot();
+		root.render(Siblings, { loud: false, record });
+		expect(host.textContent).toBe('a');
+		expect(currentSignalOwner()).toBe(ambient);
+		const between = ownerOf(log, 'between');
+		expect(isRendererOwner(between)).toBe(true);
+
+		// The owner each render reports once it asks is the one it had all along.
+		log.length = 0;
+		flushSync(() => root.render(Siblings, { loud: true, record }));
+		expect(currentSignalOwner()).toBe(ambient);
+		expect(ownerOf(log, 'siblings')).toBe(between);
+		expect(ownerOf(log, 'between')).toBe(between);
+		const tags = [ownerOf(log, 'tag a'), ownerOf(log, 'tag b')];
+		expect(new Set([between, ...tags]).size).toBe(3);
+	});
+
+	it('runs a handler in the owner its component later renders in', () => {
+		const { Panel } = quiet();
+		const log: Log = [];
+		const record = (label: string) => mark(log, label);
+		const ambient = currentSignalOwner();
+		const { host, root } = mountRoot();
+		const press = () => log.push(['handler', currentSignalOwner()]);
+		root.render(Panel, { loud: false, record, press });
+		expect(log).toEqual([]);
+		host.querySelector('button')!.click();
+		const handler = ownerOf(log, 'handler');
+		expect(isRendererOwner(handler)).toBe(true);
+		expect(handler).not.toBe(ambient);
+
+		flushSync(() => root.render(Panel, { loud: true, record, press }));
+		expect(ownerOf(log, 'press')).toBe(handler);
+		expect(ownerOf(log, 'panel')).not.toBe(handler);
+		host.querySelector('button')!.click();
+		expect(log.filter(([label]) => label === 'handler').map(([, owner]) => owner)).toEqual([
+			handler,
+			handler,
+		]);
+	});
+
+	it('keeps a deleted tree retired for a queued handler reading a handle declared elsewhere', () => {
+		const { Removable, Source } = quiet();
+		let value$!: SignalHandle<number>;
+		mountRoot().root.render(Source, {
+			expose$: (handle$: SignalHandle<number>) => (value$ = handle$),
+		});
+		const { host, root } = mountRoot();
+		const reads: unknown[] = [];
+		root.render(Removable, {
+			remove: () => root.unmount(),
+			bubble() {
+				try {
+					reads.push(value$.get());
+				} catch (error) {
+					reads.push(error);
+				}
+			},
+		});
+		host.querySelector('button')!.click();
+		expect(host.querySelector('main')).toBeNull();
+		// The handler outlives its arm and the component the arm belongs to.
+		// Neither asked for an owner while it lived, and neither gets a live one
+		// now to hold a cell for the handle.
+		expect(reads).toHaveLength(1);
+		expect(reads[0]).toBeInstanceOf(ScopeDisposedError);
+	});
+
+	it("reads a handle prop in passed children from the cell its component's handler writes", () => {
+		// A component that receives a handle owns a cell for it. Author asks for no
+		// owner while it renders, yet its handler and the children it passes Card
+		// must both reach that one cell.
+		const { Counter } = quiet();
+		const { host, root } = mountRoot();
+		root.render(Counter);
+		expect(host.querySelector('output')!.textContent).toBe('1');
+		flushSync(() => host.querySelector('button')!.click());
+		expect(host.querySelector('output')!.textContent).toBe('2');
+	});
+
+	it('keeps a deleted component retired for children it passed that render later', () => {
+		const { Lender, Outlet, Source } = quiet();
+		let value$!: SignalHandle<number>;
+		mountRoot().root.render(Source, {
+			expose$: (handle$: SignalHandle<number>) => (value$ = handle$),
+		});
+		let content: unknown;
+		const lender = mountRoot();
+		lender.root.render(Lender, { value$, take: (children: unknown) => (content = children) });
+		lender.root.unmount();
+
+		const errors: unknown[] = [];
+		const { host, root } = mountRoot();
+		root.render(Outlet, {
+			content,
+			caught(error: unknown) {
+				errors.push(error);
+				return 'retired';
+			},
+		});
+		// The children belong to the deleted Lender's template, so the handle
+		// resolves through its retired owner, not a live one minted for it.
+		expect(host.textContent).toBe('retired');
+		expect(errors[0]).toBeInstanceOf(ScopeDisposedError);
 	});
 });

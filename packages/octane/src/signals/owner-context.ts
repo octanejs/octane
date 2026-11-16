@@ -3,6 +3,12 @@ import type { SignalOwner, SignalOwnerEnvironment } from './types.js';
 
 let installedEnvironment: SignalOwnerEnvironment | undefined;
 let synchronousOwner: SignalOwner | null = null;
+/**
+ * @internal Stands in the synchronous frame for an owner the renderer creates on
+ * first use (enterDeferredSignalOwner). No owner query ever returns it.
+ */
+export const DEFERRED_SIGNAL_OWNER: SignalOwner = /* @__PURE__ */ Object.freeze({ scopeKey: '' });
+let resolveDeferredOwner: (() => SignalOwner) | null = null;
 let defaultOwner: (() => SignalOwner | null) | undefined;
 let retireOwner: ((owner: SignalOwner) => void) | undefined;
 let supersedeOwner: ((owner: SignalOwner) => boolean) | undefined;
@@ -49,15 +55,24 @@ export function installSignalOwnerEnvironment(environment: SignalOwnerEnvironmen
 	};
 }
 
+function synchronousSignalOwner(): SignalOwner | null {
+	// The resolver's truthiness comes first: a bundle that never defers a frame
+	// never sets it, so its build drops the comparison and the stand-in.
+	if (resolveDeferredOwner && synchronousOwner === DEFERRED_SIGNAL_OWNER)
+		synchronousOwner = resolveDeferredOwner();
+	return synchronousOwner;
+}
+
 export function currentSignalOwner(): SignalOwner | null {
 	// A server carrier returning no request must not acquire browser authority.
-	if (installedEnvironment !== undefined) return installedEnvironment.current() ?? synchronousOwner;
-	return synchronousOwner ?? defaultOwner?.() ?? null;
+	if (installedEnvironment !== undefined)
+		return installedEnvironment.current() ?? synchronousSignalOwner();
+	return synchronousSignalOwner() ?? defaultOwner?.() ?? null;
 }
 
 /** @internal Distinguish an active owner frame from the lazy document fallback. */
 export function currentExplicitSignalOwner(): SignalOwner | null {
-	return installedEnvironment?.current() ?? synchronousOwner;
+	return installedEnvironment?.current() ?? synchronousSignalOwner();
 }
 
 /** @internal Client renderer installs its lazy document owner, never a last-root owner. */
@@ -103,6 +118,21 @@ export function enterSynchronousSignalOwner(owner: SignalOwner): SignalOwner | n
 	synchronousOwner = owner;
 	explicitSignalOwners = true;
 	signalOwnerUse.active = true;
+	return previous;
+}
+
+/**
+ * @internal Like enterSynchronousSignalOwner, for an owner `resolve` creates
+ * when something first asks for it. A render that declares, resolves or binds
+ * no signal then never creates one.
+ */
+export function enterDeferredSignalOwner(
+	resolve: () => SignalOwner,
+): SignalOwner | null | undefined {
+	if (installedEnvironment !== undefined) return undefined;
+	const previous = synchronousOwner;
+	synchronousOwner = DEFERRED_SIGNAL_OWNER;
+	resolveDeferredOwner = resolve;
 	return previous;
 }
 

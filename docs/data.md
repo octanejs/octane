@@ -257,6 +257,13 @@ store once hydrated. Only the newest submission's outcome is shown.
 - The cache keeps a read's value from the newest request the owner made for
   it. A reply to an older request that lands later shows in the tab that asked
   for it, and is not saved over the newer value.
+- A read's value crosses to a tab once. Where the tab's output validator
+  returns the value it was given, the tab tells the owner it validated and the
+  owner saves its own copy; the tab sends the value back only where its
+  validator returned another representation, the value changed since, or an
+  earlier reply to that read was still waiting to be saved. A read with
+  `persist: false` is never kept by the owner. A view saves its rows as
+  before.
 - A durable write in flight to an owner that crashes settles by itself: once
   each tab reconnects, it looks up the receipt of every journaled write it
   shows as uncertain and keeps or rolls back the edit. The owner looks each

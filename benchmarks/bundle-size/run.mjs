@@ -304,17 +304,20 @@ const creatorInstalledRanges = resolveDeclarationRanges(
 		'discardSignalRetryItem',
 		'clearSignalRetryOwners',
 		'retireRendererSignalOwner',
-		'retireUnownedSignalScope',
+		'deferScopeSignalOwner',
+		'deferredOwnerToken',
 		'queueEventOwner',
 		'closeNativeEventBatch',
 		'promotePendingSignals',
 	]
 		.map((name) => ({ name, source: 'runtime.ts' }))
 		.concat(
-			['runWithSignalOwner', 'runInSignalOwner', 'currentExplicitSignalOwner'].map((name) => ({
-				name,
-				source: 'signals/owner-context.ts',
-			})),
+			[
+				'runWithSignalOwner',
+				'runInSignalOwner',
+				'currentExplicitSignalOwner',
+				'enterDeferredSignalOwner',
+			].map((name) => ({ name, source: 'signals/owner-context.ts' })),
 			['beginNativeBatch', 'endNativeBatch'].map((name) => ({
 				name,
 				source: 'signals/read-protocol.ts',
