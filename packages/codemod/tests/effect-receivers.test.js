@@ -544,6 +544,64 @@ it('reports getters evaluated while building array hook dependencies', () => {
 	);
 }, 20_000);
 
+it('reports React SSR effects in sequence and template hook dependencies', () => {
+	function Reference({ probe }) {
+		useMemo(() => 1, [(probe.first, `${probe.second}`)]);
+		return createElement('b', null, 'ok');
+	}
+	const probe = {
+		get first() {
+			preinit('/dependency-getter.css', { as: 'style' });
+			return 1;
+		},
+		second: {
+			toString() {
+				preinit('/dependency-string.css', { as: 'style' });
+				return 'ready';
+			},
+		},
+	};
+	const html = renderToStaticMarkup(createElement(Reference, { probe }));
+	expect(html).toContain('<link rel="stylesheet" href="/dependency-getter.css"');
+	expect(html).toContain('<link rel="stylesheet" href="/dependency-string.css"');
+
+	const input = (dependency, value = '1') => `import { useMemo } from 'react';
+		export function Probe({ probe }: { probe: { value: number } }) {
+			const own = { value: ${value} };
+			useMemo(() => 1, [${dependency}]);
+			return <b>ok</b>;
+		}`;
+	const object = '{ toString() { return readString(); } }';
+	for (const source of [
+		input('(probe.value, 1)'),
+		input('(1, probe.value)'),
+		input('`prefix ${probe.value}`'),
+		input('`prefix ${1} ${own.value}`', object),
+		input('(`prefix ${own.value}`, 1)', object),
+		input('+(1, own.value)', object),
+	]) {
+		expect(migrate(source).notes, source).toContainEqual(dependencyError);
+	}
+	for (const source of [
+		input('+(own.value, 1)', object),
+		input('`prefix ${typeof own.value}`', object),
+		input('`prefix ${(own.value, 1)}`', object),
+		input('`prefix ${own.value}`'),
+		input('`prefix ${own.value}`', '"ready"'),
+		input('false && `prefix ${probe.value}`'),
+	]) {
+		expect(migrate(source, false).notes, source).not.toContainEqual(dependencyError);
+	}
+	const stateInput = (value) => `import { useMemo, useState } from 'react';
+		export function Probe() {
+			const [state, setState] = useState({ value: 'ready' });
+			useMemo(() => 1, [\`prefix \${(0, state.value)}\`]);
+			return <button onClick={() => { setState({ value: ${value} }); }}>ok</button>;
+		}`;
+	expect(migrate(stateInput('"ready"')).notes).not.toContainEqual(dependencyError);
+	expect(migrate(stateInput(object)).notes).toContainEqual(dependencyError);
+}, 20_000);
+
 it('checks property visibility for nested arrays of component state', () => {
 	const input = (dependencies, field = '2') => `import { useMemo, useState } from 'react';
 		export function Probe() {
