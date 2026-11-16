@@ -1734,6 +1734,20 @@ export async function runCodemod(
 				path.join((physicalRoot ??= fs.realpathSync(root)), path.relative(root, file))
 		);
 	};
+	function canResolveExtensionlessJsx(specifier: string) {
+		return (
+			/^\.{1,2}\//.test(specifier) &&
+			!/[!%?#\\]/.test(specifier) &&
+			!/\.(?:[cm]?[jt]sx?|tsrx)$/.test(specifier) &&
+			(config?.moduleResolution === undefined ||
+				config.moduleResolution === ts.ModuleResolutionKind.Bundler) &&
+			!config?.rootDirs &&
+			!config?.moduleSuffixes?.some(Boolean)
+		);
+	}
+	function isExtensionlessJsxTarget(file: string, original: string) {
+		return file.endsWith('.tsx') && unambiguousJsxPath(file, original) && isPlainFile(file);
+	}
 	function retainedJsxTarget(from: string, specifier: string, name: string) {
 		if (
 			!/^\.{1,2}\//.test(specifier) ||
@@ -2020,12 +2034,16 @@ export async function runCodemod(
 					? originalReactEntry(file, module)
 					: automaticReactJsx(file) && originalReactEntry(file, module),
 			)) {
-				if (!edge.module.endsWith('.tsx')) continue;
-				const match = retainedJsxTarget(file, edge.module, edge.name);
+				const explicit = edge.module.endsWith('.tsx');
+				if (!explicit && !canResolveExtensionlessJsx(edge.module)) continue;
+				const original = path.resolve(path.dirname(file), edge.module);
+				const match = explicit
+					? retainedJsxTarget(file, edge.module, edge.name)
+					: renamed(file, edge.module);
 				if (
 					!match ||
-					match.indirect ||
-					match.file !== path.resolve(path.dirname(file), edge.module) ||
+					('indirect' in match && match.indirect) ||
+					(explicit ? match.file !== original : !isExtensionlessJsxTarget(match.file, original)) ||
 					!automaticReactJsx(match.file) ||
 					!originalReactEntry(match.file, 'react/jsx-runtime')
 				)
@@ -2082,17 +2100,7 @@ export async function runCodemod(
 				const factory = 'factory' in edge && edge.factory;
 				const inferredServerPath =
 					edge.renderer === 'server render' && !/\.[jt]sx$/.test(edge.module);
-				if (
-					inferredServerPath &&
-					(/\.(?:[cm]?[jt]sx?|tsrx)$/.test(edge.module) ||
-						(config?.moduleResolution !== undefined &&
-							config.moduleResolution !== ts.ModuleResolutionKind.Bundler) ||
-						!/^\.{1,2}\//.test(edge.module) ||
-						/[!%?#\\]/.test(edge.module) ||
-						config?.rootDirs ||
-						config?.moduleSuffixes?.some(Boolean))
-				)
-					continue;
+				if (inferredServerPath && !canResolveExtensionlessJsx(edge.module)) continue;
 				const original = path.resolve(path.dirname(file), edge.module);
 				const direct = edge.renderer === 'createElement' ? null : renamed(file, edge.module);
 				const proven =
@@ -2107,10 +2115,7 @@ export async function runCodemod(
 				if (!match || (edge.renderer === 'createElement' && proven?.indirect)) continue;
 				const exportName = proven?.name ?? edge.name;
 				const extensionlessServer =
-					inferredServerPath &&
-					match.file.endsWith('.tsx') &&
-					unambiguousJsxPath(match.file, original) &&
-					isPlainFile(match.file);
+					inferredServerPath && isExtensionlessJsxTarget(match.file, original);
 				const explicit =
 					match.file === original && (edge.renderer !== 'JSX' || /\.[jt]sx$/.test(edge.module));
 				if (
