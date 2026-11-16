@@ -17,3 +17,5 @@ export const REACTIVE_TRACKED_CELL = 128;
 export const REACTIVE_FAILED = 256;
 /** Octane's own: an effect waiting in the batch's queue. */
 export const REACTIVE_QUEUED = 512;
+/** Octane's own: a keyless cell its owner holds so retirement reaches its readers. */
+export const REACTIVE_HELD = 1024;

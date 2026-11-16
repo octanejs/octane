@@ -56,7 +56,9 @@ describe('keyless signals', () => {
 		const parity$ = scope.derived$(null, () => count$.get() % 2);
 		const heard: number[] = [];
 		const ran: number[] = [];
-		parity$.subscribe(() => heard.push(parity$.get()));
+		// A keyless derived value belongs to no scope, so its subscriptions end as
+		// another scope's would: here, before its signal's scope retires.
+		const stop = parity$.subscribe(() => heard.push(parity$.get()));
 		scope.effect(() => {
 			ran.push(parity$.get());
 		});
@@ -64,6 +66,7 @@ describe('keyless signals', () => {
 		count$.set(4);
 		expect(heard).toEqual([0]);
 		expect(ran).toEqual([1, 0]);
+		stop();
 	});
 
 	it("rethrows a keyless computation's error until a dependency changes", () => {
@@ -272,6 +275,59 @@ describe('scope effects', () => {
 		expect(() => count$.set(1)).toThrow(error);
 		expect(seen).toEqual([0, 1]);
 	});
+
+	it('runs again after its cleanup threw', () => {
+		const scope = owner();
+		const count$ = scope.signal$(null, 0);
+		const error = new Error('cleanup failed');
+		const seen: number[] = [];
+		scope.effect(() => {
+			const count = count$.get();
+			seen.push(count);
+			return () => {
+				if (count === 0) throw error;
+			};
+		});
+		expect(() => count$.set(1)).toThrow(error);
+		count$.set(2);
+		expect(seen).toEqual([0, 2]);
+	});
+
+	it.each([
+		[
+			'effect',
+			(shared: Scope, read: () => unknown, log: string[]) => {
+				shared.effect(() => {
+					log.push(`run ${String(read())}`);
+					return () => log.push('cleanup');
+				});
+			},
+		],
+		[
+			'keyless derived',
+			(shared: Scope, read: () => unknown, log: string[]) => {
+				const derived$ = shared.derived$(null, read);
+				shared.effect(() => {
+					log.push(`run ${String(derived$.get())}`);
+					return () => log.push('cleanup');
+				});
+			},
+		],
+	] as const)(
+		"stops another scope's %s that read a keyless signal when that signal's scope is disposed",
+		(_, observe) => {
+			const view = owner('keyless-retired-view');
+			const shared = owner('keyless-retired-shared');
+			const draft$ = view.signal$(null, 'draft');
+			const log: string[] = [];
+			observe(shared, () => draft$.get(), log);
+			expect(log).toEqual(['run draft']);
+			view.dispose();
+			expect(log).toEqual(['run draft', 'cleanup']);
+			shared.dispose();
+			expect(log).toEqual(['run draft', 'cleanup']);
+		},
+	);
 });
 
 describe('scoped synchronous signals', () => {

@@ -28,6 +28,7 @@ import {
 	REACTIVE_TRACKED_CELL,
 	REACTIVE_FAILED,
 	REACTIVE_QUEUED,
+	REACTIVE_HELD,
 	REACTIVE_RECURSED,
 	REACTIVE_RECURSED_CHECK,
 	REACTIVE_WATCHING,
@@ -75,6 +76,8 @@ export interface GraphOwner {
 	/** Optional document freeze barrier; ordinary owners never allocate one. */
 	readonly readBarrier?: Promise<void> | undefined;
 	readonly observers: Set<SignalObserver>;
+	/** Keyless cells that gained a reader, whose readers retirement must reach. */
+	heldCells: PlainCell[] | undefined;
 	readonly seedable: boolean;
 	/** Trace events retained; zero when tracing is off. */
 	readonly traceLimit: number;
@@ -2088,6 +2091,7 @@ export class PlainCell<T = any> implements ReactiveNode {
 		if ((signalMode & READS_SPECIAL) === 0 && !this.owner.retired) {
 			const reader = activeNode;
 			if (reader !== undefined) {
+				if (!(this.flags & REACTIVE_HELD)) holdCell(this);
 				linkDependency(this, reader, trackingCycle);
 				if (this.owner !== reader.owner) addOwner(this.owner);
 			}
@@ -2241,10 +2245,17 @@ function cellChannel(cell: PlainCell): CellChannel {
  * A keyless cell's read while something presents other values or collects reads.
  * It is never staged, seeded or historical, so it presents its live value.
  */
+/** Its owner's retirement reaches a cell's readers only through the cells it holds. */
+function holdCell(cell: PlainCell): void {
+	cell.flags |= REACTIVE_HELD;
+	(cell.owner.heldCells ??= []).push(cell);
+}
+
 function readCellOther<T>(cell: PlainCell<T>): T {
 	assertAlive(cell.owner);
 	const reader = activeNode;
 	if (reader !== undefined) {
+		if (!(cell.flags & REACTIVE_HELD)) holdCell(cell);
 		linkDependency(cell, reader, trackingCycle);
 		if (cell.owner !== reader.owner) addOwner(cell.owner);
 	}
@@ -2496,7 +2507,8 @@ function queueEffect(effect: EffectNode): void {
 function runEffect(effect: EffectNode): void {
 	// A stopped effect can still sit in the queue.
 	if (effect.run === undefined) return;
-	const flags = effect.flags;
+	// Delivered, it can be queued again even if its cleanup or check throws below.
+	const flags = (effect.flags &= ~REACTIVE_QUEUED);
 	if (!(flags & REACTIVE_DIRTY)) {
 		if (!(flags & REACTIVE_PENDING) || effect.deps === undefined) {
 			effect.flags = REACTIVE_WATCHING;
@@ -2526,6 +2538,8 @@ export function executeEffect(effect: EffectNode): void {
 	if (run === undefined) return;
 	const cleanup = effect.cleanup;
 	if (cleanup !== undefined) {
+		// Watching again first: if the cleanup throws, the next change still reaches it.
+		effect.flags = REACTIVE_WATCHING;
 		effect.cleanup = undefined;
 		untrack(cleanup);
 	}
@@ -2850,6 +2864,19 @@ export function retireGraph(owner: GraphOwner, nodes: Iterable<ScopedNode>): voi
 			while (node.deps) unlink(node.deps, node);
 			while (node.subs) unlink(node.subs);
 			node.flags = REACTIVE_NONE;
+		}
+		// A keyless cell's readers learn of it as they would of a keyed node: their next
+		// read of it throws ScopeDisposedError, which stops an effect.
+		const held = owner.heldCells;
+		if (held !== undefined) {
+			owner.heldCells = undefined;
+			for (const cell of held) {
+				const subs = cell.subs;
+				if (subs !== undefined) {
+					propagate(subs, executionDepth !== 0);
+					shallowPropagate(subs);
+				}
+			}
 		}
 	} finally {
 		retirement = previous;
