@@ -75,6 +75,12 @@ function quotedPropWithReference(node: ts.JsxAttributeLike) {
 	);
 }
 
+function singleCallbackExpression(body: ts.ConciseBody) {
+	if (!ts.isBlock(body)) return body;
+	const statement = body.statements[0];
+	if (body.statements.length === 1 && ts.isReturnStatement(statement)) return statement.expression;
+}
+
 function directMember(receiver: ts.Node) {
 	const parent = receiver.parent;
 	if (
@@ -3560,11 +3566,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			arrow.type ||
 			arrow.modifiers ||
 			arrow.typeParameters ||
-			arrow.parameters.length ||
-			ts.isBlock(arrow.body)
+			arrow.parameters.length
 		)
 			return false;
-		const call = skipParens(arrow.body);
+		const output = singleCallbackExpression(arrow.body);
+		if (!output) return false;
+		const call = skipParens(output);
 		if (
 			!ts.isCallExpression(call) ||
 			call.questionDotToken ||
@@ -8536,12 +8543,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			fn.asteriskToken
 		)
 			return;
-		const body = fn.body;
-		const output = ts.isBlock(body)
-			? body.statements.length === 1 && ts.isReturnStatement(body.statements[0])
-				? body.statements[0].expression
-				: undefined
-			: body;
+		const output = singleCallbackExpression(fn.body);
 		// The retained map can be overridden and discard its callback's result.
 		if (output) this.checkNativeOutput(output, 'map', false, true);
 	}
