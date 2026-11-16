@@ -151,6 +151,22 @@ export type ViewInput<P> = [P] extends [void] ? ViewWindow | void : P & ViewWind
 /** Sort keys, most significant first. The entity's key breaks remaining ties. */
 export type ViewOrder<T> = ReadonlyArray<readonly [keyof T & string, 'asc' | 'desc']>;
 
+/** Where a view's records point: under each name, the entity and the property that holds that record's ID. */
+export type ViewRelations<T> = {
+	readonly [name: string]: readonly [of: Entity<any>, key: keyof T & string];
+};
+
+/**
+ * A row of a view `with` relations: the record, and under each relation's name
+ * the record it points at. That is absent where the key is empty or the store
+ * holds no such record.
+ */
+export type ViewRow<T, W> = {} extends W
+	? T
+	: T & {
+			readonly [K in keyof W]?: W[K] extends readonly [Entity<infer R>, unknown] ? R : never;
+		};
+
 export interface ViewRule<T> {
 	readonly of: Entity<T>;
 	readonly where: (record: T, input: any) => boolean;
@@ -160,16 +176,84 @@ export interface ViewRule<T> {
 	readonly limit: number;
 	/** The most rows one request may ask for; the server refuses more. */
 	readonly max: number;
+	/** The view's relations: the name each related record shows under, its entity, and the key. */
+	readonly joins: ReadonlyArray<readonly [name: string, of: Entity<any>, key: string]>;
 }
 
 /**
  * A list defined by a rule over an entity, not by a server response. Its read
- * value is the window's rows. The handler serves `limit` records from position
- * `offset` of the view's order, filtered by its rule, and must sort exactly as
- * `order` says, comparing values as JavaScript's `<` does, then by the key.
+ * value is the window's rows, `R`: the records, each with the records it is
+ * joined to. The handler serves `limit` records from position `offset` of the
+ * view's order, filtered by its rule, and must sort exactly as `order` says,
+ * comparing values as JavaScript's `<` does, then by the key.
  */
-export interface View<P, T> extends Read<ViewInput<P>, T[]> {
+export interface View<P, T, R = T> extends Read<ViewInput<P>, R[]> {
 	readonly view: ViewRule<T>;
+}
+
+/** @internal A joined row's own record: the row without its related records. */
+export function recordOf(row: object, joins: ViewRule<any>['joins']): Record<string, unknown> {
+	const record: Record<string, unknown> = {};
+	for (const key of Object.keys(row))
+		if (!joins.some(([name]) => name === key)) record[key] = (row as any)[key];
+	return record;
+}
+
+/**
+ * Validate a joined row's record and each related record with its own
+ * entity's schema, so a schema that drops or refuses unknown keys can be used.
+ */
+function joinedRow<T>(of: Entity<T>, joins: ViewRule<T>['joins']): StandardSchema<unknown, any> {
+	const schemas = [of.schema, ...joins.map(([, entity]) => entity.schema)];
+	return {
+		'~standard': {
+			version: 1,
+			vendor: 'octane',
+			validate(value) {
+				if (value === null || typeof value !== 'object')
+					return { issues: [{ message: 'Expected a record' }] };
+				const results = joins.map(([name, entity]) => {
+					const related = (value as any)[name];
+					// A key that points at nothing: the server sends no record, however it spells that.
+					return related == null
+						? { value: undefined }
+						: entity.schema['~standard'].validate(related);
+				});
+				const record = of.schema['~standard'].validate(recordOf(value, joins));
+				const collect = (
+					parsed: SchemaResult<any>,
+					settled: SchemaResult<any>[],
+				): SchemaResult<any> => {
+					if (parsed.issues) return parsed;
+					const row = { ...parsed.value };
+					for (let index = 0; index < joins.length; index++) {
+						const result = settled[index]!;
+						if (result.issues) return result;
+						row[joins[index]![0]] = result.value;
+					}
+					return { value: row };
+				};
+				return record instanceof Promise || results.some((result) => result instanceof Promise)
+					? Promise.all([record, Promise.all(results)]).then(([parsed, settled]) =>
+							collect(parsed, settled),
+						)
+					: collect(record, results as SchemaResult<any>[]);
+			},
+			jsonSchema: schemas.every((schema) => schema['~standard'].jsonSchema)
+				? {
+						output: (options) => ({
+							allOf: [of.schema['~standard'].jsonSchema!.output(options)],
+							properties: Object.fromEntries(
+								joins.map(([name, entity]) => [
+									name,
+									entity.schema['~standard'].jsonSchema!.output(options),
+								]),
+							),
+						}),
+					}
+				: undefined,
+		},
+	};
 }
 
 function compareValues(a: unknown, b: unknown): number {
@@ -226,10 +310,19 @@ const isCount = (value: unknown, min: number, max: number) =>
  * `more` says whether rows follow. Read a growing list a page at a time with
  * `pages(store, view)`, which joins the pages loaded so far and adds the next
  * with `loadMore()`; a component shows it with `usePages`.
+ *
+ * `with` joins each record to the records it points at:
+ * `with: { author: [User, 'authorId'] }` gives every row an `author`. The
+ * handler returns each row with its related records under those names, and
+ * the store keeps them as shared records of their own entities, so an edit to
+ * a user shows in every row that points at it. `where` and `order` see the
+ * view's own record only. A row keeps its identity until its record or one of
+ * its related records changes.
  */
-export function view<T, P = void>(options: {
+export function view<T, P = void, const W extends ViewRelations<T> = {}>(options: {
 	name: string;
 	of: Entity<T>;
+	with?: W;
 	input?: StandardSchema<unknown, P>;
 	where?: (record: T, input: P) => boolean;
 	order: ViewOrder<T>;
@@ -241,8 +334,20 @@ export function view<T, P = void>(options: {
 	expire?: number;
 	persist?: boolean;
 	version?: string;
-}): View<P, T> {
-	const { of, order, input: params, where: rule, limit: shown, max: most, ...rest } = options;
+}): View<P, T, ViewRow<T, W>> {
+	const {
+		of,
+		with: relations,
+		order,
+		input: params,
+		where: rule,
+		limit: shown,
+		max: most,
+		...rest
+	} = options;
+	const joins = Object.entries(relations ?? {}).map(
+		([name, [entity, key]]) => [name, entity, key] as const,
+	);
 	const max = most ?? 500;
 	const limit = Math.min(shown ?? 20, max);
 	const compare = (a: T, b: T): number => {
@@ -271,8 +376,17 @@ export function view<T, P = void>(options: {
 		},
 	};
 	return {
-		...read({ ...rest, input, output: arrayOf(of.schema), entities: (rows) => of.from(rows) }),
-		view: { of, where: rule ?? (() => true), compare, limit, max },
+		...read({
+			...rest,
+			input,
+			output: arrayOf(joins.length > 0 ? joinedRow(of, joins) : of.schema),
+			// A related entity is selected too, so a write to it or a tag naming it reaches the view.
+			entities: (rows) => [
+				of.from(rows),
+				...joins.map(([name, entity]) => entity.from(rows.flatMap((row) => row[name] ?? []))),
+			],
+		}),
+		view: { of, where: rule ?? (() => true), compare, limit, max, joins },
 	};
 }
 

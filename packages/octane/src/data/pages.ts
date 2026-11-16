@@ -36,19 +36,19 @@ const lists = new WeakMap<DataStore, Map<string, PagesHandle<any>>>();
  */
 export function pages<T>(
 	store: DataStore,
-	view: View<void, T>,
+	view: View<void, any, T>,
 	params?: void,
 	size?: number,
 ): PagesHandle<T>;
 export function pages<P, T>(
 	store: DataStore,
-	view: View<P, T>,
+	view: View<P, any, T>,
 	params: P,
 	size?: number,
 ): PagesHandle<T>;
 export function pages<P, T>(
 	store: DataStore,
-	view: View<P, T>,
+	view: View<P, any, T>,
 	params: P,
 	size = view.view.limit,
 ): PagesHandle<T> {
@@ -62,7 +62,7 @@ export function pages<P, T>(
 
 function createPages<P, T>(
 	store: DataStore,
-	view: View<P, T>,
+	view: View<P, any, T>,
 	params: P,
 	size: number,
 ): PagesHandle<T> {

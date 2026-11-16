@@ -47,6 +47,7 @@ import {
 	type View,
 	type ViewWindow,
 	type Write,
+	recordOf,
 } from './contracts.js';
 import {
 	createFormHandle,
@@ -126,7 +127,7 @@ export interface DataStore {
 	readonly retired: boolean;
 	/** A read with no input; a view with no parameters shows its default window. */
 	read<O>(read: Read<void, O>): ReadHandle<O>;
-	read<T>(view: View<void, T>): ReadHandle<T[]>;
+	read<R>(view: View<void, any, R>): ReadHandle<R[]>;
 	read<I, O>(read: Read<I, O>, input: I): ReadHandle<O>;
 	prefetch<I, O>(read: Read<I, O>, input: I): Promise<void>;
 	write<I, O>(write: Write<I, O>, input: I): Promise<O>;
@@ -296,7 +297,10 @@ interface Span {
 	readonly start: number;
 	readonly first: unknown;
 	readonly last: unknown;
-	/** Whether a short span has already been reloaded once, so a list that shrank cannot loop. */
+	/**
+	 * Whether the span has already been reloaded once for rows or related records it lacks, so
+	 * a list that shrank cannot loop.
+	 */
 	reloaded: boolean;
 	/** Whether the view's last evaluation found rows past its window, or the span goes on past its rows. */
 	more: boolean;
@@ -306,6 +310,11 @@ interface Span {
 	 * edits touch, never the whole table.
 	 */
 	readonly rows: Map<string, unknown>;
+	/**
+	 * For a view with relations, the related records its load's rows pointed at, by `name\nid`,
+	 * whether or not the server had them. A row that points at any other has changed since.
+	 */
+	readonly asked: ReadonlySet<string>;
 }
 
 interface StoredRecord {
@@ -346,6 +355,8 @@ export interface Entry {
 	checkedStorage: boolean;
 	/** The last projection of a read's value, so an unchanged one keeps its identity. */
 	projected: { base: unknown; parts: Map<unknown, unknown>; value: unknown } | null;
+	/** For a view with relations, the keys of `joining` it is listed under. */
+	related: readonly string[];
 }
 
 /** @internal */
@@ -397,6 +408,7 @@ const MARGIN = 20;
 
 const EMPTY: readonly unknown[] = [];
 const NO_VIEWS: ReadonlySet<never> = new Set();
+const NO_KEYS: ReadonlySet<string> = new Set();
 
 const isView = (read: Read<any, any>): read is View<any, any> => 'view' in read;
 
@@ -600,6 +612,13 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	 * which a created record joins.
 	 */
 	const selecting = new Map<string, Entry | Set<Entry>>();
+	/**
+	 * The views that show a record through a relation, by the related record's `name\nid`: those
+	 * with a row in their window that points at it, whether or not the store holds that record.
+	 */
+	const joining = new Map<string, Entry | Set<Entry>>();
+	/** Each joined row's own record, so a row made of the same objects is shown again as it is. */
+	const joinedFrom = new WeakMap<object, unknown>();
 	const inflight = new Set<Entry>();
 	/** Reads a change to a shared record or an edit has reached, until `commitReached` commits them. */
 	const reached = new Set<Entry>();
@@ -677,9 +696,46 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		else for (const view of viewEntries(entry.read.view.of.name)) persisted.mark(view.key);
 	}
 
-	/** The confirmed records within a view's span, in its order. */
+	/** The confirmed records within a view's span, in its order, each with its confirmed related records. */
 	function confirmedRows(entry: Entry): unknown[] {
-		return [...entry.span!.rows.values()].sort((entry.read as View<any, any>).view.compare);
+		const { compare, joins } = (entry.read as View<any, any>).view;
+		const rows = [...entry.span!.rows.values()].sort(compare);
+		if (joins.length === 0) return rows;
+		const confirmed = (entity: Entity<any>, id: string) => records.get(entity.name)?.get(id)?.value;
+		return rows.map((row) => joinRow(joins, row, confirmed));
+	}
+
+	/**
+	 * A view's row as it is shown: the record with, under each relation's name, the record
+	 * `find` gives for its key. A related record that shows what `was` shows is taken from
+	 * `was`, so a row whose parts are unchanged has the fields of the row before it.
+	 */
+	function joinRow(
+		joins: View<any, any>['view']['joins'],
+		row: any,
+		find: (entity: Entity<any>, id: string) => unknown,
+		was?: any,
+	): unknown {
+		const joined = { ...row };
+		for (const [name, entity, key] of joins) {
+			const related = row[key] == null ? undefined : find(entity, String(row[key]));
+			joined[name] = was !== undefined && sameRow(was[name], related) ? was[name] : related;
+		}
+		return joined;
+	}
+
+	/** A record as `entry` shows it: the shared copy with every outstanding edit applied. */
+	function latest(entry: Entry, entity: Entity<any>, id: string): unknown {
+		let value = records.get(entity.name)?.get(id)?.value;
+		for (const operation of operations) {
+			const { effect } = operation.write;
+			if (effect?.entity.name !== entity.name || operation.entityId !== id) continue;
+			if (!shows(operation, entry)) continue;
+			if (effect.kind === 'remove') value = undefined;
+			else if (effect.kind === 'create') value ??= operation.draft;
+			else if (value !== undefined) value = { ...value, ...(operation.input as object) };
+		}
+		return value;
 	}
 
 	function assertLive(): void {
@@ -772,9 +828,14 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		for (const entry of viewEntries(name)) entry.span!.rows.delete(id);
 	}
 
-	/** Have the next commit reach every read that can show a record: its holders and its entity's views. */
+	/**
+	 * Have the next commit reach every read that can show a record: its holders, its entity's
+	 * views, and the views with a row that points at it.
+	 */
 	function reach(name: string, id: string): void {
-		for (const entry of selectors(`${name}\n${id}`)) reached.add(entry);
+		const key = `${name}\n${id}`;
+		for (const entry of selectors(key)) reached.add(entry);
+		for (const entry of selectors(key, joining)) reached.add(entry);
 		for (const entry of viewEntries(name)) reached.add(entry);
 	}
 
@@ -796,8 +857,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	}
 
 	/** The reads listed under `key`. Most records have one, so a set is made only for a second. */
-	function selectors(key: string): Iterable<Entry> {
-		const held = selecting.get(key);
+	function selectors(key: string, index = selecting): Iterable<Entry> {
+		const held = index.get(key);
 		return held === undefined ? NO_VIEWS : held instanceof Set ? held : [held];
 	}
 
@@ -812,18 +873,23 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		return keys;
 	}
 
-	/** Move `entry` from the records and lists its last value selected to those its next one does. */
-	function relist(entry: Entry, before: EntitySelection[], after: EntitySelection[]): void {
-		for (const key of selectionKeys(before)) {
-			const held = selecting.get(key);
-			if (held === entry) selecting.delete(key);
-			else if (held instanceof Set && held.delete(entry) && held.size === 0) selecting.delete(key);
+	/** Move `entry` in `index` from the keys it was listed under to those it is now. */
+	function relist(
+		entry: Entry,
+		before: readonly string[],
+		after: readonly string[],
+		index = selecting,
+	): void {
+		for (const key of before) {
+			const held = index.get(key);
+			if (held === entry) index.delete(key);
+			else if (held instanceof Set && held.delete(entry) && held.size === 0) index.delete(key);
 		}
-		for (const key of selectionKeys(after)) {
-			const held = selecting.get(key);
-			if (held === undefined) selecting.set(key, entry);
+		for (const key of after) {
+			const held = index.get(key);
+			if (held === undefined) index.set(key, entry);
 			else if (held instanceof Set) held.add(entry);
-			else if (held !== entry) selecting.set(key, new Set([held, entry]));
+			else if (held !== entry) index.set(key, new Set([held, entry]));
 		}
 	}
 
@@ -857,9 +923,17 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const table = records.get(name);
 		if (!table) return;
 		const held = viewEntries(name);
+		// A record another entity's view is joined to stays while that view holds the row pointing at it.
+		const joined = new Set<string>();
+		for (const entries of views.values())
+			for (const entry of entries)
+				for (const [, entity, key] of (entry.read as View<any, any>).view.joins)
+					if (entity.name === name)
+						for (const row of entry.span!.rows.values() as Iterable<any>)
+							if (row[key] != null) joined.add(String(row[key]));
 		for (const id of table.keys()) {
-			let kept = false;
-			for (const entry of held) if ((kept = entry.span!.rows.has(id))) break;
+			let kept = joined.has(id);
+			for (const entry of held) if (kept || (kept = entry.span!.rows.has(id))) break;
 			if (!kept) table.delete(id);
 		}
 	}
@@ -872,7 +946,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	 */
 	function evaluate(entry: Entry): unknown[] {
 		const span = entry.span!;
-		const { of, compare } = (entry.read as View<any, any>).view;
+		const { of, compare, joins } = (entry.read as View<any, any>).view;
 		const { offset, limit } = shown(entry);
 		// A window past the end of the list holds no records to bound it.
 		if (span.start > 0 && span.first === null) {
@@ -919,10 +993,43 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		for (const value of merged.values()) if (inSpan(entry, value)) rows.push(value);
 		rows.sort(compare);
 		const from = offset - span.start - shift;
-		// A reload cannot fill the window until the server has the edits that emptied it;
-		// each one that settles evaluates the view again.
 		const short = from < 0 || (span.last !== null && rows.length < from + limit);
-		if (short && !unsettled && !span.reloaded) {
+		span.more = rows.length > from + limit || span.last !== null;
+		let next = rows.slice(Math.max(0, from), Math.max(0, from + limit));
+		const previous = entry.snapshot?.value as unknown[] | undefined;
+		let unasked = false;
+		if (joins.length > 0) {
+			const find = (entity: Entity<any>, id: string) => latest(entry, entity, id);
+			/** The rows shown before, by ID, for a row that has moved. */
+			let before: Map<string, unknown> | undefined;
+			next = next.map((row: any, index) => {
+				const id = of.id(row);
+				let was = previous?.[index] as any;
+				if (was !== undefined && of.id(was) !== id)
+					was = (before ??= new Map(previous!.map((shown) => [of.id(shown), shown]))).get(id);
+				// The usual case: the record and its related records are the objects they were.
+				if (was !== undefined && joinedFrom.get(was) === row) {
+					let same = true;
+					for (const [name, entity, key] of joins)
+						same &&= was[name] === (row[key] == null ? undefined : find(entity, String(row[key])));
+					if (same) return was;
+				}
+				const made = joinRow(joins, row, find, was);
+				const joined = sameRow(was, made) ? was : made;
+				joinedFrom.set(joined, row);
+				return joined;
+			});
+			// A row an edit or an event pointed at a record the load never brought, or said it lacked.
+			for (const row of next as any[])
+				for (const [name, entity, key] of joins)
+					unasked ||=
+						row[name] === undefined &&
+						row[key] != null &&
+						!span.asked.has(`${entity.name}\n${row[key]}`);
+		}
+		// A reload cannot fill the window, or bring a record an edit points at, until the server
+		// has the edits; each one that settles evaluates the view again.
+		if ((short || unasked) && !unsettled && !span.reloaded) {
 			span.reloaded = true;
 			// Not inside the render that asked for the snapshot.
 			queueMicrotask(() => {
@@ -931,14 +1038,22 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				}
 			});
 		}
-		span.more = rows.length > from + limit || span.last !== null;
-		const next = rows.slice(Math.max(0, from), Math.max(0, from + limit));
-		const previous = entry.snapshot?.value as unknown[] | undefined;
-		return previous !== undefined &&
+		if (
+			previous !== undefined &&
 			previous.length === next.length &&
 			previous.every((row, index) => sameRow(row, next[index]))
-			? previous
-			: next;
+		)
+			return previous;
+		if (joins.length > 0) {
+			// From here a change to a record these rows point at reaches this view, and no other does.
+			const related: string[] = [];
+			for (const row of next as any[])
+				for (const [, entity, key] of joins)
+					if (row[key] != null) related.push(`${entity.name}\n${row[key]}`);
+			relist(entry, entry.related, related, joining);
+			entry.related = related;
+		}
+		return next;
 	}
 
 	/** The confirmed value with every outstanding edit applied, in submission order. */
@@ -1076,7 +1191,10 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	/** Drop the confirmed value, so every later reader loads a new one. */
 	function forget(entry: Entry): void {
 		clearHostTimeout(entry.expireTimer);
-		if (entry.hasBase && !isView(entry.read)) relist(entry, selections(entry.read, entry.base), []);
+		if (entry.hasBase && !isView(entry.read))
+			relist(entry, selectionKeys(selections(entry.read, entry.base)), EMPTY as string[]);
+		relist(entry, entry.related, EMPTY as string[], joining);
+		entry.related = EMPTY as string[];
 		entry.base = undefined;
 		entry.hasBase = false;
 		entry.names = new Set();
@@ -1094,13 +1212,16 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		entry.keepTimer = setHostTimeout(() => {
 			entry.keepTimer = undefined;
 			// A handle outlives its entry; an evicted one must not show what it once held.
-			const view = isView(entry.read) ? entry.read.view.of.name : undefined;
+			const view = isView(entry.read) ? entry.read.view : undefined;
 			forget(entry);
 			entries.delete(entry.key);
 			const lookup = lookupKey(entry.input);
 			if (lookup !== null && lookups.get(entry.read)?.get(lookup) === entry)
 				lookups.get(entry.read)!.delete(lookup);
-			if (view !== undefined) collectRecords(view);
+			if (view !== undefined) {
+				collectRecords(view.of.name);
+				for (const [, entity] of view.joins) collectRecords(entity.name);
+			}
 			collect();
 		}, entry.read.keep);
 	}
@@ -1130,10 +1251,25 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		if (!isView(entry.read)) {
 			// An edit or a reload usually selects the records the last value did.
 			const before = entry.hasBase ? selections(entry.read, entry.base) : [];
-			if (!sameRecords(before, selected)) relist(entry, before, selected);
+			if (!sameRecords(before, selected))
+				relist(entry, selectionKeys(before), selectionKeys(selected));
 		}
 		if (isView(entry.read)) {
-			const rows = value as unknown[];
+			const { of, joins } = entry.read.view;
+			const later = reload ?? new Set();
+			let rows = value as any[];
+			let asked = NO_KEYS;
+			if (joins.length > 0) {
+				// Related records join their own entities' shared records; a row keeps its own.
+				const keys = new Set<string>();
+				for (const row of rows)
+					for (const [name, entity, key] of joins) {
+						if (row[key] != null) keys.add(`${entity.name}\n${row[key]}`);
+						if (row[name] !== undefined) putRecord(entity, row[name], startedSeq, entry, later);
+					}
+				asked = keys;
+				rows = rows.map((row) => recordOf(row, joins));
+			}
 			const { offset, limit } = wireInput(entry) as { offset: number; limit: number };
 			entry.span = {
 				...(bounds ?? {
@@ -1144,9 +1280,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				reloaded: false,
 				more: false,
 				rows: new Map(),
+				asked,
 			};
-			const { of } = entry.read.view;
-			const later = reload ?? new Set();
 			const loaded = new Set<string>();
 			for (const row of rows) {
 				loaded.add(of.id(row));
@@ -1312,6 +1447,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 						reloaded: false,
 						more: false,
 						rows: new Map(),
+						asked: entry.span.asked,
 					};
 					index(entry);
 				}
@@ -1496,6 +1632,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			span: null,
 			checkedStorage: false,
 			projected: null,
+			related: EMPTY as string[],
 		};
 		entries.set(key, created);
 		handles.set(created.handle, created);
@@ -2035,6 +2172,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			records.clear();
 			views.clear();
 			selecting.clear();
+			joining.clear();
 			inflight.clear();
 			reached.clear();
 			seeds.clear();
@@ -2064,6 +2202,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		holding: (entity, id) => [...selectors(`${entity.name}\n${id}`)],
 		viewed: (entity, id, value) =>
 			!!records.get(entity.name)?.has(id) ||
+			joining.has(`${entity.name}\n${id}`) ||
 			(value !== undefined &&
 				[...viewEntries(entity.name)].some(
 					// A record above a lower window moves every row in it.

@@ -39,6 +39,8 @@ export type {
 	View,
 	ViewInput,
 	ViewOrder,
+	ViewRelations,
+	ViewRow,
 	ViewWindow,
 	Write,
 } from './contracts.js';
