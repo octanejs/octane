@@ -28,7 +28,7 @@ import {
 	REACTIVE_TRACKED_CELL,
 	REACTIVE_FAILED,
 	REACTIVE_QUEUED,
-	REACTIVE_HELD,
+	REACTIVE_KEYLESS_CELL,
 	REACTIVE_LISTED,
 	REACTIVE_RECURSED,
 	REACTIVE_RECURSED_CHECK,
@@ -163,7 +163,7 @@ interface Wakeup {
 	node?: ScopedNode | undefined;
 }
 
-type Work = ScopedNode | SignalObserver | EffectNode | (() => void);
+type Work = ScopedNode | SignalObserver | (() => void);
 
 let activeNode: ScopedNode | EffectNode | PlainComputed | undefined;
 let activeOwners: Set<GraphOwner> | undefined;
@@ -198,6 +198,10 @@ let historicalReader:
 const queue: Array<Work | undefined> = [];
 let queueIndex = 0;
 let queueLength = 0;
+/** The batch's effects, delivered after the rest of its work, in the order they were queued. */
+const effectQueue: Array<EffectNode | undefined> = [];
+let effectIndex = 0;
+let effectLength = 0;
 /** The notices of retiring owners still in the queue, so observers that share one queue it once. */
 const queuedNotices = new Set<() => void>();
 
@@ -267,6 +271,21 @@ function linkDependency(dep: ReactiveNode, sub: ReactiveNode, version: number): 
 	if (prevSub !== undefined && prevSub.version === version && prevSub.sub === sub) {
 		return;
 	}
+	addLink(dep, sub, version, prevDep, nextDep, prevSub);
+}
+
+/**
+ * The edge linkDependency found nowhere: kept out of it, so the reuse checks every
+ * tracked read makes stay small enough to inline into the read.
+ */
+function addLink(
+	dep: ReactiveNode,
+	sub: ReactiveNode,
+	version: number,
+	prevDep: Link | undefined,
+	nextDep: Link | undefined,
+	prevSub: Link | undefined,
+): void {
 	const newLink =
 		(sub.depsTail =
 		dep.subsTail =
@@ -287,6 +306,12 @@ function linkDependency(dep: ReactiveNode, sub: ReactiveNode, version: number): 
 	} else {
 		sub.deps = newLink;
 	}
+	// A keyless cell's first reader: rarer than any read, so the check lives here.
+	if (
+		prevSub === undefined &&
+		(dep.flags & (REACTIVE_KEYLESS_CELL | REACTIVE_LISTED)) === REACTIVE_KEYLESS_CELL
+	)
+		holdCell(dep as PlainCell);
 	if (prevSub !== undefined) {
 		prevSub.nextSub = newLink;
 	} else {
@@ -316,7 +341,7 @@ function unlink(link: Link, sub = link.sub): Link | undefined {
 	} else {
 		// Scopes retain their producers independently of subscriber count.
 		dep.subs = nextSub;
-		if (nextSub === undefined && dep.flags & REACTIVE_HELD) releaseCell(dep as PlainCell);
+		if (nextSub === undefined && dep.flags & REACTIVE_KEYLESS_CELL) releaseCell(dep as PlainCell);
 	}
 	return nextDep;
 }
@@ -525,7 +550,7 @@ export function startSignalBatch(): void {
 
 export function endSignalBatch(): void {
 	// Most batches queue nothing: a write nothing observes, or a read-only action.
-	if (--batchDepth === 0 && queueLength !== 0) flush();
+	if (--batchDepth === 0 && (queueLength | effectLength) !== 0) flush();
 }
 
 export function signalBatch<T>(run: () => T): T {
@@ -560,20 +585,29 @@ function flush(): void {
 		}
 	} finally {
 		flushing = false;
-		queueIndex = queueLength = 0;
+		queueIndex = queueLength = effectIndex = effectLength = 0;
 		activeNode = previousNode;
 		if (previousObserver !== null) setNativeReadObserver(previousObserver);
 	}
 	if (failed) throw firstError;
 }
 
-/** Deliver the queue in order; work queued meanwhile joins the end of the same pass. */
+/**
+ * Deliver the queue in order, then each effect, which the effects' own queue keeps
+ * monomorphic; work either queues meanwhile joins the same pass.
+ */
 function drain(): void {
-	while (queueIndex < queueLength) {
+	while (true) {
+		if (queueIndex === queueLength) {
+			if (effectIndex === effectLength) return;
+			const effect = effectQueue[effectIndex]!;
+			effectQueue[effectIndex++] = undefined;
+			runEffect(effect);
+			continue;
+		}
 		const work = queue[queueIndex];
 		queue[queueIndex++] = undefined;
-		if (work instanceof EffectNode) runEffect(work);
-		else if (work instanceof SignalObserver) {
+		if (work instanceof SignalObserver) {
 			work.queuedAt = 0;
 			runObserver(work);
 		} else if (typeof work === 'function') {
@@ -1130,7 +1164,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 					}
 				}
 			}
-			if (batchDepth === 0 && queueLength !== 0) flush();
+			if (batchDepth === 0 && (queueLength | effectLength) !== 0) flush();
 			return;
 		}
 		assertAlive(this.owner);
@@ -2080,7 +2114,7 @@ export class PlainCell<T = any> implements ReactiveNode {
 	// Every keyless node starts flags, then subs or run, then deps: graph walks read
 	// one field of mixed node kinds, and a shared offset keeps that read a single load.
 	constructor(last: T, owner: GraphOwner) {
-		this.flags = REACTIVE_MUTABLE;
+		this.flags = REACTIVE_MUTABLE | REACTIVE_KEYLESS_CELL;
 		this.subs = undefined;
 		this.subsTail = undefined;
 		this.last = last;
@@ -2095,7 +2129,6 @@ export class PlainCell<T = any> implements ReactiveNode {
 		if ((signalMode & READS_SPECIAL) === 0 && !this.owner.retired) {
 			const reader = activeNode;
 			if (reader !== undefined) {
-				if (!(this.flags & REACTIVE_HELD)) holdCell(this);
 				linkDependency(this, reader, trackingCycle);
 				if (this.owner !== reader.owner) addOwner(this.owner);
 			}
@@ -2126,7 +2159,7 @@ export class PlainCell<T = any> implements ReactiveNode {
 			} finally {
 				batchDepth--;
 			}
-			if (batchDepth === 0 && queueLength !== 0) flush();
+			if (batchDepth === 0 && (queueLength | effectLength) !== 0) flush();
 			return;
 		}
 		writeCell(this, value);
@@ -2208,7 +2241,7 @@ function writeCell<T>(cell: PlainCell<T>, value: T | ((previous: T) => T)): void
 			}
 		}
 	}
-	if (batchDepth === 0 && queueLength !== 0) flush();
+	if (batchDepth === 0 && (queueLength | effectLength) !== 0) flush();
 }
 Object.defineProperties(PlainCell.prototype, {
 	valueOnly: { value: true },
@@ -2249,27 +2282,28 @@ function cellChannel(cell: PlainCell): CellChannel {
  * A keyless cell's read while something presents other values or collects reads.
  * It is never staged, seeded or historical, so it presents its live value.
  */
-/** Its owner's retirement reaches a cell's readers only through the cells it holds. */
+/**
+ * Its owner's retirement reaches a keyless cell's readers only through the cells
+ * it lists: a cell joins the list when it gains its first reader.
+ */
 function holdCell(cell: PlainCell): void {
-	const flags = cell.flags;
-	cell.flags = flags | REACTIVE_HELD | REACTIVE_LISTED;
-	if (!(flags & REACTIVE_LISTED)) (cell.owner.heldCells ??= []).push(cell);
+	cell.flags |= REACTIVE_LISTED;
+	(cell.owner.heldCells ??= []).push(cell);
 }
 
 /**
  * A cell with no readers left has none for retirement to reach. Its entry goes
- * once released entries are half the list, so a long-lived scope holds at most
+ * once released entries are half the list, so a long-lived scope lists at most
  * twice the cells something still reads.
  */
 function releaseCell(cell: PlainCell): void {
-	cell.flags &= ~REACTIVE_HELD;
 	const owner = cell.owner;
 	const held = owner.heldCells;
 	// Retirement already let go of the whole list.
 	if (held === undefined || ++owner.heldReleased * 2 < held.length) return;
 	owner.heldReleased = 0;
 	owner.heldCells = held.filter((entry) => {
-		if (entry.flags & REACTIVE_HELD) return true;
+		if (entry.subs !== undefined) return true;
 		entry.flags &= ~REACTIVE_LISTED;
 		return false;
 	});
@@ -2279,7 +2313,6 @@ function readCellOther<T>(cell: PlainCell<T>): T {
 	assertAlive(cell.owner);
 	const reader = activeNode;
 	if (reader !== undefined) {
-		if (!(cell.flags & REACTIVE_HELD)) holdCell(cell);
 		linkDependency(cell, reader, trackingCycle);
 		if (cell.owner !== reader.owner) addOwner(cell.owner);
 	}
@@ -2524,7 +2557,7 @@ export function effectRing(): EffectNode {
 function queueEffect(effect: EffectNode): void {
 	if (effect.flags & REACTIVE_QUEUED) return;
 	effect.flags |= REACTIVE_QUEUED;
-	queue[queueLength++] = effect;
+	effectQueue[effectLength++] = effect;
 }
 
 /** Run an effect whose dependencies a change reached, if one of them did change. */
