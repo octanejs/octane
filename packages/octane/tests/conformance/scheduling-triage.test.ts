@@ -47,6 +47,26 @@ function deferred<T>(): Deferred<T> {
 }
 
 describe('ReactFlushSync-test.js ports', () => {
+	it.each([
+		['omitted', () => flushSync()],
+		['undefined', () => flushSync(undefined)],
+		['null', () => flushSync(null)],
+	] as const)('flushSync commits a queued update when the callback is %s', (_, sync) => {
+		const r = mount(PhaseLogger);
+		flushEffects();
+		drainSchedLog();
+		try {
+			bumpPhaseLogger(1);
+			expect(drainSchedLog()).toEqual([]);
+			expect(sync()).toBeUndefined();
+			expect(drainSchedLog()).toEqual(['render:1', 'layout:1']);
+			flushEffects();
+			expect(drainSchedLog()).toEqual(['effect:1']);
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('flushSync with no scheduled render does NOT flush pending passive effects', () => {
 		// Per ReactFlushSync-test.js:269 — 'does not flush pending passive effects'.
 		// Passive effects queued by an earlier commit stay pending across an empty

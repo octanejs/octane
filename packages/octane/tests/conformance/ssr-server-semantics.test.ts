@@ -3,6 +3,14 @@ import { loadCompiledFixtureSource } from '../_server-fixture.js';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 
+it('flushSync on the server can omit the callback and still returns a callback result', () => {
+	expect(ServerRT.flushSync()).toBeUndefined();
+	expect(ServerRT.flushSync(undefined)).toBeUndefined();
+	expect(ServerRT.flushSync(null)).toBeUndefined();
+	const result = {};
+	expect(ServerRT.flushSync(() => result)).toBe(result);
+});
+
 // Conformance port of facebook/react's "what runs on the server" semantics —
 // ReactDOMServerIntegrationHooks-test.js (hooks render initial values; effects /
 // imperative handles are no-ops), ReactDOMServerIntegrationRefs-test.js (ref
