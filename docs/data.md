@@ -65,6 +65,11 @@ same order.
 - Writes to a record whose create is unconfirmed wait for it. They are refused
   unsent if it is refused, and carry the server's ID if `serverId` assigned one.
 - Every value one reply carries is adopted before any reader is notified.
+- A changed record reaches the reads that select it, the lists a created
+  record joins, and the views of its entity. An optimistic edit, a settled
+  write or a feed event does work for those reads only, so its cost does not
+  grow with the reads the store holds. A read it does not reach keeps its
+  snapshot, including an age-based `stale` flag, until its own next change.
 - Every optimistic edit is an absolute patch, an insert by ID or a delete by
   ID, so it replays over any newer value without counting twice.
 - A view's records are shared: one table per entity holds the newest confirmed
