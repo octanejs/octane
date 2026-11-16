@@ -544,10 +544,21 @@ export const setup = () => {
 };
 `,
 			'app/src/commonjs.tsx': imports + 'export = renderToString(<Pane />);',
+			'app/src/default-arrow.tsx': imports + 'export default () => renderToString(<Pane />);',
+			'app/src/default-expression.tsx':
+				imports + 'export default (function () { return renderToString(<Pane />); });',
+			'app/src/default-async.tsx':
+				imports + 'export default (async () => renderToString(<Pane />));',
 		});
-		const paths = ['entry', 'controls', 'commonjs', 'pane'].map((name) =>
-			path.join(app, 'src', name + '.tsx'),
-		);
+		const paths = [
+			'entry',
+			'controls',
+			'commonjs',
+			'pane',
+			'default-arrow',
+			'default-expression',
+			'default-async',
+		].map((name) => path.join(app, 'src', name + '.tsx'));
 		const { files } = await runCodemod(paths, {
 			root: app,
 			strong: true,
@@ -562,11 +573,17 @@ export const setup = () => {
 					.map(({ line, message }) => ({ file, line, message })),
 			),
 		).toEqual(
-			[3, 4, 6, 11, 12, 14, 16, 17].map((line) => ({
-				file: 'src/entry.tsx',
-				line,
-				message: expect.stringMatching(/standalone.*migrated Pane.*NativeStoreProvider/),
-			})),
+			[
+				['src/entry.tsx', [3, 4, 6, 11, 12, 14, 16, 17]],
+				['src/default-arrow.tsx', [3]],
+				['src/default-expression.tsx', [3]],
+			].flatMap(([file, lines]) =>
+				lines.map((line) => ({
+					file,
+					line,
+					message: expect.stringMatching(/standalone.*migrated Pane.*NativeStoreProvider/),
+				})),
+			),
 		);
 	},
 );
