@@ -7116,7 +7116,12 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		const entry = declaration ? this.imports.get(declaration) : null;
 		if (!entry || entry.namespace || entry.typeOnly) return false;
 		const name = entry.imported === 'default' ? entry.local : entry.imported;
-		const context = this.options.isContext?.(entry.module, entry.imported, entry.local);
+		const context = this.options.isContext?.(
+			entry.module,
+			entry.imported,
+			entry.local,
+			declaration != null && !!ts.findAncestor(declaration, ts.isImportDeclaration)?.attributes,
+		);
 		if (context !== 'review-alias') return context ?? /Context$/.test(name);
 		if (member && !ts.isJsxClosingElement(member.parent))
 			this.note(
