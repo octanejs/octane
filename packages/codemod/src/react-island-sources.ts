@@ -1148,7 +1148,20 @@ export function reactServerComponents(
 			}
 		}
 		for (const statement of sf.statements) {
-			if (ts.isIfStatement(statement)) {
+			if (
+				ts.isVariableStatement(statement) &&
+				(statement.declarationList.flags & ts.NodeFlags.BlockScoped) === ts.NodeFlags.Const &&
+				statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
+			) {
+				for (const { name, initializer } of statement.declarationList.declarations) {
+					const value = initializer && skipParens(initializer);
+					if (ts.isIdentifier(name) && value && ts.isArrowFunction(value)) {
+						visitDirectRoot(singleReturn(value));
+					} else {
+						visitDirectRoot(initializer);
+					}
+				}
+			} else if (ts.isIfStatement(statement)) {
 				const condition = skipParens(statement.expression);
 				if (
 					ts.isPropertyAccessExpression(condition) &&

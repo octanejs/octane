@@ -514,6 +514,10 @@ if ((import.meta.main)) {
 	renderToString(<Pane />);
 }
 if (import.meta.main) renderToString(<Pane />);
+export const renderLater = () => renderToString(<Pane />);
+export const renderLaterBlock = () => {
+	return renderToString(<Pane />);
+};
 `,
 			'app/src/controls.tsx':
 				imports +
@@ -525,7 +529,15 @@ if (import.meta.main) {
 }
 if (import.meta.main) renderToString(<Pane />, { identifierPrefix: 'prefix' });
 if (import.meta.main) renderToString(<b><Pane /></b>);
-export const renderLater = () => renderToString(<Pane />);
+const unexported = () => renderToString(<Pane />);
+export let reassigned = () => renderToString(<Pane />);
+export const asyncRoot = async () => renderToString(<Pane />);
+export const receive = (renderToString) => renderToString(<Pane />);
+export const deferred = () => () => renderToString(<Pane />);
+export const setup = () => {
+	if (!globalThis.useNative) return '';
+	return renderToString(<Pane />);
+};
 `,
 			'app/src/commonjs.tsx': imports + 'export = renderToString(<Pane />);',
 		});
@@ -546,7 +558,7 @@ export const renderLater = () => renderToString(<Pane />);
 					.map(({ line, message }) => ({ file, line, message })),
 			),
 		).toEqual(
-			[3, 4, 6, 11].map((line) => ({
+			[3, 4, 6, 11, 12, 14].map((line) => ({
 				file: 'src/entry.tsx',
 				line,
 				message: expect.stringMatching(/standalone.*migrated Pane.*NativeStoreProvider/),
