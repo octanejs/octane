@@ -601,7 +601,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	 */
 	const selecting = new Map<string, Entry | Set<Entry>>();
 	const inflight = new Set<Entry>();
-	/** Reads a change to a shared record or an edit has reached since the last commit. */
+	/** Reads a change to a shared record or an edit has reached, until `commitReached` commits them. */
 	const reached = new Set<Entry>();
 	/** The store sequence of the last change `finish` applied to each entity. */
 	const touched = new Map<string, number>();
@@ -1025,12 +1025,9 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	 * snapshot is current before any reader runs, so a reader of one view never
 	 * sees another mid-change.
 	 */
-	function commit(changed: Iterable<Entry> = EMPTY as Entry[]): void {
-		const all = new Set(changed);
-		for (const entry of reached) all.add(entry);
-		reached.clear();
+	function commit(changed: Iterable<Entry>): void {
 		const notify: Entry[] = [];
-		for (const entry of all) {
+		for (const entry of changed) {
 			const previous = entry.snapshot;
 			const next = buildSnapshot(entry);
 			if (
@@ -1054,10 +1051,22 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		commit([entry]);
 	}
 
+	/**
+	 * Commit `changed` with every read a changed record or edit has reached. A load that starts
+	 * while a component renders commits its own read alone: the reads a seed adopted in that
+	 * render reached wait for the next change that settles, as the render's own state does.
+	 */
+	function commitReached(changed: Iterable<Entry> = EMPTY as Entry[]): void {
+		const all = new Set(changed);
+		for (const entry of reached) all.add(entry);
+		reached.clear();
+		commit(all);
+	}
+
 	/** Commit the reads `operation`'s edit shows in, after it was added, removed or settled. */
 	function touchEdit(operation: Operation): void {
 		reachEdit(operation);
-		commit();
+		commitReached();
 	}
 
 	function reloadAll(reload: Set<Entry>): void {
@@ -1312,7 +1321,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			.then(() => {
 				if (retired || entry.inflight !== done) return;
 				fly(entry, null);
-				touch(entry);
+				commitReached([entry]);
 				if (!entry.hasBase) return load(entry);
 				if (entry.subscribers.size > 0 && isStale(entry)) void load(entry);
 				else idle(entry);
@@ -1358,7 +1367,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				if (!current()) return;
 				fly(entry, null);
 				entry.abort = null;
-				touch(entry);
+				commitReached([entry]);
 				idle(entry);
 			});
 		fly(entry, done);
@@ -1608,7 +1617,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		if (pending.length > 0) {
 			void Promise.all(pending).then((commits) => {
 				const adopted = commits.map((adopt) => adopt());
-				commit(adopted.filter((entry): entry is Entry => entry !== undefined));
+				commitReached(adopted.filter((entry): entry is Entry => entry !== undefined));
 			});
 		}
 		const tags = writeTags(operation.write);
@@ -1704,7 +1713,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		if (recovered.length) {
 			operations = [...recovered, ...operations];
 			for (const operation of recovered) reachEdit(operation);
-			commit();
+			commitReached();
 		}
 		for (const operation of recovered) settleByReceipt(operation);
 		// Obsolete writes have no usable effect metadata. Check one receipt at a time.
@@ -1965,7 +1974,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				.then(() => {
 					if (!current()) return;
 					fly(entry, null);
-					touch(entry);
+					commitReached([entry]);
 					// A refused value leaves an observer the load it superseded.
 					if (entry.subscribers.size > 0 && (!entry.hasBase || entry.stale)) void load(entry);
 					else idle(entry);
@@ -2140,7 +2149,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			// even if the current read or view has never held that row, so a reply that
 			// predates the change is overtaken. In-flight reads have already restarted.
 			for (const name of names) touched.set(name, ++sequence);
-			commit(changed);
+			commitReached(changed);
 		},
 	});
 	return store;

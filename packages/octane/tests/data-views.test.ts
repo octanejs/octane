@@ -535,6 +535,48 @@ describe('octane/data views', () => {
 		await client.retire();
 	});
 
+	it("shows a published value's newer copy of a record in a view that holds it", async () => {
+		const server = libraryServer(3);
+		const store = createDataStore({ transport: server.transport });
+		const list = store.read(library, undefined);
+		await ready(list);
+		const requests = server.log.length;
+
+		await store.publish(search, { q: 'Book' }, [{ ...server.books.get('b0')!, title: 'Atlas' }]);
+
+		expect(titles(list)).toEqual(['Atlas', 'Book 01', 'Book 02']);
+		expect(server.log.length).toBe(requests);
+		await store.retire();
+	});
+
+	it('tells no reader of another view while a render adopts a seed and starts a load', async () => {
+		const server = libraryServer(3);
+		const rendering = createDataStore({ transport: server.transport });
+		await rendering.prefetch(shelf, { shelf: 'A' });
+		await rendering.prefetch(library, undefined);
+		// The shelf's seed predates a book the library's seed carries.
+		const saved = devalue.parse(rendering.dehydrate());
+		const seeded = saved.reads.find((item: { name: string }) => item.name === shelf.name);
+		seeded.value = seeded.value.filter((book: BookRow) => book.id !== 'b2');
+		const client = createDataStore({ transport: server.transport, seed: devalue.stringify(saved) });
+
+		const onShelf = client.read(shelf, { shelf: 'A' });
+		let told = 0;
+		onShelf.subscribe(() => told++);
+		expect(titles(onShelf)).toEqual(['Book 01']);
+
+		// What a render does: ask for a seeded read, then for one that has to load.
+		client.read(library, undefined);
+		const loaded = client.prefetch(search, { q: 'Book' });
+		expect(told).toBe(0);
+
+		await loaded;
+		expect(titles(onShelf)).toEqual(['Book 02', 'Book 01']);
+		expect(told).toBeGreaterThan(0);
+		await rendering.retire();
+		await client.retire();
+	});
+
 	it('hydrates server-ordered results from confirmed shared records without a pending edit', async () => {
 		const server = libraryServer(4);
 		const rendering = createDataStore({ transport: server.transport });
