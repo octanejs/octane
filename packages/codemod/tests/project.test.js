@@ -3292,9 +3292,28 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 			['a JSX fragment', 'make(container).render(<><Leaf /></>)', true],
 			['a React wrapper', 'hydrate(container, <Strict><Leaf /></Strict>)', true],
 			[
+				'a genuine React wrapper on a closed default import',
+				'const ref = React.createRef(); const label = React.createElement("small", null, "fallback"); hydrate(container, <React.Suspense fallback={label}><Leaf /></React.Suspense>)',
+				true,
+				{ reactImport: 'React' },
+			],
+			[
+				'a wrapper replaced by the React receiver itself',
+				"React.__defineGetter__('StrictMode', () => () => <em>ignored</em>); hydrate(container, <React.StrictMode><Leaf /></React.StrictMode>)",
+				false,
+				{ reactImport: 'React' },
+			],
+			[
+				'a wrapper replaced through a TypeScript instantiation expression',
+				"(React.__defineGetter__<any>)('StrictMode', () => () => <em>ignored</em>); hydrate(container, <React.StrictMode><Leaf /></React.StrictMode>)",
+				false,
+				{ reactImport: 'React' },
+			],
+			[
 				'a wrapper writable through the default import',
 				'Reflect.set(React, "StrictMode", other); make(container).render(<Strict><Leaf /></Strict>)',
 				false,
+				{ reactImport: 'React, { StrictMode as Strict }' },
 			],
 			['an element factory wrapper', 'make(container).render(h(Fragment, null, h(Leaf)))', true],
 			['a wrapper prop', 'make(container).render(h(Strict, { data: h(Leaf) }, "ignored"))', false],
@@ -3320,14 +3339,19 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 			['a different JSX runtime', 'make(container).render(<Leaf />)', false],
 			['a React bridge', 'make(container).render(<OctaneCompatInline component={Leaf} />)', false],
 		])('protects a migrated leaf rendered by %s', async (name, body, blocked, files) => {
-			const { specifier = './Leaf.tsx', leaf = 'Leaf.tsx', sibling } = files ?? {};
+			const {
+				specifier = './Leaf.tsx',
+				leaf = 'Leaf.tsx',
+				sibling,
+				reactImport = '{ createElement as h, StrictMode as Strict, Fragment }',
+			} = files ?? {};
 			const root = project({
 				'package.json': '{"name":"app","type":"module"}',
 				'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"Bundler"}}',
 				'Entry.tsx': `${name === 'a different JSX runtime' ? '/** @jsxImportSource octane */' : ''}
 					import * as DOM from 'react-dom/client';
 					import { createRoot as make, hydrateRoot as hydrate } from 'react-dom/client';
-					import ${name === 'a wrapper writable through the default import' ? 'React, ' : ''}{ createElement as h, StrictMode as Strict, Fragment } from 'react';
+					import ${reactImport} from 'react';
 					import { OctaneCompatInline } from 'octane/react';
 					import { Leaf } from '${specifier}';
 					${body};`,
