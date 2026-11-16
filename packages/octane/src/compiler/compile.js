@@ -17993,6 +17993,33 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	const prepare = snapshot === null ? null : allocCompilerName(ctx, '__prepareRow');
 	if (snapshot !== null) {
 		itemSub.fn = { ...itemSub.fn, params: [snapshot.binding, ...itemSub.fn.params.slice(1)] };
+	} else if (mapCall === null && node.index && itemId.type !== 'Identifier') {
+		let readsIndex = false;
+		const hasOtherExpression = mapCallbackPatternSome(itemId, (expression) => {
+			const value = unwrapTsExpr(expression);
+			if (value?.type !== 'Identifier' || value.name !== node.index.name)
+				return !isInvariantLiteral(value);
+			readsIndex = true;
+			return false;
+		});
+		if (readsIndex && !hasOtherExpression) {
+			// Bind the index before preparing an authored row, like the client.
+			const input = b.id(allocCompilerName(ctx, '__rowInput'));
+			const ordinal = b.id(allocCompilerName(ctx, '__rowIndex'));
+			const fn = itemSub.fn;
+			itemSub.fn = {
+				...fn,
+				params: [input, ordinal, ...fn.params.slice(2)],
+				body: {
+					...fn.body,
+					body: [
+						inheritOriginLoc(b.const(node.index, ordinal), node.index),
+						inheritOriginLoc(b[node.left.kind](itemId, input), itemId),
+						...fn.body.body,
+					],
+				},
+			};
+		}
 	}
 	inlinedSubs.push(itemSub.fn);
 	let emptyCall = ssrHtmlTemplate([], node, ctx);

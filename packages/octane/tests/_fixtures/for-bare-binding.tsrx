@@ -92,6 +92,30 @@ export function KeyedDefault({ rows }: { rows: { id: number; read?: () => number
 	</ul>
 }
 
+export function IndexedDefault({ rows }: { rows: { label?: number }[] }) @{
+	<ul>
+		@for (const { label = index } of rows; index index) {
+			<li>{label as number}</li>
+		}
+	</ul>
+}
+
+export function IndexedProperty({ rows }: { rows: Record<number, number>[] }) @{
+	<ul>
+		@for (const { [index]: label } of rows; index index) {
+			<li>{label as number}</li>
+		}
+	</ul>
+}
+
+export function IndexedTransparentKey({ rows }: { rows: { id: string; label?: number }[] }) @{
+	<ul>
+		@for (const { id, label = index } of rows; index index) {
+			<li key={id}>row</li>
+		}
+	</ul>
+}
+
 export function Scores(props: { scores: [string, ...number[]][] }) @{
 	<ul>
 		@for ([name, ...points] of props.scores; key name) {
