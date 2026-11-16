@@ -744,6 +744,58 @@ describe('octane/data cursor pages', () => {
 		expect(list.getSnapshot().error).toBeUndefined();
 	});
 
+	it('shows a preview of the page being added only, not of an earlier page that loads again', async () => {
+		const { server, store, list } = await firstPage();
+		const more = list.loadMore();
+		(await server.call(1)).finish(shelf(['Tree Ferns']));
+		await more;
+
+		// The first page loses its value and loads again; the page after it is still current.
+		await store.forget(search, { q: 'fern' });
+		expect(titles(list)).toEqual(['Tree Ferns']);
+		const reloading = store.read(search, { q: 'fern' }).refresh();
+		(await server.call(2)).preview(shelf(['Bracken']));
+		expect(titles(list)).toEqual(['Tree Ferns']);
+		expect(list.getSnapshot()).toMatchObject({ status: 'ready', preview: false, refreshing: true });
+
+		server.calls[2]!.finish(shelf(['Fern Atlas', 'Fern Gardens'], 'B'));
+		await reloading;
+		expect(titles(list)).toEqual(['Fern Atlas', 'Fern Gardens', 'Tree Ferns']);
+
+		// With no page left to show, an earlier page's preview does not make the list ready.
+		await store.forget(search, { q: 'fern' });
+		await store.forget(search, { q: 'fern', after: 'B' });
+		void store.read(search, { q: 'fern' }).refresh();
+		(await server.call(3)).preview(shelf(['Bracken']));
+		expect(list.getSnapshot()).toMatchObject({ status: 'pending', value: undefined });
+	});
+
+	it('follows again when a page names another next page while its replacement loads', async () => {
+		const { server, store, list, seen } = await firstPage();
+		const more = list.loadMore();
+		(await server.call(1)).finish(shelf(['Tree Ferns']));
+		await more;
+		seen.length = 0;
+
+		const refreshed = list.refresh();
+		(await server.call(2)).finish(shelf(['Bracken'], 'C'));
+		const replacement = await server.call(3);
+		expect(replacement.input).toEqual({ q: 'fern', after: 'C' });
+		// The first page changes again before the page it named arrives.
+		const again = store.read(search, { q: 'fern' }).refresh();
+		(await server.call(4)).finish(shelf(['Bracken', 'Club Moss'], 'D'));
+		await again;
+		replacement.finish(shelf(['Overtaken']));
+		await refreshed;
+
+		const last = await server.call(5);
+		expect(last.input).toEqual({ q: 'fern', after: 'D' });
+		last.finish(shelf(['Deer Fern']));
+		await vi.waitFor(() => expect(titles(list)).toEqual(['Bracken', 'Club Moss', 'Deer Fern']));
+		// The page the first page no longer names was never shown.
+		expect(seen.some((rows) => rows?.includes('Overtaken'))).toBe(false);
+	});
+
 	it('follows a cursor that changed while nothing observed the list', async () => {
 		const { server, store, list, stop } = await firstPage(settledSearch);
 		const more = list.loadMore();

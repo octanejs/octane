@@ -218,6 +218,8 @@ function createPages(store: DataStore, read: Read<any, any>, chain: Chain): Page
 	function advance(again: boolean): Promise<void> {
 		const done = load(again).then(() => {
 			if (following === done) following = null;
+			// A page that changed while the chain loaded may name yet another next page.
+			relink();
 			notify();
 		});
 		return (following = done);
@@ -299,27 +301,30 @@ function createPages(store: DataStore, read: Read<any, any>, chain: Chain): Page
 		const last = current[current.length - 1]!;
 		let rows: unknown[] = [];
 		let reloading = false;
+		let ready = false;
 		// A page that is not ready, such as an expired one reloading, leaves only
-		// its own rows out: the pages after it are still current.
+		// its own rows out: the pages after it are still current. Only the last
+		// page shows a preview: one of an earlier page may not fit the pages after it.
 		for (const part of current) {
-			if (part.status === 'ready') rows.push(...chain.rows(part.value));
-			else if (part !== last && part.status === 'pending') reloading = true;
+			if (part.status === 'ready' && (part === last || !part.preview)) {
+				rows.push(...chain.rows(part.value));
+				ready = true;
+			} else if (part !== last && part.status !== 'error') reloading = true;
 		}
 		// The same rows are the same array, so a reader of the rows alone sees no change.
 		const before = snapshot?.value;
 		if (before?.length === rows.length && rows.every((row, index) => row === before[index]))
 			rows = before;
 		const failed = current.find((part) => part.status === 'error');
-		const ready = current.some((part) => part.status === 'ready');
 		snapshot = {
-			status: ready ? 'ready' : first.status,
+			status: ready ? 'ready' : first.status === 'error' ? 'error' : 'pending',
 			value: ready ? rows : undefined,
 			error: failed ? failed.error : first.error,
 			refreshing: reloading || current.some((part) => part.refreshing),
 			stale: current.some((part) => part.stale),
 			// A failed page, anywhere, is what `loadMore` does next.
 			more: failed !== undefined || nextOf(shown, shown.length - 1) !== null,
-			preview: current.some((part) => part.preview),
+			preview: last.preview,
 			loadingMore: current.length > 1 && !confirmed(last) && last.status !== 'error',
 			loadMore,
 		};
