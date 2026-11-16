@@ -1296,6 +1296,10 @@ A change is one of four things:
 - `{ invalidates: [...] }`: reads with these tags reload, for a change the
   event does not carry.
 
+The store knows which reads hold each record, so an event does work only for
+the reads it changes. Keeping thousands of reads loaded does not make each
+event, or each optimistic edit, slower.
+
 `covers` names the tags and entities the feed keeps current. If the store may
 have missed events (the connection dropped, or the server reports a gap), it
 marks those reads stale and the ones on screen reload, so nothing stays wrong.

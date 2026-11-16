@@ -275,6 +275,73 @@ describe('feeds', () => {
 		expect(store.read(count, { done: true }).getSnapshot().status).toBe('pending');
 	});
 
+	it('leaves a read the store forgot pending when its record changes', async () => {
+		const { server, store } = setup();
+		const handle = store.read(firstTodo, undefined);
+		await observed(handle);
+		const list = await observed(store.read(todos, undefined));
+		const loads = server.log.length;
+
+		await store.forget(firstTodo, undefined);
+		receive(store, [{ put: Todo, value: { id: 'a', title: 'Atoll', done: true } }]);
+
+		// The change reaches the read that still holds the record, and only it.
+		expect(list()).toEqual([{ id: 'a', title: 'Atoll', done: true }]);
+		expect(handle.getSnapshot().status).toBe('pending');
+		expect(server.log.length).toBe(loads);
+	});
+
+	it('shows a change to the record a reload put in place of another', async () => {
+		const { server, store } = setup();
+		const list = await observed(store.read(todos, undefined));
+		const first = await observed(store.read(firstTodo, undefined));
+
+		server.rows[0] = { id: 'b', title: 'Brine', done: false };
+		await Promise.all([
+			store.read(todos, undefined).refresh(),
+			store.read(firstTodo, undefined).refresh(),
+		]);
+		receive(store, [{ put: Todo, value: { id: 'b', title: 'Basalt', done: true } }]);
+
+		expect(list()).toEqual([{ id: 'b', title: 'Basalt', done: true }]);
+		expect(first()).toEqual({ todo: { id: 'b', title: 'Basalt', done: true } });
+	});
+
+	it('reaches every read of a record, and not one the store forgot', async () => {
+		const one = read({
+			name: 'todos.one',
+			input: schema<{ id: string }>((value) => typeof value?.id === 'string'),
+			output: schema<TodoItem>(isTodo),
+			entities: (todo) => Todo.from(todo),
+		});
+		const rows = {
+			a: { id: 'a', title: 'Tides', done: false },
+			b: { id: 'b', title: 'Brine', done: false },
+		};
+		const { store } = setup(async (request) => ({
+			ok: true,
+			value:
+				request.name === todos.name
+					? [rows.a]
+					: request.name === firstTodo.name
+						? { todo: rows.a }
+						: rows[(request.input as { id: 'a' | 'b' }).id],
+		}));
+		const list = await observed(store.read(todos, undefined));
+		const first = await observed(store.read(firstTodo, undefined));
+		const a = await observed(store.read(one, { id: 'a' }));
+		const b = store.read(one, { id: 'b' });
+		await observed(b);
+
+		const atoll = { id: 'a', title: 'Atoll', done: true };
+		receive(store, [{ put: Todo, value: atoll }]);
+		expect([list(), first(), a()]).toEqual([[atoll], { todo: atoll }, atoll]);
+
+		await store.forget(one, { id: 'b' });
+		receive(store, [{ put: Todo, value: { id: 'b', title: 'Basalt', done: true } }]);
+		expect(b.getSnapshot().status).toBe('pending');
+	});
+
 	it('applies an event once when its ID arrives again', async () => {
 		const { store, connections } = setup();
 		const list = await observed(store.read(todos, undefined));
