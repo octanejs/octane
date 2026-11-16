@@ -408,6 +408,15 @@ export async function runCodemod(
 		);
 	}
 	let physicalRoot: string | undefined;
+	function isPlainFile(file: string) {
+		const stat = fs.lstatSync(file, { throwIfNoEntry: false });
+		return (
+			!!stat?.isFile() &&
+			stat.nlink === 1 &&
+			fs.realpathSync(file) ===
+				path.join((physicalRoot ??= fs.realpathSync(root)), path.relative(root, file))
+		);
+	}
 	const retainedStoreArguments = new Map<string, ReadonlySet<string> | null>();
 	const descriptorModules = new Map<string, ReadonlySet<string> | null>();
 	function retainedStoreArgument(file: string, source: string, name: string) {
@@ -1099,6 +1108,54 @@ export async function runCodemod(
 		checkedHelpers.set(output, { code, state, error });
 		return error;
 	}
+	function selectedContextReexport(file: string, name: string): boolean {
+		const seen = new Set<string>();
+		for (;;) {
+			const selected = exports.get(file);
+			if (
+				!selected ||
+				seen.has(file) ||
+				!isPlainFile(file) ||
+				ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject
+			)
+				return false;
+			const hasContext = selected.contexts.includes(name);
+			if (!hasContext && !selected.reexports.length) return false;
+			// TypeScript's source lookup omits these competing bundler targets.
+			const stem = file.slice(0, -path.extname(file).length);
+			if (['.json', '.tsrx'].some((ext) => fs.lstatSync(stem + ext, { throwIfNoEntry: false })))
+				return false;
+			const source = fs.readFileSync(file, 'utf8');
+			if (hasContext)
+				return installedReact(file) && retainedReactContextExports(file, source).has(name);
+			seen.add(file);
+			const { statements } = ts.createSourceFile(file, source, ts.ScriptTarget.Latest);
+			const [statement] = statements;
+			// A pure named forwarding module has no competing value export.
+			if (
+				statements.length !== 1 ||
+				!ts.isExportDeclaration(statement) ||
+				statement.isTypeOnly ||
+				statement.attributes ||
+				!statement.exportClause ||
+				!ts.isNamedExports(statement.exportClause) ||
+				!statement.moduleSpecifier ||
+				!ts.isStringLiteral(statement.moduleSpecifier)
+			)
+				return false;
+			const specifier = statement.moduleSpecifier.text;
+			if (!/^\.{1,2}\//.test(specifier) || /[!%?#\\]/.test(specifier)) return false;
+			const bindings = statement.exportClause.elements.filter(
+				(element) => !element.isTypeOnly && element.name.text === name,
+			);
+			if (bindings.length !== 1) return false;
+			const next = localFile(file, specifier, true);
+			const direct = path.resolve(path.dirname(file), specifier);
+			if (!next || (next !== direct && next !== direct + path.extname(next))) return false;
+			file = next;
+			name = (bindings[0].propertyName ?? bindings[0].name).text;
+		}
+	}
 	const results: FileResult[] = [];
 	const storeHookComponents = new Map<string, string[]>();
 	if (options.svgPaths && target === 'tsrx') {
@@ -1134,7 +1191,12 @@ export async function runCodemod(
 		const reactStoreComponents = new Map<string, boolean>();
 		let installedClsx: boolean | undefined;
 		let reactJsx: boolean | undefined;
-		const isContext: NonNullable<TransformOptions['isContext']> = (specifier, name, local) => {
+		const isContext: NonNullable<TransformOptions['isContext']> = (
+			specifier,
+			name,
+			local,
+			attributed,
+		) => {
 			if (!specifier.startsWith('.')) {
 				if (
 					!contextPaths.length ||
@@ -1148,11 +1210,13 @@ export async function runCodemod(
 				)
 					return null;
 				const source = localFile(file, specifier, true);
+				const selected = source && exports.get(source);
 				return source &&
-					exports.has(source) &&
+					selected &&
 					ts.findConfigFile(path.dirname(source), ts.sys.fileExists) === rootProject &&
-					(exports.get(source)?.contexts.includes(name) ||
-						(name === 'default' ? local : name).endsWith('Context'))
+					(selected.contexts.includes(name) ||
+						(name === 'default' ? local : name).endsWith('Context') ||
+						(!attributed && selected.reexports.length > 0 && selectedContextReexport(source, name)))
 					? 'review-alias'
 					: null;
 			}
@@ -1725,15 +1789,6 @@ export async function runCodemod(
 	const jsxFactories = new Map<string, ReadonlySet<string>>();
 	const renamedJsx = [...renames.keys()].some((file) => file.endsWith('.tsx'));
 	const namedReexports = new Map<string, Map<string, { module: string; name: string }>>();
-	const isPlainFile = (file: string) => {
-		const stat = fs.lstatSync(file, { throwIfNoEntry: false });
-		return (
-			!!stat?.isFile() &&
-			stat.nlink === 1 &&
-			fs.realpathSync(file) ===
-				path.join((physicalRoot ??= fs.realpathSync(root)), path.relative(root, file))
-		);
-	};
 	function canResolveExtensionlessJsx(specifier: string) {
 		return (
 			/^\.{1,2}\//.test(specifier) &&

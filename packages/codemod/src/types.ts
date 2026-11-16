@@ -84,7 +84,12 @@ export interface TransformOptions {
 	/** Whether a selected, directly imported component inspects its child descriptors. */
 	descriptorChild?(binding: { module: string; imported: string }): boolean;
 	/** Whether an imported name is a context, with separate review for selected alias targets. */
-	isContext?(specifier: string, name: string, local: string): boolean | 'review-alias' | null;
+	isContext?(
+		specifier: string,
+		name: string,
+		local: string,
+		attributed?: boolean,
+	): boolean | 'review-alias' | null;
 	/** The React package an import specifier names when the codemod keeps it on React, or null. */
 	unported?(specifier: string): string | null;
 	/** The project has React and React DOM 19.2 or newer in the React 19 series, so `ReactCompat` can host an unported package's components. */

@@ -8202,6 +8202,87 @@ export function View() {
 		},
 	);
 
+	it.each([
+		['a named context re-export', "export { Base as Shade } from './shade';", true],
+		['a renamed context re-export chain', "export { Middle as Shade } from './inner';", true],
+		[
+			'a type-only context and a separate value export',
+			"export type * from './shade';\nexport { Shade } from './ordinary';",
+			false,
+		],
+		[
+			'a competing TSRX module',
+			"export { Base as Shade } from './shade';",
+			false,
+			{ 'shade.tsrx': 'export const Base = { Provider: () => null };' },
+		],
+		[
+			'an attributed consumer import',
+			"export { Base as Shade } from './shade';",
+			false,
+			{},
+			" with { mode: 'runtime' }",
+		],
+	])(
+		'keeps runtime context member ownership explicit through a TypeScript path alias with %s',
+		async (_, barrel, blocked, rival, attribute = '') => {
+			const root = project({
+				...rival,
+				'package.json': '{"name":"app","type":"module"}',
+				'tsconfig.json':
+					'{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","jsx":"react-jsx","paths":{"@shade":["./barrel.ts"]}}}',
+				'shade.ts':
+					"import { createContext } from 'react'; export const Base = createContext('light'); export { Base as Shade };",
+				'inner.ts': "export { Base as Middle } from './shade';",
+				'ordinary.ts': 'export const Shade = { Provider: () => null };',
+				'barrel.ts': barrel,
+				'View.tsx': `import { Shade } from '@shade'${attribute};
+export function View() { return <Shade.Provider value="night"><b /></Shade.Provider>; }`,
+			});
+			fs.mkdirSync(path.join(root, 'node_modules/@types'), { recursive: true });
+			fs.symlinkSync(
+				fs.realpathSync(path.join(import.meta.dirname, '../node_modules/react')),
+				path.join(root, 'node_modules/react'),
+				'dir',
+			);
+			const reactTypes = createRequire(path.join(REPO, 'packages/octane/package.json')).resolve(
+				'@types/react/package.json',
+			);
+			fs.symlinkSync(path.dirname(reactTypes), path.join(root, 'node_modules/@types/react'), 'dir');
+			const selection = ['shade.ts', 'inner.ts', 'ordinary.ts', 'barrel.ts', 'View.tsx'].map(
+				(file) => path.join(root, file),
+			);
+			const before = selection.map((file) => fs.readFileSync(file, 'utf8'));
+			const options = { root, strong: true, verify: false };
+			const preview = await runCodemod(selection, { ...options, write: false });
+			const notes = preview.files
+				.find(({ file }) => file === 'View.tsx')
+				?.notes.filter(({ rule }) => rule === 'context-path-alias');
+			expect(notes).toEqual(
+				blocked
+					? [
+							expect.objectContaining({
+								severity: 'error',
+								line: 2,
+								message: expect.stringContaining('Provider member'),
+							}),
+						]
+					: [],
+			);
+			const result = await runCodemod(selection, options);
+			const output = path.join(root, 'View.tsrx');
+			if (blocked) {
+				expect(result.files).toEqual([
+					expect.objectContaining({ file: 'View.tsx', changed: false, notes }),
+				]);
+				expect(selection.map((file) => fs.readFileSync(file, 'utf8'))).toEqual(before);
+				expect(fs.existsSync(output)).toBe(false);
+			} else {
+				expect(fs.readFileSync(output, 'utf8')).toContain('<Shade.Provider value="night">');
+			}
+		},
+	);
+
 	it('rewrites `.Provider` only on values that are contexts', async () => {
 		const root = project({
 			'package.json': '{ "name": "app" }',
