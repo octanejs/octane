@@ -2151,12 +2151,20 @@ export async function runCodemod(
 					const originalExports = originalReactExports(match.file);
 					if (edge.lazy && originalExports.mayExportThen) continue;
 					if (!originalExports.intrinsics.has(exportName)) {
+						const extensionlessJsx =
+							edge.renderer === 'JSX' &&
+							!!direct &&
+							canResolveExtensionlessJsx(edge.module) &&
+							isExtensionlessJsxTarget(match.file, original);
 						const splitIntrinsicDefault =
 							edge.renderer === 'createElement' &&
 							exportName === 'default' &&
 							originalExports.splitIntrinsicDefault;
 						if (
-							(!explicit && !extensionlessServer && edge.renderer !== 'createElement') ||
+							(!explicit &&
+								!extensionlessServer &&
+								!extensionlessJsx &&
+								edge.renderer !== 'createElement') ||
 							edge.lazy ||
 							(!splitIntrinsicDefault && !originalExports.wrappers.has(edge.name)) ||
 							!hasTemplateExport(leaf, edge.name)
