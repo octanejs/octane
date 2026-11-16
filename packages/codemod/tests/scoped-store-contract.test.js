@@ -518,6 +518,8 @@ export const renderLater = () => renderToString(<Pane />);
 export const renderLaterBlock = () => {
 	return renderToString(<Pane />);
 };
+export const renderNamed = function serverRender() { return renderToString(<Pane />); };
+export const renderAnonymous = (function () { return renderToString(<Pane />); });
 `,
 			'app/src/controls.tsx':
 				imports +
@@ -532,6 +534,8 @@ if (import.meta.main) renderToString(<b><Pane /></b>);
 const unexported = () => renderToString(<Pane />);
 export let reassigned = () => renderToString(<Pane />);
 export const asyncRoot = async () => renderToString(<Pane />);
+export const asyncFunction = async function () { return renderToString(<Pane />); };
+export const generator = function* () { return renderToString(<Pane />); };
 export const receive = (renderToString) => renderToString(<Pane />);
 export const deferred = () => () => renderToString(<Pane />);
 export const setup = () => {
@@ -558,7 +562,7 @@ export const setup = () => {
 					.map(({ line, message }) => ({ file, line, message })),
 			),
 		).toEqual(
-			[3, 4, 6, 11, 12, 14].map((line) => ({
+			[3, 4, 6, 11, 12, 14, 16, 17].map((line) => ({
 				file: 'src/entry.tsx',
 				line,
 				message: expect.stringMatching(/standalone.*migrated Pane.*NativeStoreProvider/),
