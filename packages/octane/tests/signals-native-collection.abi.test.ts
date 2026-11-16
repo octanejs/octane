@@ -78,6 +78,21 @@ describe('native reads throughout component invocation', () => {
 		expect(host.textContent).toBe('2:11');
 	});
 
+	it('subscribes a render to a derived value it reads, not to what that value read', () => {
+		const model = state$('collection-abi-derived');
+		const doubled$ = model.scope.derived$('doubled', () => model.count$.get() * 2);
+		function Reader({ value$ }: { value$: SignalHandle<number> }) {
+			return client.createElement('p', null, String(value$.get()));
+		}
+		const subscribers = () =>
+			Object.fromEntries(model.scope.inspect().nodes.map((node) => [node.key, node.subscribers]));
+		rendered = mount(Reader, { value$: doubled$ });
+		expect(subscribers()).toMatchObject({ count: 1, doubled: 1 });
+		client.flushSync(() => model.count$.set(2));
+		expect(rendered.find('p').textContent).toBe('4');
+		expect(subscribers()).toMatchObject({ count: 1, doubled: 1 });
+	});
+
 	it('updates ordinary components that return a previously constructed element', () => {
 		const model = state$('collection-abi-indirect');
 		function Reader({ count$ }: { count$: SignalHandle<number> }) {

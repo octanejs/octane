@@ -67,6 +67,24 @@ describe('scoped signal inspection', () => {
 		scope.dispose();
 	});
 
+	it('traces an invalidation of a derived value for every write while tracing is on', () => {
+		const scope = createScope({ scopeKey: 'traced-derived', debug: { traceLimit: 64 } });
+		const value$ = scope.signal$('value', 0);
+		const doubled$ = scope.derived$('doubled', () => value$.get() * 2);
+		const invalidations = () =>
+			scope
+				.inspect()
+				.trace.filter((event) => event.type === 'invalidate' && event.key === 'doubled').length;
+		expect(doubled$.get()).toBe(0);
+		for (let next = 1; next <= 3; next++) {
+			const before = invalidations();
+			value$.set(next);
+			expect(invalidations()).toBeGreaterThan(before);
+			expect(doubled$.get()).toBe(next * 2);
+		}
+		scope.dispose();
+	});
+
 	it('keeps bounded trace history chronological across writes and retirement', () => {
 		const scope = createScope({ scopeKey: 'trace-order', debug: { traceLimit: 3 } });
 		const value$ = scope.signal$('value', 0);

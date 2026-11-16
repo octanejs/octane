@@ -66,6 +66,8 @@ export interface GraphOwner {
 	readonly readBarrier?: Promise<void> | undefined;
 	readonly observers: Set<SignalObserver>;
 	readonly seedable: boolean;
+	/** Trace events retained; zero when tracing is off. */
+	readonly traceLimit: number;
 	/** Holds a writable or asynchronous derived cell that new render inputs cannot re-select. */
 	unkeyedState?: boolean;
 	beginAdoption(seed: ScopeSeed): AdoptionFrame;
@@ -152,6 +154,11 @@ let activeOwners: Set<GraphOwner> | undefined;
 let trackingCycle = 0;
 let executionDepth = 0;
 let pureDepth = 0;
+/**
+ * Whether a read since the current plain evaluation began presented a node's
+ * state rather than a value-only node's value, so its activity may matter.
+ */
+let stateRead = false;
 let batchDepth = 0;
 let flushing = false;
 /** While an owner retires: the one error state its nodes and their dependents present. */
@@ -361,7 +368,7 @@ function checkDirty(link: Link, sub: ReactiveNode): boolean {
 			(REACTIVE_MUTABLE | REACTIVE_DIRTY)
 		) {
 			const subs = dep.subs!;
-			if (evaluate(dep as ScopedNode)) {
+			if (update(dep as ScopedNode)) {
 				if (subs.nextSub !== undefined) {
 					shallowPropagate(subs);
 				}
@@ -391,7 +398,7 @@ function checkDirty(link: Link, sub: ReactiveNode): boolean {
 			stack = stack!.prev;
 			if (dirty) {
 				const subs = sub.subs!;
-				if (evaluate(sub as ScopedNode)) {
+				if (update(sub as ScopedNode)) {
 					if (subs.nextSub !== undefined) {
 						shallowPropagate(subs);
 					}
@@ -498,6 +505,11 @@ export function signalBatch<T>(run: () => T): T {
 function flush(): void {
 	if (flushing) return;
 	flushing = true;
+	// Delivery is untracked: nothing a subscriber reads becomes a dependency of the
+	// computation or render, if any, whose batch ended here.
+	const previousNode = activeNode;
+	const previousObserver = setNativeReadObserver(null);
+	activeNode = undefined;
 	let firstError: unknown;
 	let failed = false;
 	try {
@@ -510,7 +522,7 @@ function flush(): void {
 				if (typeof work === 'function') {
 					// A notice that ran can be queued again, as any other work can.
 					if (queuedNotices.size !== 0) queuedNotices.delete(work);
-					untrack(work);
+					work();
 				} else {
 					work.queuedAt = 0;
 					if (work instanceof ScopedNode) {
@@ -527,6 +539,8 @@ function flush(): void {
 	} finally {
 		flushing = false;
 		queueIndex = queueLength = 0;
+		activeNode = previousNode;
+		setNativeReadObserver(previousObserver);
 	}
 	if (failed) throw firstError;
 }
@@ -539,17 +553,19 @@ function flush(): void {
 function presentQueued(): void {
 	let firstError: unknown;
 	let failed = false;
-	for (let at = queueIndex; at < queueLength; at++) {
-		const work = queue[at];
-		if (!(work instanceof SignalObserver) || !work.native) continue;
-		dequeue(work);
-		try {
-			runObserver(work);
-		} catch (error) {
-			if (!failed) firstError = error;
-			failed = true;
+	untrack(() => {
+		for (let at = queueIndex; at < queueLength; at++) {
+			const work = queue[at];
+			if (!(work instanceof SignalObserver) || !work.native) continue;
+			dequeue(work);
+			try {
+				runObserver(work);
+			} catch (error) {
+				if (!failed) firstError = error;
+				failed = true;
+			}
 		}
-	}
+	});
 	if (failed) throw firstError;
 }
 
@@ -829,6 +845,11 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 	storedState: NodeState<T> | undefined = undefined;
 	storedLastState: NodeState<T> | undefined = undefined;
 	compute: ((target: ScopedNode<T>) => NodeState<T>) | undefined;
+	/**
+	 * The synchronous computation behind `compute`, when `compute` only runs it
+	 * and presents its result (derivedState). `evaluatePlain` calls it directly.
+	 */
+	plain: (() => T) | undefined = undefined;
 	invalidateAttempt: (() => void) | undefined;
 	last: T | undefined = undefined;
 	hasLast = false;
@@ -946,6 +967,25 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 				pending.write(this, value, batch);
 				return;
 			}
+		}
+		// The common write: a value, not an updater, for a current cell that holds
+		// only a value and no transition value. It needs no refresh or state.
+		if (
+			this.valueOnly &&
+			!(this.flags & (REACTIVE_DIRTY | REACTIVE_PENDING)) &&
+			this.pending === undefined &&
+			typeof value !== 'function'
+		) {
+			startSignalBatch();
+			try {
+				if (!Object.is(this.last, value)) {
+					writeValue(this, value);
+					this.owner.trace('write', this);
+				}
+			} finally {
+				endSignalBatch();
+			}
+			return;
 		}
 		startSignalBatch();
 		try {
@@ -1067,6 +1107,10 @@ class GraphReadSource implements NativeReadSource {
 			if (view.retired) return NaN;
 		}
 		const node = this.node;
+		// A quiet node is not told of a change, so while one may have reached it no
+		// earlier read of it can be reused.
+		const flags = node.flags;
+		if (!(flags & REACTIVE_WATCHING) && flags & (REACTIVE_DIRTY | REACTIVE_PENDING)) return NaN;
 		// A render that reads the node's pending state cannot reuse a committed read.
 		return pendingWorld && pendingWorld.hides(node) ? NaN : node.revision;
 	}
@@ -1117,6 +1161,7 @@ function observeRead<T>(node: ScopedNode<T>, read: SignalReadMode): NodeState<T>
 	const observed =
 		read === 'latest' && state.snapshot.status !== 'ready' ? (node.lastState ?? state) : state;
 	trackRead(node, read);
+	stateRead = true;
 	// Retirement marks the owner before invoking user cancellation callbacks.
 	// A reentrant read must not expose its old value before graph teardown runs.
 	if (observed.owners) for (const owner of observed.owners) assertAlive(owner);
@@ -1134,6 +1179,52 @@ function trackRead(node: ScopedNode, read: SignalReadMode): void {
  * state. Pending, historical and adoption reads take readNode itself.
  */
 export function readValue<T>(node: ScopedNode<T>): T {
+	// The common read: a plain value that is current, in a live owner, while nothing
+	// presents another one. A node being evaluated, re-entered or retired has other flags.
+	if (node.valueOnly && !node.owner.retired && presentsLive()) {
+		const flags = node.flags;
+		if ((flags & CURRENT) !== REACTIVE_MUTABLE) {
+			// A quiet plain computation a change reached: bring it up to date here, as
+			// refresh() would, unless it is being computed or a render collects reads.
+			if (
+				node.plain === undefined ||
+				flags & REACTIVE_RECURSED_CHECK ||
+				getNativeReadObserver() !== null
+			)
+				return readOtherValue(node);
+			refreshPlain(node);
+			if (!node.valueOnly) return readOtherValue(node);
+		}
+		const reader = activeNode;
+		if (reader !== undefined) {
+			linkDependency(node, reader, trackingCycle);
+			// A plain ready state carries no owners of its own.
+			if (node.owner !== reader.owner) (activeOwners ??= new Set()).add(node.owner);
+		}
+		if (getNativeReadObserver()) reportNativeRead(node.nativeReadSource('value'), node.revision);
+		return node.last as T;
+	}
+	return readOtherValue(node);
+}
+
+/** The flags a read tests: a current node has only REACTIVE_MUTABLE of them. */
+const CURRENT =
+	REACTIVE_MUTABLE |
+	REACTIVE_DIRTY |
+	REACTIVE_PENDING |
+	REACTIVE_RECURSED |
+	REACTIVE_RECURSED_CHECK;
+
+/** Whether reads see live nodes as they are: no transition world, history or adoption frame. */
+function presentsLive(): boolean {
+	return (
+		pendingWorld === undefined &&
+		historicalReader === undefined &&
+		getNativeAdoptionResolver() === null
+	);
+}
+
+function readOtherValue<T>(node: ScopedNode<T>): T {
 	if (pendingWorld || historicalReader || (node.owner.seedable && getNativeAdoptionResolver()))
 		return strictValue(readNode(node), node.key);
 	refresh(node);
@@ -1251,6 +1342,32 @@ export function refreshNode<T>(node: ScopedNode<T>): NodeState<T> {
 	return node.state!;
 }
 
+/** refresh() for a live plain computation that is stale, while reads present live nodes. */
+function refreshPlain(node: ScopedNode): void {
+	// Dependency checks belong to the computation's pure read boundary (see refresh).
+	pureDepth++;
+	try {
+		let iterations = 0;
+		while (true) {
+			const flags = node.flags;
+			if (
+				flags & REACTIVE_DIRTY ||
+				(flags & REACTIVE_PENDING && (!node.deps || checkDirty(node.deps, node)))
+			) {
+				if (++iterations > 100) throw new SignalCycleError(node.key);
+				if (evaluatePlain(node) && node.subs) shallowPropagate(node.subs);
+				if (node.flags & (REACTIVE_DIRTY | REACTIVE_PENDING)) continue;
+			} else {
+				node.flags &= ~REACTIVE_PENDING;
+			}
+			node.flags &= ~REACTIVE_RECURSED;
+			break;
+		}
+	} finally {
+		pureDepth--;
+	}
+}
+
 function refresh(node: ScopedNode): void {
 	assertAlive(node.owner);
 	if (node.evaluating) throw new SignalCycleError(node.key);
@@ -1274,7 +1391,7 @@ function refresh(node: ScopedNode): void {
 				(flags & REACTIVE_PENDING && (!node.deps || checkDirty(node.deps, node)))
 			) {
 				if (++iterations > 100) throw new SignalCycleError(node.key);
-				if (evaluate(node) && node.subs) shallowPropagate(node.subs);
+				if (update(node) && node.subs) shallowPropagate(node.subs);
 				if (node.flags & (REACTIVE_DIRTY | REACTIVE_PENDING)) continue;
 			} else {
 				node.flags &= ~REACTIVE_PENDING;
@@ -1310,24 +1427,7 @@ function evaluate(node: ScopedNode): boolean {
 	try {
 		next = node.compute(node);
 	} catch (error) {
-		if (isThenable(error)) {
-			const wakeup =
-				!node.wakeup || node.wakeup.settled ? (node.wakeup = createWakeup()) : node.wakeup;
-			// The thenable retains the node only while the node waits on it.
-			wakeup.node = node;
-			if (wakeup.thrown !== error) {
-				wakeup.thrown = error;
-				// A thenable that already settled cannot report a change: rethrowing it
-				// waits for a dependency instead of evaluating again on every microtask.
-				if (!settledThrown.has(error)) {
-					const settle = () => settleThrown(wakeup, error);
-					Promise.resolve(error).then(settle, settle);
-				}
-			}
-			next = pendingState(wakeup.promise);
-		} else {
-			next = errorState(error);
-		}
+		next = thrownState(node, error);
 	} finally {
 		executionDepth--;
 		// compute() reassigned activeOwners, which this function narrowed to undefined.
@@ -1342,6 +1442,102 @@ function evaluate(node: ScopedNode): boolean {
 		while (obsolete) obsolete = unlink(obsolete, node);
 		if (pending) pending.leave(world, node);
 	}
+	return settle(node, next, owners);
+}
+
+/** What a computation that threw leaves: pending on a thenable, failed on anything else. */
+function thrownState(node: ScopedNode, error: unknown): NodeState {
+	if (!isThenable(error)) return errorState(error);
+	const wakeup = !node.wakeup || node.wakeup.settled ? (node.wakeup = createWakeup()) : node.wakeup;
+	// The thenable retains the node only while the node waits on it.
+	wakeup.node = node;
+	if (wakeup.thrown !== error) {
+		wakeup.thrown = error;
+		// A thenable that already settled cannot report a change: rethrowing it
+		// waits for a dependency instead of evaluating again on every microtask.
+		if (!settledThrown.has(error)) {
+			const settled = () => settleThrown(wakeup, error);
+			Promise.resolve(error).then(settled, settled);
+		}
+	}
+	return pendingState(wakeup.promise);
+}
+
+/**
+ * evaluate() for a plain computation while reads see live nodes and no render
+ * collects them: the same steps without a world to enter, a native observer to
+ * set aside or `compute` to call through. A computation that read only plain
+ * values and returned one stores it at once; anything else (a throw, a thenable,
+ * a read that presented a state, a foreign owner) settles as evaluate() does.
+ */
+function evaluatePlain(node: ScopedNode): boolean {
+	const previousNode = activeNode;
+	const previousOwners = activeOwners;
+	const previousStateRead = stateRead;
+	node.depsTail = undefined;
+	node.flags = REACTIVE_MUTABLE | REACTIVE_RECURSED_CHECK;
+	node.evaluating = true;
+	activeNode = node;
+	activeOwners = undefined;
+	stateRead = false;
+	trackingCycle++;
+	executionDepth++;
+	pureDepth++;
+	let value: unknown;
+	let failed: NodeState | undefined;
+	let owners: Set<GraphOwner> | undefined;
+	let readState: boolean;
+	try {
+		value = node.plain!();
+	} catch (error) {
+		failed = thrownState(node, error);
+	} finally {
+		pureDepth--;
+		executionDepth--;
+		owners = activeOwners as Set<GraphOwner> | undefined;
+		readState = stateRead;
+		activeOwners = previousOwners;
+		activeNode = previousNode;
+		stateRead = previousStateRead;
+		node.evaluating = false;
+		node.flags &= ~REACTIVE_RECURSED_CHECK;
+		const tail = (node as ReactiveNode).depsTail;
+		let obsolete = tail ? tail.nextDep : node.deps;
+		while (obsolete) obsolete = unlink(obsolete, node);
+	}
+	// Every dependency it read was value-only, so none has activity to aggregate.
+	if (
+		failed === undefined &&
+		!readState &&
+		owners === undefined &&
+		node.valueOnly &&
+		!isThenable(value)
+	) {
+		// A node with a plain value stays quiet: a change that reaches it marks it stale
+		// without telling it (notifyNode), and its native readers learn that it may have
+		// changed from its flags (GraphReadSource.getVersion). A waiter or a trace still
+		// needs telling.
+		if (node.wakeup !== undefined || node.owner.traceLimit !== 0) node.flags |= REACTIVE_WATCHING;
+		if (Object.is(node.last, value)) return false;
+		storeValue(node, value);
+		return true;
+	}
+	node.flags |= REACTIVE_WATCHING;
+	if (failed !== undefined) return settle(node, failed, owners);
+	if (isThenable(value))
+		return settle(node, errorState(new TypeError(formatClientError(166))), owners);
+	return settle(node, derivedResult(node, value), owners);
+}
+
+/** evaluate(node), by the plain steps when the node and the moment allow them. */
+function update(node: ScopedNode): boolean {
+	return node.plain !== undefined && presentsLive() && getNativeReadObserver() === null
+		? evaluatePlain(node)
+		: evaluate(node);
+}
+
+/** Commit what a computation left; returns whether the node's value or state changed. */
+function settle(node: ScopedNode, next: NodeState, owners: Set<GraphOwner> | undefined): boolean {
 	// Only foreign provenance keeps a plain result in a stored state.
 	const plain = next === PLAIN_RESULT && !owners?.size;
 	if (next === PLAIN_RESULT) {
@@ -1605,15 +1801,8 @@ function isPlainReady(state: NodeState | undefined, value: unknown): boolean {
  * without building a value-only node's state.
  */
 function observeCurrent(observer: SignalObserver, node: ScopedNode): boolean {
-	const previousNode = activeNode;
-	const previousObserver = setNativeReadObserver(null);
-	activeNode = undefined;
-	try {
-		refresh(node);
-	} finally {
-		activeNode = previousNode;
-		setNativeReadObserver(previousObserver);
-	}
+	// Bringing a node up to date tracks no read, so it needs no untracking.
+	refresh(node);
 	if (node.valueOnly) {
 		const value = node.last;
 		if (observer.plain ? Object.is(observer.value, value) : isPlainReady(observer.previous, value))
@@ -1654,7 +1843,9 @@ function runObserver(observer: SignalObserver): void {
 	if (!node || !observer.flags) return;
 	observer.flags = REACTIVE_WATCHING;
 	if (!observer.native && observeCurrent(observer, node)) return;
-	if (observer.notify) untrack(observer.notify);
+	// Its callers deliver untracked.
+	const notify = observer.notify;
+	if (notify) notify();
 }
 
 /** A retiring owner keeps the observer in its set, which it then clears at once. */
@@ -1928,6 +2119,7 @@ export function retireGraph(owner: GraphOwner, nodes: Iterable<ScopedNode>): voi
 			node.revision++;
 			retireState(node);
 			node.compute = undefined;
+			node.plain = undefined;
 			node.invalidateAttempt = undefined;
 			node.retryRequest = undefined;
 			if (node.subs) {
