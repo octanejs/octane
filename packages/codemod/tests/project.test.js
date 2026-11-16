@@ -4170,6 +4170,69 @@ export function inert() {}`,
 			expect(result.files.find((file) => file.file === 'Format.tsx').strong).toBe(true);
 			expect(findings(await run(['Format.tsx', 'handler.ts'], projectTypes))).toEqual([]);
 		}
+
+		const conditional = project({
+			'tsconfig.json': fs.readFileSync(path.join(root, 'tsconfig.json'), 'utf8'),
+			'Construct.tsx': fs.readFileSync(path.join(root, 'Construct.tsx'), 'utf8'),
+			'handler.ts': fs.readFileSync(path.join(root, 'handler.ts'), 'utf8'),
+			'node_modules/react-intl/package.json': JSON.stringify({
+				name: 'react-intl',
+				version: '7.1.14',
+				peerDependencies: { react: '^19.0.0' },
+				exports: { types: './index.d.ts', import: './other.mjs', require: './index.cjs' },
+			}),
+			'node_modules/react-intl/index.d.ts':
+				'export function createIntl(options: unknown): { locale: string };',
+			'node_modules/react-intl/index.cjs': 'exports.createIntl = () => ({ locale: "fr" });',
+			'node_modules/react-intl/other.mjs': 'export const createIntl = () => ({ locale: "fr" });',
+		});
+		for (const name of ['octane', 'react', 'react-dom', '@tsrx'])
+			fs.symlinkSync(
+				path.join(REPO, 'packages/codemod/node_modules', name),
+				path.join(conditional, 'node_modules', name),
+				'dir',
+			);
+		const differentFactory = await runCodemod([path.join(conditional, 'Construct.tsx')], {
+			root: conditional,
+			strong: true,
+			write: false,
+			verify: true,
+		});
+		expect(differentFactory.files[0].strong).toBe(true);
+		expect(findings(differentFactory)).toEqual([]);
+
+		const require = createRequire(import.meta.url);
+		const stockIntl = path.dirname(require.resolve('react-intl/package.json'));
+		const stockCore = path.dirname(
+			createRequire(path.join(stockIntl, 'index.js')).resolve('@formatjs/intl'),
+		);
+		const packages = path.join(conditional, 'node_modules');
+		const installedIntl = path.join(packages, 'react-intl');
+		const installedCore = path.join(packages, '@formatjs/intl');
+		fs.cpSync(stockIntl, installedIntl, { recursive: true });
+		fs.cpSync(stockCore, installedCore, { recursive: true });
+		for (const [file, replacement] of [
+			[
+				path.join(installedIntl, 'lib/src/components/createIntl.js'),
+				'export const createIntl = () => ({ locale: "fr" });',
+			],
+			[
+				path.join(installedCore, 'lib/src/create-intl.js'),
+				'export const createIntl = () => ({ locale: "fr" });',
+			],
+		]) {
+			const original = fs.readFileSync(file);
+			fs.writeFileSync(file, replacement);
+			const result = await runCodemod([path.join(conditional, 'Construct.tsx')], {
+				root: conditional,
+				strong: true,
+				write: false,
+				verify: true,
+			});
+			expect(result.files[0].strong).toBe(true);
+			expect(findings(result)).toEqual([]);
+			fs.writeFileSync(file, original);
+		}
 	});
 
 	it('reports a native setup call into a React hook left in an unselected local module', () => {

@@ -5326,6 +5326,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		if (!locale || !ts.isStringLiteralLike(locale) || !handler) return;
 		const messages = fields.get('messages');
 		if (messages && (!ts.isObjectLiteralExpression(messages) || messages.properties.length)) return;
+		if (!this.options.originalIntlFactory?.()) return;
 		const resource = this.intlCallbackResource(handler);
 		if (!resource) return;
 		const report = (site: ts.Node, operation: string) =>

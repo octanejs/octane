@@ -73,6 +73,8 @@ export interface TransformOptions {
 	): { from: string; name: string } | null;
 	/** Relative path to the project-local React Intl adapter, when its installed peers support it. */
 	reactIntlAdapter?: string;
+	/** Whether the installed React Intl factory and FormatJS error paths match the supported release. */
+	originalIntlFactory?(): boolean;
 	/** Whether a directly imported, selected component forwards this prop only to text attributes. */
 	forwardedText?(
 		module: string,
