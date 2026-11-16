@@ -84,6 +84,45 @@ describe('compiled component invocation native reads', () => {
 		expect(model.scope.inspect().nodes.every((node) => node.subscribers === 0)).toBe(true);
 	});
 
+	it('follows a reader through renders that read the same, fewer and more sources', () => {
+		const model = state$('compiled-collection-partial');
+		const subscribers = () => model.scope.inspect().nodes.map((node) => node.subscribers);
+		const text = () => rendered!.find('p').textContent;
+		rendered = mount(client.PartialReader, { ...model, both: true });
+		expect(subscribers()).toEqual([1, 1]);
+		for (let pass = 0; pass < 2; pass++) {
+			rendered.update(client.PartialReader, { ...model, both: true });
+			expect(subscribers()).toEqual([1, 1]);
+		}
+		flushSync(() => model.count$.set(2));
+		flushSync(() => model.body$.set(11));
+		expect(text()).toBe('2:11');
+
+		rendered.update(client.PartialReader, { ...model, both: false });
+		expect(subscribers()).toEqual([1, 0]);
+		flushSync(() => model.body$.set(12));
+		expect(text()).toBe('2');
+		flushSync(() => model.count$.set(3));
+		expect(text()).toBe('3');
+
+		rendered.update(client.PartialReader, { ...model, both: true });
+		expect(subscribers()).toEqual([1, 1]);
+		flushSync(() => model.count$.set(4));
+		expect(text()).toBe('4:12');
+		flushSync(() => model.body$.set(13));
+		expect(text()).toBe('4:13');
+	});
+
+	it('subscribes only what the completed pass of a render-phase rerun read', () => {
+		const first = state$('compiled-collection-replay-first');
+		const final = state$('compiled-collection-replay-final');
+		rendered = mount(client.ReplayReader, { first$: first.count$, final$: final.count$ });
+		const subscribers = (model: typeof first) => model.scope.inspect().nodes[0]!.subscribers;
+		expect([subscribers(first), subscribers(final)]).toEqual([0, 1]);
+		flushSync(() => final.count$.set(2));
+		expect(rendered.find('p').textContent).toBe('2');
+	});
+
 	it('updates reads made through an opaque helper in a body, arm, child and rows', () => {
 		const model = state$('compiled-collection-helper');
 		rendered = mount(client.HelperReader, { count$: model.count$, items: [1, 2] });
