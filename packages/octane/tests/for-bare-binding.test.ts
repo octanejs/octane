@@ -273,6 +273,59 @@ describe('bare-left @for row bindings', () => {
 		expect(node?.textContent).toBe('2');
 	});
 
+	it('initializes the index before destructuring simple rows and hydrates them in place', () => {
+		const errors: unknown[] = [];
+		const options = { onRecoverableError: (error: unknown) => errors.push(error) };
+		const defaults = { rows: [{}, {}] };
+		const properties = { rows: [{ 0: 10 }, { 1: 20 }] };
+		const keyed = { rows: [{ id: 'a' }, { id: 'b' }] };
+		const hosts = [
+			container(renderToString(server.IndexedDefault, defaults).html),
+			container(renderToString(server.IndexedProperty, properties).html),
+			container(renderToString(server.IndexedTransparentKey, keyed).html),
+		];
+		const rows = () => hosts.map((host) => [...host.querySelectorAll('li')]);
+		const expected = [
+			['0', '1'],
+			['10', '20'],
+			['row', 'row'],
+		];
+		const before = rows();
+		expect(before.map(text)).toEqual(expected);
+
+		const roots = [
+			hydrateRoot(hosts[0], client.IndexedDefault, defaults, options),
+			hydrateRoot(hosts[1], client.IndexedProperty, properties, options),
+			hydrateRoot(hosts[2], client.IndexedTransparentKey, keyed, options),
+		];
+		cleanups.push(() => roots.forEach((root) => root.unmount()));
+		flushSync(() => {});
+		const after = rows();
+		expect(after.map(text)).toEqual(expected);
+		after.forEach((items, i) => expectAdopted(items, before[i]));
+		expect(errors).toEqual([]);
+	});
+
+	it.each(['index', 'id'])(
+		'keeps the indexed row binding %s immutable on both renderers',
+		(name) => {
+			const source = `
+				export function List({ rows }) @{
+					<ul>@for (const { id, label = index } of rows; index index) {
+						eval('${name} = 7');
+						<li>{label as number}</li>
+					}</ul>
+				}
+			`;
+			const id = 'indexed-row-constant.tsrx';
+			const props = { rows: [{ id: 'a' }, { id: 'b' }] };
+			const { List: ClientList } = loadCompiledFixtureSource(source, { id, mode: 'client' });
+			const { List: ServerList } = loadCompiledFixtureSource(source, { id, mode: 'server' });
+			expect(() => mount(ClientList, props)).toThrow(TypeError);
+			expect(() => renderToString(ServerList, props)).toThrow(TypeError);
+		},
+	);
+
 	it('rejects writing a const destructured key binding on both client and server', () => {
 		// Compile directly so the runtime is exercised even without TypeScript checking.
 		const source = `
