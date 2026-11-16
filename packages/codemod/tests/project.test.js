@@ -2877,11 +2877,27 @@ ${shape === 'named and default export' ? 'export default Owner;' : ''}`,
 		},
 	);
 
-	it('warns when an explicit retained JSX import is rewritten to a component wrapper template', async () => {
-		const root = project({
-			'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler"}}',
-			'Badge.tsx': 'export function Badge() { return <b>Ready</b>; }',
-			'View.tsx': `import { Badge } from './Badge.tsx';
+	it.each([
+		['explicit', './View.tsx', {}, {}, true],
+		['extensionless', './View', {}, {}, true],
+		['aliased', '@/View', { paths: { '@/*': ['./*'] } }, {}, false],
+		[
+			'module suffixes',
+			'./View',
+			{ moduleSuffixes: ['.native', ''] },
+			{ 'View.native.tsx': 'export function View() { return <i>Native</i>; }' },
+			false,
+		],
+		['JavaScript sibling', './View', {}, { 'View.js': 'export const View = () => null;' }, false],
+	])(
+		'checks a retained component wrapper imported through %s',
+		async (_, specifier, config, siblings, warns) => {
+			const root = project({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { jsx: 'react-jsx', moduleResolution: 'bundler', ...config },
+				}),
+				'Badge.tsx': 'export function Badge() { return <b>Ready</b>; }',
+				'View.tsx': `import { Badge } from './Badge.tsx';
 export function View() { return <Badge />; }
 function Split() { return <Badge />; }
 export { Split };
@@ -2890,42 +2906,52 @@ export type { TypeOnly };
 export function Label() { return 'ready'; }
 export function Replaced() { return <Badge />; }
 Replaced = function () { return 'ready'; };`,
-			'Owner.tsx': `import { View } from './View.tsx';
+				'Owner.tsx': `import { View } from '${specifier}';
 export function Owner() { return <View />; }`,
-			'SplitOwner.tsx': `import { Split } from './View.tsx';
+				'LazyOwner.tsx': `import { lazy } from 'react';
+const LazyView = lazy(() => import('./View').then((module) => ({ default: module.View })));
+export function LazyOwner() { return <LazyView />; }`,
+				'SplitOwner.tsx': `import { Split } from '${specifier}';
 export function SplitOwner() { return <Split />; }`,
-			'TypeOnlyOwner.tsx': `import { TypeOnly } from './View.tsx';
+				'TypeOnlyOwner.tsx': `import { TypeOnly } from '${specifier}';
 export function TypeOnlyOwner() { return <TypeOnly />; }`,
-			'ScalarOwner.tsx': `import { Label } from './View.tsx';
+				'ScalarOwner.tsx': `import { Label } from '${specifier}';
 export function ScalarOwner() { return <Label />; }`,
-			'ReplacedOwner.tsx': `import { Replaced } from './View.tsx';
+				'ReplacedOwner.tsx': `import { Replaced } from '${specifier}';
 export function ReplacedOwner() { return <Replaced />; }`,
-		});
-		fs.symlinkSync(
-			path.join(REPO, 'packages/codemod/node_modules'),
-			path.join(root, 'node_modules'),
-			'dir',
-		);
-		const selected = ['View.tsx', 'Badge.tsx'].map((file) => path.join(root, file));
-		const options = { root, strong: true, verify: true, write: false };
-		const preview = await runCodemod(selected, options);
-		const affected = preview.files.flatMap((file) =>
-			file.notes
-				.filter(
-					(note) => note.rule === 'react-compat' && note.message.includes('retained React JSX'),
-				)
-				.map((note) => [file.file, note.severity, note.line]),
-		);
-		expect(affected).toEqual([
-			['View.tsx', 'warning', 1],
-			['View.tsx', 'warning', 1],
-			['Owner.tsx', 'warning', 2],
-			['SplitOwner.tsx', 'warning', 2],
-		]);
-		expect(preview.files.find((file) => file.file === 'ScalarOwner.tsx')?.code).toContain(
-			"from './View.tsrx'",
-		);
-	});
+				...siblings,
+			});
+			fs.symlinkSync(
+				path.join(REPO, 'packages/codemod/node_modules'),
+				path.join(root, 'node_modules'),
+				'dir',
+			);
+			const selected = ['View.tsx', 'Badge.tsx'].map((file) => path.join(root, file));
+			const options = { root, strong: true, verify: true, write: false };
+			const preview = await runCodemod(selected, options);
+			const affected = preview.files.flatMap((file) =>
+				file.notes
+					.filter(
+						(note) => note.rule === 'react-compat' && note.message.includes('retained React JSX'),
+					)
+					.map((note) => [file.file, note.severity, note.line]),
+			);
+			expect(affected).toEqual(
+				warns
+					? [
+							['View.tsx', 'warning', 1],
+							['View.tsx', 'warning', 1],
+							['Owner.tsx', 'warning', 2],
+							['SplitOwner.tsx', 'warning', 2],
+						]
+					: [],
+			);
+			if (warns)
+				expect(preview.files.find((file) => file.file === 'ScalarOwner.tsx')?.code).toContain(
+					"from './View.tsrx'",
+				);
+		},
+	);
 
 	it.each([
 		['direct named import', 'icon()', true],
