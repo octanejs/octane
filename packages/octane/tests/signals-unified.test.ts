@@ -380,6 +380,19 @@ describe('unified readonly derived declarations', () => {
 		expect(never).toBeInstanceOf(Promise);
 	});
 
+	it('lets a live scope drop a keyless signal once nothing reads it', async () => {
+		const scope = owner('keyless-release');
+		// Kept out of the async frame so no strong local outlives the call.
+		const released = (() => {
+			const value$ = scope.signal$(null, 0);
+			const stop = scope.effect(() => void value$.get());
+			stop();
+			return new WeakRef(value$);
+		})();
+		await collectGarbage();
+		expect(released.deref()).toBeUndefined();
+	});
+
 	it('keeps an async reader waiting on a computation that rethrows a settled thenable (#1763)', async () => {
 		const ready$ = __signalAt('module.ts#settled-ready', false);
 		const thrown = deferred<void>();

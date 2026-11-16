@@ -10,6 +10,7 @@ import type {
 	SignalReadMode,
 } from './graph.js';
 import type { NativeReadSource } from './read-protocol.js';
+import { READ_PENDING, setSignalMode } from './read-protocol.js';
 import type { ResourceBinding } from './requests.js';
 
 /**
@@ -134,6 +135,7 @@ export function registerPendingHost(value: PendingHost): void {
 
 export function setPendingWorld(live: boolean): void {
 	pendingWorld = live ? pendingSignals : undefined;
+	setSignalMode(READ_PENDING, pendingWorld !== undefined);
 }
 
 /** Writes and reads inside are urgent and committed, whatever transition is active. */

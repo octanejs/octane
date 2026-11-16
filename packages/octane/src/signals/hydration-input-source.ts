@@ -1,6 +1,11 @@
 import { hasOwnProp } from '../has-own.js';
 import type { HydrationSourceWitness } from '../hydration-inputs.js';
-import { hasScopedNodeBrand, originalScopedNodeGet, ScopedNode } from './graph.js';
+import {
+	hasScopedNodeBrand,
+	originalScopedNodeGet,
+	ScopedNode,
+	scopedNodePendingSlot,
+} from './graph.js';
 import { REACTIVE_NONE } from './graph-flags.js';
 import { pendingWorld } from './transition-state.js';
 
@@ -24,15 +29,12 @@ export function __hydrationSignalRevision(value: unknown): HydrationSourceWitnes
 		return undefined;
 	const revision = ownValue(value, 'revision');
 	const flags = ownValue(value, 'flags');
-	const pending = Object.getOwnPropertyDescriptor(value, 'pending');
 	if (
 		typeof revision !== 'number' ||
 		!Number.isFinite(revision) ||
 		typeof flags !== 'number' ||
 		flags === REACTIVE_NONE ||
-		!pending ||
-		!hasOwnProp.call(pending, 'value') ||
-		pending.value !== undefined
+		scopedNodePendingSlot(value) !== undefined
 	)
 		return undefined;
 	return [value, revision];

@@ -1,14 +1,21 @@
+import { REACTIVE_SLOW } from './graph-flags.js';
 import { formatClientError } from '../error-codes.client.generated.js';
 import { decodeSignalValue, snapshotSignalValue } from './encoding.js';
-import { SignalFrameError, SignalSerializationError } from './errors.js';
+import { ScopeDisposedError, SignalFrameError, SignalSerializationError } from './errors.js';
 import type { ScopeStreams } from './scope-streams.js';
 import { scopeSeedEntry } from './seed-serialization.js';
 import {
+	EffectNode,
+	PlainCell,
+	PlainComputed,
 	ScopedNode,
 	assertAlive,
 	assertWritable,
+	addEffect,
 	derivedState,
+	effectRing,
 	endSignalBatch,
+	executeEffect,
 	historicalBindingRead,
 	initializeValue,
 	inspectNativeNode,
@@ -21,6 +28,7 @@ import {
 	setHistoricalReader,
 	signalBatch,
 	startSignalBatch,
+	stopEffect,
 	unchangedLiveRead,
 	untrack,
 	type GraphOwner,
@@ -219,6 +227,10 @@ export class ScopeImpl implements Scope, GraphOwner {
 	streams: ScopeStreams | undefined = undefined;
 	derivedBindings: Map<ScopedNode, DerivedBindingLifecycle> | undefined = undefined;
 	frames: Set<AdoptionFrameImpl> | undefined = undefined;
+	/** Effects this scope stops when it retires. */
+	effects: EffectNode | undefined = undefined;
+	heldCells: PlainCell[] | undefined = undefined;
+	heldReleased = 0;
 	/** Holds a writable or asynchronous derived cell that new render inputs cannot re-select. */
 	unkeyedState = false;
 	readonly seedEntries: Map<string, DecodedSeedEntry> | undefined;
@@ -234,6 +246,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 	declare set: Scope['set'];
 	declare isPending: Scope['isPending'];
 	declare batch: Scope['batch'];
+	declare effect: Scope['effect'];
 	declare action: Scope['action'];
 	declare serialize: Scope['serialize'];
 	declare inspect: Scope['inspect'];
@@ -262,7 +275,13 @@ export class ScopeImpl implements Scope, GraphOwner {
 		return this.disposed;
 	}
 
-	signal$<T>(key: string, initial: T): WritableSignal<T> {
+	signal$<T>(key: string | null, initial: T): WritableSignal<T> {
+		if (key !== null) return this.keyedSignal(key, initial);
+		if (this.disposed) throw new ScopeDisposedError(this.key);
+		return new PlainCell(initial, this) as unknown as WritableSignal<T>;
+	}
+
+	private keyedSignal<T>(key: string, initial: T): WritableSignal<T> {
 		const node = createScopeNode<T>(this, key, 'signal');
 		const seed = initialScopeSeed(this, key) ?? retainedScopeSeed(this, key);
 		initializeValue(node, seed ? (seed.value as T) : initial);
@@ -292,7 +311,14 @@ export class ScopeImpl implements Scope, GraphOwner {
 		if (this.disposed) return;
 		assertWritable();
 		signalBatch(() => {
+			// Effects stop first, so their cleanups still read this scope's values.
+			const ring = this.effects;
+			if (ring !== undefined) {
+				while (ring.next !== ring) stopEffect(ring.next!);
+			}
 			this.disposed = true;
+			// Reads and writes from cancellation callbacks below take the general path, which throws.
+			for (const node of this.nodes.values()) node.flags |= REACTIVE_SLOW;
 			this.lifetime++;
 			// Optional capabilities keep their original order: producers stop before
 			// channels clear, and adoption leases release before the graph retires.
@@ -697,6 +723,11 @@ function ownScopeNode<T>(scope: ScopeImpl, handle$: SignalHandle<T>): ScopedNode
 
 let publicScope = false;
 
+/** `scope.effect`'s stop, bound to its effect, as small as alien-signals' own. */
+function stopScopeEffect(this: EffectNode): void {
+	if (this.run !== undefined || this.cleanup !== undefined) stopEffect(this);
+}
+
 /**
  * @internal Every scope an application can hold exposes the whole Scope
  * surface. The runtime's owner scopes for `signal$` and friends reach
@@ -711,10 +742,14 @@ export function installPublicScope(): void {
 	const prototype = ScopeImpl.prototype;
 	prototype.derived$ = function <T>(
 		this: ScopeImpl,
-		key: string,
+		key: string | null,
 		compute: (() => T) & (T extends PromiseLike<unknown> ? never : unknown),
 	): DerivedSignal<T> {
 		if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
+		if (key === null) {
+			assertAlive(this);
+			return new PlainComputed(compute) as unknown as DerivedSignal<T>;
+		}
 		const node = createScopeNode<T>(this, key, 'derived');
 		node.compute = (target) => derivedState(target, compute);
 		node.plain = compute;
@@ -726,6 +761,11 @@ export function installPublicScope(): void {
 		return node as DerivedSignal<T>;
 	};
 	prototype.get = function <T>(this: ScopeImpl, handle$: SignalHandle<T>): T {
+		if (
+			(handle$ instanceof PlainCell && handle$.owner === this) ||
+			handle$ instanceof PlainComputed
+		)
+			return handle$.get();
 		return readValue(ownScopeNode(this, handle$));
 	};
 	prototype.set = function <T>(
@@ -733,6 +773,7 @@ export function installPublicScope(): void {
 		handle$: WritableSignal<T>,
 		value: T | ((previous: T) => T),
 	): void {
+		if (handle$ instanceof PlainCell && handle$.owner === this) return handle$.set(value);
 		ownScopeNode(this, handle$).set(value);
 	};
 	prototype.isPending = function (this: ScopeImpl, read: () => unknown): boolean {
@@ -748,6 +789,20 @@ export function installPublicScope(): void {
 	prototype.batch = function <T>(this: ScopeImpl, write: () => T): T {
 		assertAlive(this);
 		return signalBatch(write);
+	};
+	prototype.effect = function (this: ScopeImpl, run: () => void | (() => void)): () => void {
+		assertAlive(this);
+		assertWritable();
+		if (typeof run !== 'function') throw new TypeError(formatClientError(363));
+		const effect = new EffectNode(run);
+		addEffect((this.effects ??= effectRing()), effect);
+		startSignalBatch();
+		try {
+			executeEffect(effect);
+		} finally {
+			endSignalBatch();
+		}
+		return stopScopeEffect.bind(effect);
 	};
 	prototype.action = function <F extends (...args: any[]) => any>(this: ScopeImpl, write: F): F {
 		if (typeof write !== 'function') throw new TypeError(formatClientError(139));

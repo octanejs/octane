@@ -152,8 +152,8 @@ upstream files throw on their first update.
 | Lane | What runs |
 | --- | --- |
 | `alien` | The `alien-signals` package. |
-| `octane` | `alien-upstream/octane.mjs`: `createScope`, `signal$` and `derived$`. Octane has no effect primitive, so `effect` is a derived value with a subscriber that reads it again, which holds for any effect body. |
-| `octane-direct` | The same, with each `effect(() => x())` rewritten to subscribe to `x` itself, which is what an application writes when the body reads one value. |
+| `octane` | `alien-upstream/octane.mjs`: `createScope`, `signal$`, `derived$` and `effect`. |
+| `octane-direct` | The same, with each `effect(() => x())` rewritten to subscribe to `x` itself, which is what an application writes when it only needs to hear of a change. |
 
 Every lane is bundled with the same production options.
 

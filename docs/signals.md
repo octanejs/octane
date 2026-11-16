@@ -74,6 +74,17 @@ producers. There is no replacement compatibility method or runtime installation.
 
 Keys are nonempty strings, unique within one scope. Two scopes with the same textual `scopeKey` still own separate state. A handle can read itself, or its owning scope can read it with `scope.get(handle$)`; a different scope cannot impersonate that owner. Derived computations may read handles belonging to another scope without taking ownership of them.
 
+`scope.effect(run)` runs `run` at once, tracking the signals it reads, and runs it again after the batch that changes any of them. A function `run` returns is called before the next run and when the effect stops. `scope.effect` returns a function that stops the effect; the scope also stops its effects first when it is disposed, so their cleanups still read its values. An effect that reads a signal whose owner has retired stops silently. An effect lives until it is stopped or its scope is disposed, even when nothing else references the signals it reads.
+
+```ts
+const stop = account.effect(() => {
+	const handle = setInterval(() => console.log(count$.get()), 1000);
+	return () => clearInterval(handle);
+});
+```
+
+A `null` key declares a keyless value: `account.signal$(null, 0)` or `account.derived$(null, () => count$.get() * 2)`. A keyless signal is not serialized, seeded, adopted, inspected or staged by a transition, and takes no entry in the scope's key table. A keyless derived value belongs to no scope and records no provenance. Use keys for anything that crosses the server boundary or should appear in `scope.inspect()`; use keyless values for local graphs that only the client computes.
+
 Writes use `Object.is` equality and become visible immediately. Nested batches defer notifications until the outer synchronous batch ends. `scope.action(fn)` preserves `this`, arguments, and the return value while applying that same batching rule. It does not untrack reads, roll back earlier writes on an exception, or keep a batch open across `await`.
 
 An explicit renderer `startTransition` or `useTransition` Action is different from `scope.action`: a signal written inside it keeps its committed value and gains a pending value for that transition, the way a state update joins the transition's update queue. Derived and query values computed from it are pending with it. Committed reads, public subscriptions and DOM bindings keep the committed values. The components that read them render with the transition, and those renders, like the transition's own synchronous callback, read the pending values. The transition then suspends, holds and commits as its state updates do, and `isPending` stays true until it finishes. When it does, its signals commit: DOM bindings update first, and each subscriber hears of the change once. A boundary's configured timeout may show its fallback; the transition's signals commit when that boundary reveals its content. An urgent write commits immediately, and the transition's own update applies on top of it when it commits, as React rebases state updates. Two transitions that write the same signal, or a value derived from it, commit together.

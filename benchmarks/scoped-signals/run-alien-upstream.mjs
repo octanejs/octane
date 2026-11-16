@@ -16,7 +16,7 @@ const only = process.argv.find((arg) => arg.startsWith('--only='))?.slice(7);
 const LANES = [
 	{ name: 'alien', entry: `export * from 'alien-signals';`, direct: false },
 	{ name: 'octane', entry: `export * from './octane.mjs';`, direct: false },
-	{ name: 'octane-direct', entry: `export * from './octane.mjs';`, direct: true },
+	{ name: 'octane-direct', entry: `export * from './octane-direct.mjs';`, direct: true },
 ];
 const EFFECT = /effect\(\(\) => (?:void )?(\w+(?:\[\w+\])?)\(\)\)/g;
 

@@ -324,6 +324,7 @@ type ClientErrorArguments = {
 	360: [];
 	361: [];
 	362: [];
+	363: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -1439,6 +1440,8 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 					'A hook was called outside a component render. If the call is inside a component, the app probably loads more than one copy of Octane, possibly with the same version. Check that the renderer (`createRoot`), the hooks, and `octane/internal/client` all resolve to one installed `octane` package; a custom bundler may need to deduplicate `octane` and its subpaths.',
 					args,
 				);
+			case 363:
+				return formatDevErrorMessage('A signal effect must be a function.', args);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}
