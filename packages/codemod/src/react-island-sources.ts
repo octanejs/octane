@@ -1155,7 +1155,11 @@ export function reactServerComponents(
 			) {
 				for (const { name, initializer } of statement.declarationList.declarations) {
 					const value = initializer && skipParens(initializer);
-					if (ts.isIdentifier(name) && value && ts.isArrowFunction(value)) {
+					if (
+						ts.isIdentifier(name) &&
+						value &&
+						(ts.isArrowFunction(value) || ts.isFunctionExpression(value))
+					) {
 						visitDirectRoot(singleReturn(value));
 					} else {
 						visitDirectRoot(initializer);
