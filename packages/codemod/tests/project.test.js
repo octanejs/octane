@@ -3252,6 +3252,42 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 		it.each([
 			['a direct root', 'DOM.createRoot(container).render(<Leaf />)', true],
 			['a local root', 'const root = make(container); root.render(<Leaf />);', true],
+			[
+				'an extensionless direct root',
+				'make(container).render(<Leaf />)',
+				true,
+				{ specifier: './Leaf' },
+			],
+			[
+				'an extensionless element factory',
+				'make(container).render(h(Leaf))',
+				true,
+				{ specifier: './Leaf' },
+			],
+			[
+				'an extensionless JSX index',
+				'hydrate(container, <Leaf />)',
+				true,
+				{ specifier: './leaf', leaf: 'leaf/index.tsx' },
+			],
+			[
+				'an extensionless root with a dotted file stem',
+				'make(container).render(<Leaf />)',
+				true,
+				{ specifier: './Leaf.browser', leaf: 'Leaf.browser.tsx' },
+			],
+			[
+				'an extensionless path with a separate JS sibling',
+				'make(container).render(<Leaf />)',
+				false,
+				{ specifier: './Leaf', sibling: 'Leaf.js' },
+			],
+			[
+				'an explicit JavaScript substitution',
+				'make(container).render(<Leaf />)',
+				false,
+				{ specifier: './Leaf.js' },
+			],
 			['hydration', 'hydrate(container, <Leaf />, options)', true],
 			['a JSX fragment', 'make(container).render(<><Leaf /></>)', true],
 			['a React wrapper', 'hydrate(container, <Strict><Leaf /></Strict>)', true],
@@ -3259,25 +3295,25 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 				'a genuine React wrapper on a closed default import',
 				'const ref = React.createRef(); const label = React.createElement("small", null, "fallback"); hydrate(container, <React.Suspense fallback={label}><Leaf /></React.Suspense>)',
 				true,
-				'React',
+				{ reactImport: 'React' },
 			],
 			[
 				'a wrapper replaced by the React receiver itself',
 				"React.__defineGetter__('StrictMode', () => () => <em>ignored</em>); hydrate(container, <React.StrictMode><Leaf /></React.StrictMode>)",
 				false,
-				'React',
+				{ reactImport: 'React' },
 			],
 			[
 				'a wrapper replaced through a TypeScript instantiation expression',
 				"(React.__defineGetter__<any>)('StrictMode', () => () => <em>ignored</em>); hydrate(container, <React.StrictMode><Leaf /></React.StrictMode>)",
 				false,
-				'React',
+				{ reactImport: 'React' },
 			],
 			[
 				'a wrapper writable through the default import',
 				'Reflect.set(React, "StrictMode", other); make(container).render(<Strict><Leaf /></Strict>)',
 				false,
-				'React, { StrictMode as Strict }',
+				{ reactImport: 'React, { StrictMode as Strict }' },
 			],
 			['an element factory wrapper', 'make(container).render(h(Fragment, null, h(Leaf)))', true],
 			['a wrapper prop', 'make(container).render(h(Strict, { data: h(Leaf) }, "ignored"))', false],
@@ -3302,18 +3338,25 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 			],
 			['a different JSX runtime', 'make(container).render(<Leaf />)', false],
 			['a React bridge', 'make(container).render(<OctaneCompatInline component={Leaf} />)', false],
-		])('protects a migrated leaf rendered by %s', async (name, body, blocked, reactImport) => {
+		])('protects a migrated leaf rendered by %s', async (name, body, blocked, files) => {
+			const {
+				specifier = './Leaf.tsx',
+				leaf = 'Leaf.tsx',
+				sibling,
+				reactImport = '{ createElement as h, StrictMode as Strict, Fragment }',
+			} = files ?? {};
 			const root = project({
 				'package.json': '{"name":"app","type":"module"}',
 				'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"Bundler"}}',
 				'Entry.tsx': `${name === 'a different JSX runtime' ? '/** @jsxImportSource octane */' : ''}
 					import * as DOM from 'react-dom/client';
 					import { createRoot as make, hydrateRoot as hydrate } from 'react-dom/client';
-					import ${reactImport ?? '{ createElement as h, StrictMode as Strict, Fragment }'} from 'react';
+					import ${reactImport} from 'react';
 					import { OctaneCompatInline } from 'octane/react';
-					import { Leaf } from './Leaf.tsx';
+					import { Leaf } from '${specifier}';
 					${body};`,
-				'Leaf.tsx':
+				...(sibling ? { [sibling]: 'export function Leaf() { return null; }' } : {}),
+				[leaf]:
 					name === 'a template wrapper'
 						? 'function Panel() { return <small>ready</small>; } export function Leaf() { return <Panel />; }'
 						: name === 'a scalar export beside a template'
@@ -3333,7 +3376,7 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 				);
 				fs.symlinkSync(path.dirname(source), path.join(root, 'node_modules/@types', name), 'dir');
 			}
-			const selected = [path.join(root, 'Leaf.tsx')];
+			const selected = [path.join(root, leaf)];
 			const options = { root, strong: true, verify: true };
 			const preview = await runCodemod(selected, { ...options, write: false });
 			const note = expect.objectContaining({
@@ -3341,7 +3384,7 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 				severity: 'error',
 				message: expect.stringContaining('retained React DOM client root'),
 			});
-			for (const file of ['Leaf.tsx', 'Entry.tsx']) {
+			for (const file of [leaf, 'Entry.tsx']) {
 				const findings = preview.files.find((result) => result.file === file)?.notes ?? [];
 				if (blocked) expect(findings).toContainEqual(note);
 				else expect(findings).not.toContainEqual(note);
@@ -3351,8 +3394,8 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 			const result = await runCodemod(selected, { ...options, write: true });
 			expect(result.files[0].notes).toContainEqual(note);
 			expect(fs.readFileSync(path.join(root, 'Entry.tsx'), 'utf8')).toBe(source);
-			expect(fs.existsSync(path.join(root, 'Leaf.tsx'))).toBe(true);
-			expect(fs.existsSync(path.join(root, 'Leaf.tsrx'))).toBe(false);
+			expect(fs.existsSync(path.join(root, leaf))).toBe(true);
+			expect(fs.existsSync(path.join(root, leaf.replace(/\.tsx$/, '.tsrx')))).toBe(false);
 		});
 	});
 
