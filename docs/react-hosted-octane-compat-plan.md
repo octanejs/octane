@@ -1423,9 +1423,13 @@ not `O(islands × global event types)`.
     that the StrictMode probe's layout re-setup cancels and deletion's insertion
     cleanup retires then hides the hosted Activity. Its layout and passive
     effects, refs, and `useSyncExternalStore` subscriptions disconnect while
-    state and DOM survive, and the reveal's layout commit reconnects them. A
-    Suspense hide still leaves the island's layout effects and refs connected,
-    where React disconnects them and keeps passive effects; that half is open.
+    state and DOM survive, and the reveal's layout commit reconnects them.
+    *Answered for Suspense (#2973):* the wrapper's layout cleanup requests a
+    private Suspense-hidden Activity mode, which disconnects layout effects and
+    refs but keeps connected passive effects and store subscriptions, as React
+    does. A passive cleanup upgrades the request to a full Activity hide. A
+    hide caused by the island's own relay is skipped, because its retry commits
+    Octane before React reveals (§7).
 14. Translation or rejection policy for Octane head resources in hosted SSR,
     including CSP.
 15. ~~Whether React retains a newly discovered context dependency in an

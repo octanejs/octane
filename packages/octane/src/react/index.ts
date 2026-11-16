@@ -57,6 +57,7 @@ export type {
 import * as React from 'react';
 import { hasOwnProp } from '../has-own.js';
 import { installHostedRefDriver } from '../runtime/drivers.js';
+import { SUSPENSE_HIDDEN_MODE } from '../runtime/activity.js';
 import { createElementFromConfig } from '../runtime/elements.js';
 import { attachLiveFragmentRef } from '../runtime/engine.js';
 import { discardSubtreeRefAttachesFrom, type FragmentInstance } from '../runtime/refs.js';
@@ -104,6 +105,8 @@ export type OctaneCompatComponentProps<P> = HostedComponentProps<P> & ClientSign
 
 // Structural bench/test hook (§13): provider walks happen only at discovery.
 export { __hostContextFiberWalks } from './fiber-adapter.js';
+
+type Visibility = 'visible' | 'hidden' | typeof SUSPENSE_HIDDEN_MODE;
 
 interface PendingEpisode {
 	relay: Promise<void>;
@@ -191,7 +194,7 @@ function hostedRootEnvelope(props: {
 	body: ComponentBody;
 	bodyProps: unknown;
 	bodyKey: string | null;
-	mode: 'visible' | 'hidden';
+	mode: Visibility;
 }): unknown {
 	bindRendererRegionOwner(props);
 	// The transported key rides the octane element so a key change replaces the
@@ -200,12 +203,14 @@ function hostedRootEnvelope(props: {
 		props.bodyKey === null
 			? props.bodyProps
 			: { ...(props.bodyProps as object), key: props.bodyKey };
-	// Octane's own Activity carries a React Activity hide into the island: it
-	// disconnects effects, refs, and store subscriptions while keeping state and DOM.
+	// Octane's own Activity carries a React Activity or Suspense hide into the
+	// island: it disconnects effects, refs, and store subscriptions (a Suspense
+	// hide keeps passive effects) while keeping state and DOM.
 	// We wrap a validated component and the Activity sentinel. Descendants enable
 	// optional descriptor capabilities where they create their own descriptors.
 	return createElementFromConfig(undefined, Activity, {
-		mode: props.mode,
+		// The Suspense-hidden mode is private to this envelope, not public API.
+		mode: props.mode as 'hidden',
 		children: createElementFromConfig(undefined, props.body, config as never),
 	});
 }
@@ -271,10 +276,10 @@ class HostedIslandController {
 	private hydrating = false;
 	/** A §6.3 handshake unwound the last attempt; the next commit retries the root. */
 	private pendingContextRetry = false;
-	/** React Activity hid the wrapper; the hosted Activity is hidden until the next commit. */
-	private hidden = false;
-	/** A passive disconnect awaits its microtask check; any commit cancels it. */
-	private hideRequested = false;
+	/** How React hid the wrapper; the hosted Activity keeps that mode until the next commit. */
+	private visibility: Visibility = 'visible';
+	/** A disconnect awaits its microtask check; any commit cancels it. */
+	private requestedVisibility: Visibility | null = null;
 
 	constructor(private clientSignalOwner: RootOptions['signalOwner']) {}
 
@@ -500,8 +505,9 @@ class HostedIslandController {
 		const needsContextRetry = this.pendingContextRetry;
 		this.pendingContextRetry = false;
 		// A layout commit means the wrapper is visible: cancel a pending hide and reveal.
-		const revealing = this.hidden;
-		this.hidden = this.hideRequested = false;
+		const revealing = this.visibility !== 'visible';
+		this.visibility = 'visible';
+		this.requestedVisibility = null;
 		if (
 			!revealing &&
 			!contextsChanged &&
@@ -523,19 +529,28 @@ class HostedIslandController {
 	}
 
 	/**
-	 * Wrapper passive cleanup. React runs it on an Activity hide, a StrictMode
-	 * probe, and deletion, but not on a Suspense hide, which keeps passive
-	 * effects connected. The microtask runs after the probe's layout re-setup
-	 * (which cancels it) and after deletion's insertion cleanup (which retires
-	 * the root), so only an Activity hide reaches the hosted Activity.
+	 * Wrapper layout and passive cleanups. React runs the layout one on any hide,
+	 * a StrictMode probe, and deletion, and the passive one on all but a Suspense
+	 * hide, which keeps passive effects connected. The microtask runs after the
+	 * probe's layout re-setup (which cancels it) and after deletion's insertion
+	 * cleanup (which retires the root), so only a hide reaches the hosted
+	 * Activity: a passive cleanup upgrades the request to a full hide. A
+	 * Suspense hide the island's own relay caused is not one: its retry commits
+	 * Octane before React reveals (§7).
 	 */
-	passiveDisconnected(): void {
-		if (this.hidden || this.root === null || this.lifecycleGeneration < 0) return;
-		this.hideRequested = true;
+	disconnected(passive: boolean): void {
+		if (this.visibility === 'hidden' || this.root === null || this.lifecycleGeneration < 0) return;
+		const mode = passive ? 'hidden' : SUSPENSE_HIDDEN_MODE;
+		if (mode === this.visibility || (!passive && this.episode !== null)) return;
+		const queued = this.requestedVisibility !== null;
+		if (this.requestedVisibility !== 'hidden') this.requestedVisibility = mode;
+		if (queued) return;
 		queueMicrotask(() => {
-			if (!this.hideRequested || this.disposed || this.lifecycleGeneration < 0) return;
-			this.hideRequested = false;
-			this.hidden = true;
+			const requested = this.requestedVisibility;
+			this.requestedVisibility = null;
+			if (requested === null || this.disposed || this.lifecycleGeneration < 0) return;
+			if (requested !== 'hidden' && this.episode !== null) return;
+			this.visibility = requested;
 			try {
 				this.attachAndFlush();
 			} catch (error) {
@@ -605,7 +620,7 @@ class HostedIslandController {
 			body: committed.type,
 			bodyProps: committed.props,
 			bodyKey: committed.key,
-			mode: this.hidden ? 'hidden' : 'visible',
+			mode: this.visibility,
 		};
 		Object.defineProperty(props, RENDERER_REGION_OWNER, {
 			value: this,
@@ -711,7 +726,8 @@ function createOctaneCompat(host: 'div' | 'span') {
 		React.useLayoutEffect(() => {
 			controller.commit(child, identifierPrefix, snapshot);
 		});
-		React.useEffect(() => () => controller.passiveDisconnected(), [controller]);
+		React.useLayoutEffect(() => () => controller.disconnected(false), [controller]);
+		React.useEffect(() => () => controller.disconnected(true), [controller]);
 		React.useInsertionEffect(() => controller.startLifetime(), [controller]);
 
 		return React.createElement(host, {

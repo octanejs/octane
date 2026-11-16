@@ -1016,20 +1016,156 @@ describe('octane/react — StrictMode, hide/reveal, and teardown discrimination 
 		await reactAct(async () => setSuspended(true));
 		expect(host.isConnected).toBe(true);
 		expect(host.style.display).toBe('none');
-		// Hidden, not unmounted: Octane DOM, state, and effects all kept.
+		// Hidden, not unmounted: Octane DOM and state kept; layout effects
+		// disconnect as React's own would (#2973).
 		expect(host.querySelector('.count')?.textContent).toBe('count:1');
-		expect(log.drain()).toEqual([]);
+		expect(log.drain()).toEqual(['island-cleanup:hide']);
 
 		await reactAct(async () => {
 			gate.resolve();
 			await gate.promise;
 		});
 		expect(host.style.display).not.toBe('none');
+		expect(log.drain()).toEqual(['island-layout:hide']);
 		await reactAct(async () => (host.querySelector('.count') as HTMLElement).click());
 		expect(host.querySelector('.count')?.textContent).toBe('count:2');
 
 		await mounted.unmount();
 		expect(log.drain()).toEqual(['island-cleanup:hide']);
+	});
+
+	it('disconnects layout effects and refs but keeps passive effects while React Suspense hides the island (#2973)', async () => {
+		const log = createLog();
+		const gate = deferred<void>();
+		const listeners = new Set<() => void>();
+		let value = 0;
+		let setSuspended!: (value: boolean) => void;
+		function Sibling() {
+			const [suspended, set] = React.useState(false);
+			setSuspended = set;
+			if (suspended) React.use(gate.promise);
+			return null;
+		}
+		const props = {
+			log: log.push,
+			read: () => value,
+			subscribe(listener: () => void) {
+				listeners.add(listener);
+				log.push('subscribe');
+				return () => {
+					listeners.delete(listener);
+					log.push('unsubscribe');
+				};
+			},
+			outputRef(_node: HTMLOutputElement) {
+				log.push('ref attach');
+				return () => log.push('ref cleanup');
+			},
+		};
+		const mounted = await mountReactHost(
+			h(
+				React.Suspense,
+				{ fallback: h('p', { className: 'react-fallback' }, 'react pending') },
+				h(OctaneCompat<typeof props>, { component: VisibilityProbeIsland, props }),
+				h(Sibling),
+			),
+		);
+		try {
+			flushEffects();
+			const host = mounted.host();
+			const output = host.querySelector('output')!;
+			expect(log.drain()).toEqual(['ref attach', 'layout setup', 'subscribe', 'passive setup']);
+
+			await reactAct(async () => setSuspended(true));
+			flushEffects();
+			expect(host.style.display).toBe('none');
+			expect(mounted.container.querySelector('.react-fallback')).not.toBeNull();
+			// React parity: a Suspense hide keeps passive effects and store
+			// subscriptions connected.
+			expect(log.drain().sort()).toEqual(['layout cleanup', 'ref cleanup'].sort());
+			expect(listeners.size).toBe(1);
+
+			await reactAct(async () => {
+				gate.resolve();
+				await gate.promise;
+			});
+			flushEffects();
+			expect(host.style.display).not.toBe('none');
+			expect(host.querySelector('output')).toBe(output);
+			expect(log.drain().sort()).toEqual(['layout setup', 'ref attach'].sort());
+		} finally {
+			await mounted.unmount();
+		}
+		expect(log.drain().sort()).toEqual(
+			['layout cleanup', 'passive cleanup', 'ref cleanup', 'unsubscribe'].sort(),
+		);
+	});
+
+	it('fully disconnects a Suspense-hidden island once React Activity also hides it', async () => {
+		const log = createLog();
+		const gate = deferred<void>();
+		let setSuspended!: (value: boolean) => void;
+		function Sibling() {
+			const [suspended, set] = React.useState(false);
+			setSuspended = set;
+			if (suspended) React.use(gate.promise);
+			return null;
+		}
+		function ReactPassive() {
+			React.useEffect(() => {
+				log.push('react passive setup');
+				return () => log.push('react passive cleanup');
+			}, []);
+			return null;
+		}
+		const tree = (mode: 'visible' | 'hidden') =>
+			h(React.Activity, {
+				mode,
+				children: h(
+					React.Suspense,
+					{ fallback: h('p', null, 'react pending') },
+					h(OctaneCompat<{ log: (message: string) => void }>, {
+						component: ActivityIsland,
+						props: { log: log.push },
+					}),
+					h(ReactPassive),
+					h(Sibling),
+				),
+			});
+		const mounted = await mountReactHost(tree('visible'));
+		try {
+			flushEffects();
+			expect(log.drain().sort()).toEqual(
+				['layout setup', 'passive setup', 'react passive setup'].sort(),
+			);
+			await reactAct(async () => setSuspended(true));
+			flushEffects();
+			expect(log.drain()).toEqual(['layout cleanup']);
+
+			await mounted.render(tree('hidden'));
+			flushEffects();
+			expect(log.drain().sort()).toEqual(['passive cleanup', 'react passive cleanup'].sort());
+
+			// React parity: revealing the Activity while Suspense still hides the
+			// primary reconnects no passive effects, React's or the island's.
+			await mounted.render(tree('visible'));
+			flushEffects();
+			expect(log.drain()).toEqual([]);
+
+			await reactAct(async () => {
+				gate.resolve();
+				await gate.promise;
+			});
+			flushEffects();
+			expect(log.drain().sort()).toEqual(
+				['layout setup', 'passive setup', 'react passive setup'].sort(),
+			);
+		} finally {
+			await mounted.unmount();
+		}
+		expect(log.drain().sort()).toEqual(
+			['layout cleanup', 'passive cleanup', 'react passive cleanup'].sort(),
+		);
 	});
 
 	it('disposes exactly once when React deletes an island that is currently hidden', async () => {
@@ -1051,10 +1187,11 @@ describe('octane/react — StrictMode, hide/reveal, and teardown discrimination 
 			),
 		);
 		await reactAct(async () => setSuspended(true));
-		log.clear();
+		// The hide disconnected the layout effect, so deletion runs it no second time.
+		expect(log.drain()).toEqual(['island-layout:hidden-del', 'island-cleanup:hidden-del']);
 
 		await mounted.unmount();
-		expect(log.drain()).toEqual(['island-cleanup:hidden-del']);
+		expect(log.drain()).toEqual([]);
 	});
 
 	it.each(['connected', 'detached'] as const)(
