@@ -5258,8 +5258,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 	}
 
 	private checkIntlProviderResources(tag: ts.JsxOpeningLikeElement) {
-		const resourceHint = this.options.initializerResourceHint;
-		if (!resourceHint) return;
+		if (!this.options.initializerResourceHint) return;
 		// Provider admission already excludes spreads. JSX takes the last duplicate prop.
 		const attribute = (name: string) =>
 			tag.attributes.properties.findLast(
@@ -5273,26 +5272,105 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		const callback = attribute('onError');
 		const handler = callback?.initializer;
 		if (!callback || !handler || !ts.isJsxExpression(handler) || !handler.expression) return;
-		const callee = skipWrappers(handler.expression);
-		if (!ts.isIdentifier(callee)) return;
-		const declaration = this.declarationOf(callee);
-		const imported = declaration && this.imports.get(declaration);
-		if (
-			!declaration ||
-			!imported ||
-			imported.typeOnly ||
-			imported.namespace ||
-			ts.findAncestor(declaration, ts.isImportDeclaration)?.attributes
-		)
-			return;
-		const hint = resourceHint(imported.module, imported.imported, true);
-		if (hint)
+		const resource = this.intlCallbackResource(handler.expression);
+		if (resource)
 			this.note(
 				RULE.bindings,
 				'error',
 				callback,
-				`IntlProvider can call \`${imported.imported}\` for an empty locale. The retained callback uses React DOM ${hint} outside the original React server request. Move it into Octane-compiled code or retain the React provider.`,
+				`IntlProvider can call \`${resource.name}\` for an empty locale. The retained callback uses React DOM ${resource.hint} outside the original React server request. Move it into Octane-compiled code or retain the React provider.`,
 			);
+	}
+
+	private intlCallbackResource(handler: ts.Expression) {
+		const imported = this.directImportedValue(skipWrappers(handler))?.entry;
+		if (!imported) return;
+		const hint = this.options.initializerResourceHint?.(imported.module, imported.imported, true);
+		if (hint) return { name: imported.imported, hint };
+	}
+
+	private checkIntlFactoryResources(setup: readonly ts.Statement[]) {
+		const firstConst = (statement: ts.Statement | undefined) => {
+			if (!statement || !ts.isVariableStatement(statement)) return;
+			const list = statement.declarationList;
+			if (list.flags & ts.NodeFlags.Const && list.declarations.length === 1)
+				return list.declarations[0];
+		};
+		const formatter = firstConst(setup[0]);
+		if (!formatter || !ts.isIdentifier(formatter.name)) return;
+		const factory = formatter.initializer && skipWrappers(formatter.initializer);
+		if (
+			!factory ||
+			!ts.isCallExpression(factory) ||
+			ts.isOptionalChain(factory) ||
+			factory.arguments.length !== 1
+		)
+			return;
+		const binding = this.directImportedValue(skipWrappers(factory.expression))?.entry;
+		if (binding?.module !== 'react-intl' || binding.imported !== 'createIntl') return;
+		const options = skipWrappers(factory.arguments[0]);
+		if (!options || !ts.isObjectLiteralExpression(options)) return;
+		const fields = new Map<string, ts.Expression>();
+		for (const field of options.properties) {
+			if (!field.name || !(ts.isIdentifier(field.name) || ts.isStringLiteral(field.name))) return;
+			const key = field.name.text;
+			if (key !== 'locale' && key !== 'messages' && key !== 'onError') return;
+			if (fields.has(key)) return;
+			if (ts.isPropertyAssignment(field)) fields.set(key, skipWrappers(field.initializer));
+			else if (ts.isShorthandPropertyAssignment(field) && !field.objectAssignmentInitializer)
+				fields.set(key, field.name);
+			else return;
+		}
+		const locale = fields.get('locale');
+		const handler = fields.get('onError');
+		if (!locale || !ts.isStringLiteralLike(locale) || !handler) return;
+		const messages = fields.get('messages');
+		if (messages && (!ts.isObjectLiteralExpression(messages) || messages.properties.length)) return;
+		const resource = this.intlCallbackResource(handler);
+		if (!resource) return;
+		const report = (site: ts.Node, operation: string) =>
+			this.note(
+				RULE.bindings,
+				'error',
+				site,
+				`${operation} can call \`${resource.name}\`. The retained callback uses React DOM ${resource.hint} outside the original React server request in standalone Octane SSR. Move it into Octane-compiled code or keep the formatting under React.`,
+			);
+		if (locale.text === '') {
+			report(factory, 'createIntl with an empty locale');
+			return;
+		}
+		if (!messages) return;
+		const read = firstConst(setup[1]);
+		const format = read?.initializer;
+		const call = format && skipWrappers(format);
+		if (
+			!call ||
+			!ts.isCallExpression(call) ||
+			ts.isOptionalChain(call) ||
+			call.arguments.length !== 1
+		)
+			return;
+		const method = call.expression;
+		if (
+			!ts.isPropertyAccessExpression(method) ||
+			method.name.text !== 'formatMessage' ||
+			!ts.isIdentifier(method.expression) ||
+			this.declarationOf(method.expression) !== formatter
+		)
+			return;
+		const value = skipWrappers(call.arguments[0]);
+		if (!ts.isObjectLiteralExpression(value)) return;
+		const [id, extra] = value.properties;
+		if (
+			id &&
+			!extra &&
+			ts.isPropertyAssignment(id) &&
+			(ts.isIdentifier(id.name) || ts.isStringLiteral(id.name)) &&
+			id.name.text === 'id' &&
+			ts.isStringLiteralLike(id.initializer) &&
+			id.initializer.text
+		)
+			report(call, 'formatMessage with a missing translation');
 	}
 
 	private checkInitializerResourceHints(initializer: ts.Expression) {
@@ -8611,6 +8689,12 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		}
 		let output = this.output(inner);
 		if (output === null) return null;
+		if (
+			this.options.initializerResourceHint &&
+			this.options.reactIntlAdapter &&
+			this.options.automaticReactJsx
+		)
+			this.checkIntlFactoryResources(setupStatements);
 		const head = this.head(node, body.getStart(this.sf));
 		this.markTemplate();
 

@@ -811,6 +811,7 @@ export async function runCodemod(
 		const file = localFile(from, module);
 		if (
 			!file ||
+			(retainedOnly && !module.endsWith('.ts') && fs.existsSync(file.slice(0, -3) + '.tsrx')) ||
 			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject ||
 			!installedReact(from)
 		)

@@ -4084,6 +4084,94 @@ export function inert() {}`,
 		expect(findings(await run('View.tsx', 'alias.ts'))).toEqual([]);
 	});
 
+	it('reports React DOM resources in retained callbacks on local React Intl formatters', async () => {
+		const imports = `import { createIntl as makeIntl } from 'react-intl';
+import { report, inert } from './handler';`;
+		const view = (setup, output = 'intl.locale') =>
+			`${imports}
+export function View() { ${setup} return <p>{${output}}</p>; }`;
+		const empty = "const intl = makeIntl({ locale: 'fr', messages: {}, onError: report });";
+		const missing = "intl.formatMessage({ id: 'ready' })";
+		const format = (setup, read = missing) => view(`${setup} const title = ${read};`, 'title');
+		const root = project({
+			'tsconfig.json': JSON.stringify({
+				compilerOptions: { strict: true, jsx: 'react-jsx', moduleResolution: 'bundler' },
+			}),
+			'Construct.tsx': view("const intl = makeIntl({ locale: '', onError: report });"),
+			'Format.tsx': format(empty),
+			'Shorthand.tsx': format(empty.replace('onError: report', 'onError')).replace(
+				'{ report, inert }',
+				'{ report as onError }',
+			),
+			'Translated.tsx': format(empty.replace('messages: {}', "messages: { ready: 'Prêt' }")),
+			'DefaultCatalog.tsx': format(empty.replace('messages: {}, ', '')),
+			'DefaultLocale.tsx': format(
+				empty.replace("'fr'", "'en'"),
+				"intl.formatMessage({ id: 'ready', defaultMessage: 'Ready' })",
+			),
+			'Inert.tsx': format(empty.replace('onError: report', 'onError: inert')),
+			'Override.tsx': format(empty.replace('onError: report', 'onError: report, onError: inert')),
+			'Shadowed.tsx': view('const makeIntl = () => ({ locale: "fr" }); ' + empty),
+			'ShadowedCallback.tsx': format('const report = () => {}; ' + empty),
+			'Deferred.tsx': format(empty, '() => ' + missing),
+			'LaterArgument.tsx': view("const intl = makeIntl({ locale: '', onError: report }, fail());"),
+			'CatalogGetter.tsx': view(
+				"const intl = makeIntl({ locale: '', get messages() { return fail(); }, onError: report });",
+			),
+			'ComputedOption.tsx': format(
+				empty.replace('onError: report', "onError: report, ['onError']: inert"),
+			),
+			'Destructured.tsx': view(empty.replace('const intl', 'const { ignored = fail() }'), missing),
+			'NativeRival.tsx': format(empty).replace('./handler', './rival'),
+			'ExplicitSource.tsx': format(empty).replace('./handler', './rival.ts'),
+			'rival.ts': `import { preload } from 'react-dom';
+export function report() { preload('/rival.png', { as: 'image' }); }`,
+			'rival.tsrx': 'export function report() {}',
+			'SetupOutsideRender.tsx': `${imports}
+${empty}
+export function View() { return <p>Ready</p>; }`,
+			'handler.ts': `import { preload } from 'react-dom';
+export function report() { preload('/ready.png', { as: 'image' }); }
+export function inert() {}`,
+		});
+		fs.symlinkSync(
+			path.join(REPO, 'packages/codemod/node_modules'),
+			path.join(root, 'node_modules'),
+		);
+		const names = fs.readdirSync(root).filter((name) => name.endsWith('.tsx'));
+		const run = (files, projectTypes) =>
+			runCodemod(
+				files.map((file) => path.join(root, file)),
+				{
+					root,
+					strong: true,
+					write: false,
+					verify: true,
+					projectTypes,
+				},
+			);
+		const findings = ({ files }) =>
+			files
+				.flatMap((file) =>
+					file.notes
+						.filter((note) => note.message.includes('retained callback uses React DOM'))
+						.map((note) => [file.file, note.severity]),
+				)
+				.sort();
+		for (const projectTypes of [false, true]) {
+			const result = await run(names, projectTypes);
+			expect(findings(result)).toEqual([
+				['Construct.tsx', 'error'],
+				['ExplicitSource.tsx', 'error'],
+				['Format.tsx', 'error'],
+
+				['Shorthand.tsx', 'error'],
+			]);
+			expect(result.files.find((file) => file.file === 'Format.tsx').strong).toBe(true);
+			expect(findings(await run(['Format.tsx', 'handler.ts'], projectTypes))).toEqual([]);
+		}
+	});
+
 	it('reports a native setup call into a React hook left in an unselected local module', () => {
 		const helper = `import { useState as state } from 'react';
 export function useLabel() { const [label] = state('ready'); return label; }`;
