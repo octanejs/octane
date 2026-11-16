@@ -893,6 +893,12 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		}
 	}
 
+	/** List a view in `joining` under the related records its shown rows point at, and no others. */
+	function point(entry: Entry, related: readonly string[]): void {
+		relist(entry, entry.related, related, joining);
+		entry.related = related;
+	}
+
 	/** An entry's attempt, where a change `finish` applied to an entity it selects counts as one. */
 	function attemptOf(entry: Entry): number {
 		let { attempt } = entry;
@@ -951,6 +957,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		// A window past the end of the list holds no records to bound it.
 		if (span.start > 0 && span.first === null) {
 			span.more = false;
+			point(entry, EMPTY as string[]);
 			return EMPTY as unknown[];
 		}
 		const table = records.get(of.name);
@@ -1050,8 +1057,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			for (const row of next as any[])
 				for (const [, entity, key] of joins)
 					if (row[key] != null) related.push(`${entity.name}\n${row[key]}`);
-			relist(entry, entry.related, related, joining);
-			entry.related = related;
+			point(entry, related);
 		}
 		return next;
 	}
@@ -1193,8 +1199,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		clearHostTimeout(entry.expireTimer);
 		if (entry.hasBase && !isView(entry.read))
 			relist(entry, selectionKeys(selections(entry.read, entry.base)), EMPTY as string[]);
-		relist(entry, entry.related, EMPTY as string[], joining);
-		entry.related = EMPTY as string[];
+		point(entry, EMPTY as string[]);
 		entry.base = undefined;
 		entry.hasBase = false;
 		entry.names = new Set();
