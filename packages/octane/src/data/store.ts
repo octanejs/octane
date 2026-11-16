@@ -163,6 +163,8 @@ export interface DataStore {
 	 * storage is cleared, and every call returns the same one.
 	 */
 	retire(): Promise<void>;
+	/** End this local store without erasing the account’s durable cache. */
+	dispose(): Promise<void>;
 	/**
 	 * The confirmed values loaded so far, for a client store to start from.
 	 * The text is safe inside `<script type="application/json">`. On a server,
@@ -642,6 +644,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				)
 			: null;
 	let retirement: Promise<void> | null = null;
+	let disposal: Promise<void> | null = null;
 	const persisted = options.persist
 		? (injected ?? ((collect, inUse) => createPersistence(options.persist!, collect, inUse)))(
 				saving,
@@ -1880,6 +1883,34 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		return entry.hasBase && !isStale(entry) ? Promise.resolve() : load(entry);
 	}
 
+	function end(): void {
+		if (retired) return;
+		retired = true;
+		retiring.abort(new DataRetiredError());
+		// Writes waiting on a create must settle too, or they would never end.
+		for (const operation of operations) operation.gate?.reject(new DataRetiredError());
+		operations = [];
+		queues.clear();
+		assigned.clear();
+		records.clear();
+		views.clear();
+		selecting.clear();
+		inflight.clear();
+		reached.clear();
+		seeds.clear();
+		staleSeedTags = undefined;
+		forms.clear();
+		for (const entry of entries.values()) {
+			entry.abort?.abort();
+			clearHostTimeout(entry.keepTimer);
+			clearHostTimeout(entry.expireTimer);
+			entry.snapshot = null;
+			for (const notify of [...entry.subscribers]) notify();
+		}
+		entries.clear();
+		lookups.clear();
+	}
+
 	const store: DataStore = {
 		get retired() {
 			return retired;
@@ -2021,35 +2052,18 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		},
 		retire() {
 			if (retirement) return retirement;
-			retired = true;
-			// Signing out leaves nothing of the account on the device.
 			retirement = persisted ? persisted.clear() : Promise.resolve();
-			// A caller that does not wait for the cleanup is not told it failed.
 			retirement.catch(() => {});
-			retiring.abort(new DataRetiredError());
-			// Writes waiting on a create must settle too, or they would never end.
-			for (const operation of operations) operation.gate?.reject(new DataRetiredError());
-			operations = [];
-			queues.clear();
-			assigned.clear();
-			records.clear();
-			views.clear();
-			selecting.clear();
-			inflight.clear();
-			reached.clear();
-			seeds.clear();
-			staleSeedTags = undefined;
-			forms.clear();
-			for (const entry of entries.values()) {
-				entry.abort?.abort();
-				clearHostTimeout(entry.keepTimer);
-				clearHostTimeout(entry.expireTimer);
-				entry.snapshot = null;
-				for (const notify of [...entry.subscribers]) notify();
-			}
-			entries.clear();
-			lookups.clear();
+			end();
 			return retirement;
+		},
+		dispose() {
+			if (retirement) return retirement;
+			if (!disposal) {
+				disposal = persisted ? persisted.dispose() : Promise.resolve();
+				end();
+			}
+			return disposal;
 		},
 	};
 	internals.set(store, {

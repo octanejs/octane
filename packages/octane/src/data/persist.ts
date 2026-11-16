@@ -209,6 +209,8 @@ export interface Persistence {
 	keepCursor(key: string, cursor: string): void;
 	/** Delete the saved value for `key`; rejects when storage fails. */
 	forget(key: string): Promise<void>;
+	/** Stop this instance without changing the durable partition. */
+	dispose(): Promise<void>;
 	/** Stop saving and clear the partition; rejects when storage fails. */
 	clear(): Promise<void>;
 }
@@ -337,6 +339,8 @@ export function createPersistence(
 	const versions = new Map<string, Promise<string>>();
 	let budget = Infinity;
 	let cleared = false;
+	let initialized = false;
+	let closing: Map<string, Saving | null | undefined> | null = null;
 	const dirty = new Set<string>();
 	const touched = new Set<string>();
 	const removed = new Set<string>();
@@ -348,10 +352,13 @@ export function createPersistence(
 		cipher = await createCipher(options.key);
 		partition = await cipher.name(`partition\n${options.partition}`);
 		journalPartition = await cipher.name(`journal\n${options.partition}`);
-		const [index, hints] = await Promise.all([storage.index(partition), deviceHints()]);
 		const { budget: setting = 'auto' } = options;
+		const [index, hints] = await Promise.all([
+			storage.index(partition),
+			typeof setting === 'number' ? undefined : deviceHints(),
+		]);
 		budget =
-			typeof setting === 'number' ? setting : (setting === 'auto' ? autoBudget : setting)(hints);
+			typeof setting === 'number' ? setting : (setting === 'auto' ? autoBudget : setting)(hints!);
 		// Keys saved while the index loaded are newer than what it lists.
 		for (const meta of index) if (!metas.has(meta.key)) metas.set(meta.key, meta);
 		marksPartition = await cipher.name(`marks\n${options.partition}`);
@@ -372,6 +379,7 @@ export function createPersistence(
 		// Only what has expired: which values are in use is known once components ask for them.
 		purge(hostDateNow(), Infinity);
 		if (removed.size > 0) schedule();
+		initialized = true;
 	})().catch(() => {
 		// Storage that cannot be read, such as a private window's, or no key leaves the store in memory only.
 		cleared = true;
@@ -400,7 +408,7 @@ export function createPersistence(
 			clearHostTimeout(retryTimer);
 			retryTimer = undefined;
 		}
-		if (scheduled || cleared) return;
+		if (scheduled || cleared || closing) return;
 		scheduled = true;
 		postHostTask(() => {
 			scheduled = false;
@@ -444,13 +452,16 @@ export function createPersistence(
 		const at = Math.max(now, markTime);
 		const keys = [...dirty];
 		dirty.clear();
+		// Disposal can end the source store while a prior key is encrypting.
+		const saves = keys.map((key) => (closing?.has(key) ? closing.get(key) : collect(key)));
 		// Later frames can arrive while encryption or storage is pending. Their
 		// checkpoints belong to the next batch, with the values they changed.
 		const checkpoint = marksChanged ? { marks: [...marks], cursors: [...cursors] } : null;
 		marksChanged = false;
 		const settled = ended.size ? [...ended] : null;
-		for (const key of keys) {
-			const saving = collect(key);
+		for (let i = 0; i < keys.length; i++) {
+			const key = keys[i]!;
+			const saving = saves[i];
 			if (saving === undefined) continue;
 			const name = await nameOf(key);
 			if (saving === null) {
@@ -538,6 +549,20 @@ export function createPersistence(
 		}
 	};
 	document?.addEventListener('visibilitychange', hidden);
+
+	function stop(): void {
+		cleared = true;
+		clearHostTimeout(retryTimer);
+		document?.removeEventListener('visibilitychange', hidden);
+		metas = new Map();
+		prepared.clear();
+		marks.clear();
+		cursors.clear();
+		dirty.clear();
+		touched.clear();
+		removed.clear();
+		closing?.clear();
+	}
 
 	return {
 		async restore(key, read) {
@@ -662,27 +687,26 @@ export function createPersistence(
 			marksChanged = true;
 			schedule();
 		},
+		dispose() {
+			if (!initialized) {
+				stop();
+				return writing;
+			}
+			closing ??= new Map([...dirty].map((key) => [key, collect(key)]));
+			const finishing = writing.then(() => flush(false)).finally(stop);
+			writing = finishing.catch(() => {});
+			return finishing;
+		},
 		clear() {
-			cleared = true;
-			clearHostTimeout(retryTimer);
-			document?.removeEventListener('visibilitychange', hidden);
-			metas = new Map();
-			prepared.clear();
-			marks.clear();
-			cursors.clear();
-			dirty.clear();
-			touched.clear();
-			removed.clear();
+			stop();
 			// After any save already under way, so the clear is the last write.
 			const clearing = writing
 				.then(() => ready)
 				.then(async () => {
 					if (partition) {
-						await Promise.all([
-							storage.clear(partition),
-							storage.clear(journalPartition),
-							storage.clear(marksPartition),
-						]);
+						await Promise.all(
+							[partition, journalPartition, marksPartition].map((name) => storage.clear(name)),
+						);
 					}
 				});
 			writing = clearing.catch(() => {});

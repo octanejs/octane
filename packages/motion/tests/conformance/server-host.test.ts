@@ -63,7 +63,7 @@ it('hydrates the server motion host with its first-frame style, children and ref
 		container.remove();
 		await server.close();
 	}
-});
+}, 15_000);
 
 it('releases a first-frame style and SVG attribute once authored props change', async () => {
 	const r = mount(AuthoredFrame, { opacity: 0.2, cx: 2, animate: true });

@@ -78,6 +78,7 @@ same order.
   beyond the visible window.
 - A seed is adopted when its read is first asked for, and keeps its age
   (`seedAge` adds time spent in a cache).
+- `dispose()` ends one store locally, clears its memory immediately, flushes confirmed saves already queued after persistence has initialized, and preserves durable storage for another window or restart. A store disposed before initialization cancels its pending saves. A later `retire()` can still erase the account cache.
 - `retire()` clears memory at once, ignores late replies, and resolves once
   persistent storage is cleared. Later writes, invalidations and settlements
   throw `DataRetiredError`; later reads stay pending without loading.
@@ -203,8 +204,7 @@ store once hydrated. Only the newest submission's outcome is shown.
   After a restart its edit shows again and `receipt({ operationId })` decides
   it; it is never resent. Undeclared or incompatible journal entries are kept
   30 days for a compatible build.
-- `PersistentStorage` is `index`, `get`, `commit`, `clear`; it only receives
-  hashed names and encrypted values.
+- `PersistentStorage` is `index`, `get`, `commit`, `clear`; it only receives hashed names and encrypted values. A fixed numeric budget does not query device quota hints. Independent stores sharing a partition do not coordinate logout: a trusted host must stop old writers before erasing or reusing that partition. Use an explicit shared owner when windows need coordinated account admission and one persistence writer.
 
 ## Cross-tab owner
 
@@ -234,9 +234,11 @@ store once hydrated. Only the newest submission's outcome is shown.
   `hello` naming the account. A different account signing in retires every
   replica of the old one: values clear, pending requests reject with
   `DataRetiredError`, feeds end, and nothing in flight reaches a replica.
-- `retire()` on a replica signs its account out in every tab and repeats the
+- `dispose()` on a replica detaches only that window, stops its heartbeat and preserves its peers and owner persistence.
+- `retire()` on a legacy-fenced replica signs its account out in every tab and repeats the
   request every 5 seconds until the owner confirms. A sign-out records only if
   its generation is still current, so it never undoes a newer sign-in.
+- For trusted host account lifecycle, opt into `createDataOwner({ fence: 'explicit' })` or `serveDataOwner({ fence: 'explicit' })`. Explicit mode uses a separate account database/channel and a separate persistence partition for each durable account generation, so migration starts with a cold cache and late prior-generation commits cannot appear in a new grant. Only trusted code holding the owner object calls `activate(account)` or `activate(null)`; activation rotates the durable generation, clears the prior generation, and publishes the grant only after that cleanup succeeds. A separate old owner can still finish a previously started commit into its isolated old partition before receiving revocation; the new grant cannot restore it. For physical deletion to be complete when activation resolves, the trusted host must stop and await all old owners before activating the replacement. Replica hello/reopen only joins the active grant. Replica `retire()` and raw persistence-clear messages cannot revoke or erase peers in this mode. Never expose `activate` over an untrusted replica port; explicit mode does not itself authenticate the host, and the host must serialize its account transitions and revoke old windows. The trusted host must authenticate port/account admission and keep one live owner per grant; a fresh owner may adopt the durable grant only when replacing a stopped worker.
 - A replica's reads show pending while its page is frozen. On `resume` it asks
   the owner, and shows them again only once the account is confirmed.
 - A tab's `hello` carries its contract identity: each contract's kind, name,
@@ -249,7 +251,7 @@ store once hydrated. Only the newest submission's outcome is shown.
   silent tab's feed subscriptions; its writes keep going.
 - While a replica is fenced, `prefetch` waits for the fence to lift, so a
   suspended reader shows the confirmed value rather than none.
-- The owner protocol version (4) is part of the worker's name, so tabs on
+- The owner protocol version (5) is part of the worker's name, so tabs on
   another protocol never share an owner.
 - `createDataOwner({ persist: (account) => PersistOptions })`, which
   `serveDataOwner` passes through, makes the owner the only writer of the

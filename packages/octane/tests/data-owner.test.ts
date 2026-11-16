@@ -5,8 +5,10 @@
  */
 import * as devalue from 'devalue';
 import { IDBFactory } from 'fake-indexeddb';
+import { postHostTask } from '../src/host-task.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+	contractIdentity,
 	createDataOwner,
 	createDataStore,
 	createReplica,
@@ -22,6 +24,7 @@ import {
 	type DataStore,
 	type FeedFrame,
 	type Listener,
+	type OwnerPort,
 	type PersistOptions,
 	type ReadHandle,
 	type StandardSchema,
@@ -477,6 +480,56 @@ describe('octane/data owner and replicas', () => {
 		});
 	});
 
+	it('disposes replicas locally and releases the owner’s last heartbeat without signing out peers', async () => {
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+		try {
+			const server = createServer();
+			const [first, second] = tabs(server.transport, 2);
+			// MessageChannel delivery is independent of the fake host timers.
+			await new Promise((resolve) => setImmediate(resolve));
+			await new Promise((resolve) => setImmediate(resolve));
+			await first!.dispose();
+			expect(second!.retired).toBe(false);
+			await second!.dispose();
+			await new Promise((resolve) => setImmediate(resolve));
+			expect(vi.getTimerCount()).toBe(0);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('flushes a replica’s queued save before local disposal without opening a local cache writer', async () => {
+		const server = createServer();
+		const backing = memoryStorage();
+		let commits = 0;
+		let keys = 0;
+		const storage = {
+			...backing,
+			async commit(...args: Parameters<typeof backing.commit>) {
+				commits++;
+				await backing.commit(...args);
+			},
+		};
+		const persist = {
+			storage,
+			partition: 'ada',
+			key: () => (keys++, 'a session secret of at least sixteen bytes'),
+			budget: 4096,
+		};
+		const [first, peer] = tabs(server.transport, 2, undefined, persist);
+		await observed(first!.read(todos));
+		await vi.waitFor(() => expect(commits).toBeGreaterThan(0));
+		const before = commits;
+		const beforeKeys = keys;
+		await peer!.publish(todos, undefined, [{ id: 'a', title: 'Latest', done: false }]);
+		await peer!.dispose();
+		await vi.waitFor(() => expect(commits).toBeGreaterThan(before));
+		await new Promise<void>((resolve) => postHostTask(resolve));
+		expect(keys).toBe(beforeKeys);
+		const offline = createDataStore({ transport: unshared, persist });
+		expect((await observed(offline.read(todos)))()[0]!.title).toBe('Latest');
+	});
+
 	it('holds one feed connection for every tab, and closes it when the last tab stops listening', async () => {
 		const server = createServer();
 		const connections: Array<{ signal: AbortSignal; send(frame: FeedFrame): void }> = [];
@@ -540,8 +593,10 @@ function sharedWorkers(transport: Transport, local: Transport = unshared) {
 async function accountStore<T>(
 	mode: IDBTransactionMode,
 	use: (store: IDBObjectStore) => IDBRequest<T>,
+	name = 'octane-data-account',
 ) {
-	const opening = indexedDB.open('octane-data-account', 1);
+	const opening = indexedDB.open(name, 1);
+	opening.onupgradeneeded = () => opening.result.createObjectStore('account');
 	const database = await new Promise<IDBDatabase>(
 		(resolve) => (opening.onsuccess = () => resolve(opening.result)),
 	);
@@ -553,6 +608,8 @@ async function accountStore<T>(
 	return value;
 }
 const recordedAccount = () => accountStore('readonly', (store) => store.get(0));
+const recordedExplicitAccount = () =>
+	accountStore('readonly', (store) => store.get(0), 'octane-data-account-explicit');
 const recordAccount = (value: object) => accountStore('readwrite', (store) => store.put(value, 0));
 
 describe('octane/data owners across builds and crashes', () => {
@@ -759,6 +816,486 @@ describe('octane/data in a SharedWorker', () => {
 		expect(server.log).toEqual(['list']);
 	});
 
+	it('preserves an explicit peer’s cache when a replica retires with a queued save', async () => {
+		const server = createServer();
+		const backing = memoryStorage();
+		let commits = 0;
+		const storage = {
+			...backing,
+			async commit(...args: Parameters<typeof backing.commit>) {
+				commits++;
+				await backing.commit(...args);
+			},
+		};
+		const persist = (account: string) => ({
+			storage,
+			partition: account,
+			key: 'a session secret of at least sixteen bytes',
+			budget: 4096,
+		});
+		let owner = createDataOwner({ transport: server.transport, fence: 'explicit', persist });
+		const held: Array<() => void> = [];
+		vi.stubGlobal(
+			'SharedWorker',
+			class {
+				port: OwnerPort;
+				constructor() {
+					const channel = new MessageChannel();
+					owner.connect(channel.port1);
+					this.port = {
+						postMessage(message) {
+							if ((message as { t?: string }).t === 'retire')
+								held.push(() => channel.port2.postMessage(message));
+							else channel.port2.postMessage(message);
+						},
+						addEventListener: (type, listener) => channel.port2.addEventListener(type, listener),
+						start: () => channel.port2.start(),
+						close: () => channel.port2.close(),
+					};
+					closers.push(() => (channel.port1.close(), channel.port2.close()));
+				}
+			},
+		);
+		await owner.activate('ada');
+		const open = () =>
+			createReplica(sharedOwner('ada'), { ...replicaOptions, persist: persist('ada') });
+		const first = open();
+		const retiring = open();
+		await observed(first.read(todos));
+		await vi.waitFor(() => expect(commits).toBeGreaterThan(0));
+		const before = commits;
+		try {
+			await retiring.publish(todos, undefined, [{ id: 'a', title: 'Latest', done: false }]);
+			await retiring.retire();
+			await vi.waitFor(() => expect(commits).toBeGreaterThan(before));
+			expect(first.retired).toBe(false);
+			owner = createDataOwner({ transport: unshared, fence: 'explicit', persist });
+			expect((await observed(open().read(todos)))()[0]!.title).toBe('Latest');
+		} finally {
+			for (const deliver of held.splice(0)) deliver();
+			await new Promise((resolve) => setImmediate(resolve));
+		}
+	});
+
+	it('admits only the account explicitly activated by trusted owner code, including after logout', async () => {
+		const server = createServer();
+		const owner = createDataOwner({ transport: server.transport, fence: 'explicit' });
+		vi.stubGlobal(
+			'SharedWorker',
+			class {
+				port: MessagePort;
+				constructor() {
+					const channel = new MessageChannel();
+					owner.connect(channel.port1);
+					this.port = channel.port2;
+					closers.push(() => (channel.port1.close(), channel.port2.close()));
+				}
+			},
+		);
+		const open = (account: string) => createReplica(sharedOwner(account), replicaOptions);
+		await owner.activate('ada');
+		const ada = open('ada');
+		const peer = open('ada');
+		await observed(ada.read(todos));
+		await observed(peer.read(todos));
+		await ada.retire();
+		expect(peer.retired).toBe(false);
+		expect(await recordedExplicitAccount()).toEqual({ account: 'ada', generation: 1 });
+		await owner.activate('grace');
+		const grace = open('grace');
+		await observed(grace.read(todos));
+		const stale = open('ada');
+		await vi.waitFor(() => expect(stale.retired).toBe(true));
+		expect(grace.retired).toBe(false);
+		expect(await recordedExplicitAccount()).toEqual({ account: 'grace', generation: 2 });
+		await owner.activate(null);
+		const late = open('grace');
+		await vi.waitFor(() => expect(late.retired).toBe(true));
+		expect(await recordedExplicitAccount()).toEqual({ account: null, generation: 3 });
+	});
+
+	for (const delivered of [true, false])
+		it(`does not admit a newer owner’s grant after activation is revoked (${delivered ? 'delivered' : 'withheld'} broadcast)`, async () => {
+			const channels: Array<{ onmessage: ((event: { data: number }) => void) | null }> = [];
+			vi.stubGlobal(
+				'BroadcastChannel',
+				class {
+					onmessage: ((event: { data: number }) => void) | null = null;
+					constructor() {
+						channels.push(this);
+					}
+					postMessage(data: number) {
+						if (delivered)
+							for (const channel of channels) if (channel !== this) channel.onmessage?.({ data });
+					}
+				},
+			);
+			const server = createServer();
+			const first = createDataOwner({ transport: server.transport, fence: 'explicit' });
+			const second = createDataOwner({ transport: server.transport, fence: 'explicit' });
+			let current = first;
+			vi.stubGlobal(
+				'SharedWorker',
+				class {
+					port: MessagePort;
+					constructor() {
+						const channel = new MessageChannel();
+						current.connect(channel.port1);
+						this.port = channel.port2;
+						closers.push(() => (channel.port1.close(), channel.port2.close()));
+					}
+				},
+			);
+			const open = (owner: DataOwner, account: string) => (
+				(current = owner),
+				createReplica(sharedOwner(account), replicaOptions)
+			);
+			await first.activate('ada');
+			await second.activate('grace');
+			const late = open(first, 'grace');
+			await vi.waitFor(() => expect(late.retired).toBe(true));
+			const live = open(second, 'grace');
+			expect((await observed(live.read(todos)))()[0]!.title).toBe('Tides');
+		});
+
+	it('keeps explicit activation pending until prior persistence clears, and fails closed on cleanup errors', async () => {
+		const server = createServer();
+		const backing = memoryStorage();
+		let release!: () => void;
+		let started!: () => void;
+		let fail = false;
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		const clearing = new Promise<void>((resolve) => (started = resolve));
+		const storage = {
+			...backing,
+			async clear(partition: string) {
+				started();
+				await gate;
+				if (fail) throw new Error('clear failed');
+				await backing.clear(partition);
+			},
+		};
+		const make = () =>
+			createDataOwner({
+				transport: server.transport,
+				fence: 'explicit',
+				persist: (account) => ({
+					storage,
+					partition: account,
+					key: 'a session secret of at least sixteen bytes',
+					budget: 4096,
+				}),
+			});
+		let owner = make();
+		vi.stubGlobal(
+			'SharedWorker',
+			class {
+				port: MessagePort;
+				constructor() {
+					const channel = new MessageChannel();
+					owner.connect(channel.port1);
+					this.port = channel.port2;
+					closers.push(() => (channel.port1.close(), channel.port2.close()));
+				}
+			},
+		);
+		const open = (account: string) => createReplica(sharedOwner(account), replicaOptions);
+		await owner.activate('ada');
+		await observed(open('ada').read(todos));
+		const activating = owner.activate('grace');
+		await clearing;
+		const grace = open('grace');
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		expect(grace.retired).toBe(false);
+		expect((await recordedExplicitAccount()).pending).toBe(true);
+		fail = true;
+		release();
+		await expect(activating).rejects.toThrow('clear failed');
+		await vi.waitFor(() => expect(grace.retired).toBe(true));
+		owner = make();
+		const afterCrash = open('grace');
+		await vi.waitFor(() => expect(afterCrash.retired).toBe(true));
+		expect((await recordedExplicitAccount()).account).toBe(null);
+	});
+
+	it('does not accept a global cache clear from an explicit replica port', async () => {
+		const backing = memoryStorage();
+		let clears = 0;
+		const storage = {
+			...backing,
+			async clear(partition: string) {
+				clears++;
+				await backing.clear(partition);
+			},
+		};
+		const owner = createDataOwner({
+			transport: createServer().transport,
+			fence: 'explicit',
+			persist: (account) => ({
+				storage,
+				partition: account,
+				key: 'a session secret of at least sixteen bytes',
+			}),
+		});
+		await owner.activate('ada');
+		const channel = new MessageChannel();
+		owner.connect(channel.port1);
+		closers.push(() => (channel.port1.close(), channel.port2.close()));
+		const messages: any[] = [];
+		channel.port2.addEventListener('message', ({ data }) => messages.push(data));
+		channel.port2.start();
+		channel.port2.postMessage({
+			t: 'hello',
+			account: 'ada',
+			identity: contractIdentity(contracts),
+		});
+		await vi.waitFor(() => expect(messages).toContainEqual({ t: 'live' }));
+		channel.port2.postMessage({ t: 'persist', id: 1, op: 'clear', args: [] });
+		await vi.waitFor(() =>
+			expect(messages).toContainEqual({ t: 'persisted', id: 1, value: undefined }),
+		);
+		expect(clears).toBe(0);
+		expect((await recordedExplicitAccount()).account).toBe('ada');
+	});
+
+	it('does not restore a delayed prior-grant commit into a new same-account grant', async () => {
+		const oldServer = createServer();
+		oldServer.rows[0]!.title = 'old grant';
+		const backing = memoryStorage();
+		let release!: () => void;
+		let started!: () => void;
+		let finished!: () => void;
+		const committed = new Promise<void>((resolve) => (finished = resolve));
+		const held = new Promise<void>((resolve) => (started = resolve));
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		let hold = true;
+		let oldPartition = '';
+		const channels: Array<{ onmessage: ((event: { data: number }) => void) | null }> = [];
+		const notifications: Array<() => void> = [];
+		const storage = {
+			...backing,
+			async commit(...args: Parameters<typeof backing.commit>) {
+				const heldCommit = hold && args[1].some((item) => item.value !== undefined);
+				if (heldCommit) {
+					hold = false;
+					oldPartition = args[0];
+					started();
+					await gate;
+				}
+				await backing.commit(...args);
+				if (heldCommit) finished();
+			},
+		};
+		const persist = (account: string) => ({
+			storage,
+			partition: account,
+			key: 'a session secret of at least sixteen bytes',
+			budget: 4096,
+		});
+		vi.stubGlobal(
+			'BroadcastChannel',
+			class {
+				onmessage: ((event: { data: number }) => void) | null = null;
+				constructor() {
+					channels.push(this);
+				}
+				postMessage(data: number) {
+					for (const channel of channels)
+						if (channel !== this) notifications.push(() => channel.onmessage?.({ data }));
+				}
+			},
+		);
+		let owner = createDataOwner({ transport: oldServer.transport, fence: 'explicit', persist });
+		vi.stubGlobal(
+			'SharedWorker',
+			class {
+				port: MessagePort;
+				constructor() {
+					const channel = new MessageChannel();
+					owner.connect(channel.port1);
+					this.port = channel.port2;
+					closers.push(() => (channel.port1.close(), channel.port2.close()));
+				}
+			},
+		);
+		await owner.activate('ada');
+		const old = createReplica(sharedOwner('ada'), { ...replicaOptions, persist: persist('ada') });
+		await observed(old.read(todos));
+		await held;
+		owner = createDataOwner({ transport: unshared, fence: 'explicit', persist });
+		await owner.activate('ada');
+		release();
+		await committed;
+		const current = createReplica(sharedOwner('ada'), {
+			...replicaOptions,
+			persist: persist('ada'),
+		});
+		const handle = current.read(todos);
+		closers.push(handle.subscribe(() => {}));
+		await vi.waitFor(() => expect(handle.getSnapshot().status).toBe('error'));
+		expect(handle.getSnapshot().value).toBeUndefined();
+		expect(await backing.index(oldPartition)).toHaveLength(1);
+		for (const notify of notifications.splice(0)) notify();
+		await vi.waitFor(async () => expect(await backing.index(oldPartition)).toHaveLength(0));
+	});
+
+	it('does not let a delayed old-owner notification erase a reactivated account cache', async () => {
+		const pending: Array<() => void> = [];
+		const channels: any[] = [];
+		vi.stubGlobal(
+			'BroadcastChannel',
+			class {
+				onmessage: ((event: { data: number }) => void) | null = null;
+				constructor() {
+					channels.push(this);
+				}
+				postMessage(data: number) {
+					for (const channel of channels)
+						if (channel !== this) pending.push(() => channel.onmessage?.({ data }));
+				}
+			},
+		);
+		const server = createServer();
+		const backing = memoryStorage();
+		let clears = 0;
+		let commits = 0;
+		const storage = {
+			...backing,
+			async clear(partition: string) {
+				clears++;
+				await backing.clear(partition);
+			},
+			async commit(...args: Parameters<typeof backing.commit>) {
+				commits++;
+				await backing.commit(...args);
+			},
+		};
+		const persist = (account: string) => ({
+			storage,
+			partition: account,
+			key: 'a session secret of at least sixteen bytes',
+			budget: 4096,
+		});
+		const make = () => createDataOwner({ transport: server.transport, fence: 'explicit', persist });
+		let owner = make();
+		vi.stubGlobal(
+			'SharedWorker',
+			class {
+				port: MessagePort;
+				constructor() {
+					const channel = new MessageChannel();
+					owner.connect(channel.port1);
+					this.port = channel.port2;
+					closers.push(() => (channel.port1.close(), channel.port2.close()));
+				}
+			},
+		);
+		await owner.activate('ada');
+		await observed(createReplica(sharedOwner('ada'), replicaOptions).read(todos));
+		owner = make();
+		await owner.activate('ada');
+		const fresh = createReplica(sharedOwner('ada'), { ...replicaOptions, persist: persist('ada') });
+		await observed(fresh.read(todos));
+		await vi.waitFor(() => expect(commits).toBeGreaterThan(0));
+		const before = clears;
+		for (const deliver of pending.splice(0)) deliver();
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(clears).toBe(before);
+		owner = createDataOwner({ transport: unshared, fence: 'explicit', persist });
+		const offline = createReplica(sharedOwner('ada'), {
+			...replicaOptions,
+			persist: persist('ada'),
+		});
+		expect((await observed(offline.read(todos)))()[0]!.title).toBe('Tides');
+	});
+
+	it('isolates explicit grants and cache partitions from a still-open legacy owner', async () => {
+		const server = createServer();
+		const backing = memoryStorage();
+		let commits = 0;
+		const storage = {
+			...backing,
+			async commit(...args: Parameters<typeof backing.commit>) {
+				commits++;
+				await backing.commit(...args);
+			},
+		};
+		const persist = (account: string) => ({
+			storage,
+			partition: account,
+			key: 'a session secret of at least sixteen bytes',
+			budget: 4096,
+		});
+		let explicit = createDataOwner({ transport: server.transport, fence: 'explicit', persist });
+		vi.stubGlobal(
+			'SharedWorker',
+			class {
+				port: MessagePort;
+				constructor() {
+					const channel = new MessageChannel();
+					explicit.connect(channel.port1);
+					this.port = channel.port2;
+					closers.push(() => (channel.port1.close(), channel.port2.close()));
+				}
+			},
+		);
+		await explicit.activate('ada');
+		const first = createReplica(sharedOwner('ada'), { ...replicaOptions, persist: persist('ada') });
+		const peer = createReplica(sharedOwner('ada'), { ...replicaOptions, persist: persist('ada') });
+		await observed(first.read(todos));
+		const peerValue = await observed(peer.read(todos));
+		await vi.waitFor(() => expect(commits).toBeGreaterThan(0));
+		await first.dispose();
+		expect(peer.retired).toBe(false);
+		expect(peerValue()[0]!.title).toBe('Tides');
+		const savedBeforeUpdate = commits;
+		await peer.publish(todos, undefined, [{ ...peerValue()[0]!, title: 'Peer latest' }]);
+		await vi.waitFor(() => expect(commits).toBeGreaterThan(savedBeforeUpdate));
+		const legacy = createDataOwner({ transport: server.transport, fence: true, persist });
+		const channel = new MessageChannel();
+		legacy.connect(channel.port1);
+		closers.push(() => (channel.port1.close(), channel.port2.close()));
+		channel.port2.start();
+		channel.port2.postMessage({
+			t: 'hello',
+			account: 'grace',
+			identity: contractIdentity(contracts),
+		});
+		await vi.waitFor(async () => expect((await recordedAccount()).account).toBe('grace'));
+		await createDataStore({ transport: unshared, persist: persist('ada') }).retire();
+		expect((await recordedExplicitAccount()).account).toBe('ada');
+		explicit = createDataOwner({ transport: unshared, fence: 'explicit', persist });
+		const restarted = createReplica(sharedOwner('ada'), {
+			...replicaOptions,
+			persist: persist('ada'),
+		});
+		expect((await observed(restarted.read(todos)))()[0]!.title).toBe('Peer latest');
+	});
+
+	it('publishes at most one grant when trusted owners activate concurrently', async () => {
+		const first = createDataOwner({ transport: createServer().transport, fence: 'explicit' });
+		const second = createDataOwner({ transport: createServer().transport, fence: 'explicit' });
+		const results = await Promise.allSettled([first.activate('ada'), second.activate('grace')]);
+		const record = await recordedExplicitAccount();
+		expect(['ada', 'grace']).toContain(record.account);
+		expect(record.pending).toBeUndefined();
+		expect(results.filter((result) => result.status === 'fulfilled').length).toBeGreaterThanOrEqual(
+			1,
+		);
+		const port = new MessageChannel();
+		first.connect(port.port1);
+		closers.push(() => (port.port1.close(), port.port2.close()));
+		const messages: any[] = [];
+		port.port2.addEventListener('message', ({ data }) => messages.push(data));
+		port.port2.start();
+		port.port2.postMessage({
+			t: 'hello',
+			account: record.account === 'ada' ? 'grace' : 'ada',
+			identity: contractIdentity(contracts),
+		});
+		await vi.waitFor(() => expect(messages).toContainEqual({ t: 'retired' }));
+	});
+
 	it('retires every tab of an account once another account signs in', async () => {
 		const server = createServer();
 		let release!: () => void;
@@ -893,7 +1430,7 @@ describe('octane/data in a SharedWorker', () => {
 		try {
 			expect(sharedOwner('ada')).toBe(port);
 			expect(constructed).toEqual([
-				['/_octane/data-worker.js', { type: 'module', name: 'octane-data:4:ada' }],
+				['/_octane/data-worker.js', { type: 'module', name: 'octane-data:5:ada' }],
 			]);
 			vi.stubGlobal(
 				'SharedWorker',
