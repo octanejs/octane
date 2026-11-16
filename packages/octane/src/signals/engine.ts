@@ -230,6 +230,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 	/** Effects this scope stops when it retires. */
 	effects: EffectNode | undefined = undefined;
 	heldCells: PlainCell[] | undefined = undefined;
+	heldReleased = 0;
 	/** Holds a writable or asynchronous derived cell that new render inputs cannot re-select. */
 	unkeyedState = false;
 	readonly seedEntries: Map<string, DecodedSeedEntry> | undefined;

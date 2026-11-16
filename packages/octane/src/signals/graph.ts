@@ -29,6 +29,7 @@ import {
 	REACTIVE_FAILED,
 	REACTIVE_QUEUED,
 	REACTIVE_HELD,
+	REACTIVE_LISTED,
 	REACTIVE_RECURSED,
 	REACTIVE_RECURSED_CHECK,
 	REACTIVE_WATCHING,
@@ -78,6 +79,8 @@ export interface GraphOwner {
 	readonly observers: Set<SignalObserver>;
 	/** Keyless cells that gained a reader, whose readers retirement must reach. */
 	heldCells: PlainCell[] | undefined;
+	/** Held cells that have since lost every reader, not yet compacted away. */
+	heldReleased: number;
 	readonly seedable: boolean;
 	/** Trace events retained; zero when tracing is off. */
 	readonly traceLimit: number;
@@ -313,6 +316,7 @@ function unlink(link: Link, sub = link.sub): Link | undefined {
 	} else {
 		// Scopes retain their producers independently of subscriber count.
 		dep.subs = nextSub;
+		if (nextSub === undefined && dep.flags & REACTIVE_HELD) releaseCell(dep as PlainCell);
 	}
 	return nextDep;
 }
@@ -2247,8 +2251,28 @@ function cellChannel(cell: PlainCell): CellChannel {
  */
 /** Its owner's retirement reaches a cell's readers only through the cells it holds. */
 function holdCell(cell: PlainCell): void {
-	cell.flags |= REACTIVE_HELD;
-	(cell.owner.heldCells ??= []).push(cell);
+	const flags = cell.flags;
+	cell.flags = flags | REACTIVE_HELD | REACTIVE_LISTED;
+	if (!(flags & REACTIVE_LISTED)) (cell.owner.heldCells ??= []).push(cell);
+}
+
+/**
+ * A cell with no readers left has none for retirement to reach. Its entry goes
+ * once released entries are half the list, so a long-lived scope holds at most
+ * twice the cells something still reads.
+ */
+function releaseCell(cell: PlainCell): void {
+	cell.flags &= ~REACTIVE_HELD;
+	const owner = cell.owner;
+	const held = owner.heldCells;
+	// Retirement already let go of the whole list.
+	if (held === undefined || ++owner.heldReleased * 2 < held.length) return;
+	owner.heldReleased = 0;
+	owner.heldCells = held.filter((entry) => {
+		if (entry.flags & REACTIVE_HELD) return true;
+		entry.flags &= ~REACTIVE_LISTED;
+		return false;
+	});
 }
 
 function readCellOther<T>(cell: PlainCell<T>): T {

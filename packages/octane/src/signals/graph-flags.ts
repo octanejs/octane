@@ -19,3 +19,5 @@ export const REACTIVE_FAILED = 256;
 export const REACTIVE_QUEUED = 512;
 /** Octane's own: a keyless cell its owner holds so retirement reaches its readers. */
 export const REACTIVE_HELD = 1024;
+/** Octane's own: a keyless cell with an entry in its owner's held list. */
+export const REACTIVE_LISTED = 2048;
