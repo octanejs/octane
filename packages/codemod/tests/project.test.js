@@ -3249,9 +3249,72 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 	);
 
 	describe('retained React client roots', () => {
+		const privateRoot = `class Panel {
+			#root;
+			constructor(node) { this.#root = make(node); }
+			show() { this.#root.render(h(Leaf)); }
+			close() { this.#root.unmount(); }
+		}
+		new Panel(container).show();`;
 		it.each([
 			['a direct root', 'DOM.createRoot(container).render(<Leaf />)', true],
 			['a local root', 'const root = make(container); root.render(<Leaf />);', true],
+			['a class private root', privateRoot, true],
+			['an extensionless class private root', privateRoot, true, { specifier: './Leaf' }],
+			[
+				'a private root with a substituted JSX runtime factory',
+				`import ClientRuntime from 'react/jsx-runtime'; ClientRuntime.jsx = other; ${privateRoot.replace('h(Leaf)', '<Leaf />')}`,
+				false,
+			],
+			[
+				'a private root replaced after construction',
+				privateRoot.replace('show()', 'replace(root) { this.#root = root; } show()'),
+				false,
+			],
+			[
+				'a private root replaced on an untyped peer',
+				privateRoot.replace('show()', 'replace(peer: any, root) { peer.#root = root; } show()'),
+				false,
+			],
+			[
+				'an exposed private root',
+				privateRoot.replace('show()', 'get root() { return this.#root; } show()'),
+				false,
+			],
+			[
+				'a private root with a conditional initializer',
+				privateRoot.replace('this.#root = make(node);', 'if (enabled) this.#root = make(node);'),
+				false,
+			],
+			[
+				'a private root mentioned only in an inactive computed method name',
+				privateRoot.replace(
+					'show() { this.#root.render(h(Leaf)); }',
+					'[false && this.#root.render(h(Leaf))]() {} show() {}',
+				),
+				false,
+			],
+			[
+				'a private root with a substituted React DOM factory',
+				`import Client from 'react-dom/client'; Client.createRoot = other; ${privateRoot}`,
+				false,
+			],
+			[
+				'a private root with a substituted element factory',
+				`React.createElement = other; ${privateRoot}`,
+				false,
+				{ reactImport: 'React, { createElement as h }' },
+			],
+			[
+				'a private root with a substituted prototype method',
+				`const example = make(container); Object.getPrototypeOf(example).render = other; ${privateRoot}`,
+				false,
+			],
+			[
+				'a TypeScript private property',
+				privateRoot.replace('#root;', 'private root;').replaceAll('.#root', '.root'),
+				false,
+			],
 			[
 				'an extensionless direct root',
 				'make(container).render(<Leaf />)',
@@ -3349,7 +3412,7 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 				'package.json': '{"name":"app","type":"module"}',
 				'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"Bundler"}}',
 				'Entry.tsx': `${name === 'a different JSX runtime' ? '/** @jsxImportSource octane */' : ''}
-					import * as DOM from 'react-dom/client';
+					${body.includes('DOM.') ? "import * as DOM from 'react-dom/client';" : ''}
 					import { createRoot as make, hydrateRoot as hydrate } from 'react-dom/client';
 					import ${reactImport} from 'react';
 					import { OctaneCompatInline } from 'octane/react';
