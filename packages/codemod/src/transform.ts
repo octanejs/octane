@@ -5917,6 +5917,21 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				}
 				return;
 			}
+			if (ts.isObjectLiteralExpression(member)) {
+				for (const property of member.properties) {
+					const name = property.name;
+					if (name && ts.isComputedPropertyName(name)) {
+						const found = read(name.expression, visit, true);
+						if (found) return found;
+					}
+					// Method and accessor bodies are deferred. Outer coercion or iteration can read any field.
+					if (ts.isPropertyAssignment(property)) {
+						const found = read(property.initializer, visit, coercesValue);
+						if (found) return found;
+					}
+				}
+				return;
+			}
 			if (ts.isTemplateExpression(member)) {
 				for (const span of member.templateSpans) {
 					const found = read(span.expression, visit, true);
