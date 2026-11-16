@@ -1,5 +1,68 @@
 # @octanejs/xyflow
 
+## 0.1.28
+
+### Patch Changes
+
+- 3f2fd7f: Accept the optional drag handle and click distance forwarded internally when `exactOptionalPropertyTypes` is enabled.
+- 9c03790: Fix published XYFlow source type errors for consumers that enable `noUncheckedIndexedAccess`.
+- 20ecd96: Preserve custom node types in React Flow lookups and connection state when `exactOptionalPropertyTypes` is enabled.
+- e3fe02e: Keep custom node types in the internal React Flow node queue and resize observer under `exactOptionalPropertyTypes`.
+- 78c64a9: Accept explicit undefined for React Flow store callbacks that the existing implementation initializes or clears.
+- 6312e69: Keep React Flow keyboard handlers type-safe in projects with `exactOptionalPropertyTypes` by using the supported default target on the server.
+- 1e78f2c: Fix strict TypeScript checks for props passed to the MiniMap’s private node renderers.
+- af5b760: Preserve node and edge types on `ReactFlow` so the component infers typed callbacks from its props and accepts explicit type arguments.
+- aa55a4e: Allow explicitly forwarded undefined values on internal props that already handle them as absent. This reduces strict TypeScript errors when compiling the package's authored source.
+- adc68c5: Align internal store initialization types with the optional values forwarded by XYFlow providers.
+- e19dbf6: Accept explicitly forwarded `undefined` in internal SVG background, edge anchor, and marker props.
+- Updated dependencies [aa7068e]
+- Updated dependencies [bdd71fa]
+- Updated dependencies [d3994e6]
+- Updated dependencies [801df5d]
+- Updated dependencies [82828d1]
+- Updated dependencies [a588f5d]
+- Updated dependencies [901e2c5]
+- Updated dependencies [1005f7d]
+- Updated dependencies [e452908]
+- Updated dependencies [51227c8]
+- Updated dependencies [d058a1c]
+- Updated dependencies [8274f84]
+- Updated dependencies [349a168]
+- Updated dependencies [f4f9658]
+- Updated dependencies [ecf05ed]
+- Updated dependencies [1247dfd]
+- Updated dependencies [6fd588c]
+- Updated dependencies [4f51cc8]
+- Updated dependencies [1950df7]
+- Updated dependencies [f35440d]
+- Updated dependencies [b1d701b]
+- Updated dependencies [69eafbb]
+- Updated dependencies [5fa8210]
+- Updated dependencies [cc568ff]
+- Updated dependencies [df79854]
+- Updated dependencies [1ada0a3]
+- Updated dependencies [28b5ebf]
+- Updated dependencies [aba2955]
+- Updated dependencies [523bf0e]
+- Updated dependencies [f5a9920]
+- Updated dependencies [d6b46e7]
+- Updated dependencies [489470f]
+- Updated dependencies [271454d]
+- Updated dependencies [17f8330]
+- Updated dependencies [10bf0fa]
+- Updated dependencies [bc63bc3]
+- Updated dependencies [4706e9c]
+- Updated dependencies [15c0987]
+- Updated dependencies [e811e62]
+- Updated dependencies [ff666bb]
+- Updated dependencies [6b8a3b3]
+- Updated dependencies [9c2054c]
+- Updated dependencies [ef249e7]
+- Updated dependencies [f16b371]
+- Updated dependencies [7cde992]
+  - octane@0.19.0
+  - @octanejs/zustand@0.1.72
+
 ## 0.1.27
 
 ### Patch Changes

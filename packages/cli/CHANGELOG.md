@@ -1,5 +1,11 @@
 # @octanejs/cli
 
+## 0.3.6
+
+### Patch Changes
+
+- 08303f1: Add Motion's `useInView` hook to `@octanejs/motion` and enable the codemod to migrate it when the binding exports it.
+
 ## 0.3.5
 
 ### Patch Changes
