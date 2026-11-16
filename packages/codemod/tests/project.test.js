@@ -3253,6 +3253,25 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 			['a direct root', 'DOM.createRoot(container).render(<Leaf />)', true],
 			['a local root', 'const root = make(container); root.render(<Leaf />);', true],
 			['hydration', 'hydrate(container, <Leaf />, options)', true],
+			['a JSX fragment', 'make(container).render(<><Leaf /></>)', true],
+			['a React wrapper', 'hydrate(container, <Strict><Leaf /></Strict>)', true],
+			[
+				'a wrapper writable through the default import',
+				'Reflect.set(React, "StrictMode", other); make(container).render(<Strict><Leaf /></Strict>)',
+				false,
+			],
+			['an element factory wrapper', 'make(container).render(h(Fragment, null, h(Leaf)))', true],
+			['a wrapper prop', 'make(container).render(h(Strict, { data: h(Leaf) }, "ignored"))', false],
+			[
+				'the Octane bridge under a React wrapper',
+				'make(container).render(<Strict><OctaneCompatInline component={Leaf} /></Strict>)',
+				false,
+			],
+			[
+				'a shadowed wrapper',
+				'((Strict) => make(container).render(<Strict><Leaf /></Strict>))(other)',
+				false,
+			],
 			['a template wrapper', 'make(container).render(<Leaf />)', true],
 			['a scalar export beside a template', 'make(container).render(<Leaf />)', false],
 			['a React element factory', 'make(container).render(h(Leaf, { label: "ready" }))', true],
@@ -3271,7 +3290,7 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 				'Entry.tsx': `${name === 'a different JSX runtime' ? '/** @jsxImportSource octane */' : ''}
 					import * as DOM from 'react-dom/client';
 					import { createRoot as make, hydrateRoot as hydrate } from 'react-dom/client';
-					import { createElement as h } from 'react';
+					import ${name === 'a wrapper writable through the default import' ? 'React, ' : ''}{ createElement as h, StrictMode as Strict, Fragment } from 'react';
 					import { OctaneCompatInline } from 'octane/react';
 					import { Leaf } from './Leaf.tsx';
 					${body};`,

@@ -60,6 +60,10 @@ function imported(checker: ts.TypeChecker, node: ts.Node, defaultMember = false)
 		return { name, module: imp.moduleSpecifier.text };
 }
 
+function isReactWrapper(name: string) {
+	return name === 'Fragment' || name === 'Suspense' || name === 'StrictMode';
+}
+
 function closedReactReceiver(receiver: ts.Identifier, uses: ReturnType<typeof localUses>) {
 	return uses(receiver).every((ref) => {
 		if (ts.isImportClause(ref.parent) || ts.isNamespaceImport(ref.parent) || inTypeNode(ref))
@@ -73,9 +77,7 @@ function closedReactReceiver(receiver: ts.Identifier, uses: ReturnType<typeof lo
 				ts.isJsxClosingElement(parent) ||
 				ts.isJsxSelfClosingElement(parent)) &&
 				parent.tagName === member &&
-				(member.name.text === 'Fragment' ||
-					member.name.text === 'Suspense' ||
-					member.name.text === 'StrictMode')) ||
+				isReactWrapper(member.name.text)) ||
 			(ts.isCallExpression(parent) &&
 				parent.expression === member &&
 				member.name.text !== 'default')
@@ -862,7 +864,70 @@ export function reactClientComponents(
 	const clientArgument = clientRootArgument(bound, source, 'react-dom/client');
 	const edges: { module: string; name: string; line: number }[] = [];
 	let reactJsx: boolean | undefined;
-	let reactFactory: boolean | undefined;
+	let reactModule: boolean | undefined;
+	let singleReactImport: boolean | undefined;
+	let uses: ReturnType<typeof localUses> | undefined;
+	const isReact = () => (reactModule ??= original('react'));
+	function builtin(tag: ts.Node) {
+		const entry = imported(checker, tag, true);
+		if (
+			entry?.module !== 'react' ||
+			!isReactWrapper(entry.name) ||
+			!isReact() ||
+			!(singleReactImport ??= !hasEval(sf) && hasSingleReactImport(sf, source))
+		)
+			return false;
+		if (ts.isPropertyAccessExpression(tag))
+			return (
+				ts.isIdentifier(tag.expression) &&
+				soleReactReceiver(checker, tag.expression) &&
+				closedReactReceiver(tag.expression, (uses ??= localUses(sf, checker)))
+			);
+		if (!ts.isIdentifier(tag)) return false;
+		const declaration = checker.getSymbolAtLocation(tag)?.declarations?.[0];
+		// A CJS React member can be mutated through a default import from the same clause.
+		return (
+			!!declaration &&
+			ts.isImportSpecifier(declaration) &&
+			!declaration.parent.parent.name &&
+			!declaration.parent.elements.some(
+				(item) => !item.isTypeOnly && (item.propertyName ?? item.name).text === 'default',
+			)
+		);
+	}
+	function rendered(expression: ts.Node, line: number) {
+		const value = ts.isExpression(expression) ? skipWrappers(expression) : expression;
+		let ref: ts.Node | undefined;
+		if (ts.isJsxExpression(value) && value.expression && !value.dotDotDotToken) {
+			rendered(value.expression, line);
+			return;
+		}
+		if (ts.isJsxFragment(value) || ts.isJsxElement(value) || ts.isJsxSelfClosingElement(value)) {
+			if (!(reactJsx ??= ordinaryReactJsx(source) && original('react/jsx-runtime'))) return;
+			if (
+				ts.isJsxFragment(value) ||
+				(ts.isJsxElement(value) && builtin(value.openingElement.tagName))
+			) {
+				for (const child of value.children) rendered(child, line);
+				return;
+			}
+			const { tagName } = openingTag(value);
+			if (!ts.isIdentifier(tagName) || /^[A-Z]/.test(tagName.text)) ref = tagName;
+		} else if (ts.isCallExpression(value) && !ts.isOptionalChain(value)) {
+			const [type] = value.arguments;
+			if (!type || ts.isSpreadElement(type)) return;
+			const factory = imported(checker, skipWrappers(value.expression));
+			if (factory?.module !== 'react' || factory.name !== 'createElement' || !isReact()) return;
+			ref = skipWrappers(type);
+			if (builtin(ref)) {
+				if (!value.arguments.some(ts.isSpreadElement))
+					for (const child of value.arguments.slice(2)) rendered(child, line);
+				return;
+			}
+		}
+		const leaf = ref && imported(checker, ref);
+		if (leaf?.module.startsWith('.')) edges.push({ ...leaf, line });
+	}
 	function visit(node: ts.Node) {
 		if (
 			ts.isCallExpression(node) &&
@@ -870,31 +935,8 @@ export function reactClientComponents(
 			!node.arguments.some(ts.isSpreadElement)
 		) {
 			const argument = clientArgument(node, skipWrappers(node.expression));
-			const value = argument && skipWrappers(argument);
-			let ref: ts.Node | undefined;
-			if (value && (ts.isJsxElement(value) || ts.isJsxSelfClosingElement(value))) {
-				if ((reactJsx ??= ordinaryReactJsx(source) && original('react/jsx-runtime'))) {
-					const { tagName } = openingTag(value);
-					if (!ts.isIdentifier(tagName) || /^[A-Z]/.test(tagName.text)) ref = tagName;
-				}
-			} else if (
-				value &&
-				ts.isCallExpression(value) &&
-				!ts.isOptionalChain(value) &&
-				value.arguments.length &&
-				!ts.isSpreadElement(value.arguments[0])
-			) {
-				const factory = imported(checker, skipWrappers(value.expression));
-				if (
-					factory?.module === 'react' &&
-					factory.name === 'createElement' &&
-					(reactFactory ??= original('react'))
-				)
-					ref = skipWrappers(value.arguments[0]);
-			}
-			const leaf = ref && imported(checker, ref);
-			if (leaf?.module.startsWith('.'))
-				edges.push({ ...leaf, line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1 });
+			if (argument)
+				rendered(argument, sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1);
 		}
 		ts.forEachChild(node, visit);
 	}
