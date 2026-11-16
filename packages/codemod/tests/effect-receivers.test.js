@@ -453,6 +453,53 @@ it('reports getters evaluated by strict comparisons in hook dependencies', () =>
 	);
 }, 20_000);
 
+it('reports getters evaluated while building array hook dependencies', () => {
+	function Reference({ probe }) {
+		useMemo(() => 1, [...[probe.value]]);
+		return createElement('b', null, 'ok');
+	}
+	const probe = {
+		get value() {
+			preinit('/array-dependency.css', { as: 'style' });
+			return 1;
+		},
+	};
+	expect(renderToStaticMarkup(createElement(Reference, { probe }))).toContain(
+		'<link rel="stylesheet" href="/array-dependency.css"',
+	);
+	const input = (hook, dependencies) => `import { ${hook} } from 'react';
+		export function Probe({ probe }: { probe: { value: number } }) {
+			${hook}(() => {}, ${dependencies});
+			return <b>ok</b>;
+		}`;
+	for (const [hook, dependencies] of [
+		['useMemo', '[...[probe.value]]'],
+		['useCallback', '[[, ...[probe.value]]]'],
+	]) {
+		expect(migrate(input(hook, dependencies)).notes).toContainEqual(dependencyError);
+	}
+	expect(migrate(input('useMemo', '[...[false && probe.value]]')).notes).not.toContainEqual(
+		dependencyError,
+	);
+}, 20_000);
+
+it('checks property visibility for nested arrays of component state', () => {
+	const input = (dependencies, field = '2') => `import { useMemo, useState } from 'react';
+		export function Probe() {
+			const [state, setState] = useState({ first: 1, next: ${field} });
+			useMemo(() => {}, ${dependencies});
+			return <button onClick={() => { setState({ first: 1, next: ${field} }); }}>ok</button>;
+		}`;
+	for (const dependencies of ['[state.first, [state.next]]', '[state.first, ...[state.next]]']) {
+		expect(migrate(input(dependencies)).notes).not.toContainEqual(dependencyError);
+	}
+	expect(migrate(input('[+[state.next]]', '{ toString() { return "2"; } }')).notes).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({ rule: 'hook-dependencies', severity: 'error' }),
+		]),
+	);
+}, 20_000);
+
 it('reports a getter in a short-circuit dependency that can register a React SSR stylesheet', () => {
 	function Reference({ enabled, probe }) {
 		useLayoutEffect(() => {}, [enabled && probe.value]);

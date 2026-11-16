@@ -104,6 +104,8 @@ export async function runCodemod(
 	);
 	const known = new Set(paths.flatMap((entry) => collect(path.resolve(entry))));
 	const files = [...known];
+	const config = tsconfigOptions(root);
+	const rootProject = ts.findConfigFile(root, ts.sys.fileExists);
 	let selectedRealpaths: Set<string> | undefined;
 	const renames: Map<string, string> = new Map();
 	const exports: Map<string, TransformResult['exports']> = new Map();
@@ -160,7 +162,38 @@ export async function runCodemod(
 		});
 	for (const file of files) {
 		const source = fs.readFileSync(file, 'utf8');
-		const result = transformModule(source, file, { target });
+		const result = transformModule(source, file, {
+			target,
+			mutableExports() {
+				const options = bindingOptions(file);
+				if (!options) return false;
+				const kind = options.module;
+				if (kind === undefined) {
+					return (
+						!options.noEmit &&
+						options.moduleResolution !== ts.ModuleResolutionKind.Bundler &&
+						(options.target ?? ts.ScriptTarget.ES5) < ts.ScriptTarget.ES2015
+					);
+				}
+				if (
+					kind === ts.ModuleKind.CommonJS ||
+					kind === ts.ModuleKind.AMD ||
+					kind === ts.ModuleKind.UMD
+				)
+					return true;
+				if (
+					kind !== ts.ModuleKind.Node16 &&
+					kind !== ts.ModuleKind.Node18 &&
+					kind !== ts.ModuleKind.Node20 &&
+					kind !== ts.ModuleKind.NodeNext
+				)
+					return false;
+				return (
+					ts.getImpliedNodeFormatForFile(file, undefined, ts.sys, options) ===
+					ts.ModuleKind.CommonJS
+				);
+			},
+		});
 		exports.set(file, result.exports);
 		if (!result.template) continue;
 		const output = file.replace(/\.(?:jsx?|tsx)$/, '.tsrx');
@@ -213,7 +246,6 @@ export async function runCodemod(
 	// A colliding source remains in place, so its imports and export contracts
 	// must not participate in the preview as if it had been migrated.
 	for (const file of conflicts.keys()) exports.delete(file);
-	const config = tsconfigOptions(root);
 	const strictConfig = (config?.strictNullChecks ?? config?.strict) ? config : null;
 	let program: ts.Program | undefined;
 	function typesOf(file: string): TransformOptions['types'] {
@@ -336,7 +368,6 @@ export async function runCodemod(
 	const reactCompat = ['react', 'react-dom'].every((name) =>
 		/^19\.(?:[2-9]|\d{2,})\./.test(readInstalled(root, name)?.version ?? ''),
 	);
-	const rootProject = ts.findConfigFile(root, ts.sys.fileExists);
 	const reactExports = new Map<string, ReturnType<typeof directReactExports>>();
 	function originalReactExports(file: string) {
 		let exports = reactExports.get(file);
