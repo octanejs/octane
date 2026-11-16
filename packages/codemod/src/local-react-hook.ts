@@ -354,7 +354,7 @@ function privateContextCall(
 			binding.initializer
 		) {
 			const initializer = skipWrappers(binding.initializer);
-			if (ts.isArrowFunction(initializer) && !ts.isBlock(initializer.body)) helper = initializer;
+			if (ts.isArrowFunction(initializer)) helper = initializer;
 		}
 	}
 	if (
