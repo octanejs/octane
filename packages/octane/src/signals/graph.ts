@@ -2497,44 +2497,61 @@ function refreshLean(node: PlainComputed): void {
 
 /** Compute a keyless derived value, in the shape of alien-signals' update. */
 function updateLean(node: PlainComputed): boolean {
-	const kept = node.flags & (REACTIVE_FAILED | REACTIVE_TRACKED_CELL);
+	// A tracked channel, an earlier failure or a render collecting reads takes the
+	// wrapper, which keeps this common recomputation small enough to inline.
+	if (node.flags & (REACTIVE_FAILED | REACTIVE_TRACKED_CELL) || signalMode & READ_OBSERVED)
+		return updateLeanTracked(node);
+	return recomputeLean(node);
+}
+
+/** Recompute; a throw is held as the value, flagged REACTIVE_FAILED. */
+function recomputeLean(node: PlainComputed): boolean {
 	node.depsTail = undefined;
-	node.flags = REACTIVE_MUTABLE | REACTIVE_RECURSED_CHECK | (kept & REACTIVE_TRACKED_CELL);
+	node.flags = REACTIVE_MUTABLE | REACTIVE_RECURSED_CHECK;
 	const previousNode = activeNode;
-	// A render collecting reads must not see this computation's own reads.
-	const observer = (signalMode & READ_OBSERVED) !== 0 ? setNativeReadObserver(null) : null;
 	// Being the active node rejects writes (assertWritable) and keeps no provenance (addOwner).
 	activeNode = node;
 	let value: unknown;
-	let failed = false;
 	try {
 		++trackingCycle;
 		value = node.getter();
 	} catch (error) {
-		failed = true;
 		value = error;
+		// A thrown thenable is computed again once its readers retry.
+		node.flags |= isThenable(error) ? REACTIVE_FAILED | REACTIVE_DIRTY : REACTIVE_FAILED;
 	} finally {
 		activeNode = previousNode;
-		if (observer !== null) setNativeReadObserver(observer);
 		node.flags &= ~REACTIVE_RECURSED_CHECK;
 		const tail = node.depsTail as Link | undefined;
 		let obsolete = tail ? tail.nextDep : node.deps;
 		while (obsolete) obsolete = unlink(obsolete, node);
 	}
-	if (failed) {
-		// A thrown thenable is computed again once its readers retry.
-		node.flags |= isThenable(value) ? REACTIVE_FAILED | REACTIVE_DIRTY : REACTIVE_FAILED;
-	} else if (
-		!(kept & REACTIVE_FAILED) &&
+	if (
+		!(node.flags & REACTIVE_FAILED) &&
 		(node.last === value
 			? value !== 0 || 1 / (node.last as number) === 1 / (value as number)
 			: value !== value && node.last !== node.last)
-	) {
+	)
 		return false;
-	}
 	node.last = value;
-	if (node.flags & REACTIVE_TRACKED_CELL) leanChannels.get(node)!.revision++;
 	return true;
+}
+
+function updateLeanTracked(node: PlainComputed): boolean {
+	const kept = node.flags & (REACTIVE_FAILED | REACTIVE_TRACKED_CELL);
+	// After a failure any result is a change: the held error equals no value.
+	if (kept & REACTIVE_FAILED) node.last = NO_FAILURE;
+	// A render collecting reads must not see this computation's own reads.
+	const observer = (signalMode & READ_OBSERVED) !== 0 ? setNativeReadObserver(null) : null;
+	let changed: boolean;
+	try {
+		changed = recomputeLean(node);
+	} finally {
+		if (observer !== null) setNativeReadObserver(observer);
+		node.flags |= kept & REACTIVE_TRACKED_CELL;
+	}
+	if (changed && kept & REACTIVE_TRACKED_CELL) leanChannels.get(node)!.revision++;
+	return changed;
 }
 
 /**
