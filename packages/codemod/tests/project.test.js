@@ -6738,12 +6738,13 @@ export function Cases(p: {}) {return <main><Box {...p}><i /></Box><Box> <b /> </
 		);
 	});
 
-	it('preserves element-only children through lexical named and default exports', async () => {
+	it('preserves element-only children through lexical named and default exports with displayName', async () => {
 		const caller = `import Main, { Box as Named, Broad } from './Frame.tsx';
 export function App() { return <main><Main><i /></Main><Named><strong /></Named><Broad><b /></Broad></main> }`;
 		const root = project({
 			'Frame.tsx': `import type { ReactElement, ReactNode } from 'react';
 function Frame({ children }: { children: ReactElement }) { return <section>{children}</section> }
+Frame.displayName = 'Frame';
 function Broad({ children }: { children: ReactNode }) { return <article>{children}</article> }
 export { Frame as Box, Frame as default, Broad };`,
 			'Caller.tsx': caller,
@@ -6774,6 +6775,25 @@ export { Frame as Box, Frame as default, Broad };`,
 function Frame({ children }: { children: ReactElement }) { return <section>{children}</section> }
 function Broad({ children }: { children: ReactNode }) { return <article>{children}</article> }
 [Frame] = [Broad];
+export { Frame as Box };`,
+			'Caller.tsx': `import { Box } from './Frame.tsx';
+export function App() { return <Box><i /></Box> }`,
+		});
+		const { files } = await runCodemod([root], { root, write: false, strong: true });
+		const output = files.find((file) => file.output === 'Caller.tsrx');
+		expect(output.rules['element-child-prop']).toBeUndefined();
+		expect(output.code).toContain('<Box><i /></Box>');
+	});
+
+	it.each([
+		'Frame.displayName = getDisplayName();',
+		'Frame.defaultProps = { label: "configured" };',
+		'Object.defineProperty(Function.prototype, "displayName", { set: () => {} }); Frame.displayName = "Frame";',
+	])('keeps nested children when component metadata is observable: %s', async (metadata) => {
+		const root = project({
+			'Frame.tsx': `import type { ReactElement } from 'react';
+function Frame({ children }: { children: ReactElement }) { return <section>{children}</section> }
+${metadata}
 export { Frame as Box };`,
 			'Caller.tsx': `import { Box } from './Frame.tsx';
 export function App() { return <Box><i /></Box> }`,
