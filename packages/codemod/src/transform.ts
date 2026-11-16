@@ -5713,7 +5713,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			ts.isIdentifier(name) || ts.isStringLiteral(name) ? name.text : undefined;
 
 		const required = new Set([key]);
-		const numeric = new Set<string>();
+		const coerced = new Set<string>();
 		const addField = (name: string | undefined) => {
 			if (name === undefined || name === '__proto__') return false;
 			required.add(name);
@@ -5750,7 +5750,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				outer.operator !== ts.SyntaxKind.PlusPlusToken &&
 				outer.operator !== ts.SyntaxKind.MinusMinusToken
 			) {
-				if (outer.operator !== ts.SyntaxKind.ExclamationToken) numeric.add(parent.name.text);
+				if (outer.operator !== ts.SyntaxKind.ExclamationToken) coerced.add(parent.name.text);
 				return true;
 			}
 			if (
@@ -5764,9 +5764,9 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				outer === dependencies
 			)
 				return true;
-			const coercesNumber = nestedRead(parent);
-			if (coercesNumber === undefined) return false;
-			if (coercesNumber) numeric.add(parent.name.text);
+			const coercesValue = nestedRead(parent);
+			if (coercesValue === undefined) return false;
+			if (coercesValue) coerced.add(parent.name.text);
 			return true;
 		});
 		if (!closed) return false;
@@ -5792,7 +5792,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				if (!ts.isPropertyAssignment(field)) return false;
 				const name = simpleName(field.name);
 				if (name === undefined || name === '__proto__') return false;
-				if (numeric.has(name) && !isNumericConstant(field.initializer)) return false;
+				if (coerced.has(name) && !isPrimitiveLiteral(field.initializer)) return false;
 				missing.delete(name);
 			}
 			return missing.size === 0;
@@ -5836,7 +5836,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		member: ts.PropertyAccessExpression | ts.ElementAccessExpression,
 		hook: ts.CallExpression,
 		dependencies: ts.ArrayLiteralExpression,
-		coercesNumber: boolean,
+		coercesValue: boolean,
 		nestedRead: (member: ts.PropertyAccessExpression) => boolean | undefined,
 	) {
 		const receiver = skipWrappers(member.expression);
@@ -5874,14 +5874,14 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				return false;
 			if (!name || (!ts.isIdentifier(name) && !ts.isStringLiteralLike(name))) {
 				// A numeric name can override the corresponding string name.
-				if (coercesNumber) return false;
+				if (coercesValue) return false;
 				continue;
 			}
 			if (name.text !== key) continue;
 			owns = true;
 			if (
-				coercesNumber &&
-				!(ts.isPropertyAssignment(field) && isNumericConstant(field.initializer))
+				coercesValue &&
+				!(ts.isPropertyAssignment(field) && isPrimitiveLiteral(field.initializer))
 			)
 				return false;
 		}
@@ -5893,14 +5893,14 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		if (!this.emitsTsrx || !ts.isArrayLiteralExpression(list)) return;
 		type Member = ts.PropertyAccessExpression | ts.ElementAccessExpression;
 		let memberReads: Map<Member, boolean> | undefined;
-		const recordStateRead = (member: Member, coercesNumber: boolean) => {
-			memberReads?.set(member, coercesNumber);
+		const recordStateRead = (member: Member, coercesValue: boolean) => {
+			memberReads?.set(member, coercesValue);
 			return undefined;
 		};
 		const read = (
 			expr: ts.Expression,
-			visit: (member: Member, coercesNumber: boolean) => Member | undefined,
-			coercesNumber = false,
+			visit: (member: Member, coercesValue: boolean) => Member | undefined,
+			coercesValue = false,
 		): Member | undefined => {
 			const member = skipWrappers(expr);
 			if (ts.isSpreadElement(member)) {
@@ -5908,11 +5908,18 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				const stateProof = visit === recordStateRead;
 				if (stateProof && !ts.isArrayLiteralExpression(value)) return;
 				// A custom iterator can observe elements of a fresh array.
-				return read(value, visit, coercesNumber || stateProof);
+				return read(value, visit, coercesValue || stateProof);
 			}
 			if (ts.isArrayLiteralExpression(member)) {
 				for (const item of member.elements) {
-					const found = read(item, visit, coercesNumber);
+					const found = read(item, visit, coercesValue);
+					if (found) return found;
+				}
+				return;
+			}
+			if (ts.isTemplateExpression(member)) {
+				for (const span of member.templateSpans) {
+					const found = read(span.expression, visit, true);
 					if (found) return found;
 				}
 				return;
@@ -5928,17 +5935,20 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			if (ts.isConditionalExpression(member)) {
 				const condition = skipWrappers(member.condition);
 				if (condition.kind === ts.SyntaxKind.TrueKeyword)
-					return read(member.whenTrue, visit, coercesNumber);
+					return read(member.whenTrue, visit, coercesValue);
 				if (condition.kind === ts.SyntaxKind.FalseKeyword)
-					return read(member.whenFalse, visit, coercesNumber);
+					return read(member.whenFalse, visit, coercesValue);
 				return (
 					read(condition, visit) ??
-					read(member.whenTrue, visit, coercesNumber) ??
-					read(member.whenFalse, visit, coercesNumber)
+					read(member.whenTrue, visit, coercesValue) ??
+					read(member.whenFalse, visit, coercesValue)
 				);
 			}
 			if (ts.isBinaryExpression(member)) {
 				const op = member.operatorToken.kind;
+				// The left value is read and discarded. Only the right value reaches outer coercion.
+				if (op === ts.SyntaxKind.CommaToken)
+					return read(member.left, visit) ?? read(member.right, visit, coercesValue);
 				// Strict comparison reads both operands and does not coerce either.
 				if (
 					op === ts.SyntaxKind.EqualsEqualsEqualsToken ||
@@ -5962,7 +5972,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					const left = read(
 						member.left,
 						visit,
-						coercesNumber && op !== ts.SyntaxKind.AmpersandAmpersandToken,
+						coercesValue && op !== ts.SyntaxKind.AmpersandAmpersandToken,
 					);
 					if (left) return left;
 					const condition = literalCondition(member.left);
@@ -5972,11 +5982,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 						(op === ts.SyntaxKind.BarBarToken && condition !== 'truthy') ||
 						(op === ts.SyntaxKind.QuestionQuestionToken && condition === 'nullish')
 					)
-						return read(member.right, visit, coercesNumber);
+						return read(member.right, visit, coercesValue);
 				}
 			}
 			if (ts.isPropertyAccessExpression(member) || ts.isElementAccessExpression(member))
-				return visit(member, coercesNumber);
+				return visit(member, coercesValue);
 		};
 		// The closed-state proof must account for every field read in this list.
 		const nestedRead = (member: ts.PropertyAccessExpression) => {
@@ -5987,9 +5997,9 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			return memberReads.get(member);
 		};
 		let opaqueCoercion = false;
-		const check = (member: Member, coercesNumber: boolean) => {
-			if (!this.ownDataDependency(member, node, list, coercesNumber, nestedRead)) {
-				opaqueCoercion = coercesNumber;
+		const check = (member: Member, coercesValue: boolean) => {
+			if (!this.ownDataDependency(member, node, list, coercesValue, nestedRead)) {
+				opaqueCoercion = coercesValue;
 				return member;
 			}
 		};
@@ -6004,7 +6014,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				'error',
 				opaque,
 				opaqueCoercion
-					? 'This hook dependency reads a property during render. It may run a getter owned by React or execute user code during numeric coercion. Keep the component in React or verify the property before moving it to native SSR.'
+					? 'This hook dependency reads a property during render. It may run a getter owned by React or execute user code during value coercion. Keep the component in React or verify the property before moving it to native SSR.'
 					: 'This hook dependency reads a property during render and may run a getter owned by React. Keep the component in React or verify the getter before moving it to native SSR.',
 			);
 	}
