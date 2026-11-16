@@ -1,5 +1,38 @@
 # @octanejs/codemod
 
+## 0.2.3
+
+### Patch Changes
+
+- b81eb54: Warn when a retained React JSX component renders a migrated Octane wrapper through an unambiguous relative extensionless import.
+- bb2a60f: Report the standalone store-provider requirement when an exported const function expression directly returns a migrated server render.
+- 4ce4b29: Protect retained React DOM client roots when a relative extensionless import is rewritten to a migrated Octane component.
+- b763371: Report verified retained React context reads through private arrow helpers with block bodies.
+- 4bea98f: Report hook dependencies that can run React-owned getters or coercion inside comma expressions and template interpolations.
+- 9e66821: Report eager property reads and computed key coercion inside object literals used as hook dependencies.
+- 5c2e59f: Report getters that can run while spreading an object in a React hook dependency before migrating the component to native SSR.
+- c55822c: Migrate React's `onChange` to `onInput` on native inputs whose dynamic type is proven to report per-edit changes.
+- df41f93: Report the standalone store-provider advisory when a migrated exported arrow function or function expression reads the store as a component.
+- 047f531: Avoid blocking a migration when a retained React DOM client root uses a wrapper that the React import can replace.
+- ecd756e: Report React context member reads through a TypeScript path alias and selected named re-exports before writing the migration.
+- 5b8d2fb: Preserve element-only children when a selected component is imported through a local named or default export alias.
+- 43529a8: Warn when an exported arrow function renders a migrated scoped-store component at a standalone server root.
+- b78fb7f: Keep the original React sources when converting a JSX map would initialize its index before a constructor argument in the callback parameter can read it.
+- 05490f3: Protect templates rendered by a retained React DOM root stored in a JavaScript private class field.
+- 8f37340: Report property reads and coercion in relational hook dependencies that can invoke React-owned code during standalone SSR.
+- 7d27cdc: Report React-owned getter reads inside strict equality comparisons in hook dependency arrays.
+- b89e477: Keep unsupported named React runtime re-exports on React and report them for migration. Supported siblings can still move to Octane.
+- dc15bcf: Report a blocking diagnostic before converting a JSX map callback whose local function name would be lost in an `@for` row.
+- 9fdd750: Report the standalone SSR store-provider advisory for default-exported arrow functions and function expressions that return a migrated server render.
+- dbe3d77: Report React-owned getters evaluated while constructing inline arrays or spread operands in hook dependencies.
+- 1a7e43d: Protect components rendered by retained React DOM client roots from an incompatible Octane template rewrite.
+- Updated dependencies [90243e1]
+- Updated dependencies [1e57075]
+- Updated dependencies [c9149ed]
+- Updated dependencies [b1b9de3]
+- Updated dependencies [1031884]
+  - octane@0.19.1
+
 ## 0.2.2
 
 ### Patch Changes

@@ -1,5 +1,15 @@
 # octane
 
+## 0.19.1
+
+### Patch Changes
+
+- 90243e1: Make a component that reads signals while rendering cheaper to re-render: a render that reads the sources its committed render read keeps the committed subscriptions instead of taking and releasing its own.
+- 1e57075: Evaluate and coerce mapped JSX keys during server rendering when a host row contains only static text or JSX comments.
+- c9149ed: Initialize the index before destructuring an authored `@for` item on the server when a binding default or computed property reads that index directly.
+- b1b9de3: Preserve callback evaluation order when a relational comparison in mapped JSX can coerce an operand.
+- 1031884: Emit valid TypeScript for destructured keyed `@for` rows by keeping generated parameter annotations on their declarations.
+
 ## 0.19.0
 
 ### Minor Changes
