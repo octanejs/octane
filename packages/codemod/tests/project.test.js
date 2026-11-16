@@ -4084,6 +4084,175 @@ export function inert() {}`,
 		expect(findings(await run('View.tsx', 'alias.ts'))).toEqual([]);
 	});
 
+	it('reports React DOM resources in retained callbacks on local React Intl formatters', async () => {
+		const imports = `import { createIntl as makeIntl } from 'react-intl';
+import { report, inert } from './handler';`;
+		const view = (setup, output = 'intl.locale') =>
+			`${imports}
+export function View() { ${setup} return <p>{${output}}</p>; }`;
+		const empty = "const intl = makeIntl({ locale: 'fr', messages: {}, onError: report });";
+		const missing = "intl.formatMessage({ id: 'ready' })";
+		const format = (setup, read = missing) => view(`${setup} const title = ${read};`, 'title');
+		const guarded = (source) =>
+			source.replace('function View()', 'function View({ closed }: { closed: boolean })');
+		const root = project({
+			'tsconfig.json': JSON.stringify({
+				compilerOptions: { strict: true, jsx: 'react-jsx', moduleResolution: 'bundler' },
+			}),
+			'Construct.tsx': view("const intl = makeIntl({ locale: '', onError: report });"),
+			'Format.tsx': format(empty),
+			'GuardedConstruct.tsx': guarded(
+				view("const intl = makeIntl({ locale: '', onError: report }); if (closed) return <i />;"),
+			),
+			'GuardedFormat.tsx': guarded(
+				format(empty).replace('return <p>', 'if (closed) return <i />; return <p>'),
+			),
+			'GuardBeforeConstruct.tsx': guarded(
+				view("if (closed) return <i />; const intl = makeIntl({ locale: '', onError: report });"),
+			),
+			'Shorthand.tsx': format(empty.replace('onError: report', 'onError')).replace(
+				'{ report, inert }',
+				'{ report as onError }',
+			),
+			'Translated.tsx': format(empty.replace('messages: {}', "messages: { ready: 'Prêt' }")),
+			'DefaultCatalog.tsx': format(empty.replace('messages: {}, ', '')),
+			'DefaultLocale.tsx': format(
+				empty.replace("'fr'", "'en'"),
+				"intl.formatMessage({ id: 'ready', defaultMessage: 'Ready' })",
+			),
+			'Inert.tsx': format(empty.replace('onError: report', 'onError: inert')),
+			'Override.tsx': format(empty.replace('onError: report', 'onError: report, onError: inert')),
+			'Shadowed.tsx': view('const makeIntl = () => ({ locale: "fr" }); ' + empty),
+			'ShadowedCallback.tsx': format('const report = () => {}; ' + empty),
+			'Deferred.tsx': format(empty, '() => ' + missing),
+			'LaterArgument.tsx': view("const intl = makeIntl({ locale: '', onError: report }, fail());"),
+			'CatalogGetter.tsx': view(
+				"const intl = makeIntl({ locale: '', get messages() { return fail(); }, onError: report });",
+			),
+			'ComputedOption.tsx': format(
+				empty.replace('onError: report', "onError: report, ['onError']: inert"),
+			),
+			'Destructured.tsx': view(empty.replace('const intl', 'const { ignored = fail() }'), missing),
+			'NativeRival.tsx': format(empty).replace('./handler', './rival'),
+			'ExplicitSource.tsx': format(empty).replace('./handler', './rival.ts'),
+			'rival.ts': `import { preload } from 'react-dom';
+export function report() { preload('/rival.png', { as: 'image' }); }`,
+			'rival.tsrx': 'export function report() {}',
+			'SetupOutsideRender.tsx': `${imports}
+${empty}
+export function View() { return <p>Ready</p>; }`,
+			'handler.ts': `import { preload } from 'react-dom';
+export function report() { preload('/ready.png', { as: 'image' }); }
+export function inert() {}`,
+		});
+		fs.symlinkSync(
+			path.join(REPO, 'packages/codemod/node_modules'),
+			path.join(root, 'node_modules'),
+		);
+		const names = fs.readdirSync(root).filter((name) => name.endsWith('.tsx'));
+		const run = (files, projectTypes) =>
+			runCodemod(
+				files.map((file) => path.join(root, file)),
+				{
+					root,
+					strong: true,
+					write: false,
+					verify: true,
+					projectTypes,
+				},
+			);
+		const findings = ({ files }) =>
+			files
+				.flatMap((file) =>
+					file.notes
+						.filter((note) => note.message.includes('retained callback uses React DOM'))
+						.map((note) => [file.file, note.severity]),
+				)
+				.sort();
+		for (const projectTypes of [false, true]) {
+			const result = await run(names, projectTypes);
+			expect(findings(result)).toEqual([
+				['Construct.tsx', 'error'],
+				['ExplicitSource.tsx', 'error'],
+				['Format.tsx', 'error'],
+				['GuardedConstruct.tsx', 'error'],
+				['GuardedFormat.tsx', 'error'],
+				['Shorthand.tsx', 'error'],
+			]);
+			for (const name of [
+				'Format.tsx',
+				'GuardedConstruct.tsx',
+				'GuardedFormat.tsx',
+				'GuardBeforeConstruct.tsx',
+			])
+				expect(result.files.find((file) => file.file === name).strong).toBe(true);
+			expect(findings(await run(['Format.tsx', 'handler.ts'], projectTypes))).toEqual([]);
+		}
+
+		const conditional = project({
+			'tsconfig.json': fs.readFileSync(path.join(root, 'tsconfig.json'), 'utf8'),
+			'Construct.tsx': fs.readFileSync(path.join(root, 'Construct.tsx'), 'utf8'),
+			'handler.ts': fs.readFileSync(path.join(root, 'handler.ts'), 'utf8'),
+			'node_modules/react-intl/package.json': JSON.stringify({
+				name: 'react-intl',
+				version: '7.1.14',
+				peerDependencies: { react: '^19.0.0' },
+				exports: { types: './index.d.ts', import: './other.mjs', require: './index.cjs' },
+			}),
+			'node_modules/react-intl/index.d.ts':
+				'export function createIntl(options: unknown): { locale: string };',
+			'node_modules/react-intl/index.cjs': 'exports.createIntl = () => ({ locale: "fr" });',
+			'node_modules/react-intl/other.mjs': 'export const createIntl = () => ({ locale: "fr" });',
+		});
+		for (const name of ['octane', 'react', 'react-dom', '@tsrx'])
+			fs.symlinkSync(
+				path.join(REPO, 'packages/codemod/node_modules', name),
+				path.join(conditional, 'node_modules', name),
+				'dir',
+			);
+		const differentFactory = await runCodemod([path.join(conditional, 'Construct.tsx')], {
+			root: conditional,
+			strong: true,
+			write: false,
+			verify: true,
+		});
+		expect(differentFactory.files[0].strong).toBe(true);
+		expect(findings(differentFactory)).toEqual([]);
+
+		const require = createRequire(import.meta.url);
+		const stockIntl = path.dirname(require.resolve('react-intl/package.json'));
+		const stockCore = path.dirname(
+			createRequire(path.join(stockIntl, 'index.js')).resolve('@formatjs/intl'),
+		);
+		const packages = path.join(conditional, 'node_modules');
+		const installedIntl = path.join(packages, 'react-intl');
+		const installedCore = path.join(packages, '@formatjs/intl');
+		fs.cpSync(stockIntl, installedIntl, { recursive: true });
+		fs.cpSync(stockCore, installedCore, { recursive: true });
+		for (const [file, replacement] of [
+			[
+				path.join(installedIntl, 'lib/src/components/createIntl.js'),
+				'export const createIntl = () => ({ locale: "fr" });',
+			],
+			[
+				path.join(installedCore, 'lib/src/create-intl.js'),
+				'export const createIntl = () => ({ locale: "fr" });',
+			],
+		]) {
+			const original = fs.readFileSync(file);
+			fs.writeFileSync(file, replacement);
+			const result = await runCodemod([path.join(conditional, 'Construct.tsx')], {
+				root: conditional,
+				strong: true,
+				write: false,
+				verify: true,
+			});
+			expect(result.files[0].strong).toBe(true);
+			expect(findings(result)).toEqual([]);
+			fs.writeFileSync(file, original);
+		}
+	});
+
 	it('reports a native setup call into a React hook left in an unselected local module', () => {
 		const helper = `import { useState as state } from 'react';
 export function useLabel() { const [label] = state('ready'); return label; }`;

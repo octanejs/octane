@@ -64,14 +64,63 @@ import {
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
 const ADAPTER_OCTANE_VERSION = /^0\.(?:16\.(?:[7-9]|[1-9]\d+)|1[789]\.(?:0|[1-9]\d*))$/;
-// React Intl 7.1.14. Both entry points re-export a hook that calls React.useContext.
-const INTL_HOOK_FILES = {
+const INTL_ENTRIES = {
 	'index.js': '8f5854dadcd055f066234e13a344bd0b102aea2d50ddfd2f0cf12e9f48116059',
 	'lib/index.js': '208130dc122cbb84cbc0d4cce54fd7f458954f45d2cd5dc505d7263686ca6093',
+};
+// Both React Intl 7.1.14 entries re-export a hook that calls React.useContext.
+const INTL_HOOK_FILES = {
+	...INTL_ENTRIES,
 	'src/components/useIntl.js': '7f26c3c5aebaf874aa2ee7f56952358530c246382f7ca9e729a3ee33d196d6c8',
 	'lib/src/components/useIntl.js':
 		'36bb0433939586c08e79a211372987b4173c73552f75d2ae66b6250bdf1f3b8c',
 };
+// These are the React wrappers and FormatJS paths that dispatch the two onError calls.
+const INTL_FACTORY_FILES = {
+	...INTL_ENTRIES,
+	'src/components/createIntl.js':
+		'a94ae5971e93412d91f03d44fdb0412a0593f444d64c373b26bd9b76120e6448',
+	'lib/src/components/createIntl.js':
+		'61ade432d00522e58379cc55fb8d2a7b5aa5e8a2a869638a010f0bb53e679d56',
+};
+const FORMATJS_FACTORY_FILES = {
+	'index.js': '5d533bc4ecb92df151a5778494dc55c529fc433f48c0e3fe0562af5847f27391',
+	'lib/index.js': 'c7a6b9d2c163232345a6b65918385c04ae8dd1a54bc8ab07d77308861c128ec3',
+	'src/create-intl.js': 'e50ab7b2f4adbcfc2639d9f8e7f3a80f365b343650c89f0a9a2572449d8850a7',
+	'lib/src/create-intl.js': 'b198b844cb3aa00893841f401dd50f9797444db417933b4b77049961a350ed3c',
+	'src/message.js': 'bffb1daf92059cfb21f8de7aa19b4e739a94854024c689ae9af00caa4af484f4',
+	'lib/src/message.js': '6a052dd6e84bb6d5dfc15537fb2145e18f4831c240204ddfdd018e72d1bc0840',
+};
+
+function stockIntlLayout(root: string, name: string, version: string) {
+	const installed = readInstalled(root, name);
+	if (
+		installed?.manifest.name === name &&
+		installed.version === version &&
+		!installed.manifest.browser &&
+		!installed.manifest.exports &&
+		installed.manifest.main === 'index.js' &&
+		installed.manifest.module === 'lib/index.js'
+	)
+		return fs.realpathSync(installed.dir);
+}
+
+function matchIntlFiles(root: string, files: Record<string, string>) {
+	return Object.entries(files).every(([name, hash]) => {
+		const file = path.join(root, name);
+		const stat = fs.lstatSync(file, { throwIfNoEntry: false });
+		const stem = file.slice(0, -3);
+		return (
+			stat?.isFile() &&
+			stat.size < 16_384 &&
+			fs.realpathSync(file) === file &&
+			!['', '.mjs', '.mts', '.ts', '.jsx', '.tsx', '.tsrx', '.json'].some((extension) =>
+				fs.lstatSync(stem + extension, { throwIfNoEntry: false }),
+			) &&
+			createHash('sha256').update(fs.readFileSync(file)).digest('hex') === hash
+		);
+	});
+}
 /** React packages and the Octane entry point that replaces each. */
 const CATALOG = { ...DATA.reactPackages, ...PORTED_PACKAGES };
 const MOTION_BINDING = '@octanejs/motion';
@@ -811,6 +860,7 @@ export async function runCodemod(
 		const file = localFile(from, module);
 		if (
 			!file ||
+			(retainedOnly && !module.endsWith('.ts') && fs.existsSync(file.slice(0, -3) + '.tsrx')) ||
 			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject ||
 			!installedReact(from)
 		)
@@ -842,31 +892,52 @@ export async function runCodemod(
 		}
 	>();
 	const intlHookPackages = new Map<string, boolean>();
-	function originalIntlHook(file: string) {
+	const intlFactoryPackages = new Map<string, boolean>();
+	function originalIntlPackage(file: string) {
 		const types = originalModule(file, 'react-intl');
-		if (types?.packageId?.name !== 'react-intl') return false;
-		const installed = readInstalled(path.dirname(file), 'react-intl');
-		if (
-			installed?.manifest.name !== 'react-intl' ||
-			installed.version !== '7.1.14' ||
-			installed.manifest.browser ||
-			installed.manifest.exports ||
-			installed.manifest.main !== 'index.js' ||
-			installed.manifest.module !== 'lib/index.js'
-		)
-			return false;
+		if (types?.packageId?.name !== 'react-intl') return;
 		try {
-			const dir = fs.realpathSync(installed.dir);
-			const entry = path.join(dir, 'index.js');
-			const issuer = createRequire(file);
+			const dir = stockIntlLayout(path.dirname(file), 'react-intl', '7.1.14');
 			if (
-				!dir.split(path.sep).includes('node_modules') ||
-				fs.realpathSync(types.resolvedFileName) !== path.join(dir, 'index.d.ts') ||
-				issuer.resolve('react-intl') !== entry ||
-				readInstalled(path.dirname(file), 'react')?.manifest.name !== 'react'
+				dir?.split(path.sep).includes('node_modules') &&
+				fs.realpathSync(types.resolvedFileName) === path.join(dir, 'index.d.ts') &&
+				createRequire(file).resolve('react-intl') === path.join(dir, 'index.js')
 			)
-				return false;
-			const react = issuer.resolve('react');
+				return dir;
+		} catch {
+			return;
+		}
+	}
+	function originalIntlFactory(file: string) {
+		const dir = originalIntlPackage(file);
+		if (!dir) return false;
+		const cached = intlFactoryPackages.get(dir);
+		if (cached !== undefined) return cached;
+		let verified = false;
+		try {
+			const core = '@formatjs/intl';
+			const wrappers = ['src', 'lib/src'].map((prefix) =>
+				path.join(dir, prefix, 'components/createIntl.js'),
+			);
+			const dependency = stockIntlLayout(path.dirname(wrappers[0]), core, '3.1.8');
+			verified =
+				!!dependency &&
+				wrappers.every(
+					(wrapper) => createRequire(wrapper).resolve(core) === path.join(dependency, 'index.js'),
+				) &&
+				matchIntlFiles(dir, INTL_FACTORY_FILES) &&
+				matchIntlFiles(dependency, FORMATJS_FACTORY_FILES);
+		} catch {
+			// An unreadable or incomplete package does not establish the callback behavior.
+		}
+		intlFactoryPackages.set(dir, verified);
+		return verified;
+	}
+	function originalIntlHook(file: string) {
+		const dir = originalIntlPackage(file);
+		if (!dir || readInstalled(path.dirname(file), 'react')?.manifest.name !== 'react') return false;
+		try {
+			const react = createRequire(file).resolve('react');
 			if (
 				!['src', 'lib/src'].every(
 					(prefix) =>
@@ -1432,6 +1503,7 @@ export async function runCodemod(
 					? (module, name, retainedOnly) =>
 							initializerResourceHint(file, module, name, retainedOnly)
 					: undefined,
+				originalIntlFactory: () => originalIntlFactory(file),
 				localReactHook: renames.has(file)
 					? (module, name, nativeOnly) => localReactHook(file, module, name, nativeOnly)
 					: undefined,
