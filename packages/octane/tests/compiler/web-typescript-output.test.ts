@@ -311,6 +311,31 @@ for (const parserName of ['native', 'javascript']) {
 				expect(runtime.code).not.toContain('dual');
 			});
 
+			it('emits valid TypeScript for destructured keyed rows', () => {
+				parser.javascript = parserName === 'javascript';
+				const result = compile(
+					`export function App(props: { rows: [number, string][]; prefix: string }) @{
+						<main>
+							<ul>@for (const [id, label] of props.rows; key id) {
+								<li>{label}</li>
+							}</ul>
+							<ul>@for (const [id, label] of props.rows; index position; key props.prefix + id + position) {
+								<li>{label}</li>
+							}</ul>
+						</main>
+					}`,
+					'/src/keyed-rows.tsrx',
+					{ mode, hmr: false, output: 'ts' },
+				);
+				expect(result.diagnostics).toEqual([]);
+				const emitted = ts.transpileModule(result.code, {
+					fileName: 'keyed-rows.ts',
+					compilerOptions: { module: ts.ModuleKind.ESNext },
+					reportDiagnostics: true,
+				});
+				expect(emitted.diagnostics).toEqual([]);
+			});
+
 			it('keeps generic class members in their enclosing type scope', () => {
 				parser.javascript = parserName === 'javascript';
 				const result = compile(

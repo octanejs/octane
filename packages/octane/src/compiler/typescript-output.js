@@ -271,7 +271,9 @@ export function prepareWebTypeScript(program, ctx, allocateName) {
 		// A shorthand property's key is syntax, even when it shares its identifier
 		// with the value. Only the value receives the type-only scope assertion.
 		if (parent?.type === 'Property' && key === 'key' && !parent.computed) return node;
-		if (params.has(node)) return params.get(node);
+		// Generated identifiers can be shared between a parameter and its references.
+		if (key === 'params' && FUNCTIONS.has(parent?.type) && params.has(node))
+			return params.get(node);
 		if (copies.has(node)) return copies.get(node);
 		if (
 			node.type === 'Identifier' &&
