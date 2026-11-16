@@ -23,6 +23,8 @@ export interface TransformOptions {
 	strong?: boolean;
 	/** The project checks with `strictNullChecks`, so TypeScript types can prove text holes and boolean guards. */
 	strictNullChecks?: boolean;
+	/** Whether the project can expose the selected module through mutable exports. */
+	mutableExports?(): boolean;
 	/** This module in a program over the whole project, whose resolved imports type what the module's own program cannot. */
 	types?: { sourceFile: ts.SourceFile; checker: ts.TypeChecker };
 	/** The new spelling of an import specifier (a renamed module, a binding package), or null to keep it. */

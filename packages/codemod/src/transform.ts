@@ -1,7 +1,9 @@
 import { svgDataAttribute, svgLiteralRootOverride } from './path-svg.js';
 import {
+	contains,
 	forwardedProps,
 	hasEval,
+	hasPrototypeAccess,
 	literalJsxAttribute,
 	nativeOutputOwner,
 	returnedTextReceiver,
@@ -91,6 +93,27 @@ function directMember(receiver: ts.Node) {
 		return parent.name;
 	if (ts.isQualifiedName(parent) && parent.left === receiver) return parent.right;
 	return null;
+}
+
+function literalDisplayNameAssignment(ref: ts.Identifier, declaration: ts.FunctionDeclaration) {
+	const member = ref.parent;
+	if (
+		!ts.isPropertyAccessExpression(member) ||
+		member.expression !== ref ||
+		member.questionDotToken ||
+		member.name.text !== 'displayName'
+	)
+		return false;
+	const assignment = member.parent;
+	return (
+		ts.isBinaryExpression(assignment) &&
+		assignment.left === member &&
+		assignment.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+		ts.isExpressionStatement(assignment.parent) &&
+		assignment.parent.parent === declaration.parent &&
+		assignment.getStart() >= declaration.end &&
+		ts.isStringLiteralLike(skipWrappers(assignment.right))
+	);
 }
 
 // React Router applications can augment this loader type on the original module.
@@ -840,6 +863,7 @@ class ModuleTransform {
 	readonly changeSpreads = new Set<ts.JsxSpreadAttribute>();
 	/** Proven element slots on converted top-level declarations, for the project caller pass. */
 	readonly elementChildren: NonNullable<ModuleExports['elementChildren']> = [];
+	private ordinaryElementMetadata: boolean | undefined;
 	/** Components to mark `descriptorChildren`. */
 	readonly descriptorComponents = new Set<ts.VariableDeclaration | ts.FunctionDeclaration>();
 	/** Whether a `declare module` now augments `octane/jsx-runtime`. */
@@ -953,6 +977,8 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		const isExported = (statement: ts.Statement) =>
 			ts.canHaveModifiers(statement) &&
 			ts.getModifiers(statement)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+		const elementChildren = [...this.elementChildren];
+		let safeElementAliases: boolean | undefined;
 		const descriptorChildren = [...this.descriptorComponents].flatMap((d) => {
 			const statement = ts.isVariableDeclaration(d) ? d.parent.parent : d;
 			return d.name && isExported(statement) ? [d.name.getText(this.sf)] : [];
@@ -979,7 +1005,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					for (const element of statement.exportClause.elements) {
 						if (contexts.has((element.propertyName ?? element.name).text))
 							exported.add(element.name.text);
-						if (!this.descriptorComponents.size || statement.isTypeOnly || element.isTypeOnly)
+						if (
+							(!this.descriptorComponents.size && !this.elementChildren.length) ||
+							statement.isTypeOnly ||
+							element.isTypeOnly
+						)
 							continue;
 						const local =
 							this.checker.getExportSpecifierLocalTargetSymbol(element)?.valueDeclaration;
@@ -989,6 +1019,31 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 							this.descriptorComponents.has(local)
 						) {
 							descriptorChildren.push(element.name.text);
+						}
+						if (local && ts.isFunctionDeclaration(local) && local.name) {
+							const start = local.getStart(this.sf);
+							if (
+								this.elementChildren.some((slot) => slot.start === start) &&
+								this.localUses(local.name).every(
+									(ref) =>
+										inTypeNode(ref) ||
+										componentTagOrExport(ref) ||
+										this.isOrdinaryElementMetadata(ref, local),
+								) &&
+								(safeElementAliases ??=
+									this.options.mutableExports?.() !== true &&
+									!contains(
+										this.sf,
+										(node) =>
+											node.kind === ts.SyntaxKind.ThisKeyword ||
+											(ts.isIdentifier(node) &&
+												/^(?:eval|module|exports|require|arguments)$/.test(node.text) &&
+												!isPropertyName(node) &&
+												!declaresName(node) &&
+												!inTypeNode(node)),
+									))
+							)
+								elementChildren.push({ start, exported: element.name.text });
 						}
 					}
 				}
@@ -1028,7 +1083,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			reexports,
 			...(descriptorChildren.length ? { descriptorChildren } : {}),
 			...(storeHookComponents.size ? { storeHookComponents: [...storeHookComponents] } : {}),
-			...(this.elementChildren.length ? { elementChildren: this.elementChildren } : {}),
+			...(elementChildren.length ? { elementChildren } : {}),
 		};
 	}
 
@@ -2669,25 +2724,44 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			ts.isFunctionDeclaration(fn) &&
 			fn.name &&
 			fn.parent === this.sf &&
-			this.checker.getSymbolAtLocation(fn.name)?.declarations?.length === 1 &&
 			this.acceptsSingleElement(declaration.type)
 		) {
 			const flags = ts.getCombinedModifierFlags(fn);
-			this.elementChildren.push({
-				start: fn.getStart(this.sf),
-				exported:
-					flags & ts.ModifierFlags.Export
-						? flags & ts.ModifierFlags.Default
-							? 'default'
-							: fn.name.text
-						: undefined,
-			});
+			const declarations = this.checker.getSymbolAtLocation(fn.name)?.declarations;
+			// TypeScript records a property written on the function as an additional
+			// declaration. Ordinary displayName assignments still have one function body.
+			if (
+				declarations?.includes(fn) &&
+				declarations.every(
+					(item) =>
+						item === fn ||
+						(!(flags & ts.ModifierFlags.Export) &&
+							ts.isIdentifier(item) &&
+							this.isOrdinaryElementMetadata(item, fn)),
+				)
+			)
+				this.elementChildren.push({
+					start: fn.getStart(this.sf),
+					exported:
+						flags & ts.ModifierFlags.Export
+							? flags & ts.ModifierFlags.Default
+								? 'default'
+								: fn.name.text
+							: undefined,
+				});
 		}
 		this.note(
 			RULE.elementChildren,
 			'warning',
 			fn,
 			'Nested TSRX children arrive as a render block. Pass element values explicitly with `children={...}` to keep this slot’s element type. If it only renders content and should accept nested templates, include `ChildrenBlock` from `octane/tsrx-boundary` in the children type.',
+		);
+	}
+
+	private isOrdinaryElementMetadata(ref: ts.Identifier, fn: ts.FunctionDeclaration) {
+		return (
+			literalDisplayNameAssignment(ref, fn) &&
+			(this.ordinaryElementMetadata ??= !hasPrototypeAccess(this.sf))
 		);
 	}
 
