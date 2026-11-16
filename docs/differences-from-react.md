@@ -1685,6 +1685,9 @@ flushSync(() => {
 // Both updates committed; their new passive effects remain queued.
 ```
 
+Call `flushSync()` to drain work that was already scheduled. On the server,
+`flushSync()` returns `undefined` because there is no update queue.
+
 Passive effects use a post-paint callback with a timer fallback, including effects
 queued by discrete events and external-store updates. This is not an after-paint
 guarantee: before beginning another render, Octane drains the previous commit's

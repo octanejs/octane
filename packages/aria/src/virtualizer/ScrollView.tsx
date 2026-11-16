@@ -15,6 +15,7 @@ import { addEvent, getOwnerDocument } from '../utils/domHelpers';
 
 // @ts-ignore
 import { flushSync } from 'octane';
+import type { UniversalSyncFlusher } from 'octane/universal';
 import {
 	getEventTarget,
 	getPropagationTargets,
@@ -249,7 +250,7 @@ export function useScrollView(
 
 	let isUpdatingSize = useRef(false);
 	let updateSize = useCallback(
-		(flush: typeof flushSync) => {
+		(flush: UniversalSyncFlusher) => {
 			let dom = ref.current;
 			if (!dom || isUpdatingSize.current) {
 				return;
