@@ -5,6 +5,7 @@
  */
 import * as devalue from 'devalue';
 import { IDBFactory } from 'fake-indexeddb';
+import { postHostTask } from '../src/host-task.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	contractIdentity,
@@ -23,6 +24,7 @@ import {
 	type DataStore,
 	type FeedFrame,
 	type Listener,
+	type OwnerPort,
 	type PersistOptions,
 	type ReadHandle,
 	type StandardSchema,
@@ -496,6 +498,38 @@ describe('octane/data owner and replicas', () => {
 		}
 	});
 
+	it('flushes a replica’s queued save before local disposal without opening a local cache writer', async () => {
+		const server = createServer();
+		const backing = memoryStorage();
+		let commits = 0;
+		let keys = 0;
+		const storage = {
+			...backing,
+			async commit(...args: Parameters<typeof backing.commit>) {
+				commits++;
+				await backing.commit(...args);
+			},
+		};
+		const persist = {
+			storage,
+			partition: 'ada',
+			key: () => (keys++, 'a session secret of at least sixteen bytes'),
+			budget: 4096,
+		};
+		const [first, peer] = tabs(server.transport, 2, undefined, persist);
+		await observed(first!.read(todos));
+		await vi.waitFor(() => expect(commits).toBeGreaterThan(0));
+		const before = commits;
+		const beforeKeys = keys;
+		await peer!.publish(todos, undefined, [{ id: 'a', title: 'Latest', done: false }]);
+		await peer!.dispose();
+		await vi.waitFor(() => expect(commits).toBeGreaterThan(before));
+		await new Promise<void>((resolve) => postHostTask(resolve));
+		expect(keys).toBe(beforeKeys);
+		const offline = createDataStore({ transport: unshared, persist });
+		expect((await observed(offline.read(todos)))()[0]!.title).toBe('Latest');
+	});
+
 	it('holds one feed connection for every tab, and closes it when the last tab stops listening', async () => {
 		const server = createServer();
 		const connections: Array<{ signal: AbortSignal; send(frame: FeedFrame): void }> = [];
@@ -782,6 +816,67 @@ describe('octane/data in a SharedWorker', () => {
 		expect(server.log).toEqual(['list']);
 	});
 
+	it('preserves an explicit peer’s cache when a replica retires with a queued save', async () => {
+		const server = createServer();
+		const backing = memoryStorage();
+		let commits = 0;
+		const storage = {
+			...backing,
+			async commit(...args: Parameters<typeof backing.commit>) {
+				commits++;
+				await backing.commit(...args);
+			},
+		};
+		const persist = (account: string) => ({
+			storage,
+			partition: account,
+			key: 'a session secret of at least sixteen bytes',
+			budget: 4096,
+		});
+		let owner = createDataOwner({ transport: server.transport, fence: 'explicit', persist });
+		const held: Array<() => void> = [];
+		vi.stubGlobal(
+			'SharedWorker',
+			class {
+				port: OwnerPort;
+				constructor() {
+					const channel = new MessageChannel();
+					owner.connect(channel.port1);
+					this.port = {
+						postMessage(message) {
+							if ((message as { t?: string }).t === 'retire')
+								held.push(() => channel.port2.postMessage(message));
+							else channel.port2.postMessage(message);
+						},
+						addEventListener: (type, listener) => channel.port2.addEventListener(type, listener),
+						start: () => channel.port2.start(),
+						close: () => channel.port2.close(),
+					};
+					closers.push(() => (channel.port1.close(), channel.port2.close()));
+				}
+			},
+		);
+		await owner.activate('ada');
+		const open = () =>
+			createReplica(sharedOwner('ada'), { ...replicaOptions, persist: persist('ada') });
+		const first = open();
+		const retiring = open();
+		await observed(first.read(todos));
+		await vi.waitFor(() => expect(commits).toBeGreaterThan(0));
+		const before = commits;
+		try {
+			await retiring.publish(todos, undefined, [{ id: 'a', title: 'Latest', done: false }]);
+			await retiring.retire();
+			await vi.waitFor(() => expect(commits).toBeGreaterThan(before));
+			expect(first.retired).toBe(false);
+			owner = createDataOwner({ transport: unshared, fence: 'explicit', persist });
+			expect((await observed(open().read(todos)))()[0]!.title).toBe('Latest');
+		} finally {
+			for (const deliver of held.splice(0)) deliver();
+			await new Promise((resolve) => setImmediate(resolve));
+		}
+	});
+
 	it('admits only the account explicitly activated by trusted owner code, including after logout', async () => {
 		const server = createServer();
 		const owner = createDataOwner({ transport: server.transport, fence: 'explicit' });
@@ -818,6 +913,50 @@ describe('octane/data in a SharedWorker', () => {
 		await vi.waitFor(() => expect(late.retired).toBe(true));
 		expect(await recordedExplicitAccount()).toEqual({ account: null, generation: 3 });
 	});
+
+	for (const delivered of [true, false])
+		it(`does not admit a newer owner’s grant after activation is revoked (${delivered ? 'delivered' : 'withheld'} broadcast)`, async () => {
+			const channels: Array<{ onmessage: ((event: { data: number }) => void) | null }> = [];
+			vi.stubGlobal(
+				'BroadcastChannel',
+				class {
+					onmessage: ((event: { data: number }) => void) | null = null;
+					constructor() {
+						channels.push(this);
+					}
+					postMessage(data: number) {
+						if (delivered)
+							for (const channel of channels) if (channel !== this) channel.onmessage?.({ data });
+					}
+				},
+			);
+			const server = createServer();
+			const first = createDataOwner({ transport: server.transport, fence: 'explicit' });
+			const second = createDataOwner({ transport: server.transport, fence: 'explicit' });
+			let current = first;
+			vi.stubGlobal(
+				'SharedWorker',
+				class {
+					port: MessagePort;
+					constructor() {
+						const channel = new MessageChannel();
+						current.connect(channel.port1);
+						this.port = channel.port2;
+						closers.push(() => (channel.port1.close(), channel.port2.close()));
+					}
+				},
+			);
+			const open = (owner: DataOwner, account: string) => (
+				(current = owner),
+				createReplica(sharedOwner(account), replicaOptions)
+			);
+			await first.activate('ada');
+			await second.activate('grace');
+			const late = open(first, 'grace');
+			await vi.waitFor(() => expect(late.retired).toBe(true));
+			const live = open(second, 'grace');
+			expect((await observed(live.read(todos)))()[0]!.title).toBe('Tides');
+		});
 
 	it('keeps explicit activation pending until prior persistence clears, and fails closed on cleanup errors', async () => {
 		const server = createServer();

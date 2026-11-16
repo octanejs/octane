@@ -201,7 +201,12 @@ interface Upstream {
 export function createDataOwner(options: {
 	readonly transport: Transport;
 	readonly listen?: Listener | undefined;
-	/** Serve only while this owner's account is the origin's, recorded in IndexedDB. */
+	/**
+	 * Serve only while this owner's account is the origin's, recorded in IndexedDB.
+	 * Explicit mode requires the trusted host to authenticate port/account admission and keep
+	 * one owner instance per active grant. A fresh owner can adopt the durable grant when
+	 * replacing a stopped worker.
+	 */
 	readonly fence?: boolean | 'explicit' | undefined;
 	/**
 	 * The signed-in account's encrypted cache and write journal. The owner is
@@ -297,6 +302,8 @@ export function createDataOwner(options: {
 	/** The generation this owner serves, and the newest any owner has announced. */
 	let generation = 0;
 	let announced = 0;
+	/** An explicit owner never silently adopts a different grant after it was bound. */
+	let bound: { readonly account: string | null; readonly generation: number } | null = null;
 	const channel = fence ? new BroadcastChannel(accountChannel) : null;
 	if (channel) {
 		channel.onmessage = ({ data }) => {
@@ -433,11 +440,18 @@ export function createDataOwner(options: {
 		} catch {
 			return port.postMessage(RETIRED);
 		}
-		if (!record || record.pending || record.account !== account || announced > record.generation)
+		if (
+			!record ||
+			record.pending ||
+			record.account !== account ||
+			announced > record.generation ||
+			(bound && (bound.account !== account || bound.generation !== record.generation))
+		)
 			return port.postMessage(RETIRED);
 		if (serving && (serving.account !== account || generation !== record.generation))
 			await retireAll();
 		if (announced > record.generation) return port.postMessage(RETIRED);
+		bound ??= { account, generation: record.generation };
 		serving ??= { account, ready: Promise.resolve(record.generation) };
 		generation = record.generation;
 		replicas.add(port);
@@ -707,7 +721,11 @@ export function createDataOwner(options: {
 							() => false,
 						).clear();
 					}
-					if (!(await finishActivation(account, next))) throw new DataRetiredError();
+					if (!(await finishActivation(account, next)) || announced > next)
+						throw new DataRetiredError();
+					bound = { account, generation: next };
+					generation = next;
+					serving = account === null ? null : { account, ready: Promise.resolve(next) };
 				} catch (error) {
 					await decide(null, next);
 					throw error;
@@ -896,26 +914,31 @@ export function createReplica(
 		{ readonly op: PersistOp; readonly args: readonly unknown[]; resolve(value: any): void }
 	>();
 	let own: Persistence | null = null;
+	let disposed = false;
 	let collect!: Parameters<PersistenceFactory>[0];
 	let inUse!: Parameters<PersistenceFactory>[1];
 	const ownPersistence = () => (own ??= createPersistence(local.persist!, collect, inUse));
 	const persistAsk = (op: PersistOp, args: readonly unknown[]): Promise<any> =>
 		served.then(() =>
-			port
-				? new Promise((resolve) => {
-						const id = ++next;
-						asked.set(id, { op, args, resolve });
-						send({ t: 'persist', id, op, args });
-					})
-				: (ownPersistence() as any)[op](...args),
+			disposed
+				? nothing(op)
+				: port
+					? new Promise((resolve) => {
+							const id = ++next;
+							asked.set(id, { op, args, resolve });
+							send({ t: 'persist', id, op, args });
+						})
+					: (ownPersistence() as any)[op](...args),
 		);
 	const persistTell = (op: PersistOp, args: readonly unknown[]) =>
-		void served.then(() =>
-			port ? send({ t: 'persist', id: 0, op, args }) : (ownPersistence() as any)[op](...args),
-		);
+		void served.then(() => {
+			if (!disposed)
+				port ? send({ t: 'persist', id: 0, op, args }) : (ownPersistence() as any)[op](...args);
+		});
 	const marked = new Set<string>();
 	/** Send what changed once per host task, as a local store saves once per task. */
 	const flush = () => {
+		if (disposed) return marked.clear();
 		const keys = [...marked];
 		marked.clear();
 		for (const key of keys) {
@@ -943,6 +966,7 @@ export function createReplica(
 		return {
 			restore: (key, read) => persistAsk('restore', [key, read]),
 			mark(key) {
+				if (disposed) return;
 				if (marked.size === 0) void served.then(() => postHostTask(flush));
 				marked.add(key);
 			},
@@ -980,11 +1004,14 @@ export function createReplica(
 		asking = setHostTimeout(signOut, SIGN_OUT_RETRY_MS);
 	};
 	store.retire = () => {
+		if (!store.retired) flush();
 		if (port && !store.retired) signOut();
 		return retireHere();
 	};
 	store.dispose = () => {
 		if (store.retired) return disposeHere();
+		flush();
+		disposed = true;
 		send({ t: 'disconnect' });
 		clearHostTimeout(asking);
 		clearHostTimeout(beat);
@@ -1038,6 +1065,8 @@ export function createReplica(
 
 	/** The account was signed out, or another signed in: nothing more is shown. */
 	function retired() {
+		disposed = true;
+		marked.clear();
 		clearHostTimeout(asking);
 		clearHostTimeout(beat);
 		port = null;
