@@ -5126,6 +5126,30 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				node,
 				"Octane's `flushSync` commits synchronously but leaves the commit's `useEffect`s queued, where React runs them before returning. If code after it reads what an effect did, use `useLayoutEffect` for that effect.",
 			);
+			if (
+				callee.module === 'react-dom' &&
+				!node.typeArguments?.length &&
+				!ts.isOptionalChain(node) &&
+				!(
+					ts.isPropertyAccessExpression(node.expression) &&
+					this.importOf(node.expression.expression)?.typeOnly
+				)
+			) {
+				const [argument] = node.arguments;
+				const value = argument && skipParens(argument);
+				if (!value || (node.arguments.length === 1 && value.kind === ts.SyntaxKind.NullKeyword)) {
+					// Older Octane versions need a callback even for a drain-only call.
+					const close = node.getChildren(this.sf).at(-1);
+					if (close?.kind === ts.SyntaxKind.CloseParenToken && close.getWidth(this.sf) > 0) {
+						const start = (value ?? close).getStart(this.sf);
+						return (
+							this.span(node, node.getStart(this.sf), start, PLAIN) +
+							'() => {}' +
+							this.source.slice(value?.end ?? start, node.end)
+						);
+					}
+				}
+			}
 			return null;
 		}
 		if (name in DEPENDENCY_HOOKS) {

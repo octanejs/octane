@@ -1912,6 +1912,38 @@ declare module 'react' {
 		]);
 	});
 
+	it('adds a no-op callback to direct React DOM flushes without a callback', () => {
+		const source = `import { flushSync as sync } from 'react-dom';
+import * as DOM from 'react-dom';
+import { flushSync as native } from 'octane';
+export function run() {
+	sync(/* omitted */);
+	sync((/* before */ null /* after */));
+	DOM.flushSync(/* leading */ null,);
+	sync(undefined);
+	sync(() => 'kept');
+	native();
+	return (sync, DOM, undefined) => { sync(); DOM.flushSync(); };
+}
+export const bound = (undefined: () => void) => sync(undefined);`;
+		const { code } = transformModule(source, 'flush.tsx');
+		expect(code).toContain('sync(/* omitted */() => {});');
+		expect(code).toContain('sync((/* before */ () => {} /* after */));');
+		expect(code).toContain('/* leading */ () => {},);');
+		expect(code).toContain("sync(() => 'kept');");
+		expect(code).toContain('native();');
+		expect(code).toContain('sync(undefined);');
+		expect(code).toContain('(sync, DOM, undefined) => { sync(); DOM.flushSync(); };');
+		expect(code).toContain('(undefined: () => void) => sync(undefined);');
+		const typeOnly = "import type * as DOM from 'react-dom';\nDOM.flushSync(null);";
+		expect(transformModule(typeOnly, 'types.tsx').code).toContain('flushSync(null);');
+	});
+
+	it('does not insert a callback into an unterminated call', () => {
+		const source = "import { flushSync } from 'react-dom';\nflushSync((null)";
+		expect(transformModule(source, 'broken.tsx').code).toContain('flushSync((null)');
+	});
+
 	it('leaves a module already migrated untouched', () => {
 		for (const input of INPUTS) {
 			const { result, output } = migrate(input);
