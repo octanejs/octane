@@ -39,7 +39,8 @@ interface Consumer {
 	notify: () => void;
 	subscriptions: Map<NativeReadSource, Subscription>;
 	committed: Candidate | null;
-	pending: Set<Candidate>;
+	/** Its unsettled attempts, newest first, linked by `next`. */
+	pending: Candidate | null;
 }
 
 /** Lets a release find the consumer behind a subscription (rebaseNativeRead). */
@@ -51,11 +52,27 @@ interface Candidate extends NativeReadWitness {
 	reads: Map<NativeReadSource, number>;
 	mixed: boolean;
 	active: boolean;
+	/**
+	 * The consumer's committed candidate while this pending one has read only
+	 * what it read. Its leases keep those sources subscribed, so this one holds
+	 * none of its own until it reads something else or the committed one changes.
+	 */
+	base: Candidate | null;
+	/** How many of the base's sources this candidate has yet to read. */
+	left: number;
+	/** The consumer's pending attempt before this one. */
+	next: Candidate | null;
+	/** The capture's candidates this one waits in, and its place there. */
+	set: CandidateSet | null;
+	index: number;
 }
 
 interface RenderFrame {
 	block: Block | null;
 	collectorToken: number;
+	/** The first candidate of this invocation, usually its only one. */
+	candidate: Candidate | null;
+	/** The candidates of any further Scopes. */
 	candidates: Map<Scope, Candidate> | null;
 	/** Renderer data scoped to this one invocation, such as a declaration stage. */
 	invocationData: unknown;
@@ -67,9 +84,36 @@ interface RenderFrame {
 	outerInvocation: number;
 }
 
-type CandidateSet = Map<Consumer, Candidate>;
+type CandidateSet = Candidate[];
 
 function noop(): void {}
+
+/** Give a candidate that relied on the committed leases its own. */
+function lease(candidate: Candidate): void {
+	const subscriptions = candidate.consumer.subscriptions;
+	for (const source of candidate.reads.keys()) subscriptions.get(source)!.leases++;
+	// Last: an exhausted native stack then leaves a lease too many, never one too few.
+	candidate.base = null;
+}
+
+/** Before the committed candidate changes, the attempts relying on its leases take their own. */
+function leasePending(consumer: Consumer): void {
+	for (let candidate = consumer.pending; candidate !== null; candidate = candidate.next)
+		if (candidate.base !== null) lease(candidate);
+}
+
+function unlink(consumer: Consumer, candidate: Candidate): void {
+	let previous: Candidate | null = null;
+	for (let pending = consumer.pending; pending !== null; pending = pending.next) {
+		if (pending === candidate) {
+			if (previous === null) consumer.pending = candidate.next;
+			else previous.next = candidate.next;
+			candidate.next = null;
+			return;
+		}
+		previous = pending;
+	}
+}
 
 /**
  * Hydration registers this as the NativeReadRebase. A consumer whose committed
@@ -82,6 +126,7 @@ export function rebaseNativeRead(notify: () => void, release: NativeReadRelease)
 	if (consumer === undefined) return false;
 	const { historical } = release;
 	const committed = consumer.committed;
+	leasePending(consumer);
 	const subscription = consumer.subscriptions.get(historical);
 	if (
 		committed === null ||
@@ -157,18 +202,21 @@ export function createNativeReadDriver(host: NativeReadHost) {
 
 	function release(candidate: Candidate): void {
 		if (!candidate.active) return;
-		candidate.active = false;
 		const consumer = candidate.consumer;
-		consumer.pending.delete(candidate);
-		for (const source of candidate.reads.keys()) {
-			const subscription = consumer.subscriptions.get(source);
-			if (subscription !== undefined && --subscription.leases === 0) {
-				// Forget it only once stopped: an exhausted native stack can interrupt
-				// the stop, and disposeConsumer then finishes it.
-				subscription.dispose();
-				consumer.subscriptions.delete(source);
+		// First: an exhausted native stack then leaves it as it was, still releasable.
+		unlink(consumer, candidate);
+		candidate.active = false;
+		if (candidate.base === null) {
+			for (const source of candidate.reads.keys()) {
+				const subscription = consumer.subscriptions.get(source);
+				if (subscription !== undefined && --subscription.leases === 0) {
+					// Forget it only once stopped: an exhausted native stack can interrupt
+					// the stop, and disposeConsumer then finishes it.
+					subscription.dispose();
+					consumer.subscriptions.delete(source);
+				}
 			}
-		}
+		} else candidate.base = null;
 		candidate.reads.clear();
 	}
 
@@ -177,8 +225,12 @@ export function createNativeReadDriver(host: NativeReadHost) {
 		consumer.disposed = true;
 		if (consumer.committed !== null) release(consumer.committed);
 		consumer.committed = null;
-		for (const candidate of consumer.pending) release(candidate);
-		consumer.pending.clear();
+		for (let candidate = consumer.pending; candidate !== null;) {
+			const next = candidate.next;
+			release(candidate);
+			candidate = next;
+		}
+		consumer.pending = null;
 		// Only a release the native stack interrupted leaves one behind.
 		for (const subscription of consumer.subscriptions.values()) subscription.dispose();
 		consumer.subscriptions.clear();
@@ -199,7 +251,7 @@ export function createNativeReadDriver(host: NativeReadHost) {
 				},
 				subscriptions: new Map(),
 				committed: null,
-				pending: new Set(),
+				pending: null,
 			};
 			consumers.set(scope, consumer);
 			const owned = consumer;
@@ -212,14 +264,30 @@ export function createNativeReadDriver(host: NativeReadHost) {
 		return consumer;
 	}
 
+	function attempt(consumer: Consumer): Candidate {
+		const base = consumer.committed;
+		const candidate: Candidate = {
+			consumer,
+			reads: new Map(),
+			mixed: false,
+			active: true,
+			base,
+			left: base === null ? 0 : base.reads.size,
+			next: consumer.pending,
+			set: null,
+			index: 0,
+		};
+		return (consumer.pending = candidate);
+	}
+
 	function getCandidate(frame: RenderFrame, scope: Scope): Candidate {
-		const candidates = (frame.candidates ??= new Map());
-		let candidate = candidates.get(scope);
+		const first = frame.candidate;
+		if (first === null) return (frame.candidate = attempt(getConsumer(scope, frame.block!)));
+		if (first.consumer.scope === scope) return first;
+		let candidate = frame.candidates?.get(scope);
 		if (candidate === undefined) {
-			const consumer = getConsumer(scope, frame.block!);
-			candidate = { consumer, reads: new Map(), mixed: false, active: true };
-			consumer.pending.add(candidate);
-			candidates.set(scope, candidate);
+			candidate = attempt(getConsumer(scope, frame.block!));
+			(frame.candidates ??= new Map()).set(scope, candidate);
 		}
 		return candidate;
 	}
@@ -235,6 +303,15 @@ export function createNativeReadDriver(host: NativeReadHost) {
 			if (previous !== version) candidate.mixed = true;
 			return;
 		}
+		const base = candidate.base;
+		if (base !== null) {
+			if (base.reads.has(source)) {
+				candidate.reads.set(source, version);
+				candidate.left--;
+				return;
+			}
+			lease(candidate);
+		}
 		candidate.reads.set(source, version);
 		const consumer = candidate.consumer;
 		const subscription = consumer.subscriptions.get(source);
@@ -248,21 +325,35 @@ export function createNativeReadDriver(host: NativeReadHost) {
 	});
 
 	function put(target: CandidateSet, candidate: Candidate): void {
-		const consumer = candidate.consumer;
-		const previous = target.get(consumer);
-		if (previous !== undefined && previous !== candidate) release(previous);
-		target.set(consumer, candidate);
+		let index = target.length;
+		// A set holds one attempt per consumer: this one takes an earlier one's place.
+		for (let other = candidate.consumer.pending; other !== null; other = other.next) {
+			if (other !== candidate && other.set === target) {
+				index = other.index;
+				release(other);
+				break;
+			}
+		}
+		candidate.set = target;
+		candidate.index = index;
+		target[index] = candidate;
 	}
 
 	function target(capture: object): CandidateSet {
 		let candidates = captures.get(capture);
-		if (candidates === undefined) captures.set(capture, (candidates = new Map()));
+		if (candidates === undefined) captures.set(capture, (candidates = []));
 		return candidates;
 	}
 
-	function validate(candidates: CandidateSet | null | undefined): boolean {
-		if (candidates !== null && candidates !== undefined) {
-			for (const candidate of candidates.values()) {
+	function fail(block: Block, candidate: Candidate, suspended: boolean): void {
+		if (suspended && candidate.active) host.suspended(block, candidate);
+		release(candidate);
+	}
+
+	function validate(candidates: CandidateSet | undefined): boolean {
+		if (candidates !== undefined) {
+			for (let index = 0; index < candidates.length; index++) {
+				const candidate = candidates[index];
 				if (
 					candidate.active &&
 					!candidate.consumer.disposed &&
@@ -274,17 +365,28 @@ export function createNativeReadDriver(host: NativeReadHost) {
 		return true;
 	}
 
-	function accept(candidates: CandidateSet | null | undefined): void {
-		if (candidates === null || candidates === undefined) return;
-		for (const candidate of candidates.values()) {
+	function accept(candidates: CandidateSet): void {
+		for (let index = 0; index < candidates.length; index++) {
+			const candidate = candidates[index];
 			const consumer = candidate.consumer;
 			if (!candidate.active || consumer.disposed) continue;
+			// A committed candidate must not keep its whole capture's attempts alive.
+			candidate.set = null;
 			const previous = consumer.committed;
-			consumer.pending.delete(candidate);
+			unlink(consumer, candidate);
+			leasePending(consumer);
 			consumer.committed = candidate;
+			if (candidate.base !== null) {
+				// It read every committed source and no other, so the committed leases
+				// become its own and the outgoing candidate is simply dropped.
+				if (candidate.left === 0) {
+					candidate.base = null;
+					continue;
+				}
+				lease(candidate);
+			}
 			if (previous !== null) release(previous);
 		}
-		candidates.clear();
 	}
 
 	return {
@@ -294,11 +396,14 @@ export function createNativeReadDriver(host: NativeReadHost) {
 				? (scope: Scope) => {
 						const consumer = consumers.get(scope);
 						if (consumer === undefined || consumer.disposed) return null;
+						const pending = [];
+						for (let candidate = consumer.pending; candidate !== null; candidate = candidate.next)
+							pending.unshift(inspectNativeReadWitness(candidate));
 						return {
 							block: consumer.block,
 							committed:
 								consumer.committed === null ? null : inspectNativeReadWitness(consumer.committed),
-							pending: Array.from(consumer.pending, inspectNativeReadWitness),
+							pending,
 						};
 					}
 				: undefined,
@@ -366,6 +471,7 @@ export function createNativeReadDriver(host: NativeReadHost) {
 			const frame = (frames[depth++] ??= {
 				block: null,
 				collectorToken: -1,
+				candidate: null,
 				candidates: null,
 				invocationData: null,
 				invocation: 0,
@@ -374,6 +480,7 @@ export function createNativeReadDriver(host: NativeReadHost) {
 			});
 			frame.block = block;
 			frame.collectorToken = -1;
+			frame.candidate = null;
 			frame.candidates = null;
 			frame.invocationData = null;
 			frame.invocation = invocations;
@@ -383,7 +490,8 @@ export function createNativeReadDriver(host: NativeReadHost) {
 			// Parameters precede compiler body scopes. Start with the actual Block
 			// owner, and retire prior reads even when this invocation no longer
 			// enters an instrumented body or reads a native source.
-			if (consumers.has(block)) getCandidate(frame, block);
+			const consumer = consumers.get(block);
+			if (consumer !== undefined) frame.candidate = attempt(consumer);
 		},
 		endRender(block: Block, completed: boolean, suspended: boolean): void {
 			// A native stack overflow can stop a descendant's setup or cleanup before
@@ -398,20 +506,24 @@ export function createNativeReadDriver(host: NativeReadHost) {
 				// Restoring this frame's collector token and invocation below also
 				// restores whatever abandoned frames entered. Only their reads remain.
 				for (let above = depth - 1; above > index; above--) {
-					const candidates = frames[above].candidates;
-					if (candidates !== null) for (const candidate of candidates.values()) release(candidate);
+					const abandoned = frames[above];
+					if (abandoned.candidate !== null) release(abandoned.candidate);
+					if (abandoned.candidates !== null)
+						for (const candidate of abandoned.candidates.values()) release(candidate);
 				}
-				if (frame.candidates !== null) {
+				const first = frame.candidate;
+				if (first !== null) {
+					const rest = frame.candidates;
 					if (completed) {
 						const capture = host.capture();
 						if (capture === null) throw new Error(formatClientError(167));
 						const destination = target(capture);
-						for (const candidate of frame.candidates.values()) put(destination, candidate);
+						put(destination, first);
+						if (rest !== null) for (const candidate of rest.values()) put(destination, candidate);
 					} else {
-						for (const candidate of frame.candidates.values()) {
-							if (suspended && candidate.active) host.suspended(block, candidate);
-							release(candidate);
-						}
+						fail(block, first, suspended);
+						if (rest !== null)
+							for (const candidate of rest.values()) fail(block, candidate, suspended);
 					}
 				}
 			} finally {
@@ -420,6 +532,7 @@ export function createNativeReadDriver(host: NativeReadHost) {
 				while (depth > index) {
 					const ended = frames[--depth];
 					ended.block = null;
+					ended.candidate = null;
 					ended.candidates = null;
 					ended.invocationData = null;
 					// A reused frame must not retain a settled capture's commit work.
@@ -479,10 +592,10 @@ export function createNativeReadDriver(host: NativeReadHost) {
 		},
 		acceptCapture(capture: object): boolean {
 			const candidates = captures.get(capture);
-			const native = candidates !== undefined && candidates.size > 0;
+			if (candidates === undefined) return false;
 			captures.delete(capture);
 			accept(candidates);
-			return native;
+			return candidates.length > 0;
 		},
 		spliceCapture(capture: object, parent: object | null): void {
 			const candidates = captures.get(capture);
@@ -490,14 +603,13 @@ export function createNativeReadDriver(host: NativeReadHost) {
 			if (parent === null) throw new Error(formatClientError(169));
 			captures.delete(capture);
 			const destination = target(parent);
-			for (const candidate of candidates.values()) put(destination, candidate);
+			for (let index = 0; index < candidates.length; index++) put(destination, candidates[index]);
 		},
 		discardCapture(capture: object): void {
 			const candidates = captures.get(capture);
 			if (candidates === undefined) return;
 			captures.delete(capture);
-			for (const candidate of candidates.values()) release(candidate);
-			candidates.clear();
+			for (let index = 0; index < candidates.length; index++) release(candidates[index]);
 		},
 	};
 }

@@ -39,6 +39,10 @@ export function ConditionalReader(props: CollectionProps & { enabled: boolean })
 	<p>{props.enabled ? String(props.count$.get()) : 'idle'}</p>
 }
 
+export function PartialReader(props: CollectionProps & { both: boolean }) @{
+	<p>{props.both ? props.count$.get() + ':' + props.body$.get() : String(props.count$.get())}</p>
+}
+
 function SwitchableChild({
 	source$,
 	enabled,
