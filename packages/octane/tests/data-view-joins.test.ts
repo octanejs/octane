@@ -414,6 +414,63 @@ describe('octane/data views with relations', () => {
 		expect(authors(list)).toEqual(['Ada', 'Bea', 'Ada']);
 	});
 
+	it('keeps the record a pending edit points a row at after the view that loaded it is dropped', async () => {
+		const server = chatServer();
+		const store = createDataStore({ transport: server.transport });
+		const list = store.read(inbox, undefined);
+		await ready(list);
+		// Cy is held only because the users view loaded him.
+		const users = store.read(people, undefined);
+		const stop = users.subscribe(() => {});
+		await vi.waitFor(() => expect(users.getSnapshot().status).toBe('ready'));
+
+		server.hold();
+		void store.write(reassign, { id: 'm2', authorId: 'u2' });
+		expect(authors(list)).toEqual(['Ada', 'Brook', 'Cy']);
+		stop();
+		// Past the users view's `keep`.
+		await new Promise((resolve) => setTimeout(resolve, 60));
+		expect(users.getSnapshot().status).toBe('pending');
+
+		receive(store, [{ put: User, value: { id: 'u1', name: 'Bo' } }]);
+		expect(authors(list)).toEqual(['Ada', 'Bo', 'Cy']);
+	});
+
+	it('takes a record that arrives for a row below the window, and shows it when the row moves up', async () => {
+		const server = chatServer();
+		const store = createDataStore({ transport: server.transport });
+		const list = store.read(inbox, undefined);
+		await ready(list);
+		server.log.length = 0;
+
+		// The fifth message points at a user the server lacked; it is held, below the three shown.
+		receive(store, [{ put: User, value: { id: 'u9', name: 'Ines' } }]);
+		receive(store, [
+			{ remove: Message, id: 'm0' },
+			{ remove: Message, id: 'm1' },
+		]);
+		expect(list.getSnapshot().value!.map((row) => row.id)).toEqual(['m2', 'm3', 'm4']);
+		expect(authors(list)).toEqual(['Ada', undefined, 'Ines']);
+		await quiet();
+		expect(server.log).toEqual([]);
+	});
+
+	it('keeps the related records of a seeded view nothing has read yet', async () => {
+		const server = chatServer();
+		const rendering = createDataStore({ transport: server.transport });
+		await rendering.prefetch(inbox, undefined);
+		await rendering.prefetch(people, undefined);
+		const client = createDataStore({ transport: server.transport, seed: rendering.dehydrate() });
+		// Asked for, and so seeded, but not yet read.
+		const list = client.read(inbox, undefined);
+		const stop = client.read(people, undefined).subscribe(() => {});
+		stop();
+		// Past the users view's `keep`: its records go, except those the seeded rows point at.
+		await new Promise((resolve) => setTimeout(resolve, 60));
+
+		expect(authors(list)).toEqual(['Ada', 'Brook', 'Ada']);
+	});
+
 	it('hydrates from a server render with its related records and no request', async () => {
 		const server = chatServer();
 		const rendering = createDataStore({ transport: server.transport });
@@ -448,6 +505,26 @@ describe('octane/data views with relations', () => {
 		const list = offline.read(inbox, undefined);
 		await ready(list);
 		expect(authors(list)).toEqual(['Ada', 'Brook', 'Ada']);
+	});
+
+	it('saves a change to a related record with the view, for the next session', async () => {
+		const storage = memoryStorage();
+		const persist = {
+			storage,
+			partition: 'ada',
+			key: 'a session secret of at least sixteen bytes',
+		};
+		const server = chatServer();
+		const first = createDataStore({ transport: server.transport, persist });
+		await ready(first.read(inbox, undefined));
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		receive(first, [{ put: User, value: { id: 'u0', name: 'Adah' } }]);
+		await new Promise((resolve) => setTimeout(resolve, 20));
+
+		const offline = createDataStore({ transport: () => new Promise(() => {}), persist });
+		const list = offline.read(inbox, undefined);
+		await ready(list);
+		expect(authors(list)).toEqual(['Adah', 'Brook', 'Adah']);
 	});
 
 	it('reads a growing list a page at a time', async () => {

@@ -633,7 +633,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	const selecting = new Map<string, Entry | Set<Entry>>();
 	/**
 	 * The views that show a record through a relation, by the related record's `name\nid`: those
-	 * with a row in their window that points at it, whether or not the store holds that record.
+	 * holding a row that points at it, shown or in the margin, whether or not the store holds
+	 * that record.
 	 */
 	const joining = new Map<string, Entry | Set<Entry>>();
 	/** Each joined row's own record, so a row made of the same objects is shown again as it is. */
@@ -828,6 +829,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		if (old && old.seq > seq) return;
 		table.set(id, { value, seq });
 		reach(entity.name, id);
+		saveJoined(entity.name, id);
 		const moved = old !== undefined || created;
 		for (const entry of viewEntries(entity.name)) {
 			const { rows, start } = entry.span!;
@@ -845,6 +847,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	function dropRecord(name: string, id: string): void {
 		records.get(name)!.delete(id);
 		reach(name, id);
+		saveJoined(name, id);
 		for (const entry of viewEntries(name)) entry.span!.rows.delete(id);
 	}
 
@@ -857,6 +860,12 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		for (const entry of selectors(key)) reached.add(entry);
 		for (const entry of selectors(key, joining)) reached.add(entry);
 		for (const entry of viewEntries(name)) reached.add(entry);
+	}
+
+	/** Save again the views holding a row that points at a record whose confirmed copy changed. */
+	function saveJoined(name: string, id: string): void {
+		if (persisted)
+			for (const entry of selectors(`${name}\n${id}`, joining)) persisted.mark(entry.key);
 	}
 
 	/** Reach the reads an edit can show in. An edit to a record not yet confirmed shows in its entity's lists. */
@@ -913,7 +922,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		}
 	}
 
-	/** List a view in `joining` under the related records its shown rows point at, and no others. */
+	/** List a view in `joining` under the related records the rows it holds point at, and no others. */
 	function point(entry: Entry, related: readonly string[]): void {
 		relist(entry, entry.related, related, joining);
 		entry.related = related;
@@ -958,7 +967,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 						for (const row of entry.span!.rows.values() as Iterable<any>)
 							if (row[key] != null) joined.add(String(row[key]));
 		for (const id of table.keys()) {
-			let kept = joined.has(id);
+			// And while a row an edit has pointed at it is held, which only `joining` knows.
+			let kept = joined.has(id) || joining.has(`${name}\n${id}`);
 			for (const entry of held) if (kept || (kept = entry.span!.rows.has(id))) break;
 			if (!kept) table.delete(id);
 		}
@@ -1019,6 +1029,17 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const rows: unknown[] = [];
 		for (const value of merged.values()) if (inSpan(entry, value)) rows.push(value);
 		rows.sort(compare);
+		if (joins.length > 0) {
+			// Every row the view holds counts, shown or not: a change to a record one points at
+			// reaches the view, and a record that arrives for one is kept for when its row shows.
+			const related: string[] = [];
+			for (const row of rows as any[])
+				for (const [, entity, key] of joins)
+					if (row[key] != null) related.push(`${entity.name}\n${row[key]}`);
+			const listed = entry.related;
+			if (related.length !== listed.length || related.some((key, at) => key !== listed[at]))
+				point(entry, related);
+		}
 		const from = offset - span.start - shift;
 		const short = from < 0 || (span.last !== null && rows.length < from + limit);
 		span.more = rows.length > from + limit || span.last !== null;
@@ -1071,14 +1092,6 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			previous.every((row, index) => sameRow(row, next[index]))
 		)
 			return previous;
-		if (joins.length > 0) {
-			// From here a change to a record these rows point at reaches this view, and no other does.
-			const related: string[] = [];
-			for (const row of next as any[])
-				for (const [, entity, key] of joins)
-					if (row[key] != null) related.push(`${entity.name}\n${row[key]}`);
-			point(entry, related);
-		}
 		return next;
 	}
 

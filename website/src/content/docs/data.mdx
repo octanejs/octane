@@ -848,7 +848,7 @@ exactly as if a view of users had loaded them. So:
   other read of the user, in the same moment and before the reply.
 - A row is the same object until its message or its author changes, so a
   memoized row component re-renders only when its own row did.
-- A change to a user reaches only the views showing a row by that user.
+- A change to a user reaches only the views holding a row by that user.
 - When an edit or a feed event points a row at a record the store does not
   hold, the row shows no related record until the store has it. The view
   loads it once the edit is confirmed. If another view already holds the

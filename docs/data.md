@@ -96,10 +96,11 @@ its own entity's schema. `where` and `order` see the view's own record only.
 - A view's related records are shared records of their own entities. A row
   shows each with outstanding edits applied, and is the same object until its
   record or one of its related records changes. A change to a related record
-  reaches the views with a shown row that points at it. A view reloads once
-  when a shown row points at a record its last load did not cover and the
-  store does not hold, after any edit to that row has settled. A related
-  record is kept while a view holds a row that points at it.
+  reaches the views holding a row that points at it, and is saved with them.
+  A view reloads once when a shown row points at a record its last load did
+  not cover and the store does not hold, after any edit to that row has
+  settled. A related record is kept while a view holds a row that points at
+  it.
 - A seed is adopted when its read is first asked for, and keeps its age
   (`seedAge` adds time spent in a cache).
 - `dispose()` ends one store locally, clears its memory immediately, flushes confirmed saves already queued after persistence has initialized, and preserves durable storage for another window or restart. A store disposed before initialization cancels its pending saves. A later `retire()` can still erase the account cache.
