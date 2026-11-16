@@ -105,6 +105,13 @@ export interface FragmentProps {
 // preserved because the block is never disposed while toggling.
 // ---------------------------------------------------------------------------
 
+/**
+ * Private mode for a host renderer whose own Suspense boundary hid the content
+ * (octane/react): hidden like `'hidden'`, but connected passive effects stay
+ * subscribed, as in a Suspense-hidden primary.
+ */
+export const SUSPENSE_HIDDEN_MODE = 'octane-suspense-hidden';
+
 /** Cold descriptor/dynamic-tag path; direct compiled Activities call activityBlock. */
 export function renderActivityDescriptor(props: any, scope: Scope): void {
 	const block = scope.block;
@@ -370,7 +377,7 @@ function queueActivityDeactivation(state: ActivitySlot, block: Block, commitVers
 		}
 		// Event bodies were published before commit actions drain. Destroy while
 		// the DOM is still connected, then hide the preserved range.
-		deactivateScope(block);
+		deactivateScope(block, !state.keepPassive);
 		if (blockSubtreeDisposed(block) || state.block !== block) return;
 		hideActivityRefs(state);
 		if (blockSubtreeDisposed(block) || state.block !== block) return;
@@ -402,10 +409,11 @@ export function activityBlock(
 			}
 		}
 	}
-	if (mode === 'hidden') ensureActivityVisibilityDriver();
+	const keepPassive = mode === SUSPENSE_HIDDEN_MODE;
+	const wantHidden = keepPassive || mode === 'hidden';
+	if (wantHidden) ensureActivityVisibilityDriver();
 	const parentBlock = parentScope.block;
 	const hydration = hydrating ? CURSOR : null;
-	const wantHidden = mode === 'hidden';
 	let state = parentScope.slots[slotKey] as ActivitySlot | undefined;
 	if (
 		state === undefined &&
@@ -455,6 +463,7 @@ export function activityBlock(
 			__kind: 'activityBlockSlot',
 			block: b,
 			hidden: false,
+			keepPassive,
 			fragmentVisibilityCleanupRegistered: false,
 			commitVersion: 0,
 			deactivationPending: false,
@@ -518,7 +527,7 @@ export function activityBlock(
 	const b = state.block!;
 	const transaction = ROOT_RENDER_TRANSACTION;
 	const queued = transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK;
-	if (queued && state.hidden !== wantHidden) {
+	if (queued && (state.hidden !== wantHidden || state.keepPassive !== keepPassive)) {
 		// A dropped render leaves the Activity as it was: its visibility record,
 		// the Block's inactive flag and its suspense handler come back with it.
 		journalObjectOnce(state);
@@ -539,6 +548,7 @@ export function activityBlock(
 			// hiding the still-connected DOM range.
 			b.inactive = true;
 			state.hidden = true;
+			state.keepPassive = keepPassive;
 			state.deactivationPending = true;
 			setActivitySuspenseHandler(state, true);
 			queueActivityDeactivation(state, b, commitVersion);
@@ -546,7 +556,12 @@ export function activityBlock(
 		} else {
 			// hidden → hidden: prerender (no effects), then hide any new children.
 			// If a prior visible→hidden attempt has not committed yet, replace its
-			// versioned action so the latest render owns the deactivation.
+			// versioned action so the latest render owns the deactivation. Leaving
+			// the Suspense-hidden mode also disconnects the passive effects it kept.
+			if (state.keepPassive !== keepPassive) {
+				if (!keepPassive) state.deactivationPending = true;
+				state.keepPassive = keepPassive;
+			}
 			if (state.deactivationPending) {
 				queueActivityDeactivation(state, b, commitVersion);
 			}

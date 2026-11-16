@@ -1097,6 +1097,8 @@ export interface ActivitySlot {
 	__kind: 'activityBlockSlot';
 	block: Block | null;
 	hidden: boolean;
+	/** Hidden by a host Suspense boundary: connected passive effects stay subscribed. */
+	keepPassive: boolean;
 	/** Hidden-host ownership is released even when a hidden Activity unmounts. */
 	fragmentVisibilityCleanupRegistered: boolean;
 	/** Invalidates a queued visible→hidden commit when a newer render wins. */
