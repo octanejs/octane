@@ -75,6 +75,7 @@ export interface OwnerPort {
 	postMessage(message: unknown): void;
 	addEventListener(type: 'message', listener: (event: { readonly data: unknown }) => void): void;
 	start?(): void;
+	close?(): void;
 }
 
 /** What a replica sends its owner. */
@@ -87,6 +88,8 @@ type ToOwner =
 	| { readonly t: 'hello'; readonly account: string | undefined; readonly identity: string }
 	/** Sign the account out, in every tab. */
 	| { readonly t: 'retire' }
+	/** Drop only this replica; its account and other replicas remain live. */
+	| { readonly t: 'disconnect' }
 	/** Is the account still signed in? Asked by a tab resuming from being frozen. */
 	| { readonly t: 'ping' }
 	/** A call to the account's persistence, which the owner alone writes; `id` 0 wants no answer. */
@@ -181,6 +184,8 @@ type ToReplica =
 export interface DataOwner {
 	/** Serve a replica connected through `port`. */
 	connect(port: OwnerPort): void;
+	/** In explicit-fence mode, activate or revoke an account from trusted host code. */
+	activate(account: string | null): Promise<void>;
 }
 
 interface Upstream {
@@ -196,8 +201,13 @@ interface Upstream {
 export function createDataOwner(options: {
 	readonly transport: Transport;
 	readonly listen?: Listener | undefined;
-	/** Serve only while this owner's account is the origin's, recorded in IndexedDB. */
-	readonly fence?: boolean | undefined;
+	/**
+	 * Serve only while this owner's account is the origin's, recorded in IndexedDB.
+	 * Explicit mode requires the trusted host to authenticate port/account admission and keep
+	 * one owner instance per active grant. A fresh owner can adopt the durable grant when
+	 * replacing a stopped worker.
+	 */
+	readonly fence?: boolean | 'explicit' | undefined;
 	/**
 	 * The signed-in account's encrypted cache and write journal. The owner is
 	 * their only writer, so every tab shares one budget and one journal.
@@ -205,6 +215,14 @@ export function createDataOwner(options: {
 	readonly persist?: ((account: string) => PersistOptions) | undefined;
 }): DataOwner {
 	const { transport, listen, fence } = options;
+	const accountDatabase = fence === 'explicit' ? EXPLICIT_ACCOUNT_DATABASE : ACCOUNT_DATABASE;
+	const accountChannel = fence === 'explicit' ? EXPLICIT_ACCOUNT_CHANNEL : ACCOUNT_CHANNEL;
+	const persistOptions = (account: string, grant: number): PersistOptions => {
+		const configured = options.persist!(account);
+		return fence === 'explicit'
+			? { ...configured, partition: `octane-data-explicit:${grant}:${configured.partition}` }
+			: configured;
+	};
 	/** The replicas of the signed-in account. A replica of a retired one is never served again. */
 	const replicas = new Set<OwnerPort>();
 	/** Reads in flight, by wire key, so equal reads share one request. */
@@ -247,6 +265,19 @@ export function createDataOwner(options: {
 	 * served again, and under any other it is told its account was retired.
 	 */
 	const dropped = new WeakMap<OwnerPort, number>();
+	function disconnect(port: OwnerPort): void {
+		replicas.delete(port);
+		heard.delete(port);
+		dropped.delete(port);
+		for (const upstream of upstreams.values()) {
+			const id = upstream.members.get(port);
+			if (id !== undefined) unsubscribe(port, id);
+		}
+		if (heard.size === 0) {
+			clearHostTimeout(sweeping);
+			sweeping = undefined;
+		}
+	}
 	function sweep(): void {
 		sweeping = undefined;
 		for (const [port, at] of heard) {
@@ -271,7 +302,9 @@ export function createDataOwner(options: {
 	/** The generation this owner serves, and the newest any owner has announced. */
 	let generation = 0;
 	let announced = 0;
-	const channel = fence ? new BroadcastChannel(ACCOUNT_CHANNEL) : null;
+	/** An explicit owner never silently adopts a different grant after it was bound. */
+	let bound: { readonly account: string | null; readonly generation: number } | null = null;
+	const channel = fence ? new BroadcastChannel(accountChannel) : null;
 	if (channel) {
 		channel.onmessage = ({ data }) => {
 			announced = Math.max(announced, data as number);
@@ -300,7 +333,7 @@ export function createDataOwner(options: {
 	function persistenceFor(): Persistence | null {
 		if (!persistence && serving && options.persist) {
 			persistence = createPersistence(
-				options.persist(serving.account ?? ''),
+				persistOptions(serving.account ?? '', generation),
 				(key) => {
 					if (!saves.has(key)) return undefined;
 					const saving = saves.get(key);
@@ -316,6 +349,7 @@ export function createDataOwner(options: {
 		const answer = (value: unknown) => {
 			if (id) post(port, { t: 'persisted', id, value });
 		};
+		if (fence === 'explicit' && op === 'clear') return answer(undefined);
 		const p = persistenceFor();
 		const key = args[0] as string;
 		if (!p) return answer(nothing(op));
@@ -360,9 +394,10 @@ export function createDataOwner(options: {
 	}
 
 	/** Every replica of the account hears it is retired, and nothing in flight reaches one. */
-	function retireAll(): void {
+	function retireAll(): Promise<void> {
 		// Signing out, or another account signing in, leaves nothing of this one on the device.
-		void persistence?.clear().catch(() => {});
+		const clearing = persistence?.clear() ?? Promise.resolve();
+		clearing.catch(() => {});
 		persistence = null;
 		saves.clear();
 		newestSaved.clear();
@@ -379,6 +414,49 @@ export function createDataOwner(options: {
 		newest.clear();
 		for (const port of replicas) port.postMessage(RETIRED);
 		replicas.clear();
+		for (const port of heard.keys()) disconnect(port);
+		return clearing;
+	}
+
+	async function accountRecord(): Promise<
+		{ account: string | null; generation: number; pending?: boolean } | undefined
+	> {
+		const opening = indexedDB.open(accountDatabase, 1);
+		opening.onupgradeneeded = () => opening.result.createObjectStore('account');
+		const database = await settled(opening);
+		try {
+			return await settled(database.transaction('account').objectStore('account').get(0));
+		} finally {
+			database.close();
+		}
+	}
+
+	/** Explicit replicas can only join a grant already activated by trusted owner code. */
+	async function admit(port: OwnerPort, account: string): Promise<void> {
+		await activating;
+		let record: Awaited<ReturnType<typeof accountRecord>>;
+		try {
+			record = await accountRecord();
+		} catch {
+			return port.postMessage(RETIRED);
+		}
+		if (
+			!record ||
+			record.pending ||
+			record.account !== account ||
+			announced > record.generation ||
+			(bound && (bound.account !== account || bound.generation !== record.generation))
+		)
+			return port.postMessage(RETIRED);
+		if (serving && (serving.account !== account || generation !== record.generation))
+			await retireAll();
+		if (announced > record.generation) return port.postMessage(RETIRED);
+		bound ??= { account, generation: record.generation };
+		serving ??= { account, ready: Promise.resolve(record.generation) };
+		generation = record.generation;
+		replicas.add(port);
+		watch(port);
+		port.postMessage({ t: 'live' } satisfies ToReplica);
 	}
 
 	/** Serve `port` as a replica of `account`, signing it in if another account is recorded. */
@@ -425,8 +503,13 @@ export function createDataOwner(options: {
 	 * `signedIn` is still the recorded generation, so a late sign-out never
 	 * undoes a newer sign-in.
 	 */
-	async function decide(account: string | null, signedIn?: number): Promise<number> {
-		const opening = indexedDB.open(ACCOUNT_DATABASE, 1);
+	async function decide(
+		account: string | null,
+		signedIn?: number,
+		activate = false,
+		previous?: (account: string | null) => void,
+	): Promise<number> {
+		const opening = indexedDB.open(accountDatabase, 1);
 		opening.onupgradeneeded = () => opening.result.createObjectStore('account');
 		const database = await settled(opening);
 		try {
@@ -434,13 +517,38 @@ export function createDataOwner(options: {
 			const store = transaction.objectStore('account');
 			const recorded = (await settled(store.get(0))) as
 				{ account: string | null; generation: number } | undefined;
+			previous?.(recorded?.account ?? null);
 			let next = recorded?.generation ?? 0;
 			const changed =
-				account === null ? recorded?.generation === signedIn : recorded?.account !== account;
-			if (changed) store.put({ account, generation: ++next }, 0);
+				activate ||
+				(account === null ? recorded?.generation === signedIn : recorded?.account !== account);
+			if (changed)
+				store.put(
+					activate
+						? { account, generation: ++next, pending: true }
+						: { account, generation: ++next },
+					0,
+				);
 			await done(transaction);
 			if (changed) channel!.postMessage(next);
 			return next;
+		} finally {
+			database.close();
+		}
+	}
+
+	async function finishActivation(account: string | null, signedIn: number): Promise<boolean> {
+		const opening = indexedDB.open(accountDatabase, 1);
+		const database = await settled(opening);
+		try {
+			const transaction = database.transaction('account', 'readwrite');
+			const store = transaction.objectStore('account');
+			const record = await settled(store.get(0));
+			if (record?.account !== account || record.generation !== signedIn || !record.pending)
+				return false;
+			store.put({ account, generation: signedIn }, 0);
+			await done(transaction);
+			return true;
 		} finally {
 			database.close();
 		}
@@ -593,7 +701,39 @@ export function createDataOwner(options: {
 		}
 	}
 
+	let activating: Promise<void> = Promise.resolve();
 	return {
+		activate(account) {
+			if (fence !== 'explicit')
+				return Promise.reject(new Error('octane/data: activate requires an explicit fence'));
+			const activation = activating.then(async () => {
+				let previous: string | null = null;
+				const next = await decide(account, undefined, true, (value) => (previous = value));
+				announced = Math.max(announced, next);
+				try {
+					const prior =
+						serving?.account === previous && generation === next - 1 ? persistence : null;
+					if (serving) await retireAll();
+					if (previous && options.persist && !prior) {
+						await createPersistence(
+							persistOptions(previous, next - 1),
+							() => undefined,
+							() => false,
+						).clear();
+					}
+					if (!(await finishActivation(account, next)) || announced > next)
+						throw new DataRetiredError();
+					bound = { account, generation: next };
+					generation = next;
+					serving = account === null ? null : { account, ready: Promise.resolve(next) };
+				} catch (error) {
+					await decide(null, next);
+					throw error;
+				}
+			});
+			activating = activation.catch(() => {});
+			return activation;
+		},
 		connect(port) {
 			/** A replica is served once its build matches and its account is recorded, in the order it asked. */
 			let joined: Promise<void> | null = null;
@@ -610,7 +750,12 @@ export function createDataOwner(options: {
 				if (message.t === 'request') request(port, message);
 				else if (message.t === 'listen') subscribe(port, message.id, message.request);
 				else if (message.t === 'unlisten') unsubscribe(port, message.id);
-				else if (message.t === 'retire') signOut();
+				else if (message.t === 'retire') {
+					if (fence === 'explicit') {
+						disconnect(port);
+						port.postMessage(RETIRED);
+					} else signOut();
+				} else if (message.t === 'disconnect') disconnect(port);
 				else if (message.t === 'ping') port.postMessage({ t: 'live' } satisfies ToReplica);
 				else if (message.t === 'persist') persist(port, message);
 				else if (message.t !== 'hello') others(port, message);
@@ -621,6 +766,7 @@ export function createDataOwner(options: {
 					// The first build served decides which builds share this owner.
 					identity ??= message.identity;
 					if (message.identity !== identity) joined = Promise.resolve(refuse(port));
+					else if (fence === 'explicit') joined = admit(port, message.account!);
 					else if (fence) joined = join(port, message.account!);
 					else if (serving) {
 						replicas.add(port);
@@ -768,26 +914,31 @@ export function createReplica(
 		{ readonly op: PersistOp; readonly args: readonly unknown[]; resolve(value: any): void }
 	>();
 	let own: Persistence | null = null;
+	let disposed = false;
 	let collect!: Parameters<PersistenceFactory>[0];
 	let inUse!: Parameters<PersistenceFactory>[1];
 	const ownPersistence = () => (own ??= createPersistence(local.persist!, collect, inUse));
 	const persistAsk = (op: PersistOp, args: readonly unknown[]): Promise<any> =>
 		served.then(() =>
-			port
-				? new Promise((resolve) => {
-						const id = ++next;
-						asked.set(id, { op, args, resolve });
-						send({ t: 'persist', id, op, args });
-					})
-				: (ownPersistence() as any)[op](...args),
+			disposed
+				? nothing(op)
+				: port
+					? new Promise((resolve) => {
+							const id = ++next;
+							asked.set(id, { op, args, resolve });
+							send({ t: 'persist', id, op, args });
+						})
+					: (ownPersistence() as any)[op](...args),
 		);
 	const persistTell = (op: PersistOp, args: readonly unknown[]) =>
-		void served.then(() =>
-			port ? send({ t: 'persist', id: 0, op, args }) : (ownPersistence() as any)[op](...args),
-		);
+		void served.then(() => {
+			if (!disposed)
+				port ? send({ t: 'persist', id: 0, op, args }) : (ownPersistence() as any)[op](...args);
+		});
 	const marked = new Set<string>();
 	/** Send what changed once per host task, as a local store saves once per task. */
 	const flush = () => {
+		if (disposed) return marked.clear();
 		const keys = [...marked];
 		marked.clear();
 		for (const key of keys) {
@@ -815,6 +966,7 @@ export function createReplica(
 		return {
 			restore: (key, read) => persistAsk('restore', [key, read]),
 			mark(key) {
+				if (disposed) return;
 				if (marked.size === 0) void served.then(() => postHostTask(flush));
 				marked.add(key);
 			},
@@ -826,6 +978,7 @@ export function createReplica(
 			cursor: (key) => persistAsk('cursor', [key]),
 			keepCursor: (key, cursor) => persistTell('keepCursor', [key, cursor]),
 			forget: (key) => persistAsk('forget', [key]),
+			dispose: () => own?.dispose() ?? Promise.resolve(),
 			clear: () => persistAsk('clear', []),
 		};
 	};
@@ -844,14 +997,33 @@ export function createReplica(
 	// Retiring signs the account out in every tab. Until the owner confirms it, ask again:
 	// a sign-out must not be lost to a busy or restarting owner.
 	const retireHere = store.retire;
+	const disposeHere = store.dispose;
 	let asking: unknown;
 	const signOut = () => {
 		send({ t: 'retire' });
 		asking = setHostTimeout(signOut, SIGN_OUT_RETRY_MS);
 	};
 	store.retire = () => {
+		if (!store.retired) flush();
 		if (port && !store.retired) signOut();
 		return retireHere();
+	};
+	store.dispose = () => {
+		if (store.retired) return disposeHere();
+		flush();
+		disposed = true;
+		send({ t: 'disconnect' });
+		clearHostTimeout(asking);
+		clearHostTimeout(beat);
+		port?.close?.();
+		port = null;
+		decide(false);
+		for (const pending of replies.values()) pending.reject(new DataRetiredError());
+		replies.clear();
+		for (const call of asked.values()) call.resolve(nothing(call.op));
+		asked.clear();
+		for (const feed of feeds.values()) feed.end();
+		return disposeHere();
 	};
 
 	/**
@@ -893,11 +1065,13 @@ export function createReplica(
 
 	/** The account was signed out, or another signed in: nothing more is shown. */
 	function retired() {
+		disposed = true;
+		marked.clear();
 		clearHostTimeout(asking);
 		clearHostTimeout(beat);
 		port = null;
 		decide(false);
-		void retireHere();
+		void disposeHere();
 		for (const pending of replies.values()) pending.reject(new DataRetiredError());
 		replies.clear();
 		for (const call of asked.values()) call.resolve(nothing(call.op));
@@ -1154,7 +1328,7 @@ export function createReplica(
  * and each side checks the other is still there. 4: the owner keeps the
  * account's cache and journal, which tabs reach through `persist`.
  */
-const PROTOCOL = 4;
+const PROTOCOL = 5;
 const RETIRED: ToReplica = { t: 'retired' };
 /** What a persistence call answers when there is nothing: no entries to recover, no cursor, no value. */
 const nothing = (op: PersistOp) => (op === 'recover' ? [] : op === 'cursor' ? null : undefined);
@@ -1182,6 +1356,8 @@ const SIGN_OUT_RETRY_MS = 5_000;
 /** Where fencing owners record the origin's account, and announce a new one. */
 const ACCOUNT_DATABASE = 'octane-data-account';
 const ACCOUNT_CHANNEL = 'octane-data:account';
+const EXPLICIT_ACCOUNT_DATABASE = 'octane-data-account-explicit';
+const EXPLICIT_ACCOUNT_CHANNEL = 'octane-data:account-explicit';
 
 /**
  * Connect to the owner every tab sharing `name` uses, such as the account's
@@ -1205,7 +1381,10 @@ export function sharedOwner(name: string, url: string | URL = DATA_WORKER_PATH):
 
 /** Serve an owner to every tab that connects: what the app's data worker module calls. */
 export function serveDataOwner(options: Parameters<typeof createDataOwner>[0]): DataOwner {
-	const owner = createDataOwner({ ...options, fence: true });
+	const owner = createDataOwner({
+		...options,
+		fence: options.fence === 'explicit' ? 'explicit' : true,
+	});
 	globalThis.addEventListener('connect', (event) =>
 		owner.connect((event as MessageEvent).ports[0]!),
 	);

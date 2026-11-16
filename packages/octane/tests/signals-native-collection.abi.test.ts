@@ -93,6 +93,22 @@ describe('native reads throughout component invocation', () => {
 		expect(subscribers()).toMatchObject({ count: 1, doubled: 1 });
 	});
 
+	it('renders keyless values and follows their changes', () => {
+		const model = state$('collection-abi-keyless');
+		const count$ = model.scope.signal$(null, 1);
+		const label$ = model.scope.derived$(null, () => `count ${count$.get()}`);
+		function Reader({ label }: { label: SignalHandle<string> }) {
+			return client.createElement('p', null, label.get());
+		}
+		rendered = mount(Reader, { label: label$ });
+		const host = rendered.find('p');
+		expect(host.textContent).toBe('count 1');
+		client.flushSync(() => count$.set(2));
+		expect(host.textContent).toBe('count 2');
+		client.flushSync(() => count$.set(3));
+		expect(host.textContent).toBe('count 3');
+	});
+
 	it('updates ordinary components that return a previously constructed element', () => {
 		const model = state$('collection-abi-indirect');
 		function Reader({ count$ }: { count$: SignalHandle<number> }) {

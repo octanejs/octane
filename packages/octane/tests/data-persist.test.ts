@@ -30,6 +30,7 @@ import {
 	type PersistentStorage,
 	type ReadHandle,
 	type StandardSchema,
+	type Transport,
 } from '../src/data/index.js';
 
 interface Book {
@@ -208,10 +209,126 @@ async function value<T>(store: ReturnType<typeof createDataStore>, contract: any
 
 afterEach(() => {
 	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
 	vi.useRealTimers();
 });
 
 describe('octane/data persistent cache', () => {
+	it('keeps a confirmed read on an immediate dispose and reopen', async () => {
+		const storage = memoryStorage();
+		const before = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada'),
+		});
+		await before.prefetch(shelf, undefined);
+		await before.publish(shelf, undefined, books());
+		await before.dispose();
+		const offline: Transport = () => Promise.reject(new Error('unsaved value'));
+		const after = createDataStore({ transport: offline, persist: cache(storage, 'ada') });
+		expect((await value<Book[]>(after, shelf)).value).toHaveLength(3);
+	});
+
+	it('keeps every confirmed read when disposal interrupts an encrypted save', async () => {
+		const storage = memoryStorage();
+		const second = read({
+			name: 'second',
+			output: schema<number>((v) => typeof v === 'number'),
+			fresh: 60_000,
+		});
+		const later = read({ name: 'later', output: second.output, fresh: 60_000 });
+		const before = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada', { budget: 4096 }),
+		});
+		const entered = Promise.withResolvers<void>();
+		const release = Promise.withResolvers<void>();
+		const encrypt = crypto.subtle.encrypt.bind(crypto.subtle);
+		vi.spyOn(crypto.subtle, 'encrypt').mockImplementationOnce(async (...args) => {
+			entered.resolve();
+			await release.promise;
+			return encrypt(...args);
+		});
+		await Promise.all([
+			before.publish(shelf, undefined, books()),
+			before.publish(second, undefined, 7),
+		]);
+		await entered.promise;
+		await before.publish(later, undefined, 11);
+		const disposed = before.dispose();
+		release.resolve();
+		await disposed;
+		const offline: Transport = () => Promise.reject(new Error('confirmed read was not saved'));
+		const after = createDataStore({ transport: offline, persist: cache(storage, 'ada') });
+		expect((await value<Book[]>(after, shelf)).value).toHaveLength(3);
+		expect((await value<number>(after, second)).value).toBe(7);
+		expect((await value<number>(after, later)).value).toBe(11);
+	});
+
+	it('leaves an older cache entry alone when a disposed read does not persist', async () => {
+		const storage = memoryStorage();
+		const first = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada'),
+		});
+		await value<Book[]>(first, shelf);
+		await first.dispose();
+		const privateShelf = read({ name: 'shelf', output: bookList, persist: false, fresh: 60_000 });
+		const second = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada'),
+		});
+		await saved();
+		await second.publish(privateShelf, undefined, []);
+		await second.dispose();
+		const offline: Transport = () => Promise.reject(new Error('cache entry was deleted'));
+		const after = createDataStore({ transport: offline, persist: cache(storage, 'ada') });
+		expect((await value<Book[]>(after, shelf)).value).toHaveLength(3);
+	});
+
+	it('disposes one store without erasing another window’s saved account cache', async () => {
+		const storage = memoryStorage();
+		const first = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada'),
+		});
+		const second = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada'),
+		});
+		const shown = await value<Book[]>(second, shelf);
+		await saved();
+		await first.dispose();
+		expect(first.retired).toBe(true);
+		const offline: Transport = () => Promise.reject(new Error('cache was erased'));
+		const restarted = createDataStore({ transport: offline, persist: cache(storage, 'ada') });
+		expect((await value<Book[]>(restarted, shelf)).value).toEqual(shown.value);
+
+		// An actual account retirement still erases the partition.
+		await second.retire();
+		const next = server(books());
+		await value<Book[]>(
+			createDataStore({ transport: next.transport, persist: cache(storage, 'ada') }),
+			shelf,
+		);
+		expect(next.log).toEqual(['read shelf']);
+	});
+
+	it('does not wait for device quota hints when the persistence budget is fixed', async () => {
+		const estimate = vi.fn(() => new Promise(() => {}));
+		vi.stubGlobal('navigator', { storage: { estimate } });
+		const remote = server(books());
+		const store = createDataStore({
+			transport: remote.transport,
+			persist: cache(memoryStorage(), 'ada', { budget: 4096 }),
+		});
+		const handle = store.read(shelf);
+		const stop = handle.subscribe(() => {});
+		await vi.waitFor(() => expect(handle.getSnapshot().status).toBe('ready'), { timeout: 250 });
+		expect(estimate).not.toHaveBeenCalled();
+		stop();
+		vi.unstubAllGlobals();
+	});
+
 	it('starts a fresh value from storage without loading it again', async () => {
 		const storage = memoryStorage();
 		const first = server(books());

@@ -254,6 +254,7 @@ type ServerErrorArguments = {
 	359: [];
 	360: [];
 	361: [];
+	363: [];
 };
 
 export function formatServerError<Code extends keyof ServerErrorArguments>(
@@ -1046,6 +1047,8 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 					'This container already has a behavior root; pass replace: true to replace it.',
 					args,
 				);
+			case 363:
+				return formatDevErrorMessage('A signal effect must be a function.', args);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

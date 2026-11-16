@@ -134,6 +134,42 @@ describe('scoped promise resources', () => {
 		expect(() => card$.latest(null)).toThrow(ScopeDisposedError);
 	});
 
+	it("rejects a retiring owner's derived value that another owner recomputes during cancellation", () => {
+		const shared = owner('retiring-derived-source');
+		const data = owner('retiring-derived-data');
+		const view = owner('retiring-derived-view');
+		// The retiring owner's derived value reads only another owner's value, so
+		// computing it again during cancellation succeeds.
+		const value$ = shared.signal$('value', 1);
+		const doubled$ = data.derived$('doubled', () => value$.get() * 2);
+		const card$ = view.derived$('card', () => doubled$.get() + 1);
+		const observed: unknown[] = [];
+		const load = query('retiring-derived-observer', (_argument: undefined, { signal }) => {
+			signal.addEventListener('abort', () => {
+				for (const read of [() => card$.get(), () => doubled$.get()]) {
+					try {
+						observed.push(read());
+					} catch (error) {
+						observed.push(error);
+					}
+				}
+			});
+			return new Promise<void>(() => {});
+		});
+		createResource(data, 'work', () => load(undefined));
+		// Computed twice, so both hold plain values.
+		expect(card$.get()).toBe(3);
+		value$.set(2);
+		expect(card$.get()).toBe(5);
+
+		shared.batch(() => {
+			value$.set(3);
+			data.dispose();
+		});
+
+		expect(observed).toEqual([expect.any(ScopeDisposedError), expect.any(ScopeDisposedError)]);
+	});
+
 	it('preserves a nested retry started by cancellation without orphaning its producer', async () => {
 		const scope = owner('retry-in-abort');
 		const attempts: { signal: AbortSignal; completion: Deferred<string> }[] = [];

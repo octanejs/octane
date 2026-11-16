@@ -2,12 +2,19 @@ import { hasOwnProp } from '../has-own.js';
 import { hydrating } from '../hydration-flag.js';
 import { __ownedHydrationInputs } from '../hydration-inputs.js';
 import { ScopeImpl } from './engine.js';
-import { REACTIVE_DIRTY, REACTIVE_NONE, REACTIVE_PENDING } from './graph-flags.js';
+import {
+	REACTIVE_DIRTY,
+	REACTIVE_NONE,
+	REACTIVE_PENDING,
+	REACTIVE_RECURSED_CHECK,
+} from './graph-flags.js';
 import {
 	hasScopedNodeBrand,
 	originalScopedNodeGet,
 	originalScopedNodeStateGetter,
 	ScopedNode,
+	scopedNodePendingSlot,
+	scopedNodeStoredState,
 } from './graph.js';
 import { RequestEntry, ResourceBinding } from './requests.js';
 import { pendingWorld } from './transition-state.js';
@@ -39,11 +46,11 @@ function nativeSource(value: unknown): value is ScopedNode {
 	return (
 		typeof flags === 'number' &&
 		flags !== REACTIVE_NONE &&
-		(flags & (REACTIVE_DIRTY | REACTIVE_PENDING)) === 0 &&
+		// Being computed is marked by RECURSED_CHECK.
+		(flags & (REACTIVE_DIRTY | REACTIVE_PENDING | REACTIVE_RECURSED_CHECK)) === 0 &&
 		ownValue(value, 'kind') === 'async' &&
 		ownValue(value, 'valueOnly') === false &&
-		ownValue(value, 'evaluating') === false &&
-		ownValue(value, 'pending') === undefined
+		scopedNodePendingSlot(value) === undefined
 	);
 }
 
@@ -94,7 +101,7 @@ function matches(input: QueryInput, source: unknown, allowSettled: boolean): boo
 	}
 	if (ownValue(binding, 'describedAttempt') !== currentAttempt) return false;
 
-	const state = ownValue(source, 'storedState');
+	const state = scopedNodeStoredState(source as ScopedNode);
 	if (!object(state)) return false;
 	const snapshot = ownValue(state, 'snapshot');
 	if (!object(snapshot)) return false;

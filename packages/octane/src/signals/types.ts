@@ -203,15 +203,32 @@ export interface Scope {
 	readonly scopeKey: string;
 	readonly epoch: number;
 	readonly retired: boolean;
-	signal$<T>(key: string, initial: T): WritableSignal<T>;
+	/**
+	 * A writable signal under `key`. With a `null` key it is keyless: nothing
+	 * serializes, inspects or reseeds it, a transition does not stage its writes,
+	 * and it takes no room in the scope's key table.
+	 */
+	signal$<T>(key: string | null, initial: T): WritableSignal<T>;
+	/**
+	 * A derived value under `key`. With a `null` key it is keyless: it belongs to
+	 * no scope, keeps no provenance, and is never serialized, inspected, reseeded
+	 * or staged by a transition.
+	 */
 	derived$<T>(
-		key: string,
+		key: string | null,
 		compute: (() => T) & (T extends PromiseLike<unknown> ? never : unknown),
 	): DerivedSignal<T>;
 	get<T>(handle$: SignalHandle<T>): T;
 	set<T>(handle$: WritableSignal<T>, value: T | ((previous: T) => T)): void;
 	isPending(read: () => unknown): boolean;
 	batch<T>(write: () => T): T;
+	/**
+	 * Run `run` now and again whenever a signal it read changes, after the batch
+	 * that changed it. A function it returns is called before its next run and
+	 * when the effect stops. Returns a function that stops it; the scope stops it
+	 * when it retires.
+	 */
+	effect(run: () => void | (() => void)): () => void;
 	action<F extends (...args: any[]) => any>(write: F): F;
 	serialize(): ScopeSeed;
 	beginAdoption(seed: ScopeSeed): AdoptionFrame;
@@ -227,7 +244,7 @@ export interface Scope {
  */
 export type OwnerScope = Omit<
 	Scope,
-	'derived$' | 'get' | 'set' | 'isPending' | 'batch' | 'action' | 'serialize' | 'inspect'
+	'derived$' | 'get' | 'set' | 'isPending' | 'batch' | 'effect' | 'action' | 'serialize' | 'inspect'
 >;
 
 export interface OwnerBoundSignal<T> extends SignalHandle<T> {
