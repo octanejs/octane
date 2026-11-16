@@ -70,6 +70,7 @@ import {
 	createRoot as createOctaneRoot,
 	hydrateRoot as hydrateOctaneRoot,
 	flushSync as octaneFlushSync,
+	use as octaneUse,
 	type ComponentBody,
 	type Context as OctaneContext,
 	type Root as OctaneRoot,
@@ -184,25 +185,36 @@ const hostedRefDriver: Parameters<typeof installHostedRefDriver>[0] = {
 	},
 };
 
-/**
- * Private hosted-root envelope. A plain function is a valid Octane component
- * body ("a component is any function"): it binds the owner bridge to the root,
- * then renders the transported child as an ordinary value-position component,
- * so the child itself stays an unmodified compiled Octane component.
- */
-function hostedRootEnvelope(props: {
+interface EnvelopeProps {
 	body: ComponentBody;
 	bodyProps: unknown;
 	bodyKey: string | null;
 	mode: Visibility;
-}): unknown {
-	bindRendererRegionOwner(props);
+}
+
+function sameIdentity(a: TransportedChild, b: TransportedChild): boolean {
+	return a.type === b.type && a.key === b.key;
+}
+
+/** The transported child as an ordinary value-position Octane element. */
+function transportedElement(props: EnvelopeProps): unknown {
 	// The transported key rides the octane element so a key change replaces the
 	// island subtree (octane's keyed identity semantics), never updates in place.
 	const config =
 		props.bodyKey === null
 			? props.bodyProps
 			: { ...(props.bodyProps as object), key: props.bodyKey };
+	return createElementFromConfig(undefined, props.body, config as never);
+}
+
+/**
+ * Private hosted-root envelope. A plain function is a valid Octane component
+ * body ("a component is any function"): it binds the owner bridge to the root,
+ * then renders the transported child as an ordinary value-position component,
+ * so the child itself stays an unmodified compiled Octane component.
+ */
+function hostedRootEnvelope(props: EnvelopeProps): unknown {
+	bindRendererRegionOwner(props);
 	// Octane's own Activity carries a React Activity or Suspense hide into the
 	// island: it disconnects effects, refs, and store subscriptions (a Suspense
 	// hide keeps passive effects) while keeping state and DOM.
@@ -211,8 +223,31 @@ function hostedRootEnvelope(props: {
 	return createElementFromConfig(undefined, Activity, {
 		// The Suspense-hidden mode is private to this envelope, not public API.
 		mode: props.mode as 'hidden',
-		children: createElementFromConfig(undefined, props.body, config as never),
+		children: transportedElement(props),
 	});
+}
+
+/** A stage-local context whose value only React's committed render can supply. */
+const STAGE_UNRESOLVED = {};
+
+function StageReady(props: { marker: Promise<void> }): null {
+	octaneUse(props.marker);
+	return null;
+}
+
+/**
+ * A staged dry run renders the child, then a sentinel that always suspends on
+ * a fresh, already-resolved marker. The root attempt therefore rolls back: no
+ * DOM lands and no effect runs. Octane suspends once for every sibling of a
+ * stratum, so the marker alone means the child rendered without suspending,
+ * and a joined suspension retries once the child's own work settles.
+ */
+function stagedRootEnvelope(props: EnvelopeProps & { marker: Promise<void> }): unknown {
+	bindRendererRegionOwner(props);
+	return [
+		transportedElement(props),
+		createElementFromConfig(undefined, StageReady, { marker: props.marker }),
+	];
 }
 
 function reportHostedFault(error: unknown): void {
@@ -235,6 +270,138 @@ function shallowEqualProps(a: Record<string, unknown>, b: Record<string, unknown
 		}
 	}
 	return true;
+}
+
+/**
+ * #2947: a new component type or key that arrives while the island is pending
+ * supersedes the old attempt without unmounting React's fallback. The wrapper
+ * suspends on this stage instead of the old relay, and the stage dry-runs the
+ * new child in a detached root until it renders without suspending. React then
+ * commits the new identity, and only that commit replaces the hosted child and
+ * retires the old episode. An aborted React render leaves just a dry run.
+ */
+class StagedIsland {
+	active = true;
+	readonly resourceHints = reactResourceHints;
+	status: 0 | 1 | 2 = 1; // ready, pending, error
+	payload: unknown; // relay promise, then null or the error
+	private resolve!: () => void;
+	private root: OctaneRoot | null = null;
+	private marker: Promise<void> | null = null;
+	private disposers = new Set<() => void>();
+
+	constructor(
+		private owner: HostedIslandController,
+		readonly child: TransportedChild,
+	) {
+		this.payload = new Promise<void>((done) => {
+			this.resolve = done;
+		});
+		// Dry runs never run inside React's render.
+		queueMicrotask(() => this.attempt());
+	}
+
+	/**
+	 * Stage-local React context mirrors, so a dry run never touches the live
+	 * island's registry. A value the host Fiber cannot supply counts as ready:
+	 * the committed root completes the §6.3 handshake before paint.
+	 */
+	private contexts = new Map<object, { mirror: OctaneContext<unknown>; value: unknown }>();
+
+	readContext<T>(context: OctaneContext<T>): T {
+		for (const entry of this.contexts.values()) {
+			if (entry.mirror !== context) continue;
+			if (entry.value === STAGE_UNRESOLVED) throw createHostContextRequest(this.marker!);
+			return entry.value as T;
+		}
+		return context.defaultValue;
+	}
+
+	resolveForeignContext(foreign: object): OctaneContext<any> | null {
+		if ((foreign as { $$typeof?: unknown }).$$typeof !== REACT_CONTEXT_TAG) return null;
+		let entry = this.contexts.get(foreign);
+		if (entry === undefined) {
+			const host = this.owner.host;
+			const boot = host === null ? null : readNearestProviderValue(host, foreign);
+			entry = {
+				mirror: createOctaneContext<unknown>(undefined),
+				value: boot?.found ? boot.value : STAGE_UNRESOLVED,
+			};
+			this.contexts.set(foreign, entry);
+		}
+		return entry.mirror;
+	}
+
+	routeError(error: unknown): boolean {
+		if (!this.active) return false;
+		this.settle(2, error);
+		return true;
+	}
+
+	routeSuspense(thenable: PromiseLike<unknown>): boolean {
+		if (!this.active) return false;
+		if (thenable === this.marker) {
+			this.settle(0, null);
+		} else {
+			const retry = () => this.attempt();
+			thenable.then(retry, retry);
+		}
+		return true;
+	}
+
+	registerDispose(dispose: () => void): () => void {
+		this.disposers.add(dispose);
+		return () => this.disposers.delete(dispose);
+	}
+
+	/** Retire the stage. Resolving wakes a React render still waiting on it. */
+	dispose(): void {
+		if (!this.active) return;
+		try {
+			const disposers = [...this.disposers];
+			this.disposers.clear();
+			for (const dispose of disposers) dispose();
+		} finally {
+			this.active = false;
+			this.root = null;
+			this.resolve();
+		}
+	}
+
+	private settle(status: 0 | 2, payload: unknown): void {
+		if (this.status !== 1) return;
+		this.status = status;
+		this.payload = payload;
+	}
+
+	private attempt(): void {
+		const host = this.owner.host;
+		if (this.status !== 1 || !this.owner.isStaging(this) || host === null) return;
+		if (this.root === null || this.disposers.size === 0) {
+			this.root = createOctaneRoot(host.ownerDocument.createElement(host.localName));
+		}
+		const root = this.root;
+		const props: Record<string, unknown> = {
+			body: this.child.type,
+			bodyProps: this.child.props,
+			bodyKey: this.child.key,
+			mode: 'visible',
+			marker: (this.marker = Promise.resolve()),
+		};
+		Object.defineProperty(props, RENDERER_REGION_OWNER, { value: this, enumerable: false });
+		try {
+			octaneFlushSync(() => root.render(stagedRootEnvelope as unknown as ComponentBody, props));
+		} catch (error) {
+			this.settle(2, error);
+		}
+		if (this.status !== 1) {
+			try {
+				this.dispose();
+			} catch (error) {
+				reportHostedFault(error);
+			}
+		}
+	}
 }
 
 /**
@@ -263,6 +430,7 @@ class HostedIslandController {
 	private identifierPrefix = '';
 	private committed: TransportedChild | null = null;
 	private episode: PendingEpisode | null = null;
+	private staged: StagedIsland | null = null;
 	private disposers = new Map<() => void, Block>();
 	/** Exact roots marked during the current insertion cleanup, including late registrations. */
 	private retiringRoots: Block[] | null = null;
@@ -344,6 +512,26 @@ class HostedIslandController {
 		(entry.settle ??= []).push(settle);
 		this.contextRequests.add(request);
 		throw createHostContextRequest(request);
+	}
+
+	isStaging(stage: StagedIsland): boolean {
+		return this.staged === stage && this.lifecycleGeneration > 0 && !this.disposed;
+	}
+
+	/**
+	 * Render-phase: the stage a pending island waits on for a newly selected
+	 * child identity, or null when the ordinary commit path applies.
+	 */
+	stage(child: TransportedChild): StagedIsland | null {
+		const staged = this.staged;
+		if (staged !== null && sameIdentity(staged.child, child)) return staged;
+		// Any other render abandons the stage: it stops dry-running.
+		this.retireStage();
+		const committed = this.committed;
+		// A ready island takes a new identity through the ordinary commit.
+		if (committed === null || this.disposed || this.status === 0) return null;
+		if (sameIdentity(committed, child)) return null;
+		return (this.staged = new StagedIsland(this, child));
 	}
 
 	routeError(error: unknown): boolean {
@@ -498,8 +686,16 @@ class HostedIslandController {
 		// A child identity/key change replaces the island — and resets context
 		// discovery associated with the former tree (§10): the registry is
 		// monotonic only within one child identity.
-		if (previous !== null && (previous.type !== child.type || previous.key !== child.key)) {
+		if (previous !== null && !sameIdentity(previous, child)) {
 			this.entries = [];
+			// React committed the new identity: retire the stage and the old
+			// episode, so a late settlement neither retries nor reports.
+			this.retireStage();
+			const episode = this.episode;
+			this.episode = null;
+			this.status = 0;
+			this.payload = null;
+			episode?.resolve();
 		}
 		const contextsChanged = this.publishSnapshots(snapshot);
 		const needsContextRetry = this.pendingContextRetry;
@@ -517,8 +713,7 @@ class HostedIslandController {
 			this.status === 0 &&
 			this.episode === null &&
 			previous !== null &&
-			previous.type === child.type &&
-			previous.key === child.key &&
+			sameIdentity(previous, child) &&
 			shallowEqualProps(previous.props, child.props)
 		) {
 			return;
@@ -589,8 +784,15 @@ class HostedIslandController {
 		};
 	}
 
+	private retireStage(): void {
+		const staged = this.staged;
+		this.staged = null;
+		staged?.dispose();
+	}
+
 	private dispose(): void {
 		if (this.disposed) return;
+		this.retireStage();
 		// `disposed` makes routeError/routeSuspense decline, while the bridge
 		// stays ACTIVE until Octane teardown finishes (§5 rule 8) so the
 		// runtime's teardown routing still consults it.
@@ -716,8 +918,10 @@ function createOctaneCompat(host: 'div' | 'span') {
 		// the hosted server renderer for hydration parity.
 		const identifierPrefix = React.useId();
 
-		if (controller.status === 2) throw controller.payload;
-		if (controller.status === 1) React.use(controller.payload as Promise<void>);
+		// A new identity while pending waits on its own stage, not the old relay.
+		const gate = controller.stage(child) ?? controller;
+		if (gate.status === 2) throw gate.payload;
+		if (gate.status === 1) React.use(gate.payload as Promise<void>);
 
 		const [hostRef] = React.useState(() => (node: HTMLElement | null) => {
 			if (node !== null) controller.hostAttached(node);

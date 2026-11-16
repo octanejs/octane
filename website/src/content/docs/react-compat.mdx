@@ -292,11 +292,15 @@ When React removes an `OctaneCompat` host, it takes the host out of the DOM
 during the commit. Octane disposes the hosted root afterward, so its ref and
 effect cleanups can run after the surrounding React unmount call returns.
 
-While React Suspense shows the fallback for an `OctaneCompat` island, changes to
-the child of the same host wait for the current suspension to settle. Change the
-React `key` on `OctaneCompat` itself to start a replacement without waiting for
-that work. This creates a new hosted root and resets the island's local state.
-If the replacement suspends, React shows the fallback until it is ready.
+While React Suspense shows the fallback for an `OctaneCompat` island, a new
+component type or child key on the same host replaces the pending child, as a
+`React.lazy` swap does. The replacement starts loading at once and the same
+fallback stays up until it is ready. The superseded work is dropped: it does not
+retry, reveal, or report a rejection. Its effects never run, because Octane
+commits the replacement only after React commits it. New props or context for
+the same component still wait for the current suspension and are published on
+reveal. Change the React `key` on `OctaneCompat` itself to start over with a
+new hosted root and reset the island's local state.
 
 ```tsx
 <Suspense fallback={<p>Loading panel…</p>}>
