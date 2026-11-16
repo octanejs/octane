@@ -60,6 +60,10 @@ function imported(checker: ts.TypeChecker, node: ts.Node, defaultMember = false)
 		return { name, module: imp.moduleSpecifier.text };
 }
 
+function isReactWrapper(name: string) {
+	return name === 'Fragment' || name === 'Suspense' || name === 'StrictMode';
+}
+
 function closedReactReceiver(receiver: ts.Identifier, uses: ReturnType<typeof localUses>) {
 	return uses(receiver).every((ref) => {
 		if (ts.isImportClause(ref.parent) || ts.isNamespaceImport(ref.parent) || inTypeNode(ref))
@@ -73,9 +77,7 @@ function closedReactReceiver(receiver: ts.Identifier, uses: ReturnType<typeof lo
 				ts.isJsxClosingElement(parent) ||
 				ts.isJsxSelfClosingElement(parent)) &&
 				parent.tagName === member &&
-				(member.name.text === 'Fragment' ||
-					member.name.text === 'Suspense' ||
-					member.name.text === 'StrictMode')) ||
+				isReactWrapper(member.name.text)) ||
 			(ts.isCallExpression(parent) &&
 				parent.expression === member &&
 				member.name.text !== 'default')
@@ -752,23 +754,24 @@ export function retainedReactElementReturns(file: string, source: string) {
 	return edges;
 }
 
-/** Existing Octane roots that render a directly imported component body. */
-export function octaneRootComponents(file: string, source: string) {
-	const { sf, checker } = bind(file, source);
-	const edges: {
-		runtime: 'octane' | 'octane/server';
-		module: string;
-		name: string;
-		line: number;
-	}[] = [];
+/** Direct createRoot handles and hydrateRoot calls with verified import provenance. */
+function clientRootArgument(
+	{ sf, checker }: ReturnType<typeof bind>,
+	source: string,
+	runtime: 'octane' | 'react-dom/client',
+) {
 	let uses: ReturnType<typeof localUses> | undefined;
-	function clientComponent(call: ts.CallExpression, callee: ts.Expression, hydrate: boolean) {
-		if (hydrate && call.arguments.length <= 4) return call.arguments[1];
+	return (call: ts.CallExpression, callee: ts.Expression) => {
+		const entry = imported(checker, callee);
+		if (entry?.module === runtime && entry.name === 'hydrateRoot') {
+			const maxArgs = runtime === 'octane' ? 4 : 3;
+			if (call.arguments.length <= maxArgs) return call.arguments[1];
+		}
 		if (
 			!ts.isPropertyAccessExpression(callee) ||
 			ts.isOptionalChain(callee) ||
 			callee.name.text !== 'render' ||
-			call.arguments.length > 2
+			call.arguments.length > (runtime === 'octane' ? 2 : 1)
 		)
 			return;
 		const receiver = skipWrappers(callee.expression);
@@ -799,7 +802,7 @@ export function octaneRootComponents(file: string, source: string) {
 		)
 			return;
 		const factory = imported(checker, skipWrappers(root.expression));
-		if (factory?.module !== 'octane' || factory.name !== 'createRoot') return;
+		if (factory?.module !== runtime || factory.name !== 'createRoot') return;
 		if (handle) {
 			if ((source.includes('eval') || source.includes('\\u')) && hasEval(sf)) return;
 			const rootScope = (node: ts.Node) => ts.isFunctionLike(node) || ts.isClassLike(node);
@@ -808,7 +811,20 @@ export function octaneRootComponents(file: string, source: string) {
 			if (rootHandleEscapes(refs, (ref) => ts.findAncestor(ref, rootScope) === owner)) return;
 		}
 		return call.arguments[0];
-	}
+	};
+}
+
+/** Existing Octane roots that render a directly imported component body. */
+export function octaneRootComponents(file: string, source: string) {
+	const bound = bind(file, source);
+	const { sf, checker } = bound;
+	const edges: {
+		runtime: 'octane' | 'octane/server';
+		module: string;
+		name: string;
+		line: number;
+	}[] = [];
+	const clientArgument = clientRootArgument(bound, source, 'octane');
 	function visit(node: ts.Node) {
 		if (
 			ts.isCallExpression(node) &&
@@ -822,7 +838,7 @@ export function octaneRootComponents(file: string, source: string) {
 				? node.arguments.length <= 3 &&
 					(entry.name === 'renderToString' || entry.name === 'renderToStaticMarkup') &&
 					node.arguments[0]
-				: clientComponent(node, callee, entry?.module === 'octane' && entry.name === 'hydrateRoot');
+				: clientArgument(node, callee);
 			const leaf = value ? imported(checker, skipWrappers(value)) : undefined;
 			if (leaf?.module.startsWith('.') && /\.[jt]sx$/.test(leaf.module))
 				edges.push({
@@ -830,6 +846,97 @@ export function octaneRootComponents(file: string, source: string) {
 					runtime: server ? 'octane/server' : 'octane',
 					line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1,
 				});
+		}
+		ts.forEachChild(node, visit);
+	}
+	visit(sf);
+	return edges;
+}
+
+/** Retained React DOM client roots that render a directly imported React element. */
+export function reactClientComponents(
+	file: string,
+	source: string,
+	original: (module: 'react' | 'react/jsx-runtime') => boolean,
+) {
+	const bound = bind(file, source);
+	const { sf, checker } = bound;
+	const clientArgument = clientRootArgument(bound, source, 'react-dom/client');
+	const edges: { module: string; name: string; line: number }[] = [];
+	let reactJsx: boolean | undefined;
+	let reactModule: boolean | undefined;
+	let singleReactImport: boolean | undefined;
+	let uses: ReturnType<typeof localUses> | undefined;
+	const isReact = () => (reactModule ??= original('react'));
+	function builtin(tag: ts.Node) {
+		const entry = imported(checker, tag, true);
+		if (
+			entry?.module !== 'react' ||
+			!isReactWrapper(entry.name) ||
+			!isReact() ||
+			!(singleReactImport ??= !hasEval(sf) && hasSingleReactImport(sf, source))
+		)
+			return false;
+		if (ts.isPropertyAccessExpression(tag))
+			return (
+				ts.isIdentifier(tag.expression) &&
+				soleReactReceiver(checker, tag.expression) &&
+				closedReactReceiver(tag.expression, (uses ??= localUses(sf, checker)))
+			);
+		if (!ts.isIdentifier(tag)) return false;
+		const declaration = checker.getSymbolAtLocation(tag)?.declarations?.[0];
+		// A CJS React member can be mutated through a default import from the same clause.
+		return (
+			!!declaration &&
+			ts.isImportSpecifier(declaration) &&
+			!declaration.parent.parent.name &&
+			!declaration.parent.elements.some(
+				(item) => !item.isTypeOnly && (item.propertyName ?? item.name).text === 'default',
+			)
+		);
+	}
+	function rendered(expression: ts.Node, line: number) {
+		const value = ts.isExpression(expression) ? skipWrappers(expression) : expression;
+		let ref: ts.Node | undefined;
+		if (ts.isJsxExpression(value) && value.expression && !value.dotDotDotToken) {
+			rendered(value.expression, line);
+			return;
+		}
+		if (ts.isJsxFragment(value) || ts.isJsxElement(value) || ts.isJsxSelfClosingElement(value)) {
+			if (!(reactJsx ??= ordinaryReactJsx(source) && original('react/jsx-runtime'))) return;
+			if (
+				ts.isJsxFragment(value) ||
+				(ts.isJsxElement(value) && builtin(value.openingElement.tagName))
+			) {
+				for (const child of value.children) rendered(child, line);
+				return;
+			}
+			const { tagName } = openingTag(value);
+			if (!ts.isIdentifier(tagName) || /^[A-Z]/.test(tagName.text)) ref = tagName;
+		} else if (ts.isCallExpression(value) && !ts.isOptionalChain(value)) {
+			const [type] = value.arguments;
+			if (!type || ts.isSpreadElement(type)) return;
+			const factory = imported(checker, skipWrappers(value.expression));
+			if (factory?.module !== 'react' || factory.name !== 'createElement' || !isReact()) return;
+			ref = skipWrappers(type);
+			if (builtin(ref)) {
+				if (!value.arguments.some(ts.isSpreadElement))
+					for (const child of value.arguments.slice(2)) rendered(child, line);
+				return;
+			}
+		}
+		const leaf = ref && imported(checker, ref);
+		if (leaf?.module.startsWith('.')) edges.push({ ...leaf, line });
+	}
+	function visit(node: ts.Node) {
+		if (
+			ts.isCallExpression(node) &&
+			!ts.isOptionalChain(node) &&
+			!node.arguments.some(ts.isSpreadElement)
+		) {
+			const argument = clientArgument(node, skipWrappers(node.expression));
+			if (argument)
+				rendered(argument, sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1);
 		}
 		ts.forEachChild(node, visit);
 	}
