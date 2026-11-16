@@ -5290,6 +5290,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 	}
 
 	private checkIntlFactoryResources(setup: readonly ts.Statement[]) {
+		if (
+			!this.options.initializerResourceHint ||
+			!this.options.reactIntlAdapter ||
+			!this.options.automaticReactJsx
+		)
+			return;
 		const firstConst = (statement: ts.Statement | undefined) => {
 			if (!statement || !ts.isVariableStatement(statement)) return;
 			const list = statement.declarationList;
@@ -8690,12 +8696,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		}
 		let output = this.output(inner);
 		if (output === null) return null;
-		if (
-			this.options.initializerResourceHint &&
-			this.options.reactIntlAdapter &&
-			this.options.automaticReactJsx
-		)
-			this.checkIntlFactoryResources(setupStatements);
+		this.checkIntlFactoryResources(setupStatements);
 		const head = this.head(node, body.getStart(this.sf));
 		this.markTemplate();
 
@@ -8752,6 +8753,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			: -1;
 		const output = this.arm(last.expression as ts.Expression, checkRoot && terminal === -1);
 		if (output === null) return null;
+		this.checkIntlFactoryResources(statements.slice(0, first));
 		const chain: (from: number) => string = (from) => {
 			let at = from;
 			while (at < statements.length - 1 && !guardReturn(statements[at])) at++;

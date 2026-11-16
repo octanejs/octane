@@ -4093,12 +4093,23 @@ export function View() { ${setup} return <p>{${output}}</p>; }`;
 		const empty = "const intl = makeIntl({ locale: 'fr', messages: {}, onError: report });";
 		const missing = "intl.formatMessage({ id: 'ready' })";
 		const format = (setup, read = missing) => view(`${setup} const title = ${read};`, 'title');
+		const guarded = (source) =>
+			source.replace('function View()', 'function View({ closed }: { closed: boolean })');
 		const root = project({
 			'tsconfig.json': JSON.stringify({
 				compilerOptions: { strict: true, jsx: 'react-jsx', moduleResolution: 'bundler' },
 			}),
 			'Construct.tsx': view("const intl = makeIntl({ locale: '', onError: report });"),
 			'Format.tsx': format(empty),
+			'GuardedConstruct.tsx': guarded(
+				view("const intl = makeIntl({ locale: '', onError: report }); if (closed) return <i />;"),
+			),
+			'GuardedFormat.tsx': guarded(
+				format(empty).replace('return <p>', 'if (closed) return <i />; return <p>'),
+			),
+			'GuardBeforeConstruct.tsx': guarded(
+				view("if (closed) return <i />; const intl = makeIntl({ locale: '', onError: report });"),
+			),
 			'Shorthand.tsx': format(empty.replace('onError: report', 'onError')).replace(
 				'{ report, inert }',
 				'{ report as onError }',
@@ -4164,10 +4175,17 @@ export function inert() {}`,
 				['Construct.tsx', 'error'],
 				['ExplicitSource.tsx', 'error'],
 				['Format.tsx', 'error'],
-
+				['GuardedConstruct.tsx', 'error'],
+				['GuardedFormat.tsx', 'error'],
 				['Shorthand.tsx', 'error'],
 			]);
-			expect(result.files.find((file) => file.file === 'Format.tsx').strong).toBe(true);
+			for (const name of [
+				'Format.tsx',
+				'GuardedConstruct.tsx',
+				'GuardedFormat.tsx',
+				'GuardBeforeConstruct.tsx',
+			])
+				expect(result.files.find((file) => file.file === name).strong).toBe(true);
 			expect(findings(await run(['Format.tsx', 'handler.ts'], projectTypes))).toEqual([]);
 		}
 
