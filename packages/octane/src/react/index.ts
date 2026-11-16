@@ -227,6 +227,9 @@ function hostedRootEnvelope(props: EnvelopeProps): unknown {
 	});
 }
 
+/** A stage-local context whose value only React's committed render can supply. */
+const STAGE_UNRESOLVED = {};
+
 function StageReady(props: { marker: Promise<void> }): null {
 	octaneUse(props.marker);
 	return null;
@@ -298,12 +301,35 @@ class StagedIsland {
 		queueMicrotask(() => this.attempt());
 	}
 
+	/**
+	 * Stage-local React context mirrors, so a dry run never touches the live
+	 * island's registry. A value the host Fiber cannot supply counts as ready:
+	 * the committed root completes the §6.3 handshake before paint.
+	 */
+	private contexts = new Map<object, { mirror: OctaneContext<unknown>; value: unknown }>();
+
 	readContext<T>(context: OctaneContext<T>): T {
-		return this.owner.readContext(context);
+		for (const entry of this.contexts.values()) {
+			if (entry.mirror !== context) continue;
+			if (entry.value === STAGE_UNRESOLVED) throw createHostContextRequest(this.marker!);
+			return entry.value as T;
+		}
+		return context.defaultValue;
 	}
 
 	resolveForeignContext(foreign: object): OctaneContext<any> | null {
-		return this.owner.resolveForeignContext(foreign);
+		if ((foreign as { $$typeof?: unknown }).$$typeof !== REACT_CONTEXT_TAG) return null;
+		let entry = this.contexts.get(foreign);
+		if (entry === undefined) {
+			const host = this.owner.host;
+			const boot = host === null ? null : readNearestProviderValue(host, foreign);
+			entry = {
+				mirror: createOctaneContext<unknown>(undefined),
+				value: boot?.found ? boot.value : STAGE_UNRESOLVED,
+			};
+			this.contexts.set(foreign, entry);
+		}
+		return entry.mirror;
 	}
 
 	routeError(error: unknown): boolean {
@@ -314,8 +340,7 @@ class StagedIsland {
 
 	routeSuspense(thenable: PromiseLike<unknown>): boolean {
 		if (!this.active) return false;
-		// A context handshake completes in the committed root, before paint.
-		if (thenable === this.marker || this.owner.isContextRequest(thenable)) {
+		if (thenable === this.marker) {
 			this.settle(0, null);
 		} else {
 			const retry = () => this.attempt();
@@ -489,10 +514,6 @@ class HostedIslandController {
 		throw createHostContextRequest(request);
 	}
 
-	isContextRequest(thenable: PromiseLike<unknown>): boolean {
-		return this.contextRequests.has(thenable);
-	}
-
 	isStaging(stage: StagedIsland): boolean {
 		return this.staged === stage && this.lifecycleGeneration > 0 && !this.disposed;
 	}
@@ -502,13 +523,14 @@ class HostedIslandController {
 	 * child identity, or null when the ordinary commit path applies.
 	 */
 	stage(child: TransportedChild): StagedIsland | null {
-		const committed = this.committed;
-		if (committed === null || this.disposed || sameIdentity(committed, child)) return null;
 		const staged = this.staged;
 		if (staged !== null && sameIdentity(staged.child, child)) return staged;
+		// Any other render abandons the stage: it stops dry-running.
+		this.retireStage();
+		const committed = this.committed;
 		// A ready island takes a new identity through the ordinary commit.
-		if (this.status === 0) return null;
-		staged?.dispose();
+		if (committed === null || this.disposed || this.status === 0) return null;
+		if (sameIdentity(committed, child)) return null;
 		return (this.staged = new StagedIsland(this, child));
 	}
 

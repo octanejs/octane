@@ -6,7 +6,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
 import { OctaneCompat } from 'octane/react';
-import { createElement as octaneElement, lazy as octaneLazy } from '../../src/index.js';
+import {
+	createElement as octaneElement,
+	lazy as octaneLazy,
+	use as octaneUse,
+} from '../../src/index.js';
 import { createLog } from '../_helpers.js';
 import { h, mountReactHost, reactAct, SpikeErrorBoundary } from './_react-host.js';
 import { GreetingIsland } from './_fixtures/islands.tsrx';
@@ -197,6 +201,67 @@ describe('octane/react — replacing a pending island (#2947)', () => {
 		} finally {
 			quiet.mockRestore();
 		}
+	});
+
+	it('stages a replacement that reads React context without touching the live island', async () => {
+		const Theme = React.createContext('default');
+		const Themed = () =>
+			octaneElement('b', { className: 'themed', children: octaneUse(Theme) as string });
+		const old = pendingLazy<typeof Ready>();
+		const app = (component: unknown, theme = 'dark') =>
+			h(
+				Theme.Provider,
+				{ value: theme },
+				h(
+					React.Suspense,
+					{ fallback: h('i', null, 'loading') },
+					h(OctaneCompat, { component } as never),
+				),
+			);
+		const mounted = await mountReactHost(app(old.component));
+		await mounted.render(app(Themed));
+		await settle();
+		expect(mounted.host().querySelector('.themed')?.textContent).toBe('dark');
+		await mounted.render(app(Themed, 'light'));
+		await settle();
+		expect(mounted.host().querySelector('.themed')?.textContent).toBe('light');
+		await mounted.unmount();
+	});
+
+	it('stops dry-running a replacement the parent reverts', async () => {
+		const renders: string[] = [];
+		const Logged = () => {
+			renders.push('render');
+			return octaneElement('b', { className: 'logged', children: 'logged' });
+		};
+		const first = pendingLazy<typeof Ready>();
+		const second = pendingLazy<typeof Logged>();
+		const app = (component: unknown) =>
+			h(
+				React.Suspense,
+				{ fallback: h('i', null, 'loading') },
+				h(OctaneCompat, { component } as never),
+			);
+		const mounted = await mountReactHost(app(first.component));
+		await mounted.render(app(second.component));
+		await settle();
+		await mounted.render(app(first.component));
+		await reactAct(async () => {
+			second.load.resolve({ default: Logged });
+			await second.load.promise;
+		});
+		await settle();
+		// The abandoned stage does not retry, and the reverted island still waits.
+		expect(renders).toEqual([]);
+		expect(mounted.container.textContent).toBe('loading');
+
+		await reactAct(async () => {
+			first.load.resolve({ default: Ready });
+			await first.load.promise;
+		});
+		await settle();
+		expect(mounted.host().querySelector('.ready')?.textContent).toBe('ready');
+		await mounted.unmount();
 	});
 
 	it('does not start or reveal a replacement after the island unmounts', async () => {
