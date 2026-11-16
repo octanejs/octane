@@ -4674,6 +4674,21 @@ export function View() {
 					'\nexport function Parent() { return <ReactCompat><View /></ReactCompat>; }',
 				'hook-arrow.ts': owner.replace(helper, 'const readTheme = () => readContext(Theme);'),
 				'Arrow.tsx': view('hook-arrow'),
+				'hook-arrow-block.ts': owner.replace(
+					helper,
+					'const readTheme = () => { return readContext(Theme); };',
+				),
+				'ArrowBlock.tsx': view('hook-arrow-block'),
+				'hook-arrow-block-optional.ts': owner.replace(
+					helper,
+					'const readTheme = () => { return readContext?.(Theme); };',
+				),
+				'ArrowBlockOptional.tsx': view('hook-arrow-block-optional'),
+				'hook-arrow-block-early-exit.ts': owner.replace(
+					helper,
+					"const readTheme = () => { if (maySkip()) return 'local'; return readContext(Theme); };",
+				),
+				'ArrowBlockEarlyExit.tsx': view('hook-arrow-block-early-exit'),
 				'hook-arrow-async.ts': owner.replace(
 					helper,
 					'const readTheme = async () => readContext(Theme);',
@@ -4761,6 +4776,7 @@ export function View() {
 			);
 			expect(findings).toEqual([
 				['Arrow.tsx', 2, 'warning', expect.stringContaining('after its module initializes')],
+				['ArrowBlock.tsx', 2, 'warning', expect.stringContaining('after its module initializes')],
 				[
 					'ConsumerBracket.tsx',
 					2,
