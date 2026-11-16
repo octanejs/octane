@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createRoot, flushSync, startTransition, use } from 'octane';
 import * as signals from 'octane/signals';
 import {
+	createScope,
 	currentSignalOwner,
 	installSignalOwnerEnvironment,
 	runWithSignalOwner,
@@ -503,5 +504,194 @@ describe.each([
 		// resolves through its retired owner, not a live one minted for it.
 		expect(host.textContent).toBe('retired');
 		expect(errors[0]).toBeInstanceOf(ScopeDisposedError);
+	});
+});
+
+// An effect or a cleanup runs in its component's owner too, and creates it only
+// when it asks: a deleted component that never asked for one has none to
+// retire. These components ask for none while they render until told to.
+const EFFECTS = `import { useLayoutEffect } from 'octane';
+import { signal$ } from 'octane/signals';
+function Row(props) @{
+	if (props.loud) props.record('row ' + props.id);
+	useLayoutEffect(() => {
+		props.record('effect ' + props.id);
+		return () => props.record('cleanup ' + props.id);
+	}, [props.tick]);
+	<li>{props.id as string}</li>
+}
+export function Rows(props) @{
+	if (props.loud) props.record('rows');
+	<ul>
+		@for (const id of props.ids; key id) {
+			<Row id={id} loud={props.loud} tick={props.tick} record={props.record} />
+		}
+	</ul>
+}
+export function Local(props) @{
+	const count$ = signal$(3);
+	props.expose$?.(count$);
+	useLayoutEffect(() => () => props.left?.(count$.get()), []);
+	<output>{String(count$.get())}</output>
+}`;
+
+const total$ = signal$(0);
+
+describe.each([
+	{ name: 'development', dev: true },
+	{ name: 'production', dev: false },
+])('owner of an effect or cleanup ($name)', ({ name, dev }) => {
+	const effects = () =>
+		loadCompiledFixtureSource(EFFECTS, {
+			id: `/src/effect-owner-frame-${name}.tsrx`,
+			mode: 'client',
+			compileOptions: { dev, hmr: false },
+			runtimeModules: { 'octane/signals': signals },
+		});
+
+	// The document signal owner is what gives a root's components owners.
+	function enableSignals(): void {
+		const root = createRoot(container());
+		cleanups.push(() => root.unmount());
+		root.render(Leaf, { id: 'enable', log: [] });
+	}
+
+	it('runs effects and cleanups in the owner their component later renders in', () => {
+		enableSignals();
+		const { Rows } = effects();
+		const log: Log = [];
+		const record = (label: string) => mark(log, label);
+		const ambient = currentSignalOwner();
+		const root = createRoot(container());
+		cleanups.push(() => root.unmount());
+		flushSync(() => root.render(Rows, { ids: ['a', 'b'], loud: false, tick: 0, record }));
+		flushSync(() => root.render(Rows, { ids: ['a', 'b'], loud: false, tick: 1, record }));
+		// Row b is deleted by its parent's render.
+		flushSync(() => root.render(Rows, { ids: ['a'], loud: false, tick: 1, record }));
+		expect(currentSignalOwner()).toBe(ambient);
+		const a = ownerOf(log, 'effect a');
+		const b = ownerOf(log, 'effect b');
+		expect(isRendererOwner(a)).toBe(true);
+		expect(isRendererOwner(b)).toBe(true);
+		expect(a).not.toBe(b);
+		const owners = (label: string) =>
+			log.filter(([entry]) => entry === label).map(([, owner]) => owner);
+		expect(owners('effect a')).toEqual([a, a]);
+		expect(owners('cleanup a')).toEqual([a]);
+		expect(owners('effect b')).toEqual([b, b]);
+		expect(owners('cleanup b')).toEqual([b, b]);
+
+		log.length = 0;
+		flushSync(() => root.render(Rows, { ids: ['a'], loud: true, tick: 2, record }));
+		expect(ownerOf(log, 'row a')).toBe(a);
+		expect(ownerOf(log, 'cleanup a')).toBe(a);
+		expect(ownerOf(log, 'effect a')).toBe(a);
+		expect(ownerOf(log, 'rows')).not.toBe(a);
+
+		log.length = 0;
+		root.unmount();
+		expect(ownerOf(log, 'cleanup a')).toBe(a);
+		expect(currentSignalOwner()).toBe(ambient);
+	});
+
+	it("writes a module signal from a cleanup into its root owner's cell", () => {
+		enableSignals();
+		const { Rows } = effects();
+		const owner = createScope({ scopeKey: 'cleanup-owner-frame-' + name });
+		const total = () => runWithSignalOwner(owner, () => total$.get());
+		const before = total$.get();
+		const props = {
+			loud: false,
+			tick: 0,
+			record(label: string) {
+				if (label.startsWith('cleanup')) total$.set(total$.get() + 1);
+			},
+		};
+		const root = createRoot(container(), { signalOwner: owner });
+		cleanups.push(() => root.unmount());
+		flushSync(() => root.render(Rows, { ...props, ids: ['a', 'b', 'c'] }));
+		expect(total()).toBe(0);
+		flushSync(() => root.render(Rows, { ...props, ids: ['a', 'b'] }));
+		expect(total()).toBe(1);
+		// Outside any render, where no owner is current.
+		root.unmount();
+		expect(total()).toBe(3);
+		expect(total$.get()).toBe(before);
+	});
+
+	it('restores the owner a cleanup interrupted', () => {
+		enableSignals();
+		const { Rows } = effects();
+		const explicit = { scopeKey: 'cleanup-owner-frame-explicit' };
+		const inner = createRoot(container());
+		flushSync(() => inner.render(Rows, { ids: ['x'], loud: false, tick: 0, record: () => '' }));
+		expect(
+			runWithSignalOwner(explicit, () => {
+				inner.unmount();
+				return currentSignalOwner();
+			}),
+		).toBe(explicit);
+
+		// An effect that deletes another tree keeps its own owner afterwards.
+		// Neither component has asked for an owner before its callback does.
+		const nested = createRoot(container());
+		const seen: Log = [];
+		flushSync(() =>
+			nested.render(Rows, {
+				ids: ['y'],
+				loud: false,
+				tick: 0,
+				record: (label: string) => (label === 'cleanup y' ? mark(seen, label) : ''),
+			}),
+		);
+		const log: Log = [];
+		const record = (label: string) => {
+			if (label === 'effect a' && log.length === 0) nested.unmount();
+			return mark(log, label);
+		};
+		const root = createRoot(container());
+		cleanups.push(() => root.unmount());
+		flushSync(() => root.render(Rows, { ids: ['a'], loud: false, tick: 0, record }));
+		const a = ownerOf(log, 'effect a');
+		expect(isRendererOwner(a)).toBe(true);
+		const y = ownerOf(seen, 'cleanup y');
+		expect(isRendererOwner(y)).toBe(true);
+		expect(a).not.toBe(y);
+		flushSync(() => root.render(Rows, { ids: ['a'], loud: true, tick: 0, record }));
+		expect(ownerOf(log, 'row a')).toBe(a);
+	});
+
+	it('retires the owner a cleanup of a deleted component asked for', () => {
+		enableSignals();
+		const { Rows, Local } = effects();
+		let value$!: SignalHandle<number>;
+		const source = createRoot(container());
+		cleanups.push(() => source.unmount());
+		source.render(Local, { expose$: (handle$: SignalHandle<number>) => (value$ = handle$) });
+		const log: Log = [];
+		const root = createRoot(container());
+		flushSync(() =>
+			root.render(Rows, {
+				ids: ['a'],
+				loud: false,
+				tick: 0,
+				record: (label: string) => (label === 'cleanup a' ? mark(log, label) : ''),
+			}),
+		);
+		root.unmount();
+		const owner = ownerOf(log, 'cleanup a')!;
+		expect(isRendererOwner(owner)).toBe(true);
+		expect(() => runWithSignalOwner(owner, () => value$.get())).toThrow(ScopeDisposedError);
+	});
+
+	it('reads a signal its component declared from a cleanup', () => {
+		const { Local } = effects();
+		const left: number[] = [];
+		const host = container();
+		const root = createRoot(host);
+		flushSync(() => root.render(Local, { left: (value: number) => left.push(value) }));
+		expect(host.textContent).toBe('3');
+		root.unmount();
+		expect(left).toEqual([3]);
 	});
 });
