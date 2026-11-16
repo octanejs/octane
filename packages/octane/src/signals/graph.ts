@@ -1151,7 +1151,11 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 			typeof value !== 'function' &&
 			(pendingSignals === undefined || pendingSignals.batch() === null)
 		) {
-			if (!same(this.last, value)) {
+			if (
+				!(this.last === value
+					? value !== 0 || 1 / (this.last as number) === 1 / (value as number)
+					: value !== value && this.last !== this.last)
+			) {
 				storeValue(this, value);
 				const subs = this.subs;
 				if (subs !== undefined) {
@@ -1434,7 +1438,11 @@ function readCollected<T>(node: ScopedNode<T>): T {
 	return readOtherValue(node);
 }
 
-/** Object.is, written out so the hot paths compile it to a comparison rather than a call. */
+/**
+ * Object.is. Hot comparisons write it out in place instead: one shared helper
+ * gathers every value type's comparison feedback, which makes each of them
+ * slower than a site that only ever compares, say, numbers.
+ */
 function same(a: unknown, b: unknown): boolean {
 	return a === b ? a !== 0 || 1 / (a as number) === 1 / (b as number) : a !== a && b !== b;
 }
@@ -1704,7 +1712,12 @@ function updatePlain(node: ScopedNode): boolean {
 		while (obsolete) obsolete = unlink(obsolete, node);
 	}
 	if (failure === NO_FAILURE && owners === undefined && node.valueOnly && !isThenable(value)) {
-		if (same(node.last, value)) return false;
+		if (
+			node.last === value
+				? value !== 0 || 1 / (node.last as number) === 1 / (value as number)
+				: value !== value && node.last !== node.last
+		)
+			return false;
 		storeValue(node, value);
 		return true;
 	}
@@ -2081,7 +2094,12 @@ function runObserver(observer: SignalObserver): void {
 			fresh(node)
 		) {
 			const value = node.last;
-			if (same(observer.value, value)) return;
+			if (
+				observer.value === value
+					? value !== 0 || 1 / (observer.value as number) === 1 / (value as number)
+					: value !== value && observer.value !== observer.value
+			)
+				return;
 			observer.value = value;
 		} else if (observeCurrent(observer, node)) return;
 	}
@@ -2148,7 +2166,12 @@ export class PlainCell<T = any> implements ReactiveNode {
 			!(this.flags & REACTIVE_TRACKED_CELL) &&
 			!this.owner.retired
 		) {
-			if (same(this.last, value)) return;
+			if (
+				this.last === value
+					? value !== 0 || 1 / (this.last as number) === 1 / (value as number)
+					: value !== value && this.last !== this.last
+			)
+				return;
 			this.last = value;
 			const subs = this.subs;
 			if (subs === undefined) return;
@@ -2501,7 +2524,12 @@ function updateLean(node: PlainComputed): boolean {
 	if (failed) {
 		// A thrown thenable is computed again once its readers retry.
 		node.flags |= isThenable(value) ? REACTIVE_FAILED | REACTIVE_DIRTY : REACTIVE_FAILED;
-	} else if (!(kept & REACTIVE_FAILED) && same(node.last, value)) {
+	} else if (
+		!(kept & REACTIVE_FAILED) &&
+		(node.last === value
+			? value !== 0 || 1 / (node.last as number) === 1 / (value as number)
+			: value !== value && node.last !== node.last)
+	) {
 		return false;
 	}
 	node.last = value;
