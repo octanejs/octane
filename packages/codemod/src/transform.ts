@@ -6840,7 +6840,10 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			) {
 				this.count(RULE.className);
 				out += 'class' + this.emitInitializer(attribute);
-			} else if ((name === 'onChange' || name === 'onChangeCapture') && this.isTextEntry(element)) {
+			} else if (
+				(name === 'onChange' || name === 'onChangeCapture') &&
+				this.isTextEntry(element, name === 'onChange')
+			) {
 				const input = name === 'onChange' ? 'onInput' : 'onInputCapture';
 				const existing = attributeOf(element, input);
 				const changesOrder =
@@ -6909,11 +6912,81 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		);
 	}
 
+	private textInputResult(expression: ts.Expression | undefined): boolean {
+		if (!expression) return false;
+		const value = skipWrappers(expression);
+		if (ts.isConditionalExpression(value))
+			return this.textInputResult(value.whenTrue) && this.textInputResult(value.whenFalse);
+		return (
+			ts.isStringLiteralLike(value) && (value.text === 'date' || TEXT_INPUT_TYPES.has(value.text))
+		);
+	}
+
+	private textInputTypeCall(call: ts.CallExpression) {
+		if (!ts.isIdentifier(call.expression) || !ts.isExternalModule(this.sf)) return false;
+		const symbol = this.checker.getSymbolAtLocation(call.expression);
+		const fn = symbol?.valueDeclaration;
+		if (
+			symbol?.declarations?.length !== 1 ||
+			!fn ||
+			!ts.isFunctionDeclaration(fn) ||
+			!fn.name ||
+			!fn.body ||
+			fn.parent !== this.sf ||
+			fn.asteriskToken ||
+			fn.modifiers?.length
+		)
+			return false;
+		const [statement] = fn.body.statements;
+		// Unmatched switch values and empty trailing clauses return undefined, the default text type.
+		const knownResult =
+			this.textInputResult(singleCallbackExpression(fn.body)) ||
+			(fn.body.statements.length === 1 &&
+				ts.isSwitchStatement(statement) &&
+				statement.caseBlock.clauses.every(({ statements }) => {
+					const [first] = statements;
+					return (
+						!first ||
+						(statements.length === 1 &&
+							ts.isReturnStatement(first) &&
+							this.textInputResult(first.expression))
+					);
+				}));
+		return (
+			knownResult &&
+			(!/eval|\\u/.test(this.source) || !hasEval(this.sf)) &&
+			this.localUses(fn.name).every(
+				(ref) =>
+					inTypeNode(ref) || (ts.isCallExpression(ref.parent) && ref.parent.expression === ref),
+			)
+		);
+	}
+
+	private hasAncestorInputHandler(element: ts.JsxOpeningLikeElement) {
+		for (
+			let parent: ts.Node = element.parent;
+			!ts.isFunctionLike(parent) && !ts.isSourceFile(parent);
+			parent = parent.parent
+		) {
+			if (!ts.isJsxElement(parent) || parent.openingElement === element) continue;
+			if (
+				parent.openingElement.attributes.properties.some(
+					(attribute) =>
+						ts.isJsxSpreadAttribute(attribute) ||
+						(ts.isIdentifier(attribute.name) &&
+							/^on(?:Input|Change)(?:Capture)?$/.test(attribute.name.text)),
+				)
+			)
+				return true;
+		}
+		return false;
+	}
+
 	/**
 	 * Whether `element` is a text-entry control, where React's `onChange` fires
 	 * per edit and the native `change` fires on commit.
 	 */
-	isTextEntry(element: ts.JsxOpeningLikeElement) {
+	isTextEntry(element: ts.JsxOpeningLikeElement, ordinaryChange: boolean) {
 		const tag = element.tagName.getText(this.sf);
 		if (tag === 'textarea') return true;
 		if (tag !== 'input' && !this.isTextFieldComponent(element)) return false;
@@ -6924,18 +6997,26 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		if (tag === 'input' && value && ts.isJsxExpression(value) && value.expression) {
 			const expression = skipWrappers(value.expression);
 			// A spread can also supply the input handler that a rename would overwrite.
-			if (
-				ts.isStringLiteralLike(expression) &&
-				TEXT_INPUT_TYPES.has(expression.text) &&
-				!element.attributes.properties.some(
-					(attribute) =>
-						ts.isJsxSpreadAttribute(attribute) ||
-						(attribute !== type &&
-							ts.isIdentifier(attribute.name) &&
-							attribute.name.text === 'type'),
+			const fixedType = !element.attributes.properties.some(
+				(attribute) =>
+					ts.isJsxSpreadAttribute(attribute) ||
+					(attribute !== type && ts.isIdentifier(attribute.name) && attribute.name.text === 'type'),
+			);
+			if (fixedType) {
+				if (ts.isStringLiteralLike(expression) && TEXT_INPUT_TYPES.has(expression.text))
+					return true;
+				// React dispatches native input and synthetic change in separate passes.
+				if (
+					this.target === 'tsrx' &&
+					ordinaryChange &&
+					!attributeOf(element, 'ref') &&
+					!attributeOf(element, 'onInputCapture') &&
+					!attributeOf(element, 'onChangeCapture') &&
+					((ts.isConditionalExpression(expression) && this.textInputResult(expression)) ||
+						(ts.isCallExpression(expression) && this.textInputTypeCall(expression))) &&
+					!this.hasAncestorInputHandler(element)
 				)
-			) {
-				return true;
+					return true;
 			}
 		}
 		this.note(

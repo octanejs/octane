@@ -9749,6 +9749,110 @@ export const views = [Motion, motion.div];`,
 		expect(file.code).toMatch(/id="search"[^>]*\bonInputCapture=\{change\}/);
 	});
 
+	it.each([false, true])(
+		'migrates known dynamic input types with project types %s',
+		async (projectTypes) => {
+			const root = project({
+				'package.json': '{ "name": "app" }',
+				'tsconfig.json': '{ "compilerOptions": { "jsx": "react-jsx", "strict": true } }',
+				'Field.tsx': `
+function inputType(format: 'date' | 'short' | 'long' | 'email') {
+	switch (format) {
+		case 'date': return 'date';
+		case 'short':
+		case 'long': return 'text';
+		case 'email': return 'email';
+	}
+}
+function conditionalType(date: boolean) { return date ? 'date' : 'text'; }
+function replaced(): 'text' | 'checkbox' { return 'text'; }
+replaced = () => 'checkbox';
+declare const ambient = 'text';
+function configureInput(node: HTMLInputElement | null) { if (node) node.type = 'checkbox'; }
+function Wrapper({ onInput, children }: { onInput: () => void; children: React.ReactNode }) {
+	return <div onInput={onInput}>{children}</div>;
+}
+export function Field({ format, choice, options, change }: {
+	format: 'date' | 'short' | 'long' | 'email';
+	choice: string;
+	options: { type: 'text'; onInput?: () => void };
+	change: (value: string) => void;
+}) {
+	const handle = (event: { currentTarget: { value: string } }) => change(event.currentTarget.value);
+	return <section>
+		<input id="helper" type={inputType(format)} onChange={handle} />
+		<input id="conditional" type={format === 'date' ? 'date' : 'text'} onChange={handle} />
+		<input id="conditional-helper" type={conditionalType(format === 'date')} onChange={handle} />
+		<input id="capture" type={inputType(format)} onChangeCapture={handle} />
+		<input id="date" type="date" onChange={handle} />
+		<input id="mixed" type={format === 'date' ? 'date' : 'checkbox'} onChange={handle} />
+		<input id="asserted" type={choice as 'text'} onChange={handle} />
+		<input id="getter" type={options.type} onChange={handle} />
+		<input id="replaced" type={replaced()} onChange={handle} />
+		<input id="ambient" type={ambient} onChange={handle} />
+		<input id="literal-spread" type="date" {...options} onChange={handle} />
+		<input id="helper-spread" type={inputType(format)} {...options} onChange={handle} />
+		<input id="collision" type={inputType(format)} onInput={handle} onChange={handle} />
+		<input id="capture-and-bubble" type={inputType(format)} onChangeCapture={handle} onChange={handle} />
+		<input id="input-capture-and-bubble" type={inputType(format)} onInputCapture={handle} onChange={handle} />
+		<input id="type-ref" type={inputType(format)} ref={configureInput} onChange={handle} />
+		<div onInput={handle}>
+			<input id="ancestor-input" type={inputType(format)} onChange={handle} />
+		</div>
+		<div {...options}>
+			<input id="ancestor-spread" type={inputType(format)} onChange={handle} />
+		</div>
+		<Wrapper onInput={() => change('wrapped')}>
+			<input id="ancestor-wrapper" type={inputType(format)} onChange={handle} />
+		</Wrapper>
+	</section>;
+}
+`,
+			});
+			const [file] = (
+				await runCodemod([root], { root, strong: true, verify: true, write: false, projectTypes })
+			).files;
+			expect(file.strong).toBe(true);
+			expect(file.diagnostics).toEqual([]);
+			for (const id of ['helper', 'conditional', 'conditional-helper']) {
+				expect(file.code).toMatch(new RegExp(`id="${id}"[^>]*\\bonInput=\\{handle\\}`));
+			}
+			expect(file.code).toMatch(/id="capture"[^>]*\bonChangeCapture=\{handle\}/);
+			for (const id of [
+				'date',
+				'mixed',
+				'asserted',
+				'getter',
+				'replaced',
+				'ambient',
+				'literal-spread',
+				'helper-spread',
+				'collision',
+				'capture-and-bubble',
+				'input-capture-and-bubble',
+				'type-ref',
+				'ancestor-input',
+				'ancestor-spread',
+				'ancestor-wrapper',
+			]) {
+				expect(file.code).toMatch(new RegExp(`id="${id}"[^>]*\\bonChange=\\{handle\\}`));
+			}
+			expect(file.notes.filter((note) => note.rule === 'native-text-change')).toHaveLength(15);
+		},
+	);
+
+	it('keeps dynamic change handlers when TSX output still uses React JSX', async () => {
+		const source = `/** @jsxImportSource react */
+function inputType(date: boolean) { return date ? 'date' : 'text'; }
+export function Field({ date, change }: { date: boolean; change: () => void }) {
+	return <input type={inputType(date)} onChange={change} />;
+}
+`;
+		const root = project({ 'package.json': '{ "name": "app" }', 'Field.tsx': source });
+		const [file] = (await runCodemod([root], { root, target: 'tsx', write: false })).files;
+		expect(file.code).toBe(source);
+	});
+
 	it('keeps text change handlers when other attributes make a literal expression unsafe to migrate', async () => {
 		const root = project({
 			'package.json': '{ "name": "app" }',
