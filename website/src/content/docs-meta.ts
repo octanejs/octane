@@ -325,8 +325,9 @@ export const docsMeta: DocMeta[] = [
 			{
 				id: 'views',
 				title: 'Views and pagination',
-				searchTerms: ['view', 'usePages', 'pages', 'cursor', 'loadMore'],
+				searchTerms: ['view', 'usePages', 'pages', 'cursor', 'loadMore', 'join', 'relation'],
 			},
+			{ id: 'joins', title: 'Join records from other entities', level: 3 },
 			{ id: 'cursor-pages', title: 'Pages from a cursor', level: 3 },
 			{ id: 'forms', title: 'Forms that work before JavaScript', searchTerms: ['useForm'] },
 			{

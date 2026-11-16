@@ -92,13 +92,13 @@ const confirmed = (part: ReadSnapshot<any>) => part.status === 'ready' && !part.
  */
 export function pages<T>(
 	store: DataStore,
-	view: View<void, T>,
+	view: View<void, any, T>,
 	params?: void,
 	size?: number,
 ): PagesHandle<T>;
 export function pages<P, T>(
 	store: DataStore,
-	view: View<P, T>,
+	view: View<P, any, T>,
 	params: P,
 	size?: number,
 ): PagesHandle<T>;

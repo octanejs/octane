@@ -801,6 +801,64 @@ A view is a read, so `useRead(store.read(unread))` shows its default window.
 To show a specific window, pass `{ offset, limit }` to `store.read`, plus any
 parameters the view declares with an `input` schema.
 
+<h3 id="joins">Join records from other entities</h3>
+
+A row often needs a record of another entity: a message needs its author, a
+task its assignee. Joining them in the component means a second read, a
+lookup per row on every render, and a list in which every row is a new object
+whenever anything changes. Declare the relation on the view instead, with
+`with`, and the store does the join:
+
+```ts
+import { entity, view } from 'octane/data';
+import { z } from 'zod';
+
+export const User = entity('user', z.object({ id: z.string(), name: z.string() }));
+export const Message = entity(
+	'message',
+	z.object({ id: z.string(), authorId: z.string().nullable(), text: z.string(), sent: z.date() }),
+);
+
+export const inbox = view({
+	name: 'messages.inbox',
+	of: Message,
+	// Under `author`, the user whose ID is in `authorId`.
+	with: { author: [User, 'authorId'] },
+	order: [['sent', 'desc']],
+});
+```
+
+Each row is the message with an `author`, typed `User | undefined`: it is
+absent where `authorId` is empty or no such user exists. The handler returns
+each row with its related records under the same names, as a database join
+does, and may leave one out or send `null`:
+
+```ts
+handle(inbox, async (input) => {
+	const rows = await db.messages.page(input.offset, input.limit);
+	const authors = await db.users.byIds(rows.map((row) => row.authorId));
+	return rows.map((row) => ({ ...row, author: authors.get(row.authorId) }));
+});
+```
+
+The store keeps the related records as shared records of their own entity,
+exactly as if a view of users had loaded them. So:
+
+- An edit to a user shows in every row that points at that user, and in every
+  other read of the user, in the same moment and before the reply.
+- A row is the same object until its message or its author changes, so a
+  memoized row component re-renders only when its own row did.
+- A change to a user reaches only the views holding a row by that user.
+- When an edit or a feed event points a row at a record the store does not
+  hold, the row shows no related record until the store has it. The view
+  loads it once the edit is confirmed. If another view already holds the
+  record, such as the list a user picker shows, it appears at once.
+
+`where` and `order` see the view's own record only, so a view cannot yet
+filter or sort by a field of a related record, and a relation points at one
+record, not a list. For those, let the server shape a plain
+[read](#reading) and mark its [entities](#entities).
+
 <h3 id="pages">Load a page at a time</h3>
 
 For a list that grows as the user scrolls or presses "Show more", ask for a
@@ -2065,7 +2123,7 @@ reply, and in two tabs at once.
 | `read`               | Describe a read: `name`, `input`, `output`, `entities`, `tags`, `fresh`, `keep`, `expire`, `persist`, `cancel`, `version`.    |
 | `write`              | Describe a write: `creates`, `patches` or `removes` an entity, with `draft`, `serverId`, `record`, `form` and `invalidates`.  |
 | `entity`             | Name a record type and its key, so every read holding a record shares its fields.                                             |
-| `view`               | Describe a list by a rule over an entity: `where`, `order`, `limit`, `max`.                                                   |
+| `view`               | Describe a list by a rule over an entity: `where`, `order`, `limit`, `max`, and `with` to join related records.               |
 | `feed`               | Describe server events and the `changes` each one makes, with the reads it `covers`.                                          |
 | `DataError`          | A definitive refusal, with `code`, `data` and `issues`.                                                                       |
 | `createDataStore`    | Create a store: `transport`, `seed`, `seedAge`, `form`, `persist`, `listen`, `feeds`.                                         |

@@ -34,7 +34,7 @@ the same task as the event that caused it.
 | `read` | `name`, `input?`, `output`, `entities?`, `tags?`, `fresh = 0`, `keep = 300000`, `expire = Infinity`, `persist = true`, `cancel = false`, `version = ''` | Times are milliseconds; a `keep` of 2³¹ ms or more (such as `Infinity`) keeps the value for the session. `entities(output)` returns `Entity.from(...)` selections. `cancel` aborts a load once nothing observes the read or waits on it. |
 | `write` | `name`, `input`, `output?`, one of `creates`/`patches`/`removes`, `draft?`, `serverId?`, `record?`, `form?`, `invalidates?` | `draft(input, id)` defaults to the input plus the new ID. `record(output)` locates the saved record so views take it without reloading. |
 | `entity` | `name`, `schema`, `key = 'id'` | `id(value)` is `String(value[key])`. |
-| `view` | `name`, `of`, `order`, `where?`, `input?`, `limit = 20`, `max = 500`, plus the read options | A read whose input is `{ ...params, offset, limit }` and whose value is that window's rows. `view.view.where` and `view.view.compare` are exposed for handlers. |
+| `view` | `name`, `of`, `order`, `where?`, `with?`, `input?`, `limit = 20`, `max = 500`, plus the read options | A read whose input is `{ ...params, offset, limit }` and whose value is that window's rows. `view.view.where` and `view.view.compare` are exposed for handlers. `with: { name: [Entity, key] }` joins each row to the record its `key` points at. |
 | `feed` | `name`, `params?`, `event`, `changes(event, params)`, `covers` | `changes` returns `{ put, value }`, `{ remove, id }`, `{ read, input?, value }` or `{ invalidates }`, or an array of them. |
 
 Contracts declared in `*.data.ts` modules can be checked by the build: the
@@ -46,6 +46,11 @@ imports `octane/data/manifest`. The rules and codes are in
 `view` ordering compares values as JavaScript's `<` does (dates by time,
 `null`/`undefined` first), then by the entity key. A handler must serve the
 same order.
+
+A view `with` relations has rows of the record plus, under each relation's
+name, the record its key points at. The handler returns each row with those
+records, or `null` or nothing where there is none; each part is validated by
+its own entity's schema. `where` and `order` see the view's own record only.
 
 ## Store guarantees
 
@@ -88,6 +93,14 @@ same order.
   copy of each record any view loaded, and every view of the entity is
   evaluated over it with outstanding edits applied. The store loads a margin
   beyond the visible window.
+- A view's related records are shared records of their own entities. A row
+  shows each with outstanding edits applied, and is the same object until its
+  record or one of its related records changes. A change to a related record
+  reaches the views holding a row that points at it, and is saved with them.
+  A view reloads once when a shown row points at a record its last load did
+  not cover and the store does not hold, after any edit to that row has
+  settled. A related record is kept while a view holds a row that points at
+  it.
 - A seed is adopted when its read is first asked for, and keeps its age
   (`seedAge` adds time spent in a cache).
 - `dispose()` ends one store locally, clears its memory immediately, flushes confirmed saves already queued after persistence has initialized, and preserves durable storage for another window or restart. A store disposed before initialization cancels its pending saves. A later `retire()` can still erase the account cache.

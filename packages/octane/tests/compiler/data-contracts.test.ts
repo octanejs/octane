@@ -152,6 +152,33 @@ createDataStore({ feeds: [shelfChanges], persist: { journal: { writes: [stats], 
 		]);
 	});
 
+	it('counts the entity each relation of a view points at as used', () => {
+		const chat = analyzeDataContracts(
+			`import { z } from 'zod';
+import { entity, view } from 'octane/data';
+export const User = entity('user', z.object({ id: z.string() }));
+export const Message = entity('message', z.object({ id: z.string(), authorId: z.string() }));
+export const inbox = view({
+	name: 'messages.inbox',
+	of: Message,
+	with: { author: [User, 'authorId'] } as const,
+	order: [['id', 'asc']],
+});
+// Not a relation: the entity is handed to something the build cannot follow.
+export const drafts = view({ name: 'messages.drafts', of: Message, with: { author: pick(User) }, order: [] });
+`,
+			'/app/chat.data.ts',
+		);
+		expect(chat.uses.map((use) => `${use.binding}@${use.site}`)).toEqual([
+			'Message@of',
+			'User@with',
+			'Message@of',
+		]);
+		expect(
+			chat.diagnostics.map((diagnostic) => `${diagnostic.code}:${diagnostic.start.line}`),
+		).toEqual(['OCTANE_DATA_CONTRACT_ESCAPE:12']);
+	});
+
 	it('accepts type positions, property reads, and exports', () => {
 		const source = `import { setRead, type Book } from './books.data.ts';
 export type Input = typeof setRead extends { input: infer I } ? I : never;

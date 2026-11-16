@@ -132,7 +132,8 @@ export interface DataHandler {
  * its output.
  *
  * A view's handler receives its parameters and the window to serve, and
- * returns that window's records in the view's order.
+ * returns that window's records in the view's order, each with the records
+ * the view joins it to under their relation names.
  *
  * A feed's handler yields its frames for one connection, from just after
  * `call.cursor` when the client has one, until `call.signal` aborts. When it
@@ -141,7 +142,7 @@ export interface DataHandler {
  * server render reads it to start the page's feed from it.
  */
 export type Implementation<C, T> =
-	T extends View<infer P, infer R>
+	T extends View<infer P, any, infer R>
 		? (
 				input: ([P] extends [void] ? {} : P) & { readonly offset: number; readonly limit: number },
 				call: C & DataCall,
