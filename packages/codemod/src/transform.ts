@@ -7846,6 +7846,27 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			);
 			return null;
 		}
+		if (
+			ts.isFunctionExpression(fn) &&
+			fn.name &&
+			(this.localUses(fn.name).length ||
+				reads(
+					fn,
+					(name) =>
+						name.text === 'eval' &&
+						!isPropertyName(name) &&
+						!declaresName(name) &&
+						!inTypeNode(name),
+				))
+		) {
+			this.note(
+				MAP_CALLBACK_SCOPE,
+				'error',
+				node,
+				'An @for row cannot preserve this map callback’s local function name. Keep the original map callback until these references are migrated explicitly.',
+			);
+			return null;
+		}
 		if (fn.parameters.some((parameter) => readsFunctionContext(parameter, this.checker))) {
 			this.note(
 				MAP_CALLBACK_SCOPE,

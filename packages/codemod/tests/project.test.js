@@ -6218,6 +6218,59 @@ export function View() {
 			expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(source);
 	});
 
+	it.each([false, true])(
+		'preserves a named map callback binding before writing (project types %s)',
+		async (projectTypes) => {
+			const map = (callback) =>
+				`export function List() { return <ul>{[{ id: 1 }].map(${callback})}</ul>; }`;
+			const originals = {
+				'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler"}}',
+				'Caller.tsx': "import { List } from './Body.tsx'; export const Caller = () => <List />;",
+				'index.html': '<script type="module" src="./Body.tsx"></script>',
+				'Body.tsx': map('function row(item) { return <li key={0}>{row.name}</li>; }'),
+				'Default.tsx': map(
+					'function row({ label = row.name }) { return <li key={0}>{label}</li>; }',
+				),
+				'Type.tsx': map(
+					'function row(item) { type Callback = typeof row; return <li key={0}>row</li>; }',
+				),
+				'Eval.tsx': map('function row(item) { return <li key={0}>{eval("row.name")}</li>; }'),
+				'Control.tsx': map(
+					'function row(item) { const row = "shadowed"; return <li key={0}>{row}</li>; }',
+				),
+				'TypeEval.tsx': map(
+					'function row(item) { type eval = number; const n: eval = 1; return <li key={0}>{n}</li>; }',
+				),
+			};
+			const root = project(originals);
+			const note = expect.objectContaining({ rule: 'map-callback-scope', severity: 'error' });
+			const options = { root, verify: false, strong: true, projectTypes };
+			const inputs = Object.keys(originals)
+				.filter((file) => file.endsWith('.tsx'))
+				.map((file) => path.join(root, file));
+			const preview = await runCodemod(inputs, { ...options, write: false });
+			for (const file of ['Body.tsx', 'Default.tsx', 'Type.tsx', 'Eval.tsx']) {
+				expect(preview.files.find((row) => row.file === file)).toMatchObject({
+					code: expect.stringContaining('.map(function row'),
+					notes: [note],
+				});
+			}
+			for (const file of ['Control.tsx', 'TypeEval.tsx']) {
+				expect(preview.files.find((row) => row.file === file)).toMatchObject({
+					code: expect.stringContaining('@for'),
+					notes: [],
+				});
+			}
+			const write = await runCodemod(inputs, options);
+			expect(write.files).toEqual([
+				expect.objectContaining({ file: 'Body.tsx', changed: false, notes: [note] }),
+			]);
+			expect(fs.readdirSync(root).sort()).toEqual(Object.keys(originals).sort());
+			for (const [file, source] of Object.entries(originals))
+				expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(source);
+		},
+	);
+
 	it.each([
 		'[{}, {}].map((_, index) => <li key={String(index)}>{String(arguments.length)}</li>)',
 		'[{}, , {}].map((_) => <li key={0}>{String(arguments.length)}</li>)',
