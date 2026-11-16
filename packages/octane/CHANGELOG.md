@@ -1,5 +1,13 @@
 # octane
 
+## 0.19.2
+
+### Patch Changes
+
+- 761d8bd: Make a change to an `octane/data` store cost the same however many reads the store holds. A feed event, an optimistic write and a settled write now go straight to the reads that show the changed record, instead of checking every read the store holds: with 5,000 reads held, receiving one record takes about a microsecond rather than 0.6 ms.
+- 9c8cf37: Make components cheaper to mount and unmount in an application that uses signals: an effect or cleanup creates its component's signal owner only when it asks for one, so a component that is deleted without having used a signal no longer builds an owner during its cleanups.
+- b6e67a0: `OctaneCompat` now disconnects the island's layout effects and refs while a React Suspense boundary shows its fallback, and reconnects them on reveal. Passive effects and store subscriptions stay connected, as they do for React components.
+
 ## 0.19.1
 
 ### Patch Changes

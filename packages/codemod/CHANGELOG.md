@@ -1,5 +1,15 @@
 # @octanejs/codemod
 
+## 0.2.4
+
+### Patch Changes
+
+- 7d264e5: Report a retained React Intl error callback that issues React DOM resource hints when a migrated component creates a formatter with an empty locale or formats a message from a fresh empty catalog.
+- Updated dependencies [761d8bd]
+- Updated dependencies [9c8cf37]
+- Updated dependencies [b6e67a0]
+  - octane@0.19.2
+
 ## 0.2.3
 
 ### Patch Changes
