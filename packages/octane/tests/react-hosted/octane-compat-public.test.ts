@@ -1111,6 +1111,13 @@ describe('octane/react — StrictMode, hide/reveal, and teardown discrimination 
 			if (suspended) React.use(gate.promise);
 			return null;
 		}
+		function ReactPassive() {
+			React.useEffect(() => {
+				log.push('react passive setup');
+				return () => log.push('react passive cleanup');
+			}, []);
+			return null;
+		}
 		const tree = (mode: 'visible' | 'hidden') =>
 			h(React.Activity, {
 				mode,
@@ -1121,32 +1128,44 @@ describe('octane/react — StrictMode, hide/reveal, and teardown discrimination 
 						component: ActivityIsland,
 						props: { log: log.push },
 					}),
+					h(ReactPassive),
 					h(Sibling),
 				),
 			});
 		const mounted = await mountReactHost(tree('visible'));
 		try {
 			flushEffects();
-			expect(log.drain()).toEqual(['layout setup', 'passive setup']);
+			expect(log.drain().sort()).toEqual(
+				['layout setup', 'passive setup', 'react passive setup'].sort(),
+			);
 			await reactAct(async () => setSuspended(true));
 			flushEffects();
 			expect(log.drain()).toEqual(['layout cleanup']);
 
 			await mounted.render(tree('hidden'));
 			flushEffects();
-			expect(log.drain()).toEqual(['passive cleanup']);
+			expect(log.drain().sort()).toEqual(['passive cleanup', 'react passive cleanup'].sort());
+
+			// React parity: revealing the Activity while Suspense still hides the
+			// primary reconnects no passive effects, React's or the island's.
+			await mounted.render(tree('visible'));
+			flushEffects();
+			expect(log.drain()).toEqual([]);
 
 			await reactAct(async () => {
 				gate.resolve();
 				await gate.promise;
 			});
-			await mounted.render(tree('visible'));
 			flushEffects();
-			expect(log.drain()).toEqual(['layout setup', 'passive setup']);
+			expect(log.drain().sort()).toEqual(
+				['layout setup', 'passive setup', 'react passive setup'].sort(),
+			);
 		} finally {
 			await mounted.unmount();
 		}
-		expect(log.drain()).toEqual(['layout cleanup', 'passive cleanup']);
+		expect(log.drain().sort()).toEqual(
+			['layout cleanup', 'passive cleanup', 'react passive cleanup'].sort(),
+		);
 	});
 
 	it('disposes exactly once when React deletes an island that is currently hidden', async () => {

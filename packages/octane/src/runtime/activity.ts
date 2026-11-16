@@ -579,6 +579,7 @@ export function activityBlock(
 			else showActivityRange(state);
 			b.inactive = false;
 			state.hidden = false;
+			state.keepPassive = false;
 			state.deactivationPending = false;
 			setActivitySuspenseHandler(state, false);
 			renderWithEffectReconnect(b, WIP_CAPTURE, state.pendingInsertions);
