@@ -1011,10 +1011,15 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					continue;
 				if (nativeSetupHook(ref, this.localUses, this.checker, undefined, true) !== 'first')
 					continue;
-				const component = ts.findAncestor(ref, ts.isFunctionDeclaration);
-				if (component?.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword))
-					storeHookComponents.add('default');
-				else if (component?.name) storeHookComponents.add(component.name.text);
+				const component = ts.findAncestor(ref, ts.isFunctionLike);
+				if (component && ts.isFunctionDeclaration(component)) {
+					if (component.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword))
+						storeHookComponents.add('default');
+					else if (component.name) storeHookComponents.add(component.name.text);
+				} else if (component && ts.isVariableDeclaration(component.parent)) {
+					const name = component.parent.name;
+					if (ts.isIdentifier(name)) storeHookComponents.add(name.text);
+				}
 			}
 		}
 

@@ -588,6 +588,48 @@ export const setup = () => {
 	},
 );
 
+it.each([
+	['arrow', '() =>'],
+	['function expression', 'function ReadPane()'],
+])(
+	'warns when a migrated %s component needs a standalone store provider',
+	async (_, declaration) => {
+		const { app } = project({
+			'app/src/pane.tsx': `import { useSnapshot } from 'observer';
+export const Pane = ${declaration} { const value = useSnapshot(); return <b>{String(value)}</b>; };`,
+			'app/src/entry.tsx': `import { renderToString } from 'react-dom/server';
+import { Pane } from './pane.tsx';
+export const html = renderToString(<Pane />);`,
+			'app/src/client.ts': `import { createRoot } from 'octane';
+import { Pane } from './pane.tsx';
+export function mount(host) { createRoot(host).render(Pane); }`,
+		});
+		const result = await runCodemod(
+			['entry', 'pane'].map((name) => path.join(app, 'src', name + '.tsx')),
+			{ root: app, strong: true, verify: true, write: false },
+		);
+		expect(result.files.find((file) => file.file === 'src/pane.tsx')?.rules['store-hook']).toBe(1);
+		expect(result.files.find((file) => file.file === 'src/entry.tsx')?.notes).toContainEqual(
+			expect.objectContaining({
+				rule: 'store-hook',
+				severity: 'warning',
+				line: 3,
+				message: expect.stringMatching(/standalone.*migrated Pane.*NativeStoreProvider/),
+			}),
+		);
+		expect(result.files.find((file) => file.file === 'src/client.ts')?.notes).toContainEqual(
+			expect.objectContaining({
+				rule: 'store-hook',
+				severity: 'warning',
+				line: 3,
+				message: expect.stringMatching(
+					/If the migrated Pane's store hook reads context.*NativeStoreProvider/,
+				),
+			}),
+		);
+	},
+);
+
 it('reports the context of a standalone server root that keeps a React factory config', async () => {
 	const { app } = project({
 		'app/src/pane.tsx': `import { useSnapshot } from 'observer';
