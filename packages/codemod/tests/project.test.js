@@ -6142,6 +6142,55 @@ export function View() {
 		},
 	);
 
+	it.each([false, true])(
+		'blocks a map index read in an eager constructor argument before writing (project types %s)',
+		async (projectTypes) => {
+			const cases = [
+				['new (class { constructor(index: number) {} })(index)', true],
+				['new (class {})(index)', true],
+				['new (class { constructor(...args: number[]) {} })(0, ...[index])', true],
+				['new (class { constructor(getIndex: () => number) {} })(() => index)', false],
+				['new (class { constructor(...args: number[]) {} })(fail(), index)', false],
+				['new (class { constructor(...args: number[]) {} })(...[0], index)', false],
+				['new (class extends fail() {})(index)', false],
+				['new (class { [fail()]() {} })(index)', false],
+				['new (class { static value = fail() })(index)', false],
+				['new (class { static { fail() } })(index)', false],
+			];
+			const originals = {
+				'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler"}}',
+				'Caller.ts': "export { List } from './List0.tsx';",
+				...Object.fromEntries(
+					cases.map(([expression], i) => [
+						`List${i}.tsx`,
+						`function fail(): never { throw Error('earlier'); }
+export function List() {
+	return <ul>{[{ id: 1 }, { id: 2 }].map(({ id, value = ${expression} }, index) =>
+		<li key={id}>row</li>)}</ul>;
+}`,
+					]),
+				),
+			};
+			const root = project(originals);
+			const inputs = cases.map((_, i) => path.join(root, `List${i}.tsx`));
+			const options = { root, verify: false, strong: true, projectTypes };
+			const note = expect.objectContaining({ rule: 'map-parameter-tdz', severity: 'error' });
+			const preview = await runCodemod(inputs, { ...options, write: false });
+			for (const [i, [, blocked]] of cases.entries()) {
+				const file = preview.files[i];
+				if (blocked) expect(file.code, file.file).toContain('@for');
+				expect(file.notes, file.file).toEqual(blocked ? [note] : []);
+			}
+			const result = await runCodemod(inputs, options);
+			expect(result.files).toEqual([
+				expect.objectContaining({ file: 'List0.tsx', changed: false, notes: [note] }),
+			]);
+			expect(fs.readdirSync(root).sort()).toEqual(Object.keys(originals).sort());
+			for (const [file, source] of Object.entries(originals))
+				expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(source);
+		},
+	);
+
 	it.each([
 		['write', '[1,2].map((item, index) => show ? <li>{index++}</li> : null)'],
 		['tdz', '[{id:1},{id:2}].map(({id,label=index}, index) => show ? <li>{label}</li> : null)'],

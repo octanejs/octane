@@ -8083,6 +8083,22 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					readsOrdinal(read.argumentExpression)
 				);
 			}
+			if (ts.isNewExpression(read)) {
+				const constructor = skipWrappers(read.expression);
+				// A plain inline class finishes defining itself before the arguments run.
+				return (
+					ts.isClassExpression(constructor) &&
+					!constructor.heritageClauses?.length &&
+					!constructor.modifiers?.length &&
+					constructor.members.every(
+						(member) =>
+							ts.isConstructorDeclaration(member) &&
+							!member.modifiers?.length &&
+							member.parameters.every((parameter) => !ts.getDecorators(parameter)?.length),
+					) &&
+					readsInOrder(read.arguments ?? [])
+				);
+			}
 			if (ts.isCallExpression(read)) {
 				if (readsOrdinal(read.expression)) return true;
 				const callee = skipWrappers(read.expression);
