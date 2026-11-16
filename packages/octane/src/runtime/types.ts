@@ -94,9 +94,9 @@ export interface Scope {
 	block: Block;
 	parent: Scope | null;
 	/**
-	 * An event handler published this scope as its signal authority. Deletion then
-	 * records retirement for a scope that never resolved an owner, so a handler
-	 * queued past the deletion cannot mint fresh instance state for it.
+	 * An event handler published this scope as its signal authority. A bulk
+	 * clear then unmounts an otherwise inert row, which records its retirement,
+	 * so a handler queued past the deletion cannot mint fresh instance state.
 	 */
 	signalTokenEscaped: boolean;
 	/**

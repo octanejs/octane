@@ -52,6 +52,7 @@ import {
 	endNativeReadScope,
 	beginNativeReadWitness,
 	finishNativeReadWitness,
+	deferredOwnerToken,
 } from './signal-owners.js';
 import { retireBindingLease, scheduleRender, reportEffectError } from './engine.js';
 import { registerHookCleanup } from './hooks.js';
@@ -1312,7 +1313,7 @@ export function setEventHandler(el: Element, key?: string, handler?: any, foreig
 		// Explicit authority also applies to handlers in modules with no signal bindings.
 		const explicitOwner =
 			activeSynchronousSignalOwner !== null || activeSignalOwnerEnvironment !== undefined
-				? currentExplicitSignalOwner()
+				? (deferredOwnerToken() ?? currentExplicitSignalOwner())
 				: null;
 		if (
 			SIGNAL_BINDINGS_ENABLED ||
