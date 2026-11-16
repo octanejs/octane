@@ -58,7 +58,7 @@ const FUNCTION_SITES = new Map([
 /**
  * `view({ of })`, `write({ creates, patches, removes })`, a FeedChange's `put`,
  * `remove`, `read`, and the store options `feeds`, `journal.writes`, and
- * `journal.receipt`.
+ * `journal.receipt`. A view's `with` relations are sites too, read apart.
  */
 const PROPERTY_SITES = new Set([
 	'of',
@@ -389,6 +389,17 @@ export function analyzeDataContracts(source, filename, contractExports) {
 			const name = node.key.name ?? node.key.value;
 			if (PROPERTY_SITES.has(name)) {
 				if (site(node.value, name)) walk(node.value, node, 'value', visit);
+				return false;
+			}
+			// `view({ with: { author: [User, 'authorId'] } })`: each relation names its entity first.
+			const relations = name === 'with' ? unwrapTsExpr(node.value) : null;
+			if (relations?.type === 'ObjectExpression') {
+				for (const relation of relations.properties) {
+					const pair = relation.type === 'Property' ? unwrapTsExpr(relation.value) : null;
+					const entity = pair?.type === 'ArrayExpression' ? pair.elements[0] : null;
+					if (!entity) walk(relation, relations, 'properties', visit);
+					else if (site(entity, name)) walk(entity, pair, 'elements', visit);
+				}
 				return false;
 			}
 		}
