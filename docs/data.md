@@ -31,7 +31,7 @@ the same task as the event that caused it.
 
 | Contract | Options | Notes |
 | --- | --- | --- |
-| `read` | `name`, `input?`, `output`, `entities?`, `tags?`, `fresh = 0`, `keep = 300000`, `expire = Infinity`, `persist = true`, `version = ''` | Times are milliseconds; a `keep` of 2³¹ ms or more (such as `Infinity`) keeps the value for the session. `entities(output)` returns `Entity.from(...)` selections. |
+| `read` | `name`, `input?`, `output`, `entities?`, `tags?`, `fresh = 0`, `keep = 300000`, `expire = Infinity`, `persist = true`, `cancel = false`, `version = ''` | Times are milliseconds; a `keep` of 2³¹ ms or more (such as `Infinity`) keeps the value for the session. `entities(output)` returns `Entity.from(...)` selections. `cancel` aborts a load once nothing observes the read or waits on it. |
 | `write` | `name`, `input`, `output?`, one of `creates`/`patches`/`removes`, `draft?`, `serverId?`, `record?`, `form?`, `invalidates?` | `draft(input, id)` defaults to the input plus the new ID. `record(output)` locates the saved record so views take it without reloading. |
 | `entity` | `name`, `schema`, `key = 'id'` | `id(value)` is `String(value[key])`. |
 | `view` | `name`, `of`, `order`, `where?`, `input?`, `limit = 20`, `max = 500`, plus the read options | A read whose input is `{ ...params, offset, limit }` and whose value is that window's rows. `view.view.where` and `view.view.compare` are exposed for handlers. |
@@ -55,8 +55,20 @@ same order.
   prefetching and refreshing start a load; readers of one entry share it.
   Inputs are compared by value.
 - `getSnapshot()` is stable between changes. A snapshot is
-  `{ status, value, error, refreshing, stale, more }`; `value` is the newest
-  confirmed value with pending edits applied.
+  `{ status, value, error, refreshing, stale, more, preview }`; `value` is the
+  newest confirmed value with pending edits applied, or, while `preview` is
+  true, a provisional value of the load in flight.
+- A transport may send previews of a read (not of a view) while its reply is
+  pending. Each is validated by the read's `output`; an invalid one is
+  skipped. A read with no confirmed value to show is `ready` with the newest
+  preview, in the order they were sent whatever order they validate in. The
+  reply replaces it in one snapshot change; a failure removes it, and the read
+  stays failed until it is refreshed. A read with a confirmed value keeps
+  showing that value. A preview takes no pending edit, shares no record, and
+  is never saved or dehydrated. Previews of a superseded load are ignored.
+- A read with `cancel: true` aborts its load when its last subscriber leaves,
+  unless a `prefetch()` or `refresh()` joined that load, which then runs to
+  its end. The confirmed value stays, and the next subscriber loads again.
 - A write is sent once. A transport rejection after dispatch leaves it
   uncertain (`DataUncertainError`), with its edit shown, until
   `settle(operationId, confirmed, value?)` names the outcome.
@@ -84,6 +96,32 @@ same order.
 - `dehydrate()` returns text safe inside `<script type="application/json">`.
   Call it on a server store after the render completes, then retire the store.
 
+## Pages
+
+`pages(store, view, params?, size?)` reads a view `size` rows at a time.
+`pages(store, read, input, { rows, next })` reads a list whose server returns
+a page and a cursor: `rows(page)` is a page's rows and `next(page, input)` the
+input of the page after it, or `null`/`undefined` at the end. Both return one
+handle per store for equal arguments, with `getSnapshot`, `subscribe`,
+`loadMore` and `refresh`.
+
+- A snapshot is a read snapshot of the joined rows plus `loadingMore` and
+  `loadMore`. `value` is the same array until a row changes. The page being
+  added shows its preview among the rows, with `preview` true.
+- `loadMore()` adds the next page once the last is confirmed. While that page
+  loads, it joins the load. While a page has failed, it loads that page
+  again, at the same input.
+- A cursor list adds a page only at an input no page of it has read, so a
+  missing or repeated cursor ends it. An empty page with a new cursor goes on.
+- When a confirmed page of a cursor list names another next page than the one
+  loaded, because it was refreshed, invalidated or reloaded, the pages that
+  now follow load out of sight. The list shows what it last showed, with
+  `refreshing` true, and replaces its rows once every replacement is
+  confirmed. If one fails, the list stays, with `error` set, and `loadMore()`
+  loads that page again. `refresh()` reads the chain again from its first
+  page this way, for as many pages as the list showed.
+- A view's `refresh()` reloads every page at once.
+
 ## Wire protocol
 
 Transports and handlers exchange devalue-encoded messages, so dates, maps and
@@ -102,10 +140,18 @@ type DataReply =
 	| { ok: true; value: unknown; refreshed?: Array<{ name: string; input: unknown; value: unknown }> }
 	| { ok: false; code: string; data?: unknown; issues?: SchemaIssue[] };
 
-type Transport = (request: DataRequest, signal: AbortSignal) => Promise<DataReply>;
+type Transport = (
+	request: DataRequest,
+	signal: AbortSignal,
+	preview?: (value: unknown) => void,
+) => Promise<DataReply>;
 ```
 
 A resolved reply is definitive. A rejection means the outcome is unknown. A
+read's transport may call `preview` with whole provisional values before it
+resolves; `httpTransport` and `serverTransport` send none. `signal` aborts
+when the store no longer wants the request: it was superseded, the store
+retired, or a `cancel` read lost its last subscriber. A
 write may ask for at most eight reads back; the rest reload on their own.
 `httpTransport` rejects any response that is not a reply, such as a proxy's
 error page.
@@ -221,6 +267,11 @@ store once hydrated. Only the newest submission's outcome is shown.
   except a replica's reload never joins a request that may predate it. One
   upstream connection serves every replica listening to a feed with the same
   parameters.
+- A read's request runs while a replica waits on it. A replica lets go when
+  its store aborts the request's signal, and the owner aborts its transport's
+  signal once the last replica waiting has let go. Each preview reaches every
+  replica waiting on the request, and one that joins it starts from the
+  newest.
 - `serveDataOwner(options)` is the data worker module's entry. The `dataWorker`
   option of `octane()` from `octane/compiler/vite` or `@octanejs/vite-plugin`,
   and of `OctaneRspackPlugin`, emits it at `/_octane/data-worker.js`.

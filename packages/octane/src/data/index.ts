@@ -44,5 +44,5 @@ export type {
 } from './contracts.js';
 export type { DataStore, DataStoreOptions, ReadHandle, ReadSnapshot } from './store.js';
 export type { FormHandle, FormSeed, FormState, FormView } from './form.js';
-export type { PagesHandle, PagesSnapshot } from './pages.js';
+export type { PageCursor, PagesHandle, PagesSnapshot } from './pages.js';
 export type { FeedHandle, FeedSnapshot } from './feeds.js';

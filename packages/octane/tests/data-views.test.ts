@@ -868,6 +868,21 @@ describe('octane/data pages', () => {
 		expect(list.getSnapshot().value!.map((book) => book.title)).toEqual(allTitles(6));
 	});
 
+	it('loads a page again as it is added, when what the store holds of it is stale', async () => {
+		const server = libraryServer();
+		const store = createDataStore({ transport: server.transport });
+		// Loaded ahead of any reader, and stale at once: the view is fresh for no time.
+		await store.prefetch(library, { offset: 3, limit: 3 });
+		const list = pages(store, library);
+		list.subscribe(() => {});
+		await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+
+		const requests = server.log.length;
+		await list.loadMore();
+		expect(server.log).toHaveLength(requests + 1);
+		expect(list.getSnapshot().value!.map((book) => book.title)).toEqual(allTitles(6));
+	});
+
 	it('keeps the later pages shown while an expired earlier page reloads', async () => {
 		const server = libraryServer();
 		let holding = false;

@@ -50,8 +50,9 @@ export function useRead<T>(
 }
 
 /**
- * Show a view a page at a time, from a handle, `pages(store, view, params)`.
- * `more` says whether another page has rows, and `loadMore` shows it. It does
+ * Show a list a page at a time, from a handle: `pages(store, view, params)`,
+ * or `pages(store, read, input, cursor)` for a read that returns a cursor.
+ * `more` says whether another page follows, and `loadMore` shows it. It does
  * not suspend.
  */
 export function usePages<T>(handle: PagesHandle<T>): PagesSnapshot<T> {

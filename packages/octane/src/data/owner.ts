@@ -14,6 +14,11 @@
  *   replica shows it from the moment it is sent, and settles it as that
  *   replica does: confirmed with the same reply, refused, or uncertain until
  *   one of them settles it.
+ * - A read's request runs while a replica waits on it. A replica lets go of one
+ *   when its store does, as a local store aborts its transport's signal; the
+ *   owner aborts its own transport's once the last replica waiting has. Each
+ *   preview the transport sends reaches every replica waiting, and one that
+ *   joins later starts from the newest.
  * - Equal reads in flight at once are one request, except that a replica
  *   asking again for a read it asked for before, to reload it, never joins a
  *   request that may predate the change it reloads for. The newest read
@@ -107,6 +112,8 @@ type ToOwner =
 			/** This tab saves the read's value, so the owner keeps its reply to save for it. */
 			readonly keep?: boolean;
 	  }
+	/** This tab no longer waits on the request it sent as `id`. */
+	| { readonly t: 'cancel'; readonly id: number }
 	| { readonly t: 'listen'; readonly id: number; readonly request: FeedRequest }
 	| { readonly t: 'unlisten'; readonly id: number }
 	/** A value this tab holds, loaded at `at`, for the others: a seed, or one newer than a seed offered. */
@@ -152,6 +159,8 @@ type ToReplica =
 			readonly kept?: boolean;
 	  }
 	| { readonly t: 'failed'; readonly id: number; readonly error: unknown }
+	/** A provisional value of the read asked for as `id`, ahead of its reply. */
+	| { readonly t: 'preview'; readonly id: number; readonly value: unknown }
 	| { readonly t: 'frame'; readonly id: number; readonly frame: FeedFrame }
 	| { readonly t: 'end'; readonly id: number; readonly error?: unknown }
 	/** Another replica loaded a read. */
@@ -183,6 +192,20 @@ export interface DataOwner {
 	connect(port: OwnerPort): void;
 }
 
+/** One request the owner made, shared by every replica that asked for it while it ran. */
+interface Asking {
+	/** When it started. */
+	readonly at: number;
+	/** Each replica still waiting on it, with the ID it asked under; the rest are told a read's value. */
+	readonly waiting: Array<readonly [OwnerPort, number]>;
+	/** Whether a tab that asked saves the read's value. */
+	keep: boolean;
+	/** Aborts the transport once no replica waits. */
+	readonly abort: AbortController;
+	/** The newest preview sent, for a replica that joins after it. */
+	preview: { readonly value: unknown } | null;
+}
+
 interface Upstream {
 	readonly members: Map<OwnerPort, number>;
 	readonly abort: AbortController;
@@ -210,11 +233,9 @@ export function createDataOwner(options: {
 	/** Reads in flight, by wire key, so equal reads share one request. */
 	const reading = new Map<string, Promise<DataReply>>();
 	const upstreams = new Map<string, Upstream>();
-	/** When each shared read started, and the replicas that asked for it; the rest are told its value. */
-	const asked = new WeakMap<
-		Promise<DataReply>,
-		{ readonly at: number; readonly ports: Set<OwnerPort>; keep: boolean }
-	>();
+	const asked = new WeakMap<Promise<DataReply>, Asking>();
+	/** The requests that have not ended, where a replica letting go of one finds it. */
+	const flying = new Set<Asking>();
 	/** When the last read started: each starts later than every read before it, so they have an order. */
 	let lastStart = 0;
 	/** The newest read started for each wire key: only its value is told to the others. */
@@ -473,17 +494,31 @@ export function createDataOwner(options: {
 		let shared = receipt ? receipts.get(key) : fresh ? undefined : reading.get(key);
 		if (!shared) {
 			const at = (lastStart = Math.max(lastStart + 1, hostDateNow()));
+			const asking: Asking = {
+				at,
+				waiting: [],
+				keep: false,
+				abort: new AbortController(),
+				preview: null,
+			};
 			const started = (shared = Promise.resolve().then(() =>
-				transport(payload, new AbortController().signal),
+				transport(payload, asking.abort.signal, (value) => {
+					asking.preview = { value };
+					for (const [port, member] of asking.waiting)
+						post(port, { t: 'preview', id: member, value });
+				}),
 			));
-			const asking = { at, ports: new Set<OwnerPort>(), keep: false };
 			asked.set(started, asking);
+			flying.add(asking);
 			reading.set(key, started);
 			newest.set(key, started);
 			const done = () => {
+				flying.delete(asking);
 				if (reading.get(key) === started) reading.delete(key);
 				if (newest.get(key) === started) newest.delete(key);
 			};
+			// A request no replica waits on is no longer one to join.
+			asking.abort.signal.addEventListener('abort', done, { once: true });
 			if (receipt) {
 				receipts.set(key, started);
 				// An answer that is not an outcome is asked for again; the oldest outcomes are forgotten.
@@ -514,7 +549,8 @@ export function createDataOwner(options: {
 							at,
 							kept: kept.get(cacheKey)?.at === at,
 						};
-						for (const port of replicas) if (!asking.ports.has(port)) post(port, value);
+						for (const port of replicas)
+							if (!asking.waiting.some(([asker]) => asker === port)) post(port, value);
 					},
 					() => {},
 				);
@@ -523,12 +559,24 @@ export function createDataOwner(options: {
 		}
 		const asking = asked.get(shared)!;
 		const { at } = asking;
-		asking.ports.add(from);
+		asking.waiting.push([from, id]);
 		asking.keep ||= !!keep;
+		if (asking.preview) post(from, { t: 'preview', id, value: asking.preview.value });
 		shared.then(
 			(reply) => post(from, { t: 'reply', id, reply, at, kept: kept.get(cacheKey)?.at === at }),
 			fail,
 		);
+	}
+
+	/** A replica let go of the request it sent as `id`, which ends once no replica waits on it. */
+	function cancel(from: OwnerPort, id: number): void {
+		for (const asking of flying) {
+			const index = asking.waiting.findIndex(([port, member]) => port === from && member === id);
+			if (index < 0) continue;
+			asking.waiting.splice(index, 1);
+			if (asking.waiting.length === 0) asking.abort.abort();
+			return;
+		}
 	}
 
 	function subscribe(from: OwnerPort, id: number, payload: FeedRequest): void {
@@ -608,6 +656,7 @@ export function createDataOwner(options: {
 				}
 				heard.set(port, hostDateNow());
 				if (message.t === 'request') request(port, message);
+				else if (message.t === 'cancel') cancel(port, message.id);
 				else if (message.t === 'listen') subscribe(port, message.id, message.request);
 				else if (message.t === 'unlisten') unsubscribe(port, message.id);
 				else if (message.t === 'retire') signOut();
@@ -677,6 +726,8 @@ export function createReplica(
 		{
 			readonly request: DataRequest;
 			readonly fresh: boolean;
+			readonly signal: AbortSignal;
+			readonly preview: ((value: unknown) => void) | undefined;
 			resolve(reply: DataReply): void;
 			reject(error: unknown): void;
 		}
@@ -708,18 +759,34 @@ export function createReplica(
 	const ownerKept = (value: unknown, at: number) => {
 		if (typeof value === 'object' && value !== null) kept.set(value, at);
 	};
-	/** Ask the owner to make `request`. */
-	const ask = (request: DataRequest, fresh: boolean) =>
+	/** Ask the owner to make `request`, and let go of it when `signal` aborts. */
+	const ask = (
+		request: DataRequest,
+		fresh: boolean,
+		signal: AbortSignal,
+		preview?: (value: unknown) => void,
+	) =>
 		new Promise<DataReply>((resolve, reject) => {
+			if (signal.aborted) return reject(signal.reason);
 			const id = ++next;
-			replies.set(id, { request, fresh, resolve, reject });
+			replies.set(id, { request, fresh, signal, preview, resolve, reject });
+			signal.addEventListener(
+				'abort',
+				() => {
+					// Unless it was answered, or asked again of another owner under a new ID.
+					if (!replies.delete(id)) return;
+					send({ t: 'cancel', id });
+					reject(signal.reason);
+				},
+				{ once: true },
+			);
 			const receipt = request.kind === 'read' && request.name === receiptName;
 			const saves = request.kind === 'read' && saved.has(request.name);
 			send({ t: 'request', id, request, fresh, receipt, keep: saves });
 		});
 
-	const transport: Transport = (request, signal) => {
-		if (!port) return local.transport(request, signal);
+	const transport: Transport = (request, signal, preview) => {
+		if (!port) return local.transport(request, signal, preview);
 		let fresh = false;
 		if (request.kind !== 'write') {
 			const key = `${request.kind}\n${entryKey(request.name, request.input)}`;
@@ -727,7 +794,7 @@ export function createReplica(
 			askedFor.add(key);
 			if (askedFor.size > 512) askedFor.delete(askedFor.values().next().value!);
 		}
-		return ask(request, fresh);
+		return ask(request, fresh, signal, preview);
 	};
 
 	const viaOwner: Listener = (request, signal) => ({
@@ -857,18 +924,16 @@ export function createReplica(
 	/**
 	 * Stop waiting on the owner's port: a write already sent to it may have
 	 * been made, so it is uncertain, never sent again; every other request is
-	 * asked again, of `ask`. Each feed connects again, through whatever serves
+	 * asked again, of `again`. Each feed connects again, through whatever serves
 	 * this tab now.
 	 */
-	function abandon(
-		ask: (request: DataRequest, fresh: boolean) => Promise<DataReply>,
-		refused: boolean,
-	) {
+	function abandon(again: typeof ask, refused: boolean) {
 		const pending = [...replies.values()];
 		replies.clear();
 		for (const item of pending) {
 			if (item.request.kind === 'write' && !refused) item.reject(new Error(LOST));
-			else ask(item.request, item.fresh).then(item.resolve, item.reject);
+			else
+				again(item.request, item.fresh, item.signal, item.preview).then(item.resolve, item.reject);
 		}
 		for (const feed of feeds.values()) feed.end(new Error(LOST));
 		// Persistence calls are asked again of whatever serves this tab now.
@@ -888,7 +953,7 @@ export function createReplica(
 		decide(false);
 		clearHostTimeout(beat);
 		inner.fence(false);
-		abandon((request) => local.transport(request, new AbortController().signal), refused);
+		abandon((request, _, signal, preview) => local.transport(request, signal, preview), refused);
 	}
 
 	/** The account was signed out, or another signed in: nothing more is shown. */
@@ -1100,6 +1165,9 @@ export function createReplica(
 					} else pending?.reject(message.error);
 					break;
 				}
+				case 'preview':
+					replies.get(message.id)?.preview?.(message.value);
+					break;
 				case 'frame':
 					feeds.get(message.id)?.push(message.frame);
 					break;
