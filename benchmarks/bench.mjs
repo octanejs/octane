@@ -282,6 +282,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n, quick) => [String(n), ...(quick ? ['--quick'] : [])] }],
 	},
 	{
+		// alien-signals' own propagate and memory benchmarks, run against
+		// alien-signals and against the scoped engine.
+		name: 'alien-signals-upstream',
+		cwd: 'scoped-signals',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run-alien-upstream.mjs', args: () => [] }],
+	},
+	{
 		// Renderer-free production trace-event retention before and after the
 		// bounded history fills, with exact chronological sequence controls.
 		name: 'scoped-signals-trace',

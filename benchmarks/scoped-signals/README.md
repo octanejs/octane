@@ -134,6 +134,49 @@ stops for its imperative owner; it does not implement Octane's retirement,
 requests, history, or rendering. This is not a comparison of all those features,
 nor a comparison against the old `@octanejs/alien-signals` binding.
 
+## alien-signals' own benchmarks
+
+`run-alien-upstream.mjs` runs the two benchmarks alien-signals ships in its
+repository against alien-signals and against Octane's engine. The files in
+`alien-upstream/benchs` are copied from the upstream commit named in their
+headers, under its MIT license (`alien-upstream/LICENSE`), with one change:
+each effect body is `void last()`. The original returns the value it read, and
+alien-signals 3.2.1 calls an effect's return value as its cleanup, so the
+upstream files throw on their first update.
+
+- `propagate.mjs`: `w` chains of `h` computed values over one signal, each
+  chain ending in an effect, timed with mitata for one write to the signal.
+- `memoryUsage.mjs`: the heap 10,000 signals, 10,000 computed values and
+  10,000 effects each take, and a 100 × 100 tree with an effect on every node.
+
+| Lane | What runs |
+| --- | --- |
+| `alien` | The `alien-signals` package. |
+| `octane` | `alien-upstream/octane.mjs`: `createScope`, `signal$` and `derived$`. Octane has no effect primitive, so `effect` is a derived value with a subscriber that reads it again, which holds for any effect body. |
+| `octane-direct` | The same, with each `effect(() => x())` rewritten to subscribe to `x` itself, which is what an application writes when the body reads one value. |
+
+Every lane is bundled with the same production options.
+
+```bash
+node benchmarks/scoped-signals/run-alien-upstream.mjs            # with the JIT, as an application runs
+node benchmarks/scoped-signals/run-alien-upstream.mjs --jitless  # as upstream's own `bench` script runs
+node benchmarks/scoped-signals/run-alien-upstream.mjs --only=memory
+```
+
+`BENCH_JSON=<file>` also writes the rows as JSON.
+
+Reading the results:
+
+- Upstream runs `propagate.mjs` with `--jitless`. That measures how much code
+  an update executes; the default run measures what an application sees.
+- alien-signals' time for `propagate: 100 * 100` depends on how V8 compiles
+  the caller: inside mitata's one-expression closure it is about half what the
+  same graph takes in a plain loop, and adding a counter to the closure moves
+  it most of the way there. Octane's time is the same in all three. The smaller
+  graphs reproduce in a plain loop for both.
+- The heap figures include Octane's key string and scope map entry for each
+  node, which alien-signals has no equivalent of.
+
 ## Running
 
 ```bash
