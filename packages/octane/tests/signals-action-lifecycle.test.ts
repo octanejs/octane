@@ -139,6 +139,40 @@ describe('native signal Action lifetimes', () => {
 		});
 	});
 
+	it('keeps a derived value that starts reading a staged signal out of committed reads', async () => {
+		const { createScope } = await import('octane/signals');
+		const scope = createScope({ scopeKey: 'staged-new-dependency' });
+		const count = scope.signal$('count', 0);
+		const enabled = scope.signal$('enabled', false);
+		const shown = scope.derived$('shown', () => (enabled.get() ? count.get() : -1));
+		expect(shown.get()).toBe(-1);
+		// Stale now, and reading `count` only once it computes again, inside the transition.
+		enabled.set(true);
+		const release = deferred<void>();
+		let staged: number | undefined;
+		let action!: Promise<void>;
+		startTransition(() => {
+			action = (async () => {
+				startTransition(() => {
+					count.set(2);
+					staged = shown.get();
+				});
+				await release.promise;
+			})();
+		});
+		try {
+			expect(staged).toBe(2);
+			expect(shown.get()).toBe(0);
+		} finally {
+			await act(() => {
+				release.resolve();
+				return action;
+			});
+		}
+		expect(shown.get()).toBe(2);
+		scope.dispose();
+	});
+
 	it('exposes staged reads inside an explicit nested transition', async () => {
 		const state = await pendingAction();
 		try {

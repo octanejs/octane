@@ -717,6 +717,7 @@ export function installPublicScope(): void {
 		if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
 		const node = createScopeNode<T>(this, key, 'derived');
 		node.compute = (target) => derivedState(target, compute);
+		node.plain = compute;
 		initializeScopeRetention(this, node);
 		// Live derived values always reflect live inputs, including edits made
 		// before this node was created. Only an adoption frame reads historical

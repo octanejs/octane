@@ -357,34 +357,43 @@ describe('scoped synchronous signals', () => {
 	});
 
 	it.each([
-		{ blocked: 'pending', indirect: false },
-		{ blocked: 'error', indirect: false },
-		{ blocked: 'pending', indirect: true },
-		{ blocked: 'error', indirect: true },
+		{ blocked: 'pending', indirect: false, again: false },
+		{ blocked: 'error', indirect: false, again: false },
+		{ blocked: 'pending', indirect: true, again: false },
+		{ blocked: 'error', indirect: true, again: false },
+		// The last successful computation read the foreign value again, once it was current.
+		{ blocked: 'pending', indirect: false, again: true },
+		{ blocked: 'error', indirect: true, again: true },
 	] as const)(
-		'revokes a retained foreign value after a $blocked branch stops reading it (indirect=$indirect)',
-		({ blocked, indirect }) => {
+		'revokes a retained foreign value after a $blocked branch stops reading it (indirect=$indirect, again=$again)',
+		({ blocked, indirect, again }) => {
 			const shared = owner('private-data');
 			const intermediate = owner('intermediate');
 			const view = owner('view');
 			const secret$ = shared.signal$('secret', 'old account');
 			const source$ = indirect ? intermediate.derived$('source', () => secret$.get()) : secret$;
 			const unavailable$ = view.signal$('unavailable', false);
+			const revision$ = view.signal$('revision', 0);
 			const failure =
 				blocked === 'pending' ? new Promise<never>(() => {}) : new Error('not available');
 			const card$ = view.derived$('card', () => {
 				if (unavailable$.get()) throw failure;
-				return { value: source$.get() };
+				return { value: source$.get(), revision: revision$.get() };
 			});
 			const observed: unknown[] = [];
 			card$.subscribe(() => {
 				const snapshot = card$.snapshot();
 				observed.push(snapshot.status === 'error' ? snapshot.error : snapshot.status);
 			});
-			expect(card$.get()).toEqual({ value: 'old account' });
+			expect(card$.get()).toEqual({ value: 'old account', revision: 0 });
+			if (again) {
+				revision$.set(1);
+				expect(card$.get()).toEqual({ value: 'old account', revision: 1 });
+			}
+			const retained = { value: 'old account', revision: again ? 1 : 0 };
 			unavailable$.set(true);
 			expect(card$.snapshot().status).toBe(blocked);
-			expect(card$.latest(null)).toEqual({ value: 'old account' });
+			expect(card$.latest(null)).toEqual(retained);
 
 			shared.dispose();
 
@@ -396,6 +405,29 @@ describe('scoped synchronous signals', () => {
 			});
 		},
 	);
+
+	it('revokes a foreign value that a computation started reading after a local one', () => {
+		const shared = owner('started-data');
+		const view = owner('started-view');
+		const secret$ = shared.signal$('secret', 'old account');
+		const foreign$ = view.signal$('foreign', false);
+		const blocked$ = view.signal$('blocked', false);
+		const card$ = view.derived$('card', () => {
+			if (blocked$.get()) throw new Error('blocked');
+			return foreign$.get() ? secret$.get() : 'local';
+		});
+		// Current already, so the computation reads it as a plain value.
+		expect(secret$.get()).toBe('old account');
+		expect(card$.get()).toBe('local');
+		foreign$.set(true);
+		expect(card$.get()).toBe('old account');
+		blocked$.set(true);
+		expect(card$.latest(null)).toBe('old account');
+
+		shared.dispose();
+
+		expect(() => card$.latest(null)).toThrow(ScopeDisposedError);
+	});
 
 	it('releases an old foreign lifetime after a whole replacement succeeds', () => {
 		const previous = owner('previous');
@@ -550,6 +582,39 @@ describe('scoped synchronous signals', () => {
 		expect(() => async$.get()).toThrow(/synchronous/);
 		base$.set(2);
 		expect(base$.get()).toBe(2);
+	});
+
+	it('wakes a waiter on a pending computation once a dependency changes', async () => {
+		const scope = owner();
+		const gate$ = scope.signal$('gate', true);
+		const value$ = scope.derived$('value', () => {
+			if (gate$.get()) throw new Promise<never>(() => {});
+			return 1;
+		});
+		let waiting: unknown;
+		try {
+			value$.get();
+		} catch (thrown) {
+			waiting = thrown;
+		}
+		expect(typeof (waiting as PromiseLike<unknown>)?.then).toBe('function');
+		gate$.set(false);
+		const woken = Promise.resolve(waiting).then(() => 'woken');
+		const still = new Promise((resolve) => setTimeout(() => resolve('waiting'), 50));
+		await expect(Promise.race([woken, still])).resolves.toBe('woken');
+		expect(value$.get()).toBe(1);
+	});
+
+	it('reports a cycle that only a later computation makes', () => {
+		const scope = owner();
+		const loop$ = scope.signal$('loop', false);
+		let cycle$: ReturnType<Scope['derived$']>;
+		cycle$ = scope.derived$('cycle', () => (loop$.get() ? cycle$.get() : 1));
+		expect(cycle$.get()).toBe(1);
+		loop$.set(true);
+		expect(() => cycle$.get()).toThrow(SignalCycleError);
+		loop$.set(false);
+		expect(cycle$.get()).toBe(1);
 	});
 
 	it('rejects duplicate and empty keys instead of merging unrelated nodes', () => {

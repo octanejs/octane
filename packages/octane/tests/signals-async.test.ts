@@ -104,7 +104,13 @@ describe('scoped promise resources', () => {
 		const observed: unknown[] = [];
 		const load = query('retirement-observer', (_argument: undefined, { signal }) => {
 			signal.addEventListener('abort', () => {
-				for (const read of [() => card$.get(), () => card$.latest(null), () => card$.snapshot()]) {
+				const reads = [
+					() => value$.get(),
+					() => card$.get(),
+					() => card$.latest(null),
+					() => card$.snapshot(),
+				];
+				for (const read of reads) {
 					try {
 						observed.push(read());
 					} catch (error) {
@@ -120,6 +126,7 @@ describe('scoped promise resources', () => {
 		data.dispose();
 
 		expect(observed).toEqual([
+			expect.any(ScopeDisposedError),
 			expect.any(ScopeDisposedError),
 			expect.any(ScopeDisposedError),
 			expect.any(ScopeDisposedError),

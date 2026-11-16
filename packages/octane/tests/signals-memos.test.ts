@@ -40,6 +40,38 @@ export function Reader(props) @{
 		}
 	});
 
+	it('recomputes a memo whose derived read a change has reached', () => {
+		const { Reader } = loadCompiledFixtureSource(
+			`import { useMemo } from 'octane';
+import 'octane/signals';
+export function Reader(props) @{
+  const value = useMemo(props.read$);
+  <output>{value as string}</output>
+}`,
+			{ id: 'derived-reader.tsrx', mode: 'client' },
+		);
+		const scope = createScope({ scopeKey: 'derived-reader' });
+		const value$ = scope.signal$('value', 'zero');
+		const shown$ = scope.derived$('shown', () => `${value$.get()}!`);
+		// Computed twice outside any render first, as a value read elsewhere is.
+		expect(shown$.get()).toBe('zero!');
+		value$.set('first');
+		expect(shown$.get()).toBe('first!');
+		const props = { read$: () => shown$.get() };
+		const root = mount(Reader, props);
+		try {
+			const output = root.find('output');
+			expect(output.textContent).toBe('first!');
+			for (const next of ['second', 'third', 'fourth']) {
+				flushSync(() => value$.set(next));
+				expect(output.textContent).toBe(`${next}!`);
+			}
+		} finally {
+			root.unmount();
+			scope.dispose();
+		}
+	});
+
 	it('refreshes inferred reads after a cache hit without changing explicit dependency contracts', () => {
 		const scope = createScope({ scopeKey: 'memo-contracts' });
 		const value$ = scope.signal$('value', 'first');
