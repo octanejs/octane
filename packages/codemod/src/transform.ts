@@ -5882,12 +5882,31 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		const list = skipWrappers(deps);
 		if (!this.emitsTsrx || !ts.isArrayLiteralExpression(list)) return;
 		type Member = ts.PropertyAccessExpression | ts.ElementAccessExpression;
+		let memberReads: Map<Member, boolean> | undefined;
+		const recordStateRead = (member: Member, coercesNumber: boolean) => {
+			memberReads?.set(member, coercesNumber);
+			return undefined;
+		};
 		const read = (
 			expr: ts.Expression,
 			visit: (member: Member, coercesNumber: boolean) => Member | undefined,
 			coercesNumber = false,
 		): Member | undefined => {
 			const member = skipWrappers(expr);
+			if (ts.isSpreadElement(member)) {
+				const value = skipWrappers(member.expression);
+				const stateProof = visit === recordStateRead;
+				if (stateProof && !ts.isArrayLiteralExpression(value)) return;
+				// A custom iterator can observe elements of a fresh array.
+				return read(value, visit, coercesNumber || stateProof);
+			}
+			if (ts.isArrayLiteralExpression(member)) {
+				for (const item of member.elements) {
+					const found = read(item, visit, coercesNumber);
+					if (found) return found;
+				}
+				return;
+			}
 			if (ts.isTypeOfExpression(member) || ts.isVoidExpression(member))
 				return read(member.expression, visit);
 			if (
@@ -5942,19 +5961,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				return visit(member, coercesNumber);
 		};
 		// The closed-state proof must account for every field read in this list.
-		let members: Map<Member, boolean> | undefined;
 		const nestedRead = (member: ts.PropertyAccessExpression) => {
-			if (!members) {
-				const reachable = new Map<Member, boolean>();
-				for (const entry of list.elements) {
-					read(entry, (dep, coercesNumber) => {
-						reachable.set(dep, coercesNumber);
-						return undefined;
-					});
-				}
-				members = reachable;
+			if (!memberReads) {
+				memberReads = new Map();
+				for (const entry of list.elements) read(entry, recordStateRead);
 			}
-			return members.get(member);
+			return memberReads.get(member);
 		};
 		let opaqueCoercion = false;
 		const check = (member: Member, coercesNumber: boolean) => {
