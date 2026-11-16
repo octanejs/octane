@@ -20,6 +20,260 @@ afterEach(() => {
 	for (const scope of owners.splice(0)) scope.dispose();
 });
 
+describe('keyless signals', () => {
+	it('reads, writes and derives like keyed ones, with no room in the scope', () => {
+		const scope = owner();
+		const count$ = scope.signal$(null, 1);
+		const doubled$ = scope.derived$(null, () => count$.get() * 2);
+		const keyed$ = scope.derived$('keyed', () => doubled$.get() + 1);
+		expect([count$.get(), doubled$.get(), keyed$.get()]).toEqual([1, 2, 3]);
+		count$.set((value) => value + 1);
+		expect([count$.get(), doubled$.get(), keyed$.get()]).toEqual([2, 4, 5]);
+		expect(scope.get(count$)).toBe(2);
+		scope.set(count$, 5);
+		expect(doubled$.get()).toBe(10);
+		expect(scope.inspect().nodes.map((node) => node.key)).toEqual(['keyed']);
+	});
+
+	it('computes a keyless derived value only when read after a change', () => {
+		const scope = owner();
+		const count$ = scope.signal$(null, 1);
+		let runs = 0;
+		const doubled$ = scope.derived$(null, () => (runs++, count$.get() * 2));
+		expect(runs).toBe(0);
+		expect(doubled$.get()).toBe(2);
+		expect(doubled$.get()).toBe(2);
+		count$.set(2);
+		count$.set(3);
+		expect(runs).toBe(1);
+		expect(doubled$.get()).toBe(6);
+		expect(runs).toBe(2);
+	});
+
+	it('tells subscribers and effects of keyless changes', () => {
+		const scope = owner();
+		const count$ = scope.signal$(null, 1);
+		const parity$ = scope.derived$(null, () => count$.get() % 2);
+		const heard: number[] = [];
+		const ran: number[] = [];
+		parity$.subscribe(() => heard.push(parity$.get()));
+		scope.effect(() => {
+			ran.push(parity$.get());
+		});
+		count$.set(3);
+		count$.set(4);
+		expect(heard).toEqual([0]);
+		expect(ran).toEqual([1, 0]);
+	});
+
+	it("rethrows a keyless computation's error until a dependency changes", () => {
+		const scope = owner();
+		const fail$ = scope.signal$(null, true);
+		const error = new Error('failed');
+		let runs = 0;
+		const value$ = scope.derived$(null, () => {
+			runs++;
+			if (fail$.get()) throw error;
+			return 'ok';
+		});
+		expect(() => value$.get()).toThrow(error);
+		expect(() => value$.get()).toThrow(error);
+		expect(runs).toBe(1);
+		expect(value$.snapshot()).toMatchObject({ status: 'error', error });
+		expect(value$.latest('fallback')).toBe('fallback');
+		fail$.set(false);
+		expect(value$.get()).toBe('ok');
+	});
+
+	it('rethrows a thrown thenable and computes again on the next read', () => {
+		const scope = owner();
+		const ready$ = scope.signal$(null, false);
+		const waiting = new Promise<never>(() => {});
+		let runs = 0;
+		const value$ = scope.derived$(null, () => {
+			runs++;
+			if (!ready$.get()) throw waiting;
+			return 'ready';
+		});
+		expect(() => value$.get()).toThrow();
+		expect(value$.snapshot().status).toBe('pending');
+		expect(runs).toBe(2);
+		ready$.set(true);
+		expect(value$.get()).toBe('ready');
+	});
+
+	it('reports cycles and rejects writes from keyless computations', () => {
+		const scope = owner();
+		const count$ = scope.signal$(null, 1);
+		let cycle$: ReturnType<Scope['derived$']>;
+		cycle$ = scope.derived$(null, () => cycle$.get());
+		expect(() => cycle$.get()).toThrow(SignalCycleError);
+		const writes$ = scope.derived$(null, () => {
+			count$.set(2);
+			return 1;
+		});
+		expect(() => writes$.get()).toThrow(SignalWriteError);
+		// Declaring a keyed signal is a write too.
+		const declares$ = scope.derived$(null, () => scope.signal$('declared', 0).get());
+		expect(() => declares$.get()).toThrow(SignalWriteError);
+		expect(count$.get()).toBe(1);
+	});
+
+	it('stops answering once its scope retires', () => {
+		const scope = createScope({ scopeKey: 'keyless-retiring' });
+		const count$ = scope.signal$(null, 1);
+		scope.dispose();
+		expect(() => count$.get()).toThrow(ScopeDisposedError);
+		expect(() => count$.set(2)).toThrow(ScopeDisposedError);
+		expect(() => scope.signal$(null, 1)).toThrow(ScopeDisposedError);
+	});
+
+	it('keeps a keyed computation that reads a keyless value of another scope tied to that scope', () => {
+		const shared = owner('keyless-shared');
+		const view = owner('keyless-view');
+		const secret$ = shared.signal$(null, 'old account');
+		const blocked$ = view.signal$('blocked', false);
+		const card$ = view.derived$('card', () => {
+			if (blocked$.get()) throw new Error('blocked');
+			return secret$.get();
+		});
+		expect(card$.get()).toBe('old account');
+		blocked$.set(true);
+		expect(card$.latest(null)).toBe('old account');
+		shared.dispose();
+		expect(() => card$.latest(null)).toThrow(ScopeDisposedError);
+	});
+});
+
+describe('scope effects', () => {
+	it('runs at once and again after each batch that changes what it read', () => {
+		const scope = owner();
+		const count$ = scope.signal$('count', 1);
+		const doubled$ = scope.derived$('doubled', () => count$.get() * 2);
+		const seen: number[] = [];
+		scope.effect(() => {
+			seen.push(doubled$.get());
+		});
+		expect(seen).toEqual([2]);
+		count$.set(2);
+		expect(seen).toEqual([2, 4]);
+		scope.batch(() => {
+			count$.set(3);
+			count$.set(4);
+		});
+		expect(seen).toEqual([2, 4, 8]);
+		// A change that leaves what it read equal does not run it.
+		const parity$ = scope.derived$('parity', () => count$.get() % 2);
+		const parities: number[] = [];
+		scope.effect(() => {
+			parities.push(parity$.get());
+		});
+		count$.set(6);
+		expect(parities).toEqual([0]);
+	});
+
+	it('follows the reads of its latest run only', () => {
+		const scope = owner();
+		const useA$ = scope.signal$('useA', true);
+		const a$ = scope.signal$('a', 'a1');
+		const b$ = scope.signal$('b', 'b1');
+		const seen: string[] = [];
+		scope.effect(() => {
+			seen.push(useA$.get() ? a$.get() : b$.get());
+		});
+		useA$.set(false);
+		a$.set('a2');
+		b$.set('b2');
+		expect(seen).toEqual(['a1', 'b1', 'b2']);
+	});
+
+	it('cleans up before each run and when stopped, and never runs after', () => {
+		const scope = owner();
+		const count$ = scope.signal$('count', 0);
+		const log: string[] = [];
+		const stop = scope.effect(() => {
+			const value = count$.get();
+			log.push(`run ${value}`);
+			return () => log.push(`clean ${value}`);
+		});
+		count$.set(1);
+		stop();
+		stop();
+		count$.set(2);
+		expect(log).toEqual(['run 0', 'clean 0', 'run 1', 'clean 1']);
+	});
+
+	it('may write signals, and its writes reach other readers in the same delivery', () => {
+		const scope = owner();
+		const source$ = scope.signal$('source', 1);
+		const mirror$ = scope.signal$('mirror', 0);
+		const mirrored: number[] = [];
+		scope.effect(() => {
+			mirror$.set(source$.get() * 10);
+		});
+		scope.effect(() => {
+			mirrored.push(mirror$.get());
+		});
+		source$.set(2);
+		expect(mirror$.get()).toBe(20);
+		expect(mirrored).toEqual([10, 20]);
+	});
+
+	it('stops with its scope after its cleanup reads current values', () => {
+		const scope = createScope({ scopeKey: 'effect-retiring' });
+		const count$ = scope.signal$('count', 1);
+		const cleaned: number[] = [];
+		scope.effect(() => {
+			count$.get();
+			return () => cleaned.push(count$.get());
+		});
+		scope.dispose();
+		expect(cleaned).toEqual([1]);
+	});
+
+	it('ends silently once an owner it reads retires', () => {
+		const shared = owner('effect-shared');
+		const view = owner('effect-view');
+		const value$ = shared.signal$('value', 1);
+		const seen: number[] = [];
+		view.effect(() => {
+			seen.push(value$.get());
+		});
+		expect(() => shared.dispose()).not.toThrow();
+		expect(seen).toEqual([1]);
+		expect(view.retired).toBe(false);
+	});
+
+	it('is rejected inside a computation and with something other than a function', () => {
+		const scope = owner();
+		const value$ = scope.signal$('value', 1);
+		const inside$ = scope.derived$('inside', () => {
+			scope.effect(() => {});
+			return value$.get();
+		});
+		expect(() => inside$.get()).toThrow(SignalWriteError);
+		expect(() => scope.effect(1 as never)).toThrow(TypeError);
+		const retired = createScope({ scopeKey: 'effect-after-dispose' });
+		retired.dispose();
+		expect(() => retired.effect(() => {})).toThrow(ScopeDisposedError);
+	});
+
+	it('runs every effect a write reaches when one of them throws, then reports the error', () => {
+		const scope = owner();
+		const count$ = scope.signal$('count', 0);
+		const error = new Error('effect failed');
+		const seen: number[] = [];
+		scope.effect(() => {
+			if (count$.get() === 1) throw error;
+		});
+		scope.effect(() => {
+			seen.push(count$.get());
+		});
+		expect(() => count$.set(1)).toThrow(error);
+		expect(seen).toEqual([0, 1]);
+	});
+});
+
 describe('scoped synchronous signals', () => {
 	it('returns immutable snapshots that remain stable after later writes', () => {
 		const scope = owner();
@@ -603,6 +857,18 @@ describe('scoped synchronous signals', () => {
 		const still = new Promise((resolve) => setTimeout(() => resolve('waiting'), 50));
 		await expect(Promise.race([woken, still])).resolves.toBe('woken');
 		expect(value$.get()).toBe(1);
+	});
+
+	it('refuses a write to a derived value that holds a plain value', () => {
+		const scope = owner();
+		const value$ = scope.signal$('value', 1);
+		const doubled$ = scope.derived$('doubled', () => value$.get() * 2);
+		expect(doubled$.get()).toBe(2);
+		value$.set(2);
+		expect(doubled$.get()).toBe(4);
+		const writable = doubled$ as unknown as { set(value: number): void };
+		expect(() => writable.set(10)).toThrow(TypeError);
+		expect(doubled$.get()).toBe(4);
 	});
 
 	it('reports a cycle that only a later computation makes', () => {

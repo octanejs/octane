@@ -12,6 +12,7 @@ import {
 	REACTIVE_DIRTY,
 	REACTIVE_MUTABLE,
 	REACTIVE_PENDING,
+	REACTIVE_SLOW,
 	REACTIVE_WATCHING,
 } from './graph-flags.js';
 import {
@@ -601,7 +602,8 @@ function promoteSlots(slots: readonly PendingSlot[]): void {
 	} finally {
 		candidateHooks.defer = deferred;
 	}
-	for (const { slot } of installs) slot.node.flags = REACTIVE_MUTABLE | REACTIVE_WATCHING;
+	for (const { slot } of installs)
+		slot.node.flags = REACTIVE_MUTABLE | REACTIVE_WATCHING | (slot.node.flags & REACTIVE_SLOW);
 	try {
 		for (const { receipt } of installs) receipt?.accept?.();
 	} finally {

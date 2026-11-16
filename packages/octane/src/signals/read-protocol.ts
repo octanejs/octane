@@ -134,6 +134,24 @@ export type NativeReadObserver = (source: NativeReadSource, version: number) => 
 let nativeReadObserver: NativeReadObserver | null = null;
 let nativeWriteGuarded = false;
 
+/**
+ * The states that change how a read or write behaves, one bit each, so the
+ * engine's hot paths test them together. Zero is the common case: reads see
+ * live nodes as they are, nothing collects them, and writes are allowed.
+ */
+export const READ_OBSERVED = 1;
+export const READ_ADOPTING = 2;
+export const READ_HISTORICAL = 4;
+export const READ_PENDING = 8;
+export const WRITE_GUARDED = 16;
+/** Any state in which a read is not a plain read of a live node. */
+export const READS_SPECIAL = READ_OBSERVED | READ_ADOPTING | READ_HISTORICAL | READ_PENDING;
+export let signalMode = 0;
+
+export function setSignalMode(bit: number, on: boolean): void {
+	signalMode = on ? signalMode | bit : signalMode & ~bit;
+}
+
 /** Private protocol implemented on native handles, never inferred from a get method. */
 export const NATIVE_DOM_VALUE: unique symbol = Symbol('octane.nativeDomValue');
 
@@ -291,6 +309,7 @@ export function setNativeAdoptionResolver(
 ): NativeAdoptionResolver | null {
 	const previous = nativeAdoptionResolver;
 	nativeAdoptionResolver = resolver;
+	setSignalMode(READ_ADOPTING, resolver !== null);
 	return previous;
 }
 
@@ -383,6 +402,7 @@ export function setNativeReadObserver(
 ): NativeReadObserver | null {
 	const previous = nativeReadObserver;
 	nativeReadObserver = observer;
+	setSignalMode(READ_OBSERVED, observer !== null);
 	return previous;
 }
 
@@ -394,11 +414,13 @@ export function setNativeReadObserver(
 export function beginNativeWriteGuard(): boolean {
 	const previous = nativeWriteGuarded;
 	nativeWriteGuarded = true;
+	setSignalMode(WRITE_GUARDED, true);
 	return previous;
 }
 
 export function endNativeWriteGuard(previous: boolean): void {
 	nativeWriteGuarded = previous;
+	setSignalMode(WRITE_GUARDED, previous);
 }
 
 export function isNativeWriteGuarded(): boolean {
