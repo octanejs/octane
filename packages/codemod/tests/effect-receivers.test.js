@@ -602,6 +602,56 @@ it('reports React SSR effects in sequence and template hook dependencies', () =>
 	expect(migrate(stateInput(object)).notes).toContainEqual(dependencyError);
 }, 20_000);
 
+it('reports React SSR effects from object properties in hook dependencies', () => {
+	function Reference({ probe }) {
+		useMemo(() => 1, [{ [probe.key]: [probe.value] }]);
+		return createElement('b', null, 'ok');
+	}
+	const probe = {
+		key: {
+			toString() {
+				preinit('/dependency-key.css', { as: 'style' });
+				return 'key';
+			},
+		},
+		get value() {
+			preinit('/dependency-field.css', { as: 'style' });
+			return 1;
+		},
+	};
+	const html = renderToStaticMarkup(createElement(Reference, { probe }));
+	expect(html).toContain('<link rel="stylesheet" href="/dependency-key.css"');
+	expect(html).toContain('<link rel="stylesheet" href="/dependency-field.css"');
+
+	const input = (dependency, value = '"key"') => `import { useMemo } from 'react';
+		export function Probe({ probe }) {
+			const own = { value: ${value} };
+			useMemo(() => 1, [${dependency}]);
+			return <b>ok</b>;
+		}`;
+	const object = '{ toString() { return readString(); } }';
+	for (const source of [
+		input('{ field: probe.value }'),
+		input('{ [probe.key]: 1 }'),
+		input('{ get [probe.key]() { return 1; } }'),
+		input('{ field: [{ field: probe.value }] }'),
+		input('{ [own.value]: 1 }', object),
+		input('`value=\${{ toString: own.value }}`', 'readString'),
+		input('+{ field: own.value, valueOf() { return +this.field; } }', object),
+	]) {
+		expect(migrate(source).notes, source).toContainEqual(dependencyError);
+	}
+	for (const source of [
+		input('{ [own.value]: 1 }'),
+		input('{ field: own.value }', object),
+		input('{ get field() { return probe.value; } }'),
+		input('{ field: () => probe.value }'),
+		input('false && { field: probe.value }'),
+	]) {
+		expect(migrate(source, false).notes, source).not.toContainEqual(dependencyError);
+	}
+}, 20_000);
+
 it('checks property visibility for nested arrays of component state', () => {
 	const input = (dependencies, field = '2') => `import { useMemo, useState } from 'react';
 		export function Probe() {
