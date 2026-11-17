@@ -6605,7 +6605,7 @@
     "135": {
       "message": "Candidate frames require live, non-adopting nodes.",
       "runtime": ["client", "server"],
-      "status": "active"
+      "status": "retired"
     },
     "136": {
       "message": "Async derived candidates are not supported by this prototype.",
@@ -6935,7 +6935,7 @@
     "201": {
       "message": "Streamed candidates are not supported by this prototype.",
       "runtime": ["client", "server"],
-      "status": "active"
+      "status": "retired"
     },
     "202": {
       "message": "Incompatible query definitions use the same key \"%s\".",
@@ -7744,6 +7744,11 @@
     },
     "363": {
       "message": "A signal effect must be a function.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "364": {
+      "message": "Candidate frames require live nodes.",
       "runtime": ["client", "server"],
       "status": "active"
     }

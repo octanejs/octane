@@ -599,6 +599,12 @@ class AdoptionFrameImpl implements AdoptionFrame {
 		return seedState(seed);
 	}
 
+	/** Each subscriber that presented `node` through this frame (pending.ts enlist). */
+	readers(node: ScopedNode, each: (notify: () => void) => void): void {
+		for (const source of this.sources.values())
+			if (source.node === node) for (const notify of source.subscribers) each(notify);
+	}
+
 	release(): void {
 		if (this.ended) return;
 		this.ended = true;
