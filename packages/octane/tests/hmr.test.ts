@@ -1230,6 +1230,35 @@ describe('hmr — runtime wrapper', () => {
 		r.unmount();
 	});
 
+	it('reloads instead of swapping a memo template body that gains or loses an early return', async () => {
+		const hot = webpackHotModule('/src/App.tsrx');
+		const source = (guard: string, label: string) =>
+			`import { memo } from 'octane';
+			 export const Panel = memo(function Panel({ shown }: { shown: boolean }) @{
+				${guard}
+				<p>{'${label}'}</p>
+			 });
+			 export function App() @{ <main><Panel shown={true} /></main> }`;
+		const App = await hot.load(source('if (!shown) return null;', 'v1'));
+		const r = mount(App);
+		try {
+			expect(r.find('p').textContent).toBe('v1');
+			for (const [guard, label] of [
+				['', 'v2'],
+				['if (!shown) return null;', 'v3'],
+			]) {
+				hot.invalidated = false;
+				await hot.load(source(guard, label));
+				flushSync(() => {});
+				expect(hot.invalidated).toBe(true);
+				// The declined body is not reused; App mounts the replacement wrapper fresh.
+				expect(r.find('p').textContent).toBe(label);
+			}
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('preserves hook state across update() — stable Symbol.for keys', () => {
 		// Both bodies use the SAME hook symbol (simulating the compiler's
 		// `Symbol.for('octane:file.tsrx:Foo.useState#0')`-stable emit).

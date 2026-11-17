@@ -14096,6 +14096,17 @@ function compileInternal(
 					lowered.type === 'ExportNamedDeclaration' ? lowered.declaration : lowered;
 				const [declarator] = declaration.declarations;
 				// A memo wrapper keeps its identity and comparator; HMR swaps the body it wraps.
+				// A body on the return ABI carries the stamp hmr().update() compares, so an
+				// edit that adds or removes its return reloads instead of reusing slot 0.
+				const memoBody = valueComponent.memo ? declarator.init.arguments[0] : null;
+				const hmrBody =
+					unwrapTsExpr(memoBody)?._octaneReturnedOutput === true
+						? b.call(
+								b.member(b.id('Object'), 'assign'),
+								memoBody,
+								b.object([b.prop('init', b.id('__octaneReturnedOutput'), b.literal(true, 'true'))]),
+							)
+						: memoBody;
 				const mutable = valueComponent.memo
 					? {
 							...declaration,
@@ -14105,12 +14116,7 @@ function compileInternal(
 									...declarator,
 									init: {
 										...declarator.init,
-										arguments: [
-											inheritOriginLoc(
-												b.call('_$hmr', declarator.init.arguments[0]),
-												declarator.init.arguments[0],
-											),
-										],
+										arguments: [inheritOriginLoc(b.call('_$hmr', hmrBody), memoBody)],
 									},
 								},
 							],
@@ -26465,12 +26471,11 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 			const previousWarm = ctx._pendingWarm;
 			// Like a component declaration (and the server path), a body that can
 			// return a value renders its template through the same return ABI.
+			const returnedOutput = ctx.mode !== 'server' && hasOwnValueReturn(n);
 			const compile = () =>
 				ctx.mode === 'server'
 					? ssrCompileBody(n, ctx, name, null, [], 'opaque')
-					: compileFunctionBody(n, ctx, name, 'opaque', null, {
-							returnedOutput: hasOwnValueReturn(n),
-						});
+					: compileFunctionBody(n, ctx, name, 'opaque', null, { returnedOutput });
 			try {
 				// A missing fold marks a module-level callback, whose names only this
 				// function's closure can reach.
@@ -26481,6 +26486,7 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 				return {
 					...functionExpressionFromDeclaration({ ...compiled, id: n.id ?? null }, n),
 					_octaneCompiledTemplate: true,
+					_octaneReturnedOutput: returnedOutput,
 				};
 			} finally {
 				ctx._pendingWarm = previousWarm;
