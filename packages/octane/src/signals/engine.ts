@@ -14,7 +14,6 @@ import {
 	addEffect,
 	computeEqual,
 	derivedState,
-	equalCell,
 	effectRing,
 	endSignalBatch,
 	executeEffect,
@@ -27,6 +26,7 @@ import {
 	readyState,
 	refreshNode,
 	retireGraph,
+	setEquals,
 	setHistoricalReader,
 	signalBatch,
 	startSignalBatch,
@@ -279,17 +279,11 @@ export class ScopeImpl implements Scope, GraphOwner {
 		return this.disposed;
 	}
 
-	signal$<T>(key: string | null, initial: T, options?: ScopeSignalOptions<T>): WritableSignal<T> {
-		const equals = equalsOption(options);
-		if (key !== null) {
-			const signal$ = this.keyedSignal(key, initial);
-			if (equals) ScopedNode.setEquals(signal$ as ScopedNode<T>, equals);
-			return signal$;
-		}
+	// installPublicScope adds the `equals` option, which only createScope's scopes take.
+	signal$<T>(key: string | null, initial: T): WritableSignal<T> {
+		if (key !== null) return this.keyedSignal(key, initial);
 		if (this.disposed) throw new ScopeDisposedError(this.key);
-		return (equals
-			? equalCell(initial, this, equals)
-			: new PlainCell(initial, this)) as unknown as WritableSignal<T>;
+		return new PlainCell(initial, this) as unknown as WritableSignal<T>;
 	}
 
 	private keyedSignal<T>(key: string, initial: T): WritableSignal<T> {
@@ -767,6 +761,22 @@ export function installPublicScope(): void {
 	if (publicScope) return;
 	publicScope = true;
 	const prototype = ScopeImpl.prototype;
+	const plainSignal: (
+		this: ScopeImpl,
+		key: string | null,
+		initial: unknown,
+	) => WritableSignal<any> = prototype.signal$;
+	prototype.signal$ = function <T>(
+		this: ScopeImpl,
+		key: string | null,
+		initial: T,
+		options?: ScopeSignalOptions<T>,
+	): WritableSignal<T> {
+		const equals = equalsOption(options);
+		const signal$: WritableSignal<T> = plainSignal.call(this, key, initial);
+		if (equals !== undefined) setEquals(signal$ as unknown as ScopedNode<T> | PlainCell<T>, equals);
+		return signal$;
+	};
 	prototype.derived$ = function <T>(
 		this: ScopeImpl,
 		key: string | null,

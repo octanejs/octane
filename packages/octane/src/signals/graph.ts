@@ -905,7 +905,6 @@ class ColdState<T> {
 	nativeSnapshotSource: NativeReadSource | undefined = undefined;
 	retryRequest: ((options?: { pending?: boolean }) => void) | undefined = undefined;
 	pending: PendingSlotLike | undefined = undefined;
-	equals: SignalEquals<T> | undefined = undefined;
 }
 
 export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
@@ -925,21 +924,12 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 	}
 
 	/**
-	 * Compare this cell's writes with `equals` too, which only a rare cell has.
-	 * Its writes take the general path, which consults it, so the common write
-	 * never looks for one.
-	 */
-	static setEquals<T>(node: ScopedNode<T>, equals: SignalEquals<T>): void {
-		node.#warm().equals = equals;
-		node.flags |= REACTIVE_SLOW;
-	}
-
-	/**
 	 * Whether the cell's own `equals` finds two values Object.is told apart
 	 * equal. Such a write keeps the previous value and notifies no one.
 	 */
 	isEqual(previous: T, next: T): boolean {
-		const equals = this.#cold?.equals;
+		// setEquals marks every cell it gives one REACTIVE_SLOW.
+		const equals = this.flags & REACTIVE_SLOW ? cellEquals?.get(this) : undefined;
 		return equals !== undefined && untrack(() => equals(previous, next));
 	}
 
@@ -2306,7 +2296,7 @@ function writeCell<T>(cell: PlainCell<T>, value: T | ((previous: T) => T)): void
 			: value;
 	if (
 		!same(cell.last, next) &&
-		!(cell.flags & REACTIVE_CUSTOM_EQUALS && untrack(() => cellEquals.get(cell)!(cell.last, next)))
+		!(cell.flags & REACTIVE_CUSTOM_EQUALS && untrack(() => cellEquals!.get(cell)!(cell.last, next)))
 	) {
 		cell.last = next;
 		if (cell.flags & REACTIVE_TRACKED_CELL) cellChannels.get(cell)!.revision++;
@@ -2331,15 +2321,17 @@ Object.defineProperties(PlainCell.prototype, {
 	depsTail: { value: undefined },
 });
 
-/** The `equals` of each keyless cell flagged REACTIVE_CUSTOM_EQUALS. */
-const cellEquals = new WeakMap<PlainCell, SignalEquals<any>>();
+/** Each writable cell's own `equals`, made with the first one. */
+let cellEquals: WeakMap<ScopedNode | PlainCell, SignalEquals<any>> | undefined;
 
-/** A keyless cell whose writes also consult `equals`. */
-export function equalCell<T>(initial: T, owner: GraphOwner, equals: SignalEquals<T>): PlainCell<T> {
-	const cell = new PlainCell(initial, owner);
-	cell.flags |= REACTIVE_CUSTOM_EQUALS;
-	cellEquals.set(cell, equals);
-	return cell;
+/**
+ * Compare a writable cell's writes with `equals` too, which only a rare cell
+ * has. Its writes leave the fast path for the one that consults it, so the
+ * common write never looks for one.
+ */
+export function setEquals<T>(cell: ScopedNode<T> | PlainCell<T>, equals: SignalEquals<T>): void {
+	(cellEquals ??= new WeakMap()).set(cell, equals);
+	cell.flags |= cell instanceof PlainCell ? REACTIVE_CUSTOM_EQUALS : REACTIVE_SLOW;
 }
 
 /** A keyless cell's revision and native read channel, once a render has read it. */
