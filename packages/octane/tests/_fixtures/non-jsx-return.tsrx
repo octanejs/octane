@@ -236,6 +236,23 @@ export function GuardedAliasedMemoApp({ shown }: { shown: boolean }) @{
 	</main>
 }
 
+// Exported, so its callback keeps the authored null return.
+export const ExportedGuardedCounter = memo(function ExportedGuardedCounter({
+	shown,
+}: {
+	shown: boolean;
+}) @{
+	if (!shown) return null;
+	const [count, setCount] = useState(1);
+	<button onClick={() => setCount(count + 1)}>{count as number}</button>
+});
+
+export function GuardedExportedMemoApp({ shown }: { shown: boolean }) @{
+	<main>
+		<ExportedGuardedCounter shown={shown} />
+	</main>
+}
+
 const EscapedGuardedCounter = memo!(
 	function EscapedGuardedCounter({ shown }: { shown: boolean }) @{
 		if (!shown) return null;

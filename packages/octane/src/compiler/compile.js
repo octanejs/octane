@@ -26463,10 +26463,14 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 			const name = n.id?.name ?? allocCompilerName(ctx, '__template');
 			// A nested body must not replace the enclosing component's warm plan.
 			const previousWarm = ctx._pendingWarm;
+			// Like a component declaration (and the server path), a body that can
+			// return a value renders its template through the same return ABI.
 			const compile = () =>
 				ctx.mode === 'server'
 					? ssrCompileBody(n, ctx, name, null, [], 'opaque')
-					: compileFunctionBody(n, ctx, name, 'opaque');
+					: compileFunctionBody(n, ctx, name, 'opaque', null, {
+							returnedOutput: hasOwnValueReturn(n),
+						});
 			try {
 				// A missing fold marks a module-level callback, whose names only this
 				// function's closure can reach.
