@@ -372,6 +372,7 @@ internally, get their own baseline and guard namespace.
 | `dbmon-deopt` | dbmon | octane-tsrx + octane-deopt | tuned vs plain-.ts cliff |
 | `js-framework-deopt` | js-framework | octane-tsrx + naive triplet | tuned vs naive-authoring cliff |
 | `async-waterfall` | async-waterfall | octane-tsrx, react, preact, solid, svelte, ripple, inferno | 10-level nested async: `use()` waterfall vs parallel-by-model signals (init + transition update) |
+| `router-data` | router-data | octane-floor, octane-remix-router, octane-tanstack-router, react-router, tanstack-router, sveltekit | data-router journeys (nested loaders, sibling, search-only, intent preload, mutation, cached back): request/wave counts, latency, and router CPU at 4x throttle; layout-identity and held-screen gates |
 | `async-composition` | async-composition | octane-tsrx, react, inferno | dashboard composition: adjacent async panels, nested children, imported custom hook, and one true dependency |
 | `lynx-list` | lynx-list | none (Node-only) | deterministic 1,000-row native-list physical allocation, reuse, and teardown through a fake Element PAPI |
 | `universal-leaf-update` | universal-leaf-update | none (Node-only) | universal update locality beside 0–4,000 unrelated component siblings through the compiler and native object driver: plain leaf `setState`, keyed `@for` item state, a leaf under an idle `@try`, a structural (insert/remove) update, and compact-row list selection |

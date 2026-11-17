@@ -1,0 +1,21 @@
+{
+  "name": "tanstack-router-data-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "router-data fixture for TanStack Router (code routes, loaders, intent preload, staleTime, filtered invalidate) on React 19 with the React Compiler.",
+  "scripts": {
+    "dev": "vite --host --port 5345 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5345 --strictPort"
+  },
+  "dependencies": {
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "@tanstack/react-router": "catalog:default"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

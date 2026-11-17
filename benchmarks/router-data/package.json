@@ -1,0 +1,13 @@
+{
+  "name": "octane-router-data-benchmarks",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Data-router journeys (nested loaders, preload, search, mutation, back) across Octane, React Router, TanStack Router and SvelteKit.",
+  "scripts": {
+    "bench": "node run.mjs"
+  },
+  "dependencies": {
+    "playwright": "catalog:default"
+  }
+}

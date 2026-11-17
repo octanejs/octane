@@ -1,0 +1,19 @@
+{
+  "name": "sveltekit-router-data-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "router-data fixture for SvelteKit 3 as a single-page app (universal load functions, hover preload, depends/invalidate).",
+  "scripts": {
+    "dev": "vite --host --port 5346 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5346 --strictPort"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-static": "4.0.1",
+    "@sveltejs/kit": "3.2.0",
+    "@sveltejs/vite-plugin-svelte": "catalog:default",
+    "svelte": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

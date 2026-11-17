@@ -1,0 +1,21 @@
+{
+  "name": "react-router-data-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "router-data fixture for React Router 8 data mode (createBrowserRouter, loaders, action, Form) on React 19 with the React Compiler.",
+  "scripts": {
+    "dev": "vite --host --port 5344 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5344 --strictPort"
+  },
+  "dependencies": {
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "react-router": "catalog:default"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

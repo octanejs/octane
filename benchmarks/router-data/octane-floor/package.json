@@ -1,0 +1,18 @@
+{
+  "name": "octane-floor-router-data-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "router-data floor: the octane/router RFC's mechanism wired by hand (location signal, one explicit scope and resource per match, transitions, intent preload, single-flight mutation), compiled under Strong mode.",
+  "scripts": {
+    "dev": "vite --host --port 5341 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5341 --strictPort"
+  },
+  "dependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "catalog:default"
+  }
+}

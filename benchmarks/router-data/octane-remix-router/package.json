@@ -1,0 +1,19 @@
+{
+  "name": "octane-remix-router-data-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "router-data fixture for @octanejs/remix-router (the React Router 8.2 port) in .tsrx.",
+  "scripts": {
+    "dev": "vite --host --port 5342 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5342 --strictPort"
+  },
+  "dependencies": {
+    "@octanejs/remix-router": "workspace:*",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "catalog:default"
+  }
+}
