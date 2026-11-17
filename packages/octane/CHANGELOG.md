@@ -1,5 +1,24 @@
 # octane
 
+## 0.20.0
+
+### Minor Changes
+
+- dea55aa: Add progressive reads and cursor pagination to `octane/data`.
+
+  - A transport receives a third argument, `preview(value)`, and may call it with provisional values of a read while its reply is pending. A read with no confirmed value shows the newest preview, with `preview: true` on its snapshot; the reply replaces it in one update, a failure removes it, and it is never saved, seeded or shared with other reads.
+  - `read({ cancel: true })` aborts a load when its last observer leaves, unless a `prefetch()` or a `refresh()` is waiting on it. Through a shared owner, a request now stops once the last tab waiting on it lets go, and previews reach every tab waiting on it.
+  - `pages(store, read, input, { rows, next })` reads a list whose server returns a page and a cursor. `loadMore()` joins a page already loading and retries a failed page at the same cursor; a missing or repeated cursor ends the list; `refresh()` follows the cursors again from the first page and replaces the rows once every page is confirmed.
+  - A pages snapshot's `value` is now the same array until a row changes.
+- 84cd776: Add `with` to `view` in `octane/data`, which joins each row to the records it points at: `with: { author: [User, 'authorId'] }` gives every row an `author`. The handler returns each row with its related records under those names, and the store keeps them as shared records of their own entities. An edit to a related record shows in every row that points at it, a row keeps its identity until its record or one of its related records changes, and a change to a related record reaches only the views holding a row that points at it. `where` and `order` see the view's own record only.
+- 3735d72: Add `scope.effect(run)` and keyless signals. An effect runs at once and again after each batch that changes a signal it read, calls the cleanup it returns before rerunning and when it stops, and stops when its scope is disposed. `scope.signal$(null, initial)` and `scope.derived$(null, compute)` declare values that are not serialized, inspected or staged by a transition, and cost as little as alien-signals' own nodes. Plain signal writes, derived recomputation and effect delivery also take shorter paths: on alien-signals' propagate benchmark Octane goes from 1.2–1.4× alien's time to 1.1–1.3×, with memory at parity.
+
+### Patch Changes
+
+- 32e6a02: Separate local data-store disposal from account erasure and add trusted explicit account activation for shared owners. Fixed numeric persistence budgets no longer wait for quota estimation.
+- 90721b3: Make recomputing chains of signal values faster. Hot equality checks are written out in place, still with `Object.is` semantics, instead of going through one shared helper that collected every value type's comparison feedback. A keyless derived value's recomputation is now small enough to inline into the dependency check, and the rare cases (a tracked channel, an earlier failure, a render collecting reads) take a wrapper around it. On alien-signals' propagate benchmark this brings chains from 1.17–1.21× alien's time to about 1.1×.
+- 6c5c451: Let a transition change the selection of a query that came from the server. A `startTransition` render that reads a query a streamed SSR response supplied, or that changes its selection, used to fail with "Streamed candidates are not supported by this prototype". It now stages like any other transition: the adopted result stays on screen while the new selection loads, and the server's channel hands over to the browser's request only when the transition commits. Returning to the adopted selection before then reuses the server result without loading it again. A transition started while hydration still holds a scope's adoption frame, such as from a hydrating layout effect, no longer fails either, and holds the components that showed the server values until it commits.
+
 ## 0.19.3
 
 ### Patch Changes

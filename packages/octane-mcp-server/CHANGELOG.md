@@ -1,5 +1,11 @@
 # @octanejs/mcp-server
 
+## 0.3.14
+
+### Patch Changes
+
+- 8a8df44: Accept `router-data` as a benchmark suite, the runner's new suite that drives data routers (Octane, React Router, TanStack Router, SvelteKit) through nested loaders, preload, search, mutation and cached back navigations.
+
 ## 0.3.13
 
 ### Patch Changes

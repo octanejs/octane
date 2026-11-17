@@ -1,5 +1,17 @@
 # @octanejs/better-auth
 
+## 0.0.24
+
+### Patch Changes
+
+- Updated dependencies [32e6a02]
+- Updated dependencies [dea55aa]
+- Updated dependencies [84cd776]
+- Updated dependencies [3735d72]
+- Updated dependencies [90721b3]
+- Updated dependencies [6c5c451]
+  - octane@0.20.0
+
 ## 0.0.23
 
 ### Patch Changes
