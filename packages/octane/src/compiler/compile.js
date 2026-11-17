@@ -5809,9 +5809,9 @@ function autoMemoContextReads(root, ctx, includeImportedHooks = false) {
 			return;
 		}
 		if (node.type === 'CallExpression' && node.callee?.type === 'Identifier') {
-			// Full TSRX slots a named custom hook when the local name also
-			// follows the hook convention. Its imported body may read context.
-			if (includeImportedHooks && node._octaneCustomHookCall && /^use[A-Z]/.test(node.callee.name))
+			// Full TSRX slots a custom hook by its `use*` name, including an
+			// imported hook under an ordinary alias. Its body may read context.
+			if (includeImportedHooks && /^use[A-Z]/.test(node._octaneCustomHookCall ?? ''))
 				found |= MEMO_IMPORTED_HOOK;
 			const name =
 				node._octaneImportedHook ??
@@ -6683,7 +6683,8 @@ function plainCalleeIsMemoizable(node, ctx, seen) {
 	const callee = node.callee;
 	if (callee?.type !== 'Identifier') return false;
 	const name = callee.name;
-	if (isHookCalleeName(name)) return false;
+	// An imported hook keeps its hook identity under an ordinary local alias.
+	if (isHookCalleeName(name) || /^use[A-Z]/.test(node._octaneCustomHookCall ?? '')) return false;
 	// A namespace member (`ns.fn()`) is already a member callee; a namespace used
 	// bare is not callable as a projection.
 	if (ctx?.importNamespaceNames?.has(name)) return false;
@@ -21251,7 +21252,7 @@ function isPropCreationExpr(expr, ctx, includesLiteral = false) {
 			) {
 				if (
 					(n.type === 'CallExpression' || n.type === 'OptionalCallExpression') &&
-					isHookishCallee(n.callee)
+					(isHookishCallee(n.callee) || /^use[A-Z]/.test(n._octaneCustomHookCall ?? ''))
 				) {
 					blocked = true;
 					return;
@@ -22728,6 +22729,9 @@ function slotKeyedHookName(n, ctx) {
 			return imported;
 		if (!shadowsImport && HOOK_NAMES.has(local)) return local;
 		if (/^use[A-Z]/.test(local) && local !== 'useContext') return local;
+		// An imported custom hook under an ordinary alias, as rewriteHookCalls slots it.
+		const custom = n._octaneCustomHookCall;
+		if (/^use[A-Z]/.test(custom ?? '') && custom !== 'useContext') return custom;
 		return null;
 	}
 	const imported = n._octaneImportedHook ?? n._octaneHookRuntimeImportedHook;
@@ -23638,7 +23642,13 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 			const profileOwner = annotatedOwner?.name || componentName;
 			const importedName = n._octaneImportedHook;
 			const hookRuntimeImportedName = n._octaneHookRuntimeImportedHook;
-			const name = importedName ?? hookRuntimeImportedName ?? localName;
+			// An imported custom hook keeps its exported `use*` name under any
+			// local alias (`import { useReading as readValue }`).
+			const customHookName = n._octaneCustomHookCall;
+			const name =
+				importedName ??
+				hookRuntimeImportedName ??
+				(/^use[A-Z]/.test(customHookName ?? '') ? customHookName : localName);
 			// Three kinds of call receive a per-call-site hook identity:
 			//  - a built-in base hook (HOOK_NAMES) — also needs its runtime import;
 			//  - a custom / library hook by React's `use[A-Z]` convention — e.g. a
@@ -39824,7 +39834,7 @@ function retainTailHookState(body, first, ctx) {
  * ahead of a later exit renders that output under only the exits before it:
  * the guard-nested form expresses that, and one guarded output cannot.
  */
-function hookedTailStart(body) {
+function hookedTailStart(body, hookAliases = null) {
 	const first = body.findIndex(
 		(statement) => !isJsxNode(statement) && ownsArmJump(statement, false, false),
 	);
@@ -39838,7 +39848,7 @@ function hookedTailStart(body) {
 			continue;
 		}
 		if (output && ownsArmJump(statement, false, false)) return -1;
-		hook ||= containsHookCall(statement, true);
+		hook ||= containsHookCall(statement, true, hookAliases);
 	}
 	return output && hook ? first : -1;
 }
@@ -40055,6 +40065,28 @@ function markLocalStateAliases(ast, aliases) {
 	return bodyNodes === ast.body ? ast : { ...ast, body: bodyNodes };
 }
 
+// Local names that import a `use*` hook from another module under a name that
+// does not follow the convention (`import { useCell as cell }`). Hook analysis
+// annotates their calls later; the early-exit lowering runs before it. A
+// shadowing local only keeps its tail on the component scope, which is safe.
+function importedHookAliases(statements) {
+	let aliases = null;
+	for (const node of statements) {
+		if (node.type !== 'ImportDeclaration' || node.importKind === 'type') continue;
+		if (node.source.value === 'octane') continue;
+		for (const specifier of node.specifiers) {
+			if (specifier.type !== 'ImportSpecifier' || specifier.importKind === 'type') continue;
+			const local = specifier.local.name;
+			if (
+				/^use[A-Z]/.test(specifier.imported.name ?? specifier.imported.value) &&
+				!isHookCalleeName(local)
+			)
+				(aliases ??= new Set()).add(local);
+		}
+	}
+	return aliases;
+}
+
 // A memo wrapper can be called directly or pass its .type along. Keep
 // authored JS exits unless the private binding is only rendered by templates.
 function privateMemoTagUses(ast) {
@@ -40119,6 +40151,7 @@ function lowerNullishComponentExits(
 	parsedAst,
 ) {
 	const statements = ast.body || [];
+	const hookAliases = importedHookAliases(statements);
 	let out = null;
 	// Compiler-name allocation for retainTailHookState, before the compile
 	// context exists. That context later collects these names from the AST.
@@ -40173,7 +40206,7 @@ function lowerNullishComponentExits(
 					? (markMemoSetup ??= localStateSetupMarker(ast, localStateAliases))(component.body)
 					: component.body;
 			const sequence = [...(body.body || []), ...(body.render ? [body.render] : [])];
-			const tail = hookedTailStart(sequence);
+			const tail = hookedTailStart(sequence, hookAliases);
 			const rewritten =
 				tail === -1
 					? rewriteEarlyExits(sequence, true)
@@ -40286,7 +40319,7 @@ function jsxArmRoot(node) {
  * scope is torn down with the arm. `slotKeyed` skips `use` and `useContext`,
  * which are keyed by call order and context identity and hold no such state.
  */
-function containsHookCall(node, slotKeyed = false) {
+function containsHookCall(node, slotKeyed = false, hookAliases = null) {
 	const seen = new WeakSet();
 	// The shared convention (HOOK_NAME_CONVENTION_RE) — covers `use`, `useX`,
 	// and the `unstable_`/`UNSTABLE_` prefixed forms.
@@ -40311,6 +40344,8 @@ function containsHookCall(node, slotKeyed = false) {
 			if (value._octaneLocalStateAlias === true) return true;
 			const callee = value.callee;
 			if (callee?.type === 'Identifier' && isHookName(callee.name)) return true;
+			// An imported custom hook under an ordinary alias (`importedHookAliases`).
+			if (callee?.type === 'Identifier' && hookAliases?.has(callee.name)) return true;
 			if (
 				callee?.type === 'MemberExpression' &&
 				callee.computed !== true &&
