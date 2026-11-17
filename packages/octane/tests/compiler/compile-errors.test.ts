@@ -1278,6 +1278,15 @@ export function C(props) @{
 }`,
 		],
 		[
+			'OCTANE_HOOK_IN_LOOP',
+			`import { useCell as cell } from './cells';
+export function C(props) @{
+	const cells = [];
+	for (let i = 0; i < props.n; i++) cells.push(cell(i));
+	<div>{cells.length + ''}</div>
+}`,
+		],
+		[
 			'OCTANE_HOOK_DEPENDENCIES_UNINFERABLE',
 			`import { useEffect } from 'octane';
 export function App(props) @{ useEffect(props.makeEffect()); <div /> }`,

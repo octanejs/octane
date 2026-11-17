@@ -22729,6 +22729,9 @@ function slotKeyedHookName(n, ctx) {
 			return imported;
 		if (!shadowsImport && HOOK_NAMES.has(local)) return local;
 		if (/^use[A-Z]/.test(local) && local !== 'useContext') return local;
+		// An imported custom hook under an ordinary alias, as rewriteHookCalls slots it.
+		const custom = n._octaneCustomHookCall;
+		if (/^use[A-Z]/.test(custom ?? '') && custom !== 'useContext') return custom;
 		return null;
 	}
 	const imported = n._octaneImportedHook ?? n._octaneHookRuntimeImportedHook;

@@ -42,7 +42,7 @@ describe('imported custom hooks under an ordinary local alias', () => {
 		}
 	});
 
-	it('keeps an aliased call\'s state across an early null return', () => {
+	it("keeps an aliased call's state across an early null return", () => {
 		const r = mount(GuardedCell, { shown: true });
 		try {
 			r.click('.guarded');
