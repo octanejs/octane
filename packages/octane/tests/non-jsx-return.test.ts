@@ -10,6 +10,7 @@ import {
 	App,
 	EscapedGuardedMemoApp,
 	GuardedAliasedMemoApp,
+	GuardedExportedMemoApp,
 	GuardedMemoApp,
 	GuardedOwnerMemoApp,
 	Mixed,
@@ -201,6 +202,7 @@ describe('generic component return reconciliation', () => {
 		['GuardedMemoApp', GuardedMemoApp],
 		['GuardedOwnerMemoApp', GuardedOwnerMemoApp],
 		['GuardedAliasedMemoApp', GuardedAliasedMemoApp],
+		['GuardedExportedMemoApp', GuardedExportedMemoApp],
 	] as const)('keeps %s across an early null return', (_name, CounterApp) => {
 		const r = mount(CounterApp, { shown: false });
 		try {
@@ -765,6 +767,7 @@ describe('non-JSX return on the server (props-first ABI)', () => {
 		['GuardedMemoApp', GuardedMemoApp],
 		['GuardedOwnerMemoApp', GuardedOwnerMemoApp],
 		['GuardedAliasedMemoApp', GuardedAliasedMemoApp],
+		['GuardedExportedMemoApp', GuardedExportedMemoApp],
 	] as const)('adopts %s before switching to an early null return', async (name, App) => {
 		const server = serverModule();
 		const { html } = await ServerRT.renderToString(server[name], { shown: true });
