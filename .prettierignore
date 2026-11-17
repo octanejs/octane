@@ -79,6 +79,7 @@ packages/image-crop/src/ReactCrop.css
 # Vendored pinned upstream shadcn style sheet (byte-exact below its header)
 playground/octane/src/styles/style-nova.css
 **/dist/
+**/.svelte-kit/
 **/dist-active/
 **/build/
 # Cargo build artifacts and Tauri's generated ACL schemas

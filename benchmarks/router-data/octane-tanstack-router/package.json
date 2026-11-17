@@ -1,0 +1,19 @@
+{
+  "name": "octane-tanstack-router-data-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "router-data fixture for @octanejs/tanstack-router (the TanStack Router port) in .tsrx.",
+  "scripts": {
+    "dev": "vite --host --port 5343 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5343 --strictPort"
+  },
+  "dependencies": {
+    "@octanejs/tanstack-router": "workspace:*",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "catalog:default"
+  }
+}

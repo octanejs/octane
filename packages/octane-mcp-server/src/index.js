@@ -125,6 +125,7 @@ export const BENCHMARK_SUITES = [
 	'dbmon-deopt',
 	'js-framework-deopt',
 	'async-waterfall',
+	'router-data',
 	'async-composition',
 	'lynx-list',
 	'lynx-handle-retirement',

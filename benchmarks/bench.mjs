@@ -933,6 +933,25 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Data-router journeys: nested loaders, sibling and search-only
+		// navigations, intent preload, a mutation and a cached back navigation,
+		// with request and wave counts beside the timings. octane-floor is the
+		// octane/router RFC's mechanism wired by hand (the target to hold the
+		// router to); the rest are the routers it must beat.
+		name: 'router-data',
+		cwd: 'router-data',
+		servers: [
+			{ filter: 'octane-floor-router-data-bench', port: 5341 },
+			{ filter: 'octane-remix-router-data-bench', port: 5342 },
+			{ filter: 'octane-tanstack-router-data-bench', port: 5343 },
+			{ filter: 'react-router-data-bench', port: 5344 },
+			{ filter: 'tanstack-router-data-bench', port: 5345 },
+			{ filter: 'sveltekit-router-data-bench', port: 5346 },
+		],
+		iter: { normal: 10, quick: 2 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Realistic async composition: adjacent panels under one route boundary,
 		// nested async children, an imported custom hook with independent use()
 		// reads, and one true data dependency.

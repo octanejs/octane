@@ -6838,5 +6838,61 @@
     "reference": "radio-input-128",
     "maxRatio": 5,
     "note": "Four times as many independent two-choice radios may perform at most five times the native getter work during a complete requested reset or native click sequence. Clean and observed runs preserve checked values, original input identity, and teardown."
+  },
+  {
+    "suite": "router-data",
+    "op": "cold_nested_waves",
+    "target": "octane-floor",
+    "reference": "react-router",
+    "maxRatio": 1,
+    "note": "Nested independent loaders start in one wave. The floor must never add a wave over React Router: any value above 1 means a loader waited on another."
+  },
+  {
+    "suite": "router-data",
+    "op": "preload_intent_reads",
+    "target": "octane-floor",
+    "reference": "react-router",
+    "maxRatio": 0,
+    "note": "An intent preload leaves nothing to fetch after the click. React Router data mode has no data preload, so it pays three reads; the floor must pay none."
+  },
+  {
+    "suite": "router-data",
+    "op": "back_cached_reads",
+    "target": "octane-floor",
+    "reference": "react-router",
+    "maxRatio": 0,
+    "note": "A back navigation inside the fresh window is served from the match cache with no read before the DOM is restored."
+  },
+  {
+    "suite": "router-data",
+    "op": "mutation_waves",
+    "target": "octane-floor",
+    "reference": "tanstack-router",
+    "maxRatio": 0.5,
+    "note": "A mutation answers with the refreshed task in the same response (single flight): one wave, where a write followed by an invalidate takes two."
+  },
+  {
+    "suite": "router-data",
+    "op": "preload_intent",
+    "target": "octane-floor",
+    "reference": "react-router",
+    "maxRatio": 0.25,
+    "note": "Time to the preloaded route. Observed about 0.05x; the headroom absorbs timer noise while still failing if the preload stops being adopted."
+  },
+  {
+    "suite": "router-data",
+    "op": "back_cached",
+    "target": "octane-floor",
+    "reference": "react-router",
+    "maxRatio": 0.25,
+    "note": "Time to a cached back navigation. Observed about 0.05x; failing means the cache stopped serving the revisit."
+  },
+  {
+    "suite": "router-data",
+    "op": "mutation",
+    "target": "octane-floor",
+    "reference": "tanstack-router",
+    "maxRatio": 0.75,
+    "note": "Time to the confirmed rename. Observed about 0.5x, one request wave against two."
   }
 ]
