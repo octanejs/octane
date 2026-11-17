@@ -107,6 +107,7 @@
     "./signals": "./src/signals/index.ts",
     "./signals/client": "./src/signals/client.ts",
     "./signals/server": "./src/signals/server.ts",
+    "./signals/react": "./src/signals/react.ts",
     "./internal/client": "./src/internal/client.ts",
     "./internal/server": "./src/internal/server.ts",
     "./internal/context": "./src/internal/context.ts",
@@ -386,6 +387,11 @@
         "import": "./dist/signals/server.js",
         "require": "./dist/cjs/signals/server.cjs",
         "default": "./dist/signals/server.js"
+      },
+      "./signals/react": {
+        "types": "./dist/signals/react.d.ts",
+        "node": "./dist/node/signals/react.js",
+        "default": "./dist/signals/react.js"
       },
       "./internal/client": {
         "types": "./dist/internal/client.d.ts",

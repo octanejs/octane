@@ -242,6 +242,12 @@ export const docsMeta: DocMeta[] = [
 				searchTerms: ['createScope', 'query', 'createResource'],
 			},
 			{ id: 'explicit-resources', title: 'Load data in an explicit scope', level: 3 },
+			{
+				id: 'react-components',
+				title: 'Read a scope from React',
+				level: 3,
+				searchTerms: ['octane/signals/react', 'useSignalValue', 'SignalScopeProvider'],
+			},
 			{ id: 'async-derived', title: 'Derive values across await' },
 			{ id: 'availability', title: 'Choose what to show while waiting', level: 3 },
 			{
