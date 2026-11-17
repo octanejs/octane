@@ -32,5 +32,20 @@ export const SCENARIOS = {
 	field: { rows: 5000, reads: 0, writes: 20, perWrite: 1, lanes: [...ALL, 'hooks-list'] },
 	stream: { rows: 1000, reads: 1, writes: 20, perWrite: 100, lanes: ALL },
 	none: { rows: 5000, reads: 0, writes: 0, perWrite: 0, lanes: ['hooks', 'hooks-on'] },
+	/**
+	 * An application shell that reads its data near the top of the tree: the
+	 * viewer, settings, an unread count and 200 conversations, over a
+	 * 100-message thread every row of which shows the `compact` setting.
+	 * `hooks-top` reads everything in the shell and passes it down. Each write
+	 * step makes `writes` separately flushed changes of one kind.
+	 */
+	shell: {
+		rows: 200,
+		reads: 0,
+		writes: 200,
+		perWrite: 1,
+		lanes: ['hooks-top', 'hooks', 'cells', 'bound'],
+		steps: ['mount', 'badge', 'rename', 'title', 'setting', 'unmount'],
+	},
 };
 export const STEPS = ['mount', 'rerender', 'write', 'unmount'];

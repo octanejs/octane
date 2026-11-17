@@ -75,6 +75,7 @@ const cases = Object.entries(SCENARIOS)
 	.flatMap(([scenario, config]) => config.lanes.map((lane) => ({ scenario, lane })));
 const key = ({ scenario, lane }) => `${scenario} ${lane}`;
 const stepsOf = (scenario) =>
+	SCENARIOS[scenario].steps ??
 	STEPS.filter((step) => step !== 'write' || SCENARIOS[scenario].writes);
 /** Per case and step, the median of each round; `heap` is bytes held while mounted. */
 const medians = new Map();
@@ -109,6 +110,12 @@ async function runCase(spec) {
 			if (result.rows !== expectedRows || !result.written)
 				throw new Error(`${key(spec)} ${step}: wrong DOM ${JSON.stringify(result)}`);
 			renders.set(`${key(spec)} ${step}`, result.renders);
+			// Let the step's passive effects run, as a page would before its next
+			// interaction: a read subscribes in one, so a write in the same frame
+			// as its mount would render after the step instead of in it.
+			await page.evaluate(
+				() => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0))),
+			);
 			if (index < WARMUP) continue;
 			samples[step].push(result.duration);
 			if (step === 'mount') samples.heap.push((await heap()) - before);
