@@ -324,6 +324,7 @@ type ClientErrorArguments = {
 	362: [];
 	363: [];
 	364: [];
+	365: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -1436,6 +1437,8 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 				return formatDevErrorMessage('A signal effect must be a function.', args);
 			case 364:
 				return formatDevErrorMessage('Candidate frames require live nodes.', args);
+			case 365:
+				return formatDevErrorMessage("A signal's equals option must be a function.", args);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

@@ -961,3 +961,144 @@ describe('scoped synchronous signals', () => {
 		expect(() => scope.signal$('', 1)).toThrow(/nonempty/);
 	});
 });
+
+describe('equals', () => {
+	type Point = { x: number; y: number };
+	const samePoint = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
+	const sameItems = (a: readonly number[], b: readonly number[]) =>
+		a.length === b.length && a.every((item, index) => Object.is(item, b[index]));
+
+	for (const key of ['point', null]) {
+		const kind = key === null ? 'keyless' : 'keyed';
+
+		it(`keeps a ${kind} signal's value when equals finds a write equal`, () => {
+			const scope = owner();
+			const compared: [Point, Point][] = [];
+			const initial = { x: 1, y: 2 };
+			const point$ = scope.signal$(key, initial, {
+				equals: (previous, next) => {
+					compared.push([previous, next]);
+					return samePoint(previous, next);
+				},
+			});
+			const runs: Point[] = [];
+			const label$ = scope.derived$(null, () => {
+				runs.push(point$.get());
+				return `${point$.get().x},${point$.get().y}`;
+			});
+			const notified: string[] = [];
+			point$.subscribe(() => notified.push('subscriber'));
+			scope.effect(() => {
+				notified.push(`effect ${label$.get()}`);
+			});
+
+			const copy = { x: 1, y: 2 };
+			point$.set(copy);
+			scope.set(point$, (previous) => ({ ...previous }));
+			expect(point$.get()).toBe(initial);
+			expect(compared[0]).toEqual([initial, copy]);
+			expect(compared[0]![0]).toBe(initial);
+			expect(compared[0]![1]).toBe(copy);
+			expect(notified).toEqual(['effect 1,2']);
+			expect(runs).toHaveLength(1);
+
+			// Object.is-equal values are never compared.
+			compared.length = 0;
+			point$.set(initial);
+			expect(compared).toEqual([]);
+
+			const moved = { x: 3, y: 2 };
+			point$.set(moved);
+			expect(point$.get()).toBe(moved);
+			expect(notified).toEqual(['effect 1,2', 'subscriber', 'effect 3,2']);
+		});
+
+		it(`keeps a ${kind} derived value's reference when equals finds a result equal`, () => {
+			const scope = owner();
+			const items$ = scope.signal$(null, [3, 1, 2]);
+			const evens$ = scope.derived$(key, () => items$.get().filter((item) => item % 2 === 0), {
+				equals: sameItems,
+			});
+			let downstream = 0;
+			const total$ = scope.derived$(null, () => {
+				downstream++;
+				return evens$.get().reduce((sum, item) => sum + item, 0);
+			});
+			const notified: number[] = [];
+			// A keyless derived value's subscription ends before its signal's scope retires.
+			const stop = evens$.subscribe(() => notified.push(total$.get()));
+			const first = evens$.get();
+			expect(total$.get()).toBe(2);
+
+			items$.set([5, 2, 7]);
+			expect(evens$.get()).toBe(first);
+			expect(total$.get()).toBe(2);
+			expect(downstream).toBe(1);
+			expect(notified).toEqual([]);
+
+			items$.set([4, 2]);
+			expect(evens$.get()).toEqual([4, 2]);
+			expect(notified).toEqual([6]);
+			expect(downstream).toBe(2);
+			stop();
+		});
+
+		it(`batches equal and unequal writes to a ${kind} signal`, () => {
+			const scope = owner();
+			const point$ = scope.signal$(key, { x: 0, y: 0 }, { equals: samePoint });
+			const notified: Point[] = [];
+			point$.subscribe(() => notified.push(point$.get()));
+			scope.batch(() => {
+				point$.set({ x: 0, y: 0 });
+				point$.set({ x: 0, y: 0 });
+			});
+			expect(notified).toEqual([]);
+			scope.batch(() => {
+				point$.set({ x: 1, y: 0 });
+				point$.set({ x: 1, y: 0 });
+			});
+			expect(notified).toEqual([{ x: 1, y: 0 }]);
+		});
+	}
+
+	for (const key of ['copy', null]) {
+		it(`computes a ${key === null ? 'keyless' : 'keyed'} derived value's first result, and its first after a failure, without equals`, () => {
+			const scope = owner();
+			const fail$ = scope.signal$(null, false);
+			const items$ = scope.signal$(null, [1]);
+			const copy$ = scope.derived$(
+				key,
+				() => {
+					if (fail$.get()) throw new Error('failed');
+					return [...items$.get()];
+				},
+				{ equals: () => true },
+			);
+			const first = copy$.get();
+			expect(first).toEqual([1]);
+			items$.set([2]);
+			expect(copy$.get()).toBe(first);
+			fail$.set(true);
+			expect(() => copy$.get()).toThrow('failed');
+			fail$.set(false);
+			expect(copy$.get()).toEqual([2]);
+			expect(copy$.get()).not.toBe(first);
+		});
+	}
+
+	it('compares with Object.is alone by default', () => {
+		const scope = owner();
+		const point$ = scope.signal$('point', { x: 0, y: 0 });
+		const notified: number[] = [];
+		point$.subscribe(() => notified.push(point$.get().x));
+		point$.set({ x: 0, y: 0 });
+		expect(notified).toEqual([0]);
+	});
+
+	it('rejects an equals option that is not a function', () => {
+		const scope = owner();
+		expect(() => scope.signal$('a', 1, { equals: 'no' as never })).toThrow(TypeError);
+		expect(() => scope.derived$(null, () => 1, { equals: 1 as never })).toThrow(TypeError);
+		expect(() => scope.signal$(null, 1, 'no' as never)).toThrow(TypeError);
+	});
+});

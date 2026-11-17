@@ -281,15 +281,17 @@ function write(node: ScopedNode, value: unknown, batch: object): void {
 		typeof value === 'function'
 			? evaluateUpdater(batch, value as (previous: unknown) => unknown, previous)
 			: value;
+	const equal = Object.is(previous, next) || node.isEqual(previous, next);
 	graph.signalBatch(() => {
 		if (slot === undefined) {
 			// An equal write queues nothing.
-			if (Object.is(previous, next)) return;
+			if (equal) return;
 			slot = createSlot(node, batch);
 			fork(slot);
 			enlist(node, batch);
 		} else if (!sameRoot(slot.batch, batch)) pending.host!.entangle(slot.batch, batch);
-		graph.publishNode(slot.shadow!, graph.readyState(next));
+		// An equal value keeps the pending value's reference.
+		graph.publishNode(slot.shadow!, graph.readyState(equal ? previous : next));
 	});
 }
 

@@ -367,3 +367,29 @@ async function acceptReadyStaged$(whileHeld: (next$: WritableSignal<boolean>) =>
 	}
 	return { container, next$, read: () => read!(), cleanup };
 }
+
+it("stages a transition's writes through a scope signal's equals", async () => {
+	const scope = createScope({ scopeKey: 'staged-equals' });
+	const initial = { x: 1 };
+	const point$ = scope.signal$('point', initial, {
+		equals: (previous, next) => previous.x === next.x,
+	});
+	const heard: { x: number }[] = [];
+	point$.subscribe(() => heard.push(point$.get()));
+	try {
+		await act(() => startTransition(() => point$.set({ x: 1 })));
+		expect(point$.get()).toBe(initial);
+		const moved = { x: 2 };
+		await act(() =>
+			startTransition(() => {
+				point$.set(moved);
+				point$.set({ x: 2 });
+				point$.set((previous) => ({ ...previous }));
+			}),
+		);
+		expect(point$.get()).toBe(moved);
+		expect(heard).toEqual([moved]);
+	} finally {
+		scope.dispose();
+	}
+});
