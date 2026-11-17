@@ -393,3 +393,34 @@ it("stages a transition's writes through a scope signal's equals", async () => {
 		scope.dispose();
 	}
 });
+
+it("compares a transition's derived results with equals against its pending result", async () => {
+	const scope = createScope({ scopeKey: 'staged-derived-equals' });
+	const items$ = scope.signal$('items', [1, 2]);
+	const evens$ = scope.derived$('evens', () => items$.get().filter((item) => item % 2 === 0), {
+		equals: (previous, next) =>
+			previous.length === next.length && previous.every((item, index) => item === next[index]),
+	});
+	const committed = evens$.get();
+	const heard: number[][] = [];
+	evens$.subscribe(() => heard.push(evens$.get()));
+	let first: number[] | undefined;
+	let second: number[] | undefined;
+	try {
+		await act(() =>
+			startTransition(() => {
+				items$.set([4, 2]);
+				first = evens$.get();
+				items$.set([4, 2, 5]);
+				second = evens$.get();
+			}),
+		);
+		expect(first).toEqual([4, 2]);
+		expect(first).not.toBe(committed);
+		expect(second).toBe(first);
+		expect(evens$.get()).toBe(first);
+		expect(heard).toEqual([[4, 2]]);
+	} finally {
+		scope.dispose();
+	}
+});

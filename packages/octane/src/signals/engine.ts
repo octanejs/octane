@@ -783,7 +783,11 @@ export function installPublicScope(): void {
 		}
 		const node = createScopeNode<T>(this, key, 'derived');
 		const read: () => T = equals ? computeEqual(node, compute, equals) : compute;
-		node.compute = (target) => derivedState(target, read);
+		// A transition's shadow takes `compute` alone: its results compare with its own.
+		node.compute = equals
+			? (target) =>
+					derivedState(target, target === node ? read : computeEqual(target, compute, equals))
+			: (target) => derivedState(target, read);
 		node.plain = read;
 		initializeScopeRetention(this, node);
 		// Live derived values always reflect live inputs, including edits made
