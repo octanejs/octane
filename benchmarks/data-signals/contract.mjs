@@ -49,3 +49,12 @@ export const SCENARIOS = {
 	},
 };
 export const STEPS = ['mount', 'rerender', 'write', 'unmount'];
+
+/** The steps one scenario runs, in order. */
+export const stepsOf = (scenario) =>
+	SCENARIOS[scenario].steps ??
+	STEPS.filter((step) => step !== 'write' || SCENARIOS[scenario].writes);
+
+/** Let a step's passive effects run, as a page would before its next interaction. */
+export const settle = () =>
+	new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));

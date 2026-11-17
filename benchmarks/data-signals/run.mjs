@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { SCENARIOS, STEPS } from './contract.mjs';
+import { SCENARIOS, settle, stepsOf } from './contract.mjs';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const ROOT = path.resolve(HERE, '../..');
@@ -74,9 +74,6 @@ const cases = Object.entries(SCENARIOS)
 	.filter(([scenario]) => !only || only.includes(scenario))
 	.flatMap(([scenario, config]) => config.lanes.map((lane) => ({ scenario, lane })));
 const key = ({ scenario, lane }) => `${scenario} ${lane}`;
-const stepsOf = (scenario) =>
-	SCENARIOS[scenario].steps ??
-	STEPS.filter((step) => step !== 'write' || SCENARIOS[scenario].writes);
 /** Per case and step, the median of each round; `heap` is bytes held while mounted. */
 const medians = new Map();
 /** Per case and step, the row renders the step made. */
@@ -113,9 +110,7 @@ async function runCase(spec) {
 			// Let the step's passive effects run, as a page would before its next
 			// interaction: a read subscribes in one, so a write in the same frame
 			// as its mount would render after the step instead of in it.
-			await page.evaluate(
-				() => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0))),
-			);
+			await page.evaluate(settle);
 			if (index < WARMUP) continue;
 			samples[step].push(result.duration);
 			if (step === 'mount') samples.heap.push((await heap()) - before);

@@ -126,7 +126,9 @@ const shellSteps = {
 	),
 	setting: shellWrites(
 		settings,
-		(current) => ({ compact: !current.compact }),
+		// Ends compact, unlike the mounted rows (the first write keeps it off), so
+		// a class that never updates fails the check.
+		(_, write) => ({ compact: (config.writes - 1 - write) % 2 === 0 }),
 		(value) =>
 			Array.from(container.querySelectorAll('#thread p')).every(
 				(line) => line.className === (value.compact ? 'msg compact' : 'msg'),
