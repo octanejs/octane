@@ -105,7 +105,9 @@ function TodoApp() {
 						<For each={visible()}>
 							{(t) => (
 								<li
-									class={(t.completed() ? 'completed' : '') + (editing() === t.id ? ' editing' : '')}
+									class={
+										(t.completed() ? 'completed' : '') + (editing() === t.id ? ' editing' : '')
+									}
 								>
 									<div class="view">
 										<input

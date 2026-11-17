@@ -19,7 +19,9 @@ function TableView(props) {
 					{(row) => (
 						<tr data-id={row.id} class={row.active ? 'active' : 'inactive'}>
 							<th textContent={row.label} />
-							{row.cells.map((cell) => <td textContent={cell.text} />)}
+							{row.cells.map((cell) => (
+								<td textContent={cell.text} />
+							))}
 						</tr>
 					)}
 				</For>

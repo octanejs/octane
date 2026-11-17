@@ -8,10 +8,10 @@ import { INITIAL_SNAPSHOT } from '../../shared/workloads.js';
 // through the row ACCESSOR so a surviving row whose object was replaced
 // (`{...row, active: true}`) re-runs its own bindings and writes only what
 // changed. The list diff is the only diff. This is the idiomatic Solid 2.0
-// authoring for immutable snapshots handed to the view (ruled 2026-09-17);
-// ../solid-reconcile keeps the Solid 1-era store + reconcile shape for the
-// record — it pays a walk over every row per commit for stable proxies and
-// per-leaf notifications this workload never uses (2.6x vs 1.2x of Octane).
+// authoring for immutable snapshots handed to the view; ../solid-reconcile
+// keeps the Solid 1-era store + reconcile shape as a second target — it pays a
+// walk over every row per commit for stable proxies and per-leaf notifications
+// this workload never uses.
 
 const byId = (item) => item.id;
 
@@ -38,9 +38,7 @@ function AnimView(props) {
 	return (
 		<div class="uibench-anim" data-kind="anim">
 			<For each={props.boxes} keyed={byId}>
-				{(box) => (
-					<div class="box" data-id={box().id} style={{ transform: box().transform }} />
-				)}
+				{(box) => <div class="box" data-id={box().id} style={{ transform: box().transform }} />}
 			</For>
 		</div>
 	);
