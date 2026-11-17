@@ -5,7 +5,7 @@ import solid from '@solidjs/vite-plugin';
 // existing Solid benchmark fixtures all exercise its production runtime even
 // when the interaction harness drives Vite's development server.
 export default defineConfig({
-	plugins: [solid({ dev: false, hot: false })],
+	plugins: [solid({ dev: false, refresh: false })],
 	mode: 'production',
 	define: { 'process.env.NODE_ENV': JSON.stringify('production') },
 	resolve: {

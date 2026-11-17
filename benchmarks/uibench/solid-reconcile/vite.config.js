@@ -9,7 +9,7 @@ const isolationHeaders = {
 // Solid 2's development renderer is not compatible with the pinned Vite
 // plugin, so benchmark the production renderer used by the other Solid suites.
 export default defineConfig({
-	plugins: [solid({ dev: false, hot: false })],
+	plugins: [solid({ dev: false, refresh: false })],
 	mode: 'production',
 	define: { 'process.env.NODE_ENV': JSON.stringify('production') },
 	resolve: {

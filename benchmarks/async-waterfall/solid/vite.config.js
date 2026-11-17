@@ -2,9 +2,9 @@ import { defineConfig } from 'vite';
 import solid from '@solidjs/vite-plugin';
 
 // Force Solid 2.0-beta's production bundle — same rationale as the other Solid
-// bench fixtures (dev bundle crashes; hot:false skips solid-refresh).
+// bench fixtures (dev bundle crashes; refresh:false skips solid-refresh).
 export default defineConfig({
-	plugins: [solid({ dev: false, hot: false })],
+	plugins: [solid({ dev: false, refresh: false })],
 	mode: 'production',
 	define: { 'process.env.NODE_ENV': JSON.stringify('production') },
 	resolve: {

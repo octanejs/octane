@@ -3,12 +3,12 @@ import solid from '@solidjs/vite-plugin';
 
 // Force Solid 2.0-beta's production bundle (its dev bundle crashes) — same
 // rationale as the dbmon / recursive-context Solid fixtures: dev:false +
-// mode:production + resolve.conditions omitting 'development', hot:false to skip
+// mode:production + resolve.conditions omitting 'development', refresh: false to skip
 // solid-refresh. The reorder harness drives the dev server, so what matters is
 // that Solid's production runtime (fine-grained keyed <For> reconciler) is what
 // gets measured.
 export default defineConfig({
-	plugins: [solid({ dev: false, hot: false })],
+	plugins: [solid({ dev: false, refresh: false })],
 	mode: 'production',
 	define: { 'process.env.NODE_ENV': JSON.stringify('production') },
 	resolve: {

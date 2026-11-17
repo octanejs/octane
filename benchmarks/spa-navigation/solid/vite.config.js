@@ -8,9 +8,9 @@ import solid from '@solidjs/vite-plugin';
 //   2. mode:'production' so Vite sets process.env.NODE_ENV correctly
 //   3. resolve.conditions explicitly omits 'development', overriding Vite's
 //      auto-injected condition in serve mode
-// hot:false also disables solid-refresh (independent HMR-injection issue).
+// refresh:false also disables solid-refresh (independent HMR-injection issue).
 export default defineConfig({
-	plugins: [solid({ dev: false, hot: false })],
+	plugins: [solid({ dev: false, refresh: false })],
 	mode: 'production',
 	define: { 'process.env.NODE_ENV': JSON.stringify('production') },
 	resolve: {
