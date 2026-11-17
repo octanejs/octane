@@ -1,5 +1,14 @@
 # @octanejs/codemod
 
+## 0.2.5
+
+### Patch Changes
+
+- Updated dependencies [5224963]
+- Updated dependencies [b2470a0]
+- Updated dependencies [598f48a]
+  - octane@0.19.3
+
 ## 0.2.4
 
 ### Patch Changes
