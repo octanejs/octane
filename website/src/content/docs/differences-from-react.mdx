@@ -47,17 +47,6 @@ would share one source location, so the compiler reports an error. Use keyed `@f
 move the hook into a child component. `use()` and `useContext` are exempt because they
 are not slot-keyed.
 
-When you rename an imported custom hook in a fully compiled `.tsrx` or Octane-owned
-`.tsx` module, keep the local name in the `useX` form:
-
-```ts
-import { useReading as useValue } from './reading';
-```
-
-With an ordinary alias like `readValue`, repeated calls can share state and
-context reads can stay stale. Keep the hook name until the compiler can follow
-these aliases. [Track the compiler fix](https://github.com/octanejs/octane/issues/2756).
-
 Dependency lists are optional for effects, memos, callbacks, and imperative handles.
 When you omit one, the compiler derives it from the callback's captures:
 
