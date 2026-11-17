@@ -212,6 +212,23 @@ function ArmApp() @{
 	</div>
 }
 
+type TreeNode = { id: string; children: TreeNode[] };
+
+function TreeItem(props: { node: TreeNode }) @{
+	<li>
+		{props.node.id as string}
+		@for (const child of props.node.children; key child.id) {
+			<TreeItem node={child} />
+		}
+	</li>
+}
+
+function RecursiveTree(props: { root: TreeNode }) @{
+	<ul>
+		<TreeItem node={props.root} />
+	</ul>
+}
+
 function UnboundedReader(props: { promise: Promise<string> }) @{
 	const value = use(props.promise);
 	<p>{value as string}</p>
@@ -607,6 +624,20 @@ describe('profile build engine counters', () => {
 		const hookless = await mountOn(0);
 		const hooked = await mountOn(32);
 		expect(hooked['block.create']).toBe(hookless['block.create']! + 1);
+	});
+
+	it('mounts a component that renders itself like one rendered by another', async () => {
+		const leaf = (id: string) => ({ id, children: [] });
+		const root = { id: 'r', children: [leaf('a'), { id: 'b', children: [leaf('c')] }] };
+		let mounted!: ReturnType<typeof mount>;
+		const counters = await measure(() => {
+			mounted = mount(RecursiveTree, { root });
+		});
+		expect(mounted.container.textContent).toBe('rabc');
+		// RecursiveTree mounts the root item; each item mounts its children. Every
+		// item is hookless, so each takes the lite scope whichever component calls it.
+		expect(counters).toMatchObject({ 'block.lite.mount': 4, 'block.lite.fallback': 0 });
+		mounted.unmount();
 	});
 
 	it('counts a skipped memo body as a bailout, not a render', async () => {
