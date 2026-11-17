@@ -1,5 +1,11 @@
 # @octanejs/mcp-server
 
+## 0.3.13
+
+### Patch Changes
+
+- 4ebd92d: Accept `alien-signals-upstream` as a benchmark suite, the runner's new suite that runs alien-signals' own benchmarks against the signal engine.
+
 ## 0.3.12
 
 ### Patch Changes
