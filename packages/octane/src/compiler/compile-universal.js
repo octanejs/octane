@@ -955,7 +955,7 @@ export function createLexicalAnalysis(ast) {
 			if (node.type === 'FunctionDeclaration' && node.id) declarePattern(node.id, scope);
 			const parameterScope = createLexicalScope(scope, true);
 			const binding = node.metadata?.octaneMutableComponent;
-			const self = binding ? binding.self : node.id;
+			const self = binding ? binding.self : node.type === 'FunctionExpression' ? node.id : null;
 			if (self) declarePattern(self, parameterScope);
 			for (const parameter of node.params ?? []) declarePattern(parameter, parameterScope);
 			if (node.id) visitScopes(node.id, parameterScope);
