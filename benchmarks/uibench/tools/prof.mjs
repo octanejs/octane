@@ -46,7 +46,8 @@ page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 await page.goto(URL, { waitUntil: 'load' });
 await page.waitForFunction(() => window.__ready === true);
-if (!(await page.evaluate(() => window.crossOriginIsolated))) throw new Error('not cross-origin isolated');
+if (!(await page.evaluate(() => window.crossOriginIsolated)))
+	throw new Error('not cross-origin isolated');
 await page.evaluate(() => {
 	let state = 0x51be11 >>> 0; // same deterministic Math.random as run.mjs
 	Math.random = () => {
@@ -69,7 +70,8 @@ await page.evaluate(() => window.__mount());
 const cdp = await context.newCDPSession(page);
 
 const shortUrl = (u) => (u ? u.replace(/^https?:\/\/[^/]+\//, '').replace(/\?.*$/, '') : '');
-const frameKey = (cf) => `${cf.functionName || '(anonymous)'} ${shortUrl(cf.url)}:${cf.lineNumber + 1}`;
+const frameKey = (cf) =>
+	`${cf.functionName || '(anonymous)'} ${shortUrl(cf.url)}:${cf.lineNumber + 1}`;
 
 async function timeOp(name, reps) {
 	// Plain timing with the harness's protocol so the profiled condition can be
@@ -86,7 +88,11 @@ async function timeOp(name, reps) {
 				samples.push(performance.now() - t);
 			}
 			samples.sort((a, b) => a - b);
-			return { median: samples[samples.length >> 1], min: samples[0], p90: samples[Math.floor(samples.length * 0.9)] };
+			return {
+				median: samples[samples.length >> 1],
+				min: samples[0],
+				p90: samples[Math.floor(samples.length * 0.9)],
+			};
 		},
 		{ name, reps },
 	);
@@ -116,12 +122,17 @@ async function cpuProfile(name, reps) {
 	const parent = new Map();
 	for (const n of profile.nodes) for (const c of n.children ?? []) parent.set(c, n.id);
 	const stackHas = (id, fn) => {
-		for (let cur = id; cur !== undefined; cur = parent.get(cur)) if (byId.get(cur).callFrame.functionName === fn) return true;
+		for (let cur = id; cur !== undefined; cur = parent.get(cur))
+			if (byId.get(cur).callFrame.functionName === fn) return true;
 		return false;
 	};
 	// Window the samples: inside = after a __PROF_START sample until a __PROF_END sample.
-	const self = new Map(), incl = new Map();
-	let inside = false, windows = 0, totalUs = 0, samplesIn = 0;
+	const self = new Map(),
+		incl = new Map();
+	let inside = false,
+		windows = 0,
+		totalUs = 0,
+		samplesIn = 0;
 	const { samples, timeDeltas } = profile;
 	for (let i = 0; i < samples.length; i++) {
 		const id = samples[i];
@@ -130,8 +141,17 @@ async function cpuProfile(name, reps) {
 		// The sentinels spin on performance.now(), so their samples have `now`
 		// as the leaf and the sentinel below it — test the whole stack, not the
 		// leaf, or the spin time lands in the window as `now`.
-		if (stackHas(id, '__PROF_START')) { if (!inside) { inside = true; windows++; } continue; }
-		if (stackHas(id, '__PROF_END')) { inside = false; continue; }
+		if (stackHas(id, '__PROF_START')) {
+			if (!inside) {
+				inside = true;
+				windows++;
+			}
+			continue;
+		}
+		if (stackHas(id, '__PROF_END')) {
+			inside = false;
+			continue;
+		}
 		if (!inside) continue;
 		samplesIn++;
 		totalUs += dt;
@@ -147,23 +167,61 @@ async function cpuProfile(name, reps) {
 	}
 	const perRep = (us) => (us / windows / 1000).toFixed(4);
 	const rows = [...self.entries()].sort((a, b) => b[1] - a[1]);
-	console.log(`\n== CPU ${name}: ${windows} windows, ${samplesIn} samples, ${perRep(totalUs)} ms/run attributed (interval ${INTERVAL}µs)`);
+	console.log(
+		`\n== CPU ${name}: ${windows} windows, ${samplesIn} samples, ${perRep(totalUs)} ms/run attributed (interval ${INTERVAL}µs)`,
+	);
 	console.log('self ms/run  incl ms/run  %self  function');
 	for (const [k, us] of rows.slice(0, TOP))
-		console.log(`${perRep(us).padStart(11)}  ${perRep(incl.get(k)).padStart(11)}  ${((us / totalUs) * 100).toFixed(1).padStart(5)}  ${k}`);
+		console.log(
+			`${perRep(us).padStart(11)}  ${perRep(incl.get(k)).padStart(11)}  ${((us / totalUs) * 100).toFixed(1).padStart(5)}  ${k}`,
+		);
 	// Inclusive view of the known entry points, in one place.
 	const watch = [
-		'updateKeyedMap', 'disposeChildren', 'runDisposal', 'clearDeps', 'unlinkSubs', 'deleteFromHeap', 'unobserved',
-		'insertExpression', 'reconcileArrays', 'cleanChildren', 'normalize', 'normalizeIncomingArray', 'appendNodes',
-		'recompute', 'runEffect', 'flush', 'runQueue', 'createOwner', 'createComponent', 'effect', 'memo', 'computed', 'signal',
-		'TreeItem', 'TableView', 'TreeView', '(garbage collector)', '(program)', '(idle)',
+		'updateKeyedMap',
+		'disposeChildren',
+		'runDisposal',
+		'clearDeps',
+		'unlinkSubs',
+		'deleteFromHeap',
+		'unobserved',
+		'insertExpression',
+		'reconcileArrays',
+		'cleanChildren',
+		'normalize',
+		'normalizeIncomingArray',
+		'appendNodes',
+		'recompute',
+		'runEffect',
+		'flush',
+		'runQueue',
+		'createOwner',
+		'createComponent',
+		'effect',
+		'memo',
+		'computed',
+		'signal',
+		'TreeItem',
+		'TableView',
+		'TreeView',
+		'(garbage collector)',
+		'(program)',
+		'(idle)',
 	];
 	console.log('-- inclusive ms/run for watched functions --');
 	for (const w of watch) {
 		const hits = [...incl.entries()].filter(([k]) => k.startsWith(w + ' '));
-		if (hits.length) console.log(`${w.padEnd(24)} ${hits.map(([k, us]) => `${perRep(us)} (${k.split(' ')[1]})`).join('  ')}`);
+		if (hits.length)
+			console.log(
+				`${w.padEnd(24)} ${hits.map(([k, us]) => `${perRep(us)} (${k.split(' ')[1]})`).join('  ')}`,
+			);
 	}
-	return { windows, samplesIn, totalUs, self: Object.fromEntries(rows), incl: Object.fromEntries(incl) };
+	return {
+		windows,
+		samplesIn,
+		totalUs,
+		self: Object.fromEntries(rows),
+		incl: Object.fromEntries(incl),
+	};
 }
 
 async function allocProfile(name, reps) {
@@ -171,9 +229,19 @@ async function allocProfile(name, reps) {
 	let totalBytes = 0;
 	await cdp.send('HeapProfiler.enable');
 	for (let i = 0; i < reps; i++) {
-		await page.evaluate(async (name) => { await window.__prepare(name); await window.__settle(); if (typeof gc === 'function') gc(); }, name);
-		await cdp.send('HeapProfiler.startSampling', { samplingInterval: 256, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true });
-		await page.evaluate(async (name) => { await window.__run(name); }, name);
+		await page.evaluate(async (name) => {
+			await window.__prepare(name);
+			await window.__settle();
+			if (typeof gc === 'function') gc();
+		}, name);
+		await cdp.send('HeapProfiler.startSampling', {
+			samplingInterval: 256,
+			includeObjectsCollectedByMajorGC: true,
+			includeObjectsCollectedByMinorGC: true,
+		});
+		await page.evaluate(async (name) => {
+			await window.__run(name);
+		}, name);
 		const { profile } = await cdp.send('HeapProfiler.stopSampling');
 		const walk = (node, stack) => {
 			const k = frameKey(node.callFrame);
@@ -192,11 +260,19 @@ async function allocProfile(name, reps) {
 	}
 	await cdp.send('HeapProfiler.disable');
 	const rows = [...merged.entries()].sort((a, b) => b[1].bytes - a[1].bytes);
-	console.log(`\n== ALLOC ${name}: ${(totalBytes / reps / 1024).toFixed(1)} KB/run sampled (${reps} runs, 256 B interval)`);
+	console.log(
+		`\n== ALLOC ${name}: ${(totalBytes / reps / 1024).toFixed(1)} KB/run sampled (${reps} runs, 256 B interval)`,
+	);
 	console.log('KB/run   %    function  [top caller chains]');
 	for (const [k, e] of rows.slice(0, TOP)) {
-		const chains = [...e.stacks.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([s, b]) => `${s} ${(b / reps / 1024).toFixed(1)}K`).join(' | ');
-		console.log(`${(e.bytes / reps / 1024).toFixed(2).padStart(6)} ${((e.bytes / totalBytes) * 100).toFixed(1).padStart(5)}  ${k}  [${chains}]`);
+		const chains = [...e.stacks.entries()]
+			.sort((a, b) => b[1] - a[1])
+			.slice(0, 2)
+			.map(([s, b]) => `${s} ${(b / reps / 1024).toFixed(1)}K`)
+			.join(' | ');
+		console.log(
+			`${(e.bytes / reps / 1024).toFixed(2).padStart(6)} ${((e.bytes / totalBytes) * 100).toFixed(1).padStart(5)}  ${k}  [${chains}]`,
+		);
 	}
 	return { totalBytes, perRun: Object.fromEntries(rows.map(([k, e]) => [k, e.bytes / reps])) };
 }
@@ -204,13 +280,28 @@ async function allocProfile(name, reps) {
 const out = {};
 for (const name of CASES) {
 	// Warm the JIT the way the harness does (its warmup is 2 iterations × case-sized repetitions).
-	await page.evaluate(async ({ name, warmup }) => { for (let i = 0; i < warmup; i++) { await window.__prepare(name); await window.__run(name); } }, { name, warmup: WARMUP });
+	await page.evaluate(
+		async ({ name, warmup }) => {
+			for (let i = 0; i < warmup; i++) {
+				await window.__prepare(name);
+				await window.__run(name);
+			}
+		},
+		{ name, warmup: WARMUP },
+	);
 	const timing = await timeOp(name, Math.min(REPS, 100));
-	console.log(`\n#### ${name}  [${URL}]  median ${timing.median.toFixed(4)} ms  min ${timing.min.toFixed(4)}  p90 ${timing.p90.toFixed(4)}  (${Math.min(REPS, 100)} timed runs)`);
+	console.log(
+		`\n#### ${name}  [${URL}]  median ${timing.median.toFixed(4)} ms  min ${timing.min.toFixed(4)}  p90 ${timing.p90.toFixed(4)}  (${Math.min(REPS, 100)} timed runs)`,
+	);
 	out[name] = { timing };
 	if (MODE === 'cpu' || MODE === 'both') out[name].cpu = await cpuProfile(name, REPS);
-	if (MODE === 'alloc' || MODE === 'both') out[name].alloc = await allocProfile(name, Math.min(REPS, 60));
-	if (errors.length) { console.error('browser errors:', errors); process.exitCode = 1; break; }
+	if (MODE === 'alloc' || MODE === 'both')
+		out[name].alloc = await allocProfile(name, Math.min(REPS, 60));
+	if (errors.length) {
+		console.error('browser errors:', errors);
+		process.exitCode = 1;
+		break;
+	}
 }
 if (JSON_OUT) fs.writeFileSync(JSON_OUT, JSON.stringify(out, null, 1));
 await browser.close();

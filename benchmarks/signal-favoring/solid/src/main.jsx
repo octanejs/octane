@@ -48,29 +48,31 @@ window.__bumpAt81 = () => flush(bumpAt81);
 window.__bumpAt91 = () => flush(bumpAt91);
 // Batched sweep: enqueue all 10 stateful bumps, then ONE flush() — Solid's natural
 // microtask coalescing, bounded synchronously. Contrast bump_sweep (flush per bump).
-window.__sweepBatched = () => flush(() => {
-	bumpAt1();
-	bumpAt11();
-	bumpAt21();
-	bumpAt31();
-	bumpAt41();
-	bumpAt51();
-	bumpAt61();
-	bumpAt71();
-	bumpAt81();
-	bumpAt91();
-});
+window.__sweepBatched = () =>
+	flush(() => {
+		bumpAt1();
+		bumpAt11();
+		bumpAt21();
+		bumpAt31();
+		bumpAt41();
+		bumpAt51();
+		bumpAt61();
+		bumpAt71();
+		bumpAt81();
+		bumpAt91();
+	});
 // Same batch queued DESCENDANT-first (deepest stateful node first).
-window.__sweepBatchedReverse = () => flush(() => {
-	bumpAt91();
-	bumpAt81();
-	bumpAt71();
-	bumpAt61();
-	bumpAt51();
-	bumpAt41();
-	bumpAt31();
-	bumpAt21();
-	bumpAt11();
-	bumpAt1();
-});
+window.__sweepBatchedReverse = () =>
+	flush(() => {
+		bumpAt91();
+		bumpAt81();
+		bumpAt71();
+		bumpAt61();
+		bumpAt51();
+		bumpAt41();
+		bumpAt31();
+		bumpAt21();
+		bumpAt11();
+		bumpAt1();
+	});
 window.__ready = true;
