@@ -27,11 +27,11 @@ export function installDerivedCandidates(): void {
 }
 
 function forkResource<T>(this: ResourceBinding<T>, target: ScopedNode<T>): CandidateProducer {
-	if (this.streamedSelection || this.owner.streams?.selections.has(this.node.key)) {
-		throw new CandidateUnsupportedError(formatClientError(201));
-	}
-	// A candidate may publish only over the selection it was forked from.
+	// A candidate may publish only over the selection, and the receiver-owned
+	// channel bound to it, that it was forked from. The fork never binds a
+	// receiver channel itself (`candidate` skips that in compute).
 	const authority = this.selectionAuthority;
+	const streamed = this.streamedSelection;
 	const fork = new (this.constructor as typeof ResourceBinding<T>)(
 		this.owner,
 		target,
@@ -45,14 +45,13 @@ function forkResource<T>(this: ResourceBinding<T>, target: ScopedNode<T>): Candi
 	return {
 		dispose: () => fork.dispose(),
 		prepare: () => {
-			if (this.streamedSelection || this.owner.streams?.selections.has(this.node.key))
-				return { status: 'invalid' };
 			const entry = fork.selected;
 			const attempt = entry?.attempt;
 			if (entry) {
-				// Receiver-owned channels need their own adoption authority, even
-				// when another resource selected this canonical request first.
-				if (attempt?.streamed) return { status: 'invalid' };
+				// A receiver-owned channel belongs to the binding it was bound to. The
+				// fork presents it only while it shares that binding's request, as an
+				// equal selection does; any other channel needs its own adoption.
+				if (attempt?.streamed && entry !== this.selected) return { status: 'invalid' };
 				const snapshot = entry.state.snapshot;
 				if (
 					attempt &&
@@ -82,9 +81,8 @@ function forkResource<T>(this: ResourceBinding<T>, target: ScopedNode<T>): Candi
 				status: 'ready',
 				receipt: {
 					validate: () =>
-						!this.streamedSelection &&
-						!this.owner.streams?.selections.has(this.node.key) &&
 						this.selectionAuthority === authority &&
+						this.streamedSelection === streamed &&
 						fork.selectionAuthority === forkAuthority &&
 						fork.selected === entry &&
 						(entry
@@ -94,6 +92,9 @@ function forkResource<T>(this: ResourceBinding<T>, target: ScopedNode<T>): Candi
 						const previous = this.selected;
 						const resolve = this.resolvePending;
 						this.adoptSelection(fork);
+						// Leaving the receiver's selection hands its authority to the
+						// browser's request, as an urgent reselection does (detach).
+						if (previous !== entry) this.releaseStreamedSelection(entry?.request.identity);
 						this.selectionAuthority = fork.selectionAuthority;
 						return () => {
 							if (resolve !== this.resolvePending) resolve?.();

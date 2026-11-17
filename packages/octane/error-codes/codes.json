@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 364,
+  "nextCode": 365,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -810,7 +810,7 @@
       "message": "Candidate frames require live, non-adopting nodes.",
       "argumentCount": 0,
       "runtime": ["client", "server"],
-      "status": "active"
+      "status": "retired"
     },
     "136": {
       "message": "Async derived candidates are not supported by this prototype.",
@@ -1206,7 +1206,7 @@
       "message": "Streamed candidates are not supported by this prototype.",
       "argumentCount": 0,
       "runtime": ["client", "server"],
-      "status": "active"
+      "status": "retired"
     },
     "202": {
       "message": "Incompatible query definitions use the same key \"%s\".",
@@ -2179,6 +2179,12 @@
     },
     "363": {
       "message": "A signal effect must be a function.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "364": {
+      "message": "Candidate frames require live nodes.",
       "argumentCount": 0,
       "runtime": ["client", "server"],
       "status": "active"

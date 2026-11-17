@@ -107,7 +107,6 @@ type ClientErrorArguments = {
 	132: [unknown];
 	133: [unknown];
 	134: [unknown, unknown];
-	135: [];
 	136: [];
 	137: [];
 	138: [];
@@ -173,7 +172,6 @@ type ClientErrorArguments = {
 	198: [];
 	199: [];
 	200: [];
-	201: [];
 	202: [unknown];
 	203: [];
 	204: [];
@@ -325,6 +323,7 @@ type ClientErrorArguments = {
 	361: [];
 	362: [];
 	363: [];
+	364: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -667,8 +666,6 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 				return formatDevErrorMessage('Signal seed kind does not match "%s".', args);
 			case 134:
 				return formatDevErrorMessage('Signal key "%s" already has kind "%s".', args);
-			case 135:
-				return formatDevErrorMessage('Candidate frames require live, non-adopting nodes.', args);
 			case 136:
 				return formatDevErrorMessage(
 					'Async derived candidates are not supported by this prototype.',
@@ -880,11 +877,6 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 				return formatDevErrorMessage('A stream query returned an invalid iterator.', args);
 			case 200:
 				return formatDevErrorMessage('A resource must describe a query request.', args);
-			case 201:
-				return formatDevErrorMessage(
-					'Streamed candidates are not supported by this prototype.',
-					args,
-				);
 			case 202:
 				return formatDevErrorMessage('Incompatible query definitions use the same key "%s".', args);
 			case 203:
@@ -1442,6 +1434,8 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 				);
 			case 363:
 				return formatDevErrorMessage('A signal effect must be a function.', args);
+			case 364:
+				return formatDevErrorMessage('Candidate frames require live nodes.', args);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

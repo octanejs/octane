@@ -185,8 +185,11 @@ function fork(slot: PendingSlot): ScopedNode {
 	const registered = owner.nodes.get(node.key) === node;
 	// A render's private declaration view forks like the cell it presents.
 	const view = registered ? undefined : graph.declarationViewFork(node);
-	if ((!registered && view === undefined) || owner.readBarrier || owner.frames?.size)
-		throw new CandidateUnsupportedError(formatClientError(135));
+	// A held adoption frame does not block forking: historical reads bypass
+	// pending state (resolve), and release moves only readers whose committed
+	// read is unchanged and not hidden by a slot (unchangedLiveRead).
+	if ((!registered && view === undefined) || owner.readBarrier)
+		throw new CandidateUnsupportedError(formatClientError(364));
 	const shadow = new graph.ScopedNode(owner, node.key, node.kind);
 	shadow.pending = slot;
 	shadow.state = node.state;
@@ -237,8 +240,17 @@ function enlist(start: ScopedNode, batch: object): void {
 		}
 		stack.push(node);
 	};
+	const consumeReader = (notify: () => void): void => {
+		const block = (notify as NativeTransitionNotify)[NATIVE_TRANSITION_CONSUMER];
+		if (block !== undefined) host.consume(batch, block);
+	};
 	while (stack.length !== 0) {
 		const node = stack.pop()!;
+		// A hydrating reader presents the node through an adoption frame, not a
+		// graph link. It renders with the batch too, so the transition holds it
+		// rather than committing past the screen it presented.
+		const frames = (node.owner as ScopeImpl | undefined)?.frames;
+		if (frames?.size) for (const frame of frames) frame.readers(node, consumeReader);
 		for (let link = node.subs; link !== undefined; link = link.nextSub) {
 			const sub = link.sub;
 			if (sub instanceof graph.ScopedNode) {
