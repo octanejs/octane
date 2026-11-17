@@ -49,6 +49,7 @@ import {
 	type Feed,
 	type Listener,
 	type Read,
+	type Tags,
 	type Transport,
 	type View,
 	type ViewWindow,
@@ -344,6 +345,8 @@ export interface Entry {
 	readonly key: string;
 	readonly subscribers: Set<() => void>;
 	readonly handle: ReadHandle<any>;
+	/** The read's tags for this input. */
+	readonly tags: readonly string[];
 	base: unknown;
 	hasBase: boolean;
 	/** Entity names the confirmed value selects. */
@@ -438,6 +441,11 @@ function shown(entry: Entry): { offset: number; limit: number } {
 		offset: window.offset ?? 0,
 		limit: window.limit ?? (entry.read as View<any, any>).view.limit,
 	};
+}
+
+/** A contract's tags for one input. */
+function tagsFor(tags: Tags<any>, input: unknown): readonly string[] {
+	return typeof tags === 'function' ? tags(input) : tags;
 }
 
 /**
@@ -705,7 +713,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			savedAt: entry.fetchedAt,
 			stale: entry.stale,
 			span: span && { start: span.start, first: span.first, last: span.last },
-			tags: [...entry.read.tags, ...entry.names],
+			tags: [...entry.tags, ...entry.names],
 		};
 		return { stored, read: persistedRead(entry.read), requestedAt: entry.requestedAt };
 	}
@@ -1631,21 +1639,22 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	}
 
 	function affects(entry: Entry, tags: Iterable<string>): boolean {
-		for (const tag of tags) if (entry.read.tags.includes(tag) || entry.names.has(tag)) return true;
+		for (const tag of tags) if (entry.tags.includes(tag) || entry.names.has(tag)) return true;
 		return false;
 	}
 
-	function writeTags(write: Write<any, any>): readonly string[] {
-		return write.effect ? [...write.invalidates, write.effect.entity.name] : write.invalidates;
+	/** A write's own tags plus its entity's name. */
+	function writeTags(write: Write<any, any>, own: readonly string[]): readonly string[] {
+		return write.effect ? [...own, write.effect.entity.name] : own;
 	}
 
 	/**
 	 * The tags a write affects `entry` through. A view settles a removal, or a
 	 * write whose reply carries its record, from the shared table, so only the
-	 * write's own `invalidates` tags reach it.
+	 * write's `own` tags reach it.
 	 */
-	function viewTags(entry: Entry, write: Write<any, any>, tags: readonly string[], local: boolean) {
-		return entry.span && local ? write.invalidates : tags;
+	function viewTags(entry: Entry, own: readonly string[], tags: readonly string[], local: boolean) {
+		return entry.span && local ? own : tags;
 	}
 
 	/** Whether a write's views can settle from the shared table, before its reply is read. */
@@ -1717,6 +1726,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 					return (current.wanted = load(current));
 				},
 			},
+			tags: tagsFor(read.tags, input),
 			base: undefined,
 			hasBase: false,
 			names: new Set(),
@@ -1862,7 +1872,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				commitReached(adopted.filter((entry): entry is Entry => entry !== undefined));
 			});
 		}
-		const tags = writeTags(operation.write);
+		const own = tagsFor(write.invalidates, operation.input);
+		const tags = writeTags(write, own);
 		// Saved values no entry holds now are marked too, for the session that restores them.
 		persisted?.invalidated(tags);
 		for (const entry of entries.values()) {
@@ -1870,7 +1881,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			// and may predate the write. Reads that select none are untouched unless a tag names them.
 			const unknown = !entry.hasBase && entry.read.entities && tags.length > 0;
 			if (refreshed.has(entry)) continue;
-			if (unknown || affects(entry, viewTags(entry, write, tags, local))) reload.add(entry);
+			if (unknown || affects(entry, viewTags(entry, own, tags, local))) reload.add(entry);
 		}
 		reloadAll(reload);
 		if (!operation.write.effect) operations = operations.filter((item) => item !== operation);
@@ -2047,11 +2058,12 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		let dispatchedAt = 0;
 		const deliver = () => {
 			dispatchedAt = sequence;
-			const tags = writeTags(write);
+			const own = tagsFor(write.invalidates, operation.input);
+			const tags = writeTags(write, own);
 			const refresh: { name: string; input: unknown }[] = [];
 			for (const entry of entries.values()) {
 				if (refresh.length === MAX_REFRESH) break;
-				const viewed = viewTags(entry, write, tags, settlesLocally(write));
+				const viewed = viewTags(entry, own, tags, settlesLocally(write));
 				if (entry.subscribers.size > 0 && affects(entry, viewed)) {
 					refresh.push({ name: entry.read.name, input: wireInput(entry) });
 				}

@@ -31,8 +31,8 @@ the same task as the event that caused it.
 
 | Contract | Options | Notes |
 | --- | --- | --- |
-| `read` | `name`, `input?`, `output`, `entities?`, `tags?`, `fresh = 0`, `keep = 300000`, `expire = Infinity`, `persist = true`, `cancel = false`, `version = ''` | Times are milliseconds; a `keep` of 2³¹ ms or more (such as `Infinity`) keeps the value for the session. `entities(output)` returns `Entity.from(...)` selections. `cancel` aborts a load once nothing observes the read or waits on it. |
-| `write` | `name`, `input`, `output?`, one of `creates`/`patches`/`removes`, `draft?`, `serverId?`, `record?`, `form?`, `invalidates?` | `draft(input, id)` defaults to the input plus the new ID. `record(output)` locates the saved record so views take it without reloading. |
+| `read` | `name`, `input?`, `output`, `entities?`, `tags?`, `fresh = 0`, `keep = 300000`, `expire = Infinity`, `persist = true`, `cancel = false`, `version = ''` | Times are milliseconds; a `keep` of 2³¹ ms or more (such as `Infinity`) keeps the value for the session. `entities(output)` returns `Entity.from(...)` selections. `tags` is a list, or `tags(input)` for each input. `cancel` aborts a load once nothing observes the read or waits on it. |
+| `write` | `name`, `input`, `output?`, one of `creates`/`patches`/`removes`, `draft?`, `serverId?`, `record?`, `form?`, `invalidates?` | `draft(input, id)` defaults to the input plus the new ID. `record(output)` locates the saved record so views take it without reloading. `invalidates` is a list, or `invalidates(input)` from the validated input. |
 | `entity` | `name`, `schema`, `key = 'id'` | `id(value)` is `String(value[key])`. |
 | `view` | `name`, `of`, `order`, `where?`, `with?`, `input?`, `limit = 20`, `max = 500`, plus the read options | A read whose input is `{ ...params, offset, limit }` and whose value is that window's rows. `view.view.where` and `view.view.compare` are exposed for handlers. `with: { name: [Entity, key] }` joins each row to the record its `key` points at. |
 | `feed` | `name`, `params?`, `event`, `changes(event, params)`, `covers` | `changes` returns `{ put, value }`, `{ remove, id }`, `{ read, input?, value }` or `{ invalidates }`, or an array of them. |
@@ -46,6 +46,28 @@ imports `octane/data/manifest`. The rules and codes are in
 `view` ordering compares values as JavaScript's `<` does (dates by time,
 `null`/`undefined` first), then by the entity key. A handler must serve the
 same order.
+
+Tags computed from an input scope invalidation to that input. A read
+computes its tags once per input, as `store.read` was given it; a view's
+input also carries any `offset` and `limit`. A write computes its
+`invalidates` from its validated input when it is sent, to pick the reads
+refreshed in its reply, and again when it settles. Saved values keep the
+tags computed for them, so a later invalidation still reaches them after a
+restart.
+
+```ts
+const project = read({
+	name: 'project',
+	input: ProjectId,
+	output: Project,
+	tags: (id) => [`project:${id}`],
+});
+const rename = write({
+	name: 'renameProject',
+	input: Rename,
+	invalidates: ({ id }) => [`project:${id}`],
+});
+```
 
 A view `with` relations has rows of the record plus, under each relation's
 name, the record its key points at. The handler returns each row with those

@@ -96,7 +96,8 @@ export interface Read<Input, Output> {
 	readonly input: StandardSchema<unknown, Input> | undefined;
 	readonly output: StandardSchema<unknown, Output>;
 	readonly entities: ((output: Output) => EntitySelection | EntitySelection[]) | undefined;
-	readonly tags: readonly string[];
+	/** Tags an invalidation names to mark this read stale, or the tags for one input. */
+	readonly tags: Tags<Input>;
 	/** Milliseconds a value is served without refetching. */
 	readonly fresh: number;
 	/** Milliseconds an unobserved value is retained. */
@@ -127,8 +128,16 @@ export interface Write<Input, Output> {
 	readonly record: ((output: Output) => unknown) | undefined;
 	/** The fields a native form submits, by name; a write without them takes no form POST. */
 	readonly form: FormFields | undefined;
-	readonly invalidates: readonly string[];
+	/** Tags of the reads a confirmed write marks stale, or the tags for one input. */
+	readonly invalidates: Tags<Input>;
 }
+
+/**
+ * Tags as a list, or computed from an input: a read's input as it was passed
+ * to `store.read`, a write's validated input. A read's tags are computed once
+ * per input; a write's when it is sent and again when it settles.
+ */
+export type Tags<Input> = readonly string[] | ((input: Input) => readonly string[]);
 
 /**
  * How one submitted field becomes an input value. Each appears exactly once,
@@ -330,7 +339,7 @@ export function view<T, P = void, const W extends ViewRelations<T> = {}>(options
 	order: ViewOrder<T>;
 	limit?: number;
 	max?: number;
-	tags?: readonly string[];
+	tags?: Tags<ViewInput<P>>;
 	fresh?: number;
 	keep?: number;
 	expire?: number;
@@ -398,7 +407,7 @@ export function read<Output, Input = void>(options: {
 	input?: StandardSchema<unknown, Input>;
 	output: StandardSchema<unknown, Output>;
 	entities?: (output: Output) => EntitySelection | EntitySelection[];
-	tags?: readonly string[];
+	tags?: Tags<Input>;
 	fresh?: number;
 	keep?: number;
 	expire?: number;
@@ -453,7 +462,7 @@ export function write<Input, Output = unknown>(options: {
 	 * works before hydration and without JavaScript. Any other field is refused.
 	 */
 	form?: { readonly [K in keyof Input & string]?: FieldCodec };
-	invalidates?: readonly string[];
+	invalidates?: Tags<Input>;
 }): Write<Input, Output> {
 	const { creates, patches, removes } = options;
 	return {
