@@ -174,7 +174,8 @@ describe('octane/signals/react', () => {
 			return null;
 		}
 		const { container } = mount(h(Boundary, null, h(Orphan)));
-		expect(container.textContent).toContain('no <SignalScopeProvider>');
+		// Development builds spell the message out; production keeps its code.
+		expect(container.textContent).toMatch(/No <SignalScopeProvider> above|errors\/365/);
 	});
 
 	it('throws ScopeDisposedError instead of showing a retired scope value', async () => {

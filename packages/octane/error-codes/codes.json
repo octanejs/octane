@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 365,
+  "nextCode": 366,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -2185,6 +2185,12 @@
     },
     "364": {
       "message": "Candidate frames require live nodes.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "365": {
+      "message": "No <SignalScopeProvider> above this component.",
       "argumentCount": 0,
       "runtime": ["client", "server"],
       "status": "active"

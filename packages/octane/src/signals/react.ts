@@ -8,6 +8,7 @@
  */
 import { createContext, createElement, use, useCallback, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
+import { formatClientError } from '../error-codes.client.generated.js';
 import { SIGNAL_BINDING_READ, SIGNAL_BINDING_SUBSCRIBE } from './types.js';
 import type { Scope, SignalHandle } from './types.js';
 
@@ -24,7 +25,7 @@ export function SignalScopeProvider(props: { scope: Scope; children?: ReactNode 
 
 export function useSignalScope(): Scope {
 	const scope = use(ScopeContext);
-	if (!scope) throw new Error('octane/signals: no <SignalScopeProvider> above this component');
+	if (!scope) throw new Error(formatClientError(365));
 	return scope;
 }
 
