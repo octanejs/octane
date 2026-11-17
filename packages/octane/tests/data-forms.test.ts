@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
 	createDataStore,
 	DataError,
+	DataUncertainError,
 	httpTransport,
 	write,
 	type StandardSchema,
@@ -428,6 +429,55 @@ describe('octane/data forms in the store', () => {
 		stop();
 		await saving;
 		expect(store.form(addNote, 'row')).not.toBe(form);
+	});
+
+	it('keeps a refused form that unmounted mid-submission, with its values and issues', async () => {
+		const server = createServer(addNote, [
+			{ title: 'Tides', pinned: false, priority: 1, operationId: 'x' },
+		]);
+		const store = createDataStore({ transport: server.transport });
+		const form = store.form(addNote, 'dialog');
+		const stop = form.subscribe(() => {});
+		const fields = new FormData();
+		fields.set('title', 'Tides');
+		fields.set('priority', '2');
+		fields.set('password', 'hunter2');
+		const saving = form.submit(fields);
+		// The dialog closes optimistically, before the reply.
+		stop();
+		await expect(saving).rejects.toMatchObject({ code: 'duplicate' });
+
+		// Reopened, the dialog finds the same form with what was submitted, secrets left out.
+		expect(store.form(addNote, 'dialog')).toBe(form);
+		expect(form.getSnapshot()).toEqual({
+			pending: false,
+			values: { title: 'Tides', priority: '2' },
+			issues: {},
+			error: 'duplicate',
+		});
+	});
+
+	it('keeps showing an uncertain submission after the app settles it, until the next one', async () => {
+		const server = createServer();
+		let lose = true;
+		const transport: Transport = async (request, signal) => {
+			const reply = await server.transport(request, signal);
+			if (lose) throw new Error('connection reset after the server applied the write');
+			return reply;
+		};
+		const store = createDataStore({ transport });
+		const form = store.form(addNote, 'dialog');
+		const fields = new FormData();
+		fields.set('title', 'Tides');
+		fields.set('priority', '1');
+		fields.set('password', '');
+		const error = (await form.submit(fields).catch((reason) => reason)) as DataUncertainError;
+		expect(error).toMatchObject({ name: 'DataUncertainError' });
+		expect(form.getSnapshot()).toMatchObject({ error: 'uncertain', values: { title: 'Tides' } });
+
+		store.settle(error.operationId, true);
+		expect(form.getSnapshot()).toMatchObject({ error: 'uncertain' });
+		expect(server.log).toEqual(['add Tides']);
 	});
 
 	it('refuses a form handle for a write without form fields', () => {

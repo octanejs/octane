@@ -355,6 +355,32 @@ describe('octane/data store', () => {
 		expect(list.getSnapshot().value![0].done).toBe(false);
 	});
 
+	it('still sends a later edit to a record after an earlier edit to it is refused', async () => {
+		const server = createServer();
+		let writes = 0;
+		const store = createDataStore({
+			transport: async (request, signal) => {
+				if (request.kind === 'write' && writes++ === 0) {
+					await new Promise((resolve) => setTimeout(resolve, 20));
+					return { ok: false, code: 'conflict' };
+				}
+				return server.transport(request, signal);
+			},
+		});
+		const list = store.read(todos, undefined);
+		await observe(list);
+
+		const first = store.write(setDone, { id: 'a', done: true }).catch((error) => error);
+		const second = store.write(setDone, { id: 'a', done: false });
+		expect(await first).toMatchObject({ name: 'DataError', code: 'conflict' });
+		await second;
+		await settled();
+
+		// Order is kept, but the second edit does not depend on the first succeeding.
+		expect(server.log.filter((line) => line.startsWith('setDone'))).toEqual(['setDone false']);
+		expect(list.getSnapshot().value![0].done).toBe(false);
+	});
+
 	it('keeps a confirmed edit visible until a value that includes it arrives', async () => {
 		const server = createServer();
 		let release!: () => void;
