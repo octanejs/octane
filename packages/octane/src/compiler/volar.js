@@ -935,9 +935,7 @@ function collectDirectiveOrigins(ast, source) {
 		) {
 			origins.set(node.start, {
 				end: node.start + keyword.length,
-				// A directive that is a template's output also starts the `return`
-				// (or `return await`) that outputs it.
-				texts: names === null ? null : new Set([...names, 'return', 'return await']),
+				texts: names === null ? null : new Set(names),
 			});
 		}
 		// `@else`: the clause block starts at its `{`, so the transform anchors

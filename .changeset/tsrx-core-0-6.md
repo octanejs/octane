@@ -1,7 +1,6 @@
 ---
 'octane': minor
 '@octanejs/codemod': patch
-'@octanejs/rspeedy-plugin': patch
 ---
 
 Update the TSRX toolchain to `@tsrx/core` 0.6.3 and `@tsrx/oxc` 0.24.0. Install `@tsrx/oxc@0.24.0` as the Node compiler's parser peer.

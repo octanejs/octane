@@ -227,9 +227,13 @@ describe('types mapping — template-directive keywords', () => {
 		code.slice(0, at).match(/<([A-Za-z$_][\w$]*)[^<]*$/)?.[1] ?? null;
 
 	it.each([
-		['@pending alone', '@try { <p>a</p> } @pending { <p>l</p> }', 'Suspense'],
-		['@catch alone', '@try { <p>a</p> } @catch (e) { <p>z</p> }', 'TsrxErrorBoundary'],
-		['both clauses', '@try { <p>a</p> } @pending { <p>l</p> } @catch (e) { <p>z</p> }', 'Suspense'],
+		['@pending alone', '@try { <p>a</p> } @pending { <p>l</p> }', '__Suspense'],
+		['@catch alone', '@try { <p>a</p> } @catch (e) { <p>z</p> }', '__TsrxErrorBoundary'],
+		[
+			'both clauses',
+			'@try { <p>a</p> } @pending { <p>l</p> } @catch (e) { <p>z</p> }',
+			'__Suspense',
+		],
 	])('resolves @try to the boundary it became — %s', (_label, body, expected) => {
 		const { source, code, mapping } = tryCase(body);
 		const pair = mapping.pairFromSource(source.indexOf('@try') + 1);
@@ -239,8 +243,8 @@ describe('types mapping — template-directive keywords', () => {
 	});
 
 	it.each([
-		['@pending', 'Suspense'],
-		['@catch', 'TsrxErrorBoundary'],
+		['@pending', '__Suspense'],
+		['@catch', '__TsrxErrorBoundary'],
 	])('resolves %s to the fallback it fills', (keyword, owner) => {
 		const { source, code, mapping } = tryCase(
 			'@try { <p>a</p> } @pending { <p>l</p> } @catch (e) { <p>z</p> }',
