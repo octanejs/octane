@@ -40,7 +40,7 @@ async function collectGarbage(): Promise<void> {
 }
 
 describe('signal families', () => {
-	function seededFamily<T>(
+	function seededFamily$<T>(
 		scope: Scope,
 		namespace: string,
 		initial: (id: string) => T,
@@ -66,16 +66,16 @@ describe('signal families', () => {
 	it('hydrates only selected members without mixing family namespaces or requests', () => {
 		const server = owner('seeded-family');
 		const otherRequest = owner('seeded-family');
-		const rows = seededFamily(server, 'rows', () => 'server default');
-		const other = seededFamily(server, 'rows,a', () => 'other default');
-		const otherRows = seededFamily(otherRequest, 'rows', () => 'request default');
-		rows.family.get('a,b').set('server value');
-		rows.family.get('transient').set('secret transient');
-		other.family.get('b').set('other family');
-		otherRows.family.get('a,b').set('other request');
-		rows.capture(['a,b']);
-		other.capture(['b']);
-		otherRows.capture(['a,b']);
+		const rows$ = seededFamily$(server, 'rows', () => 'server default');
+		const other$ = seededFamily$(server, 'rows,a', () => 'other default');
+		const otherRows$ = seededFamily$(otherRequest, 'rows', () => 'request default');
+		rows$.family.get('a,b').set('server value');
+		rows$.family.get('transient').set('secret transient');
+		other$.family.get('b').set('other family');
+		otherRows$.family.get('a,b').set('other request');
+		rows$.capture(['a,b']);
+		other$.capture(['b']);
+		otherRows$.capture(['a,b']);
 		const seed = server.serialize();
 		expect(JSON.stringify(seed)).not.toContain('secret transient');
 		expect(server.inspect().nodes).toHaveLength(2);
@@ -85,16 +85,16 @@ describe('signal families', () => {
 			seed: otherRequest.serialize(),
 		});
 		owners.push(client, clientOther);
-		const hydrated = seededFamily(client, 'rows', () => 'client default');
-		expect(hydrated.family.get('a,b').get()).toBe('server value');
-		expect(hydrated.family.get('transient').get()).toBe('client default');
+		const hydrated$ = seededFamily$(client, 'rows', () => 'client default');
+		expect(hydrated$.family.get('a,b').get()).toBe('server value');
+		expect(hydrated$.family.get('transient').get()).toBe('client default');
 		expect(
-			seededFamily(client, 'rows,a', () => 'client default')
+			seededFamily$(client, 'rows,a', () => 'client default')
 				.family.get('b')
 				.get(),
 		).toBe('other family');
 		expect(
-			seededFamily(clientOther, 'rows', () => 'client default')
+			seededFamily$(clientOther, 'rows', () => 'client default')
 				.family.get('a,b')
 				.get(),
 		).toBe('other request');
@@ -103,27 +103,27 @@ describe('signal families', () => {
 	it('retains selected snapshots through eviction without growing the keyed table', () => {
 		vi.useFakeTimers();
 		const scope = owner();
-		const rows = seededFamily(scope, 'rows', () => 'default', { idle: 10 });
-		const first = rows.family.get('a');
-		first.set('selected');
-		rows.capture(['a']);
-		const stop = first.subscribe(() => {});
+		const rows$ = seededFamily$(scope, 'rows', () => 'default', { idle: 10 });
+		const first$ = rows$.family.get('a');
+		first$.set('selected');
+		rows$.capture(['a']);
+		const stop = first$.subscribe(() => {});
 		vi.advanceTimersByTime(20);
-		expect(rows.family.get('a')).toBe(first);
+		expect(rows$.family.get('a')).toBe(first$);
 		stop();
 		vi.advanceTimersByTime(10);
-		expect(() => first.get()).toThrow(ScopeDisposedError);
-		const recreated = rows.family.get('a');
-		expect(recreated).not.toBe(first);
-		expect(recreated.get()).toBe('selected');
+		expect(() => first$.get()).toThrow(ScopeDisposedError);
+		const recreated$ = rows$.family.get('a');
+		expect(recreated$).not.toBe(first$);
+		expect(recreated$.get()).toBe('selected');
 		for (let i = 0; i < 100; i++) {
-			rows.family.get(String(i));
-			rows.family.delete(String(i));
+			rows$.family.get(String(i));
+			rows$.family.delete(String(i));
 		}
 		expect(scope.inspect().nodes).toHaveLength(1);
-		rows.capture([]);
-		rows.family.delete('a');
-		expect(rows.family.get('a').get()).toBe('default');
+		rows$.capture([]);
+		rows$.family.delete('a');
+		expect(rows$.family.get('a').get()).toBe('default');
 		expect(scope.serialize().entries).toHaveLength(1);
 	});
 

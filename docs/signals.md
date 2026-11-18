@@ -111,7 +111,7 @@ A family remains transient by default. To send selected string-keyed members to 
 ```ts
 import { createFamily, createScope, type FamilyOptions, type Scope } from 'octane/signals';
 
-function seededFamily<T>(
+function seededFamily$<T>(
 	scope: Scope,
 	namespace: string,
 	initial: (id: string) => T,
@@ -134,12 +134,12 @@ function seededFamily<T>(
 	};
 }
 
-const rows = seededFamily(server, 'rows', () => 'server default', { idle: 30_000 });
-rows.family.get('a').set('server value');
-rows.capture(['a']);
+const rows$ = seededFamily$(server, 'rows', () => 'server default', { idle: 30_000 });
+rows$.family.get('a').set('server value');
+rows$.capture(['a']);
 const seed = server.serialize();
 const client = createScope({ scopeKey: server.scopeKey, seed });
-seededFamily(client, 'rows', () => 'client default').family.get('a').get(); // 'server value'
+seededFamily$(client, 'rows', () => 'client default').family.get('a').get(); // 'server value'
 ```
 
 This recipe uses exact string member keys and accepts only the `idle` family option; it does not support custom `keyOf` aliases. Reserve the `JSON.stringify(['family', namespace])` scope keys for this recipe, and use a distinct namespace for each family in a scope. Send each request's seed only to its matching client scope. Values must be serializable by `scope.serialize()`. A selected member recreated after eviction starts from its last captured value; call `capture([])` to discard that snapshot, or capture a new selection to replace it. This uses one keyed node per family regardless of the number of members created or evicted. Captures are explicit snapshots, so later member writes are not included until captured again.
