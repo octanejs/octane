@@ -22,6 +22,11 @@
       "reason": "Exercises Octane component integration and is not counted as React parity."
     },
     {
+      "path": "packages/radix/tests/dialog-mixed-escape.test.tsx",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises the Octane-specific cooperative mixed-renderer Escape bridge with real React Radix participants; React has no corresponding bridge API, so these interop cases are not counted as renderer parity."
+    },
+    {
       "path": "packages/radix/tests/dialog.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Exercises Octane component integration and is not counted as React parity."
