@@ -422,22 +422,7 @@ export function mapSlot(
 			deps,
 		);
 	} else {
-		let mapped = NATIVE_REFLECT_APPLY(method, items, [callback]);
-		if (Array.isArray(mapped)) {
-			let packed: any[] | null = null;
-			for (let index = 0; index < mapped.length; index++) {
-				if (!(index in mapped)) {
-					packed = [];
-					break;
-				}
-			}
-			if (packed !== null) {
-				for (let index = 0; index < mapped.length; index++) {
-					if (index in mapped) packed.push(mapped[index]);
-				}
-				mapped = packed;
-			}
-		}
+		const mapped = NATIVE_REFLECT_APPLY(method, items, [callback]);
 		childSlot(
 			scopeOrItems,
 			slotOrMethod,
