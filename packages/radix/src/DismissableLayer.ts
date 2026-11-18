@@ -96,7 +96,7 @@ export function createEscapeLayerBridge(): {
 			}
 			const registry = current && escapeRegistries.get(current.node.ownerDocument);
 			const top = registry?.layers.at(-1);
-			if (!current || !top || top === current || !event.cancelable) {
+			if (!current || !registry || !top || top === current || !event.cancelable) {
 				handler?.(event);
 				return;
 			}
@@ -107,7 +107,17 @@ export function createEscapeLayerBridge(): {
 				} finally {
 					event.preventDefault();
 				}
-			} else event.preventDefault();
+			} else {
+				// React owns dismissal for React layers. Preserve its private stack decision
+				// unless doing so would cross a native layer and dismiss a mixed subtree.
+				for (let i = registry.layers.indexOf(current) + 1; i < registry.layers.length; i++) {
+					if (registry.layers[i].action) {
+						event.preventDefault();
+						return;
+					}
+				}
+				handler?.(event);
+			}
 		},
 	};
 }

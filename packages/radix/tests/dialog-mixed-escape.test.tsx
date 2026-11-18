@@ -10,7 +10,13 @@ import { createEscapeLayerBridge, Dialog } from '../src/index';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 type Log = string[];
-type LayerProps = { id: string; log: Log; veto?: boolean; throwEscape?: boolean };
+type LayerProps = {
+	id: string;
+	log: Log;
+	veto?: boolean;
+	throwEscape?: boolean;
+	bridge?: ReturnType<typeof createEscapeLayerBridge>;
+};
 const keepFocus = (event: Event) => event.preventDefault();
 
 function recordEscape(props: LayerProps, event: KeyboardEvent): void {
@@ -45,7 +51,7 @@ function NativeLayer(props: LayerProps & { reactChild?: LayerProps; nativeChild?
 function ReactLayer(
 	props: LayerProps & { children?: React.ReactNode; cooperate?: boolean; refs?: string[] },
 ) {
-	const bridge = React.useMemo(createEscapeLayerBridge, []);
+	const bridge = React.useMemo(() => props.bridge ?? createEscapeLayerBridge(), [props.bridge]);
 	const ref = React.useCallback(
 		(node: HTMLElement | null) => {
 			bridge.ref(node);
@@ -85,10 +91,11 @@ function ReactOuter(props: {
 	log: Log;
 	inner?: LayerProps & { reactChild?: LayerProps };
 	refs?: string[];
+	bridge?: ReturnType<typeof createEscapeLayerBridge>;
 }) {
 	return React.createElement(
 		ReactLayer,
-		{ id: 'outer', log: props.log, refs: props.refs },
+		{ id: 'outer', log: props.log, refs: props.refs, bridge: props.bridge },
 		props.inner &&
 			React.createElement<OctaneCompatComponentProps<Parameters<typeof NativeLayer>[0]>>(
 				OctaneCompat,
@@ -281,6 +288,70 @@ describe('cooperative mixed Radix Dialog Escape', () => {
 			document.removeEventListener('keydown', observer, { capture: true });
 		}
 		expect(log).toEqual(['inner:escape', 'independent:capture', 'inner:false']);
+	});
+
+	it('preserves React Escape behavior when opted nested React layers mount together', async () => {
+		const run = async (cooperate: boolean) => {
+			const log: Log = [];
+			await renderReact(
+				React.createElement(
+					ReactLayer,
+					{ id: 'outer', log, cooperate },
+					React.createElement(ReactLayer, { id: 'inner', log, cooperate }),
+				),
+			);
+			await press('inner');
+			await React.act(async () => unmount!());
+			unmount = undefined;
+			reactRoot = undefined;
+			document.body.innerHTML = '';
+			await settle();
+			return log;
+		};
+		const original = await run(false);
+		expect(original).not.toEqual([]);
+		expect(await run(true)).toEqual(original);
+	});
+
+	it('routes a native top through two React layers mounted together', async () => {
+		const log: Log = [];
+		await renderReact(
+			React.createElement(
+				ReactLayer,
+				{ id: 'outer', log },
+				React.createElement(
+					ReactLayer,
+					{ id: 'middle', log },
+					React.createElement<OctaneCompatComponentProps<Parameters<typeof NativeLayer>[0]>>(
+						OctaneCompat,
+						{ component: NativeLayer, props: { id: 'inner', log } },
+					),
+				),
+			),
+		);
+		await press('inner');
+		expect(log).toEqual(['inner:escape', 'inner:false']);
+		expect(document.getElementById('middle')).not.toBeNull();
+		expect(document.getElementById('outer')).not.toBeNull();
+	});
+
+	it('suppresses a React parent whose private stack disagrees across a native layer', async () => {
+		const log: Log = [],
+			bridge = createEscapeLayerBridge();
+		await renderReact(
+			React.createElement(ReactOuter, {
+				log,
+				bridge,
+				inner: { id: 'middle', log, reactChild: { id: 'leaf', log } },
+			}),
+		);
+		const event = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true });
+		bridge.onEscapeKeyDown(event, () => log.push('outer:escape'));
+		expect(event.defaultPrevented).toBe(true);
+		expect(log).toEqual([]);
+		expect(document.getElementById('outer')).not.toBeNull();
+		expect(document.getElementById('middle')).not.toBeNull();
+		expect(document.getElementById('leaf')).not.toBeNull();
 	});
 
 	it('leaves same-renderer React and native stacks unchanged', async () => {
