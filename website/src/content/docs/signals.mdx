@@ -275,6 +275,30 @@ keeps showing it during a retry. Use `reload()` to show pending UI instead.
 Resources selecting the same request in the same scope share the load. Call
 `close()` when the account session ends.
 
+<h3 id="families">Keep one signal per key</h3>
+
+When the keys come and go as the program runs, such as one row per item in a
+list, use a family instead of a key per item. `createFamily` creates a keyless
+member the first time you ask for a key, and returns that member for the same
+key after that.
+
+```ts
+import { createFamily, createScope } from 'octane/signals';
+
+const board = createScope({ scopeKey: 'board' });
+const done = createFamily(board, (_id: string) => board.signal$(null, false), { idle: 30_000 });
+
+done.get('task-1').set(true);
+console.log(done.get('task-1').get()); // true
+
+// When the task is deleted:
+done.delete('task-1');
+```
+
+`delete` evicts a member, and reading an evicted member throws. With `idle`, a
+member that nothing has observed for that many milliseconds is evicted too. A later
+`get` of the same key creates a fresh member.
+
 <h3 id="react-components">Read a scope from React</h3>
 
 React components read the same handles through `octane/signals/react`, with no
@@ -657,6 +681,7 @@ implementation when it compiles a component for SSR.
 | `createScope`                                             | Own state for a lifetime you manage, such as a cart or an account session. Create keyed signals with `scope.signal$` and synchronous calculations with `scope.derived$`. Call `scope.dispose()` when the owner closes.                             |
 | `query`, `createResource`                                 | In an explicit scope, `query` defines a reusable request. Calling that function with an argument describes a load. `createResource` selects the request, starts the load in the scope, and returns the handle you read.                            |
 | `optimistic$`, `action$`, `isActionUncertain`             | Show an edit while saving it. `optimistic$` overlays the edit on a ready source. `action$` gives each save its own operation. Use `isActionUncertain` to recognize a receipt or error that needs reconciliation with the server.                   |
+| `createFamily`                                            | Keep one keyless signal per key, such as one per row, in a scope. Evict members with `.delete(key)` or the `idle` option so keys that come and go don't grow the scope.                                                                            |
 | `isSignalHandle`, `isWritableSignal`                      | Check an unknown value before treating it as a readable handle or writing to it with `.set()`.                                                                                                                                                     |
 | `SignalScopeProvider`, `useSignalScope`, `useSignalValue` | From `octane/signals/react`: pass a scope to React components and read a handle's value in them.                                                                                                                                                   |
 

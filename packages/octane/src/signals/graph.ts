@@ -2499,6 +2499,62 @@ function releaseCell(cell: PlainCell): void {
 }
 
 /**
+ * Retire one keyless node, as its scope's retirement would: native views
+ * invalidate once, public subscriptions end silently, and every other reader
+ * recomputes, where reading it throws ScopeDisposedError. A cell moves to
+ * `retired`, a retired owner of the same shape as its own, so its fast paths
+ * keep their single check. A derived value lets go of its dependencies. Only
+ * signal families call this, so applications without them ship none of it.
+ * Callers batch, so the invalidations run once this returns.
+ */
+export function retireKeyless(
+	node: PlainCell | PlainComputed,
+	retired: GraphOwner,
+	scopeKey: string,
+): void {
+	for (let link = node.subs; link !== undefined;) {
+		const sub = link.sub;
+		link = link.nextSub;
+		if (!(sub instanceof SignalObserver)) continue;
+		const notice = sub.native ? sub.notify : undefined;
+		if (notice !== undefined && !queuedNotices.has(notice)) {
+			queuedNotices.add(notice);
+			queue[queueLength++] = notice;
+		}
+		stopObserver(sub);
+	}
+	const subs = node.subs;
+	if (subs !== undefined) {
+		propagate(subs, executionDepth !== 0);
+		shallowPropagate(subs);
+		while (node.subs) unlink(node.subs);
+	}
+	// Its observation has ended; a retained handle must not keep its hooks, or what they hold.
+	if (watchDriver) watchDriver.retire(node);
+	if (node instanceof PlainCell) {
+		(node as { owner: GraphOwner }).owner = retired;
+		node.last = undefined;
+		return;
+	}
+	while (node.deps) unlink(node.deps, node);
+	node.getter = () => {
+		throw new ScopeDisposedError(scopeKey);
+	};
+	node.last = undefined;
+	node.flags = (node.flags & REACTIVE_TRACKED_CELL) | REACTIVE_MUTABLE | REACTIVE_DIRTY;
+}
+
+/** The native read source a render took from a keyless derived value, if one did. */
+export function leanSource(node: PlainComputed): NativeReadSource | undefined {
+	return leanChannels.get(node)?.source;
+}
+
+/** A node's own `watched` hook, which a family keeps when it adds its own. */
+export function watchedHook(node: ReactiveNode): WatchHook['watched'] | undefined {
+	return watchDriver ? watchHooks.get(node)?.watched : undefined;
+}
+
+/**
  * Observer counts for the nodes a `watched` hook depends on: the hooked node and
  * everything that reads it, directly or through derived values. Every reader of a
  * counted node is counted too, from the link that makes it one. A node counts the
@@ -2512,7 +2568,7 @@ let watchDriver:
 	| {
 			link(dep: ReactiveNode, sub: ReactiveNode): void;
 			unlink(dep: ReactiveNode, sub: ReactiveNode): void;
-			retire(cell: PlainCell): void;
+			retire(node: PlainCell | PlainComputed): void;
 	  }
 	| undefined;
 let observerCounts: WeakMap<ReactiveNode, number>;
