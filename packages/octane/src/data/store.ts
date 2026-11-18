@@ -1797,6 +1797,13 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 					if (retired) return NEVER;
 					const current = entryFor(read, input);
 					if (current.startup && current.inflight) return (current.wanted = current.inflight);
+					if (current.startup?.pending && !current.hasBase) {
+						// The previous live request failed before restore finished. Retry both
+						// paths without marking the still-unread persisted value for deletion.
+						current.checkedStorage = false;
+						supersede(current);
+						return (current.wanted = load(current));
+					}
 					invalidateEntry(current);
 					return (current.wanted = load(current));
 				},
