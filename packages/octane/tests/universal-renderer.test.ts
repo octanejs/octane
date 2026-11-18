@@ -2724,6 +2724,38 @@ export function Scene() @{ <><Shared0 /><Native><Shared0 /></Native></> }
 		root.unmount();
 	});
 
+	it('publishes the retried result of a lazy keyed row that updates during render', () => {
+		const { container, root } = objectRoot(true);
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'retried-row',
+			bindings: [['value', 0]],
+		});
+		const Scene = defineUniversalComponent('object', ({ ids }: { ids: string[] }) =>
+			universalFor(
+				ids,
+				(id) => id,
+				(id) => {
+					const [value, setValue] = useUniversalState(0, 'value');
+					if (value === 0) setValue(1);
+					return universalValue(plan, [`${id}:${value}`]);
+				},
+				null,
+				true,
+				true,
+			),
+		);
+		try {
+			root.render(Scene, { ids: ['a', 'b'] });
+			const original = [...container.children];
+			expect(original.map((child) => child.props['value'])).toEqual(['a:1', 'b:1']);
+			root.render(Scene, { ids: ['b', 'a'] });
+			expect(container.children).toEqual([original[1], original[0]]);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('preserves nested leaves across ordinary, compact, aborted, and empty renders', () => {
 		const container = createObjectContainer();
 		const baseDriver = createObjectDriver();
