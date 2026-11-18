@@ -420,9 +420,23 @@ Styled native returned fragments use an inspectable `Fragment` descriptor, inclu
 `octane/signals/react` reads the same handles from React 19 components with no Octane compiler. It imports only `react` (an optional peer); `octane/signals` itself stays renderer-free.
 
 - `useSignalValue(handle$)` subscribes with `useSyncExternalStore`. Its subscribe and snapshot callbacks are stable per handle, so a new handle resubscribes and an unchanged one does not. It subscribes as a renderer binding, not through the public `subscribe`: when the handle's scope retires, the component re-reads and the read throws `ScopeDisposedError` to the nearest error boundary instead of showing a retired value. A derived value re-renders its readers only when the value changes.
-- The server snapshot is the same read. Render each request with its own scope, serialize it, and hydrate with `createScope({ scopeKey, seed })`; the seeded values win over the client's initial values.
+- By default the server snapshot is the live handle read. Render each request with its own scope, serialize it, and hydrate with `createScope({ scopeKey, seed })`; this is sufficient if live state has not advanced before hydration. If it can advance, pass `useSignalValue(handle$, getServerSnapshot)` a stable historical snapshot. React uses that callback on the server and during hydration, then catches up to the live handle through the regular subscription.
 - A read that throws throws from the component: a pending async handle suspends, and a failed one reaches the error boundary.
 - `SignalScopeProvider` passes a scope to `useSignalScope()`. It borrows the scope and never disposes it. The application creates one per root or request and disposes it after unmounting the tree that reads it. React does not own scopes here: a scope created during render is lost when StrictMode or Suspense discards that render, and one created in an effect is missing from the first render and from SSR.
+
+For a seeded scope, an adoption frame supplies that historical read without rewinding live state:
+
+```tsx
+const scope = createScope({ scopeKey, seed });
+const name$ = scope.signal$('name', '');
+const frame = scope.beginAdoption(seed);
+
+function Name() {
+  return <span>{useSignalValue(name$, () => frame.run(() => name$.get()))}</span>;
+}
+```
+
+Create the frame outside React render and retain it until every boundary that needs its historical snapshot has hydrated, including delayed Suspense boundaries. Release it after those boundaries complete, or when the root unmounts; do not release it from a parent layout effect while a child boundary can still hydrate. The application owns the frame and the borrowed scope. The callback must return the same snapshot for repeated hydration reads; for decoded objects, read from the retained frame rather than decoding again.
 
 ## Server rendering and historical adoption
 

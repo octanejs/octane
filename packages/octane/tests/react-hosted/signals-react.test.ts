@@ -254,6 +254,55 @@ describe('octane/signals/react', () => {
 		expect(container.innerHTML).toBe('<p>Hello Lin</p>');
 	});
 
+	it('adopts a historical server value before catching up to a pre-hydration write', async () => {
+		const request = createScope({ scopeKey: 'historical-request' });
+		const serverName$ = request.signal$('name', 'Ada');
+		function Greeting(props: {
+			name$: SignalHandle<string>;
+			getServerSnapshot?: () => string;
+			layouts?: string[];
+		}) {
+			const name = useSignalValue(props.name$, props.getServerSnapshot);
+			React.useLayoutEffect(() => {
+				props.layouts?.push(name);
+			}, [name, props.layouts]);
+			return h('p', null, name);
+		}
+		const html = renderToString(h(Greeting, { name$: serverName$ }));
+		const seed = request.serialize();
+		request.dispose();
+
+		const scope = createScope({ scopeKey: 'historical-request', seed });
+		const name$ = scope.signal$('name', '');
+		const frame = scope.beginAdoption(seed);
+		name$.set('Lin');
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		const serverNode = container.firstChild;
+		const errors: unknown[] = [];
+		const layouts: string[] = [];
+		let root!: Root;
+		await act(() => {
+			root = hydrateRoot(
+				container,
+				h(Greeting, { name$, getServerSnapshot: () => frame.run(() => name$.get()), layouts }),
+				{ onRecoverableError: (error) => errors.push(error) },
+			);
+		});
+		roots.push(root);
+		expect(errors).toEqual([]);
+		expect(container.firstChild).toBe(serverNode);
+		expect(layouts[0]).toBe('Ada');
+		expect(container.textContent).toBe('Lin');
+		frame.release();
+		await act(() => name$.set('Grace'));
+		expect(container.textContent).toBe('Grace');
+		await act(() => root.unmount());
+		roots.splice(roots.indexOf(root), 1);
+		expect(scope.inspect().retired).toBe(false);
+		scope.dispose();
+	});
+
 	it('suspends on a pending async handle and throws its failure', async () => {
 		const scope = createScope({ scopeKey: 'async' });
 		const outcomes = new Map<
