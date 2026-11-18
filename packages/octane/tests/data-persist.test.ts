@@ -324,6 +324,118 @@ describe('octane/data persistent cache', () => {
 		await store.dispose();
 	});
 
+	it('retries a cancelled concurrent restore when a later observer subscribes', async () => {
+		const storage = memoryStorage();
+		const before = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada'),
+		});
+		await before.prefetch(shelf, undefined);
+		await before.dispose();
+		const key = Promise.withResolvers<string>();
+		const offline = new Error('offline');
+		let calls = 0;
+		const transport = vi.fn<Transport>((_request, signal) =>
+			++calls === 1
+				? new Promise((_resolve, reject) =>
+						signal.addEventListener('abort', () => reject(signal.reason)),
+					)
+				: Promise.reject(offline),
+		);
+		const contract = read({
+			name: shelf.name,
+			output: shelf.output,
+			cancel: true,
+			restore: 'concurrent',
+		});
+		const store = createDataStore({
+			transport,
+			persist: cache(storage, 'ada', { key: () => key.promise }),
+		});
+		const handle = store.read(contract);
+		const stop = handle.subscribe(() => {});
+		await vi.waitFor(() => expect(transport).toHaveBeenCalledTimes(1));
+		stop();
+		expect(transport.mock.calls[0]![1].aborted).toBe(true);
+		const stopAgain = handle.subscribe(() => {});
+		await vi.waitFor(() => expect(handle.getSnapshot().error).toBe(offline));
+		key.resolve(KEY);
+		await vi.waitFor(() => expect(handle.getSnapshot().value).toEqual(books()));
+		expect(handle.getSnapshot()).toMatchObject({ status: 'ready', error: offline });
+		expect(transport).toHaveBeenCalledTimes(2);
+		stopAgain();
+		await store.dispose();
+	});
+
+	it('honors a forget requested synchronously by the cancelled transport', async () => {
+		const storage = memoryStorage();
+		const before = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada'),
+		});
+		await before.prefetch(shelf, undefined);
+		await before.dispose();
+		const reading = Promise.withResolvers<void>();
+		const releaseRead = Promise.withResolvers<void>();
+		const writing = Promise.withResolvers<void>();
+		const releaseWrite = Promise.withResolvers<void>();
+		const delayed: PersistentStorage = {
+			...storage,
+			async get(partition, key) {
+				if (partition !== key) {
+					reading.resolve();
+					await releaseRead.promise;
+				}
+				return storage.get(partition, key);
+			},
+			async commit(partition, puts, removals) {
+				if (puts.length > 0) {
+					writing.resolve();
+					await releaseWrite.promise;
+				}
+				return storage.commit(partition, puts, removals);
+			},
+		};
+		const offline = new Error('offline');
+		const contract = read({
+			name: shelf.name,
+			output: shelf.output,
+			cancel: true,
+			restore: 'concurrent',
+		});
+		let store!: ReturnType<typeof createDataStore>;
+		let forgotten: Promise<void> | undefined;
+		let calls = 0;
+		const transport = vi.fn<Transport>((_request, signal) =>
+			++calls === 1
+				? new Promise((_resolve, reject) =>
+						signal.addEventListener('abort', () => {
+							forgotten = store.forget(contract, undefined);
+							reject(signal.reason);
+						}),
+					)
+				: Promise.reject(offline),
+		);
+		store = createDataStore({ transport, persist: cache(delayed, 'ada') });
+		await store.publish(count, undefined, 42);
+		await writing.promise;
+		const handle = store.read(contract);
+		const stop = handle.subscribe(() => {});
+		await vi.waitFor(() => expect(transport).toHaveBeenCalledTimes(1));
+		await reading.promise;
+		stop();
+		expect(forgotten).toBeDefined();
+		const stopAgain = handle.subscribe(() => {});
+		await vi.waitFor(() => expect(handle.getSnapshot().error).toBe(offline));
+		releaseRead.resolve();
+		await saved();
+		expect(handle.getSnapshot().value).toBeUndefined();
+		releaseWrite.resolve();
+		await forgotten;
+		stopAgain();
+		await store.dispose();
+	});
+
 	it('does not let a corrupt restore delete a newer persisted live value', async () => {
 		const storage = memoryStorage();
 		const before = createDataStore({

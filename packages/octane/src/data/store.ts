@@ -1727,6 +1727,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 						created.subscribers.delete(notify);
 						if (retired) return;
 						if (created.abort && unwanted(created)) {
+							// Abort listeners may synchronously forget this entry.
+							if (created.startup && !created.hasBase) created.checkedStorage = false;
 							supersede(created);
 							touch(created);
 						}
