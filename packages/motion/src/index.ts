@@ -22,11 +22,13 @@ import {
 	isVariantLabel,
 	numberValueTypes,
 	resolveMotionValue,
+	setTarget,
 	scrapeHTMLMotionValuesFromProps,
 	scrapeSVGMotionValuesFromProps,
 	SVGVisualElement,
 	visualElementStore,
 	type MotionValue,
+	type VisualElement,
 } from 'motion-dom';
 import { getRendererOwnerVisibility } from 'octane/internal/client';
 import {
@@ -77,6 +79,7 @@ const ANIMATE = Symbol.for('octane-motion:animate');
 const ANIMATE_COMPLETE = Symbol.for('octane-motion:animate-complete');
 const CONTROLLER_PROPS = Symbol.for('octane-motion:controller-props');
 const CONTROLLER = Symbol.for('octane-motion:controller');
+const CONTROLLER_SUBSCRIBE = Symbol.for('octane-motion:controller-subscribe');
 const GESTURE = Symbol.for('octane-motion:gesture');
 const EXIT = Symbol.for('octane-motion:exit');
 const LAYOUT = Symbol.for('octane-motion:layout');
@@ -245,8 +248,14 @@ function readDomProps(
 				if (motion && isMotionSVGAttribute(attribute, svgRoot))
 					(subscriptions ??= []).push({ key, attribute, value, sample: out[key] });
 			}
-			// An authored static value takes over even if it equals the MotionValue's sample.
-			if (!motion && value != null && motionAttrs?.has(key) && attrs && Object.hasOwn(attrs, key)) {
+			// A fresh authored MotionValue or static value owns the attribute even if
+			// its sample equals the original value beneath the first-frame projection.
+			if (
+				((motion && motionAttrs?.get(key) !== value) ||
+					(!motion && value != null && motionAttrs?.has(key))) &&
+				attrs &&
+				Object.hasOwn(attrs, key)
+			) {
 				if (attrs === originalAttrs) attrs = { ...attrs };
 				delete attrs[key];
 			}
@@ -279,15 +288,26 @@ function readDomProps(
 	return subscriptions;
 }
 
+// Imperative animate(<svg>) registers an HTML visual. Keep it alive for pending
+// keyframe resolvers, and bridge the root's supported direct viewBox value.
+function syncSVGRootViewBox(
+	visual: VisualElement,
+	next: MotionValue<unknown> | undefined,
+	previous: MotionValue<unknown> | undefined,
+) {
+	if (next) visual.addValue('viewBox', next);
+	else if (previous && visual.getValue('viewBox') === previous) visual.removeValue('viewBox');
+}
+
 // Cheap structural key so a layout effect re-runs only when the target actually
 // changes (inline objects are a new reference every render).
 function stableKey(v: any): string {
 	return v == null ? '' : typeof v === 'string' ? v : JSON.stringify(v);
 }
 
-function whenDone(controls: any, done: () => void): void {
+function whenDone(controls: any, done: () => void, successOnly = false): void {
 	const p = controls && (controls.finished ?? controls);
-	if (p && typeof p.then === 'function') p.then(done, done);
+	if (p && typeof p.then === 'function') p.then(done, successOnly ? () => {} : done);
 	else done();
 }
 
@@ -388,11 +408,11 @@ function firstFrame(tag: string, svg: boolean, props: any, target: any, atEnd: b
 	const originalStyle: Record<string, any> = {};
 	for (const key in style) originalStyle[key] = raw?.[key];
 	const originalAttrs: Record<string, any> = {};
-	let motionAttrs: Set<string> | undefined;
+	let motionAttrs: Map<string, MotionValue<unknown>> | undefined;
 	for (const key in state.attrs) {
 		const source = props[key];
 		originalAttrs[key] = resolveMotionValue(source);
-		if (isMotionValue(source)) (motionAttrs ??= new Set()).add(key);
+		if (isMotionValue(source)) (motionAttrs ??= new Map()).set(key, source);
 	}
 	return { values, style, attrs: state.attrs, originalAttrs, motionAttrs, originalStyle };
 }
@@ -456,11 +476,15 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 				({
 					host: { current: null as HTMLElement | null },
 					animationComplete: undefined,
-					committedControllerProps: undefined,
-					nextController: undefined,
+					committedVisualProps: undefined,
+					nextVisualKey: undefined,
 					controller: undefined,
-					controllerVisual: undefined,
-					controllerSnapshot: undefined,
+					visual: undefined,
+					visualViewBox: undefined,
+					releaseVisual: undefined,
+					unsubscribeController: undefined,
+					authoredMotionDeps: undefined,
+					cancelAnimate: undefined,
 					hostMounted: false,
 					motionStyleMounted: false,
 					initialAnimationKey: initialLabel === false ? true : null,
@@ -549,21 +573,70 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		latest.layoutIdKey = layoutIdKey;
 		latest.layoutMode = layoutAnimationMode(props.layout);
 
-		if (controller || latest.controllerVisual) {
+		const host: Record<string, any> = {};
+		const subscriptions = readDomProps(props, svg, svgRoot, host, latest);
+		const styleMvDeps: any[] = [];
+		let authoredMotionDeps: any[] | undefined;
+		if (props.style && typeof props.style === 'object') {
+			for (const key in props.style) {
+				const v = props.style[key];
+				const motion = isMotionValue(v);
+				if (motion) (authoredMotionDeps ??= []).push('style', key, v);
+				if (motion || isTransformKey(key)) styleMvDeps.push(key, v);
+			}
+		}
+		if (subscriptions) {
+			for (const { key, value } of subscriptions)
+				(authoredMotionDeps ??= []).push('attr', key, value);
+		}
+		// The style inventory can grow or shrink; a hook dependency tuple cannot.
+		// Retain an equal inventory so ordinary renders do not churn subscriptions.
+		const previousStyleMvDeps: any[] | undefined = latest.styleMvDeps;
+		let sameMotionStyles = previousStyleMvDeps?.length === styleMvDeps.length;
+		if (sameMotionStyles) {
+			for (let i = 0; i < styleMvDeps.length; i++) {
+				if (!Object.is(previousStyleMvDeps![i], styleMvDeps[i])) {
+					sameMotionStyles = false;
+					break;
+				}
+			}
+		}
+		if (!sameMotionStyles) latest.styleMvDeps = styleMvDeps;
+		const previousAuthored: any[] | undefined = latest.authoredMotionDeps;
+		if (
+			authoredMotionDeps &&
+			previousAuthored?.length === authoredMotionDeps.length &&
+			authoredMotionDeps.every((value, i) => Object.is(value, previousAuthored[i]))
+		)
+			authoredMotionDeps = previousAuthored;
+		const hasAuthoredMotionValue = !!authoredMotionDeps;
+		const visualKey = controller ?? (hasAuthoredMotionValue ? true : undefined);
+		if (visualKey || latest.visual || previousAuthored) {
 			// Commands must see only props from an accepted commit, even if another
 			// render is suspended or abandoned.
 			useInsertionEffect(
 				() => {
+					if (latest.authoredMotionDeps !== authoredMotionDeps) {
+						// React cancels an in-flight target on an authored value rebind;
+						// an unchanged target does not start again on the new value.
+						latest.cancelAnimate?.();
+						latest.authoredMotionDeps = authoredMotionDeps;
+					}
 					const committed =
 						props.transition === undefined && config.transition
 							? { ...props, transition: config.transition }
 							: props;
-					latest.committedControllerProps = committed;
-					latest.nextController = controller;
-					if (controller && latest.controller === controller && latest.controllerVisual) {
-						const visual = latest.controllerVisual;
+					latest.committedVisualProps = committed;
+					latest.nextVisualKey = visualKey;
+					if (visualKey && latest.visual) {
+						const visual = latest.visual;
 						const previousStyle = visual.props.style;
 						visual.update(committed, null);
+						if (svgRoot && !(visual instanceof SVGVisualElement)) {
+							const value = subscriptions?.[0]?.value;
+							syncSVGRootViewBox(visual, value, latest.visualViewBox);
+							latest.visualViewBox = value;
+						}
 						for (const key in committed.style) {
 							const value = committed.style[key];
 							if (
@@ -580,98 +653,127 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 				CONTROLLER_PROPS,
 			);
 		}
-		if (controller) {
+		if (visualKey) {
 			useLayoutEffect(
 				() => {
 					if (!animationEnabled) return;
 					const node = latest.host.current;
 					const Visual = svg ? SVGVisualElement : HTMLVisualElement;
-					const snapshot = latest.controllerSnapshot;
-					const seed = !latest.hostMounted ? { ...latest.frame?.values } : { ...snapshot?.values };
-					latest.controllerSnapshot = undefined;
+					const registered = visualElementStore.get(node);
+					const reuse = latest.hostMounted && !!registered;
+					const seed = !latest.hostMounted ? { ...latest.frame?.values } : {};
 					const scraped = svg
-						? scrapeSVGMotionValuesFromProps(latest.committedControllerProps, {})
-						: scrapeHTMLMotionValuesFromProps(latest.committedControllerProps, {});
-					if (snapshot) {
-						for (const key in scraped) {
-							if (isMotionValue(scraped[key]) && scraped[key] !== snapshot.authored[key])
-								seed[key] = scraped[key].get();
+						? scrapeSVGMotionValuesFromProps(latest.committedVisualProps, {})
+						: scrapeHTMLMotionValuesFromProps(latest.committedVisualProps, {});
+					const visual = reuse
+						? registered!
+						: new Visual({
+								props: latest.committedVisualProps,
+								presenceContext: null,
+								reducedMotionConfig: shouldReduceMotion ? 'always' : 'never',
+								visualState: {
+									latestValues: seed,
+									renderState: {
+										style: {},
+										vars: {},
+										transform: {},
+										transformOrigin: {},
+										attrs: {},
+									},
+								},
+							} as any);
+					if (reuse) {
+						visual.update(latest.committedVisualProps, null);
+						if (svgRoot && !(visual instanceof SVGVisualElement)) {
+							const value = subscriptions?.[0]?.value;
+							syncSVGRootViewBox(visual, value, undefined);
+							latest.visualViewBox = value;
 						}
-					}
-					const visual = new Visual({
-						props: latest.committedControllerProps,
-						presenceContext: null,
-						reducedMotionConfig: shouldReduceMotion ? 'always' : 'never',
-						visualState: {
-							latestValues: seed,
-							renderState: { style: {}, vars: {}, transform: {}, transformOrigin: {}, attrs: {} },
-						},
-					} as any);
-					if (snapshot) {
-						for (const key in snapshot.base) {
-							const authored = scraped[key];
-							if (!isMotionValue(authored) || authored === snapshot.authored[key])
-								visual.setBaseTarget(key, snapshot.base[key]);
-						}
-					}
-					if (latest.hostMounted && !Object.keys(seed).length) {
-						for (const key of new Set([
-							...Object.keys(latest.frame?.values ?? {}),
-							...Object.keys(scraped),
-						])) {
-							const authored = scraped[key];
-							const value = isMotionValue(authored)
-								? authored.get()
-								: visual.readValueFromInstance(node, key);
-							if (value != null) {
-								seed[key] = value;
-								visual.setBaseTarget(key, value);
+						visual.shouldReduceMotion = shouldReduceMotion;
+					} else {
+						if (latest.hostMounted) {
+							for (const key of new Set([
+								...Object.keys(latest.frame?.values ?? {}),
+								...Object.keys(scraped),
+							])) {
+								const authored = scraped[key];
+								const value = isMotionValue(authored)
+									? authored.get()
+									: (visual as HTMLVisualElement | SVGVisualElement).readValueFromInstance(
+											node,
+											key,
+										);
+								if (value != null) {
+									seed[key] = value;
+									visual.setBaseTarget(key, value);
+								}
 							}
 						}
+						visual.mount(node);
 					}
-					visual.mount(node);
-					latest.controller = controller;
-					latest.controllerVisual = visual;
+					latest.visual = visual;
+					let active = true;
 					const release = () => {
-						if (latest.nextController && latest.nextController !== controller) {
-							const base: Record<string, any> = {};
-							for (const key in visual.latestValues) {
-								const value = visual.getBaseTarget(key);
-								if (value !== undefined) base[key] = value;
+						if (!active) return;
+						active = false;
+						try {
+							latest.unsubscribeController?.();
+						} finally {
+							try {
+								if (latest.nextVisualKey === undefined && !scope.block.disposed) {
+									// Relinquish authored values without stopping independent imperative work.
+									visual.update(latest.committedVisualProps, null);
+									if (latest.visualViewBox)
+										syncSVGRootViewBox(visual, undefined, latest.visualViewBox);
+								} else {
+									stopVisualElement(visual);
+									visual.unmount();
+									if (visualElementStore.get(node) === visual) visualElementStore.delete(node);
+								}
+							} finally {
+								if (latest.visual === visual) latest.visual = undefined;
+								latest.visualViewBox = undefined;
+								if (latest.releaseVisual === release) latest.releaseVisual = undefined;
 							}
-							latest.controllerSnapshot = {
-								values: { ...visual.latestValues },
-								base,
-								authored: svg
-									? scrapeSVGMotionValuesFromProps(visual.props, {})
-									: scrapeHTMLMotionValuesFromProps(visual.props, {}),
-							};
-						}
-						stopVisualElement(visual);
-						visual.unmount();
-						if (visualElementStore.get(node) === visual) visualElementStore.delete(node);
-						if (latest.controllerVisual === visual) {
-							latest.controllerVisual = undefined;
-							latest.controller = undefined;
 						}
 					};
+					latest.releaseVisual = release;
+					return release;
+				},
+				[animationEnabled, !!visualKey],
+				CONTROLLER,
+			);
+		}
+		if (controller) {
+			useLayoutEffect(
+				() => {
+					if (!animationEnabled || !latest.visual) return;
 					let unsubscribe: () => void;
 					try {
-						unsubscribe = controller.subscribe(visual);
+						unsubscribe = controller.subscribe(latest.visual);
 					} catch (error) {
-						release();
+						latest.releaseVisual?.();
 						throw error;
 					}
-					return () => {
+					latest.controller = controller;
+					let active = true;
+					const release = () => {
+						if (!active) return;
+						active = false;
 						try {
 							unsubscribe();
 						} finally {
-							release();
+							if (latest.unsubscribeController === release) {
+								latest.unsubscribeController = undefined;
+								latest.controller = undefined;
+							}
 						}
 					};
+					latest.unsubscribeController = release;
+					return release;
 				},
 				[animationEnabled, controller],
-				CONTROLLER,
+				CONTROLLER_SUBSCRIBE,
 			);
 		}
 
@@ -681,7 +783,12 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 			() => {
 				const node: HTMLElement = latest.host.current;
 				latest.hostMounted = true;
-				if (animationEnabled && resolvedInitial && !controller) {
+				if (
+					animationEnabled &&
+					resolvedInitial &&
+					!controller &&
+					!(hasAuthoredMotionValue && resolvedAnimate)
+				) {
 					animate(node, resolvedInitial, { duration: 0 });
 				}
 			},
@@ -736,22 +843,46 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 						}
 						if (delay > 0) t = { ...(t || {}), delay: (t?.delay || 0) + delay };
 					}
-					const controls = animateTarget(node, resolvedAnimate, t, latest.shouldReduceMotion);
+					const end = visualKey && resolvedAnimate.transitionEnd;
+					let target = resolvedAnimate;
+					if (end) {
+						const { transitionEnd, ...values } = resolvedAnimate;
+						target = values;
+					}
+					const controls = animateTarget(node, target, t, latest.shouldReduceMotion);
 					let active = true;
-					whenDone(controls, () => {
+					const finish = () => {
+						if (!active) return;
+						if (end && latest.visual) setTarget(latest.visual, end);
 						const complete = latest.animationComplete;
-						if (!active || !complete) return;
+						if (!complete) return;
 						try {
 							complete(animateLabel);
 						} catch (error) {
 							if (typeof reportError === 'function') reportError(error);
 							else console.error(error);
 						}
-					});
-					return () => {
-						active = false;
-						controls.stop();
 					};
+					// Motion also applies transitionEnd in frame.update. This keeps an
+					// instant/reduced target write from landing after its end value.
+					whenDone(
+						controls,
+						end
+							? () => {
+									if (active) motionFrame.update(finish, false, true);
+								}
+							: finish,
+						!!end,
+					);
+					const cancel = () => {
+						if (!active) return;
+						active = false;
+						if (end) cancelFrame(finish);
+						controls.stop();
+						if (latest.cancelAnimate === cancel) latest.cancelAnimate = undefined;
+					};
+					latest.cancelAnimate = cancel;
+					return cancel;
 				}
 			},
 			[animationEnabled, animationKey, stableKey(transition), shouldReduceMotion],
@@ -776,26 +907,6 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		// subscribed (and update the element without a re-render); shorthands apply once.
 		// Re-bind when the style bag's MotionValue identities or shorthand values change
 		// so callers can swap `style={{ x }}` across updates (upstream useMotionValue).
-		const styleMvDeps: any[] = [];
-		if (props.style && typeof props.style === 'object') {
-			for (const key in props.style) {
-				const v = props.style[key];
-				if (isMotionValue(v) || isTransformKey(key)) styleMvDeps.push(key, v);
-			}
-		}
-		// The style inventory can grow or shrink; a hook dependency tuple cannot.
-		// Retain an equal inventory so ordinary renders do not churn subscriptions.
-		const previousStyleMvDeps: any[] | undefined = latest.styleMvDeps;
-		let sameMotionStyles = previousStyleMvDeps?.length === styleMvDeps.length;
-		if (sameMotionStyles) {
-			for (let i = 0; i < styleMvDeps.length; i++) {
-				if (!Object.is(previousStyleMvDeps![i], styleMvDeps[i])) {
-					sameMotionStyles = false;
-					break;
-				}
-			}
-		}
-		if (!sameMotionStyles) latest.styleMvDeps = styleMvDeps;
 		useLayoutEffect(
 			() => {
 				const node: HTMLElement = latest.host.current;
@@ -875,7 +986,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 					transitionKey: string,
 					entering: boolean,
 				) => {
-					const visual = latest.controllerVisual;
+					const visual = latest.controller ? latest.visual : undefined;
 					let activated = bit === 4 ? tapTarget : bit === 2 ? hoverTarget : focusTarget;
 					if (entering) {
 						active |= bit;
@@ -1146,8 +1257,6 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		);
 		useLayoutEffect(() => () => latest.layout?.stop(), [], LAYOUT_CLEANUP);
 
-		const host: Record<string, any> = {};
-		const subscriptions = readDomProps(props, svg, svgRoot, host, latest);
 		if (subscriptions?.length) {
 			for (const { key } of subscriptions) host[key] = svgAttributeValue(key, host[key]);
 			const previous: SVGAttributeValue[] | undefined = latest.svgAttrs;

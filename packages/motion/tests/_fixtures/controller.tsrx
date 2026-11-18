@@ -61,3 +61,13 @@ export function ControllerGroup({
 		}
 	</div>
 }
+
+export function ExternalController({
+	controls,
+	x,
+}: {
+	controls: LegacyAnimationControls;
+	x: MotionValue<number>;
+}) @{
+	<motion.div id="external-controller" animate={controls} style={{ x }} />
+}

@@ -19,9 +19,11 @@ it('hydrates the server motion host with its first-frame style, children and ref
 	const container = document.createElement('main');
 	document.body.appendChild(container);
 	try {
-		const { ServerHost: ServerView, VisualStates } = await server.ssrLoadModule(
-			'/tests/_fixtures/server-host.tsrx',
-		);
+		const {
+			ServerHost: ServerView,
+			VisualStates,
+			AuthoredFrame: ServerFrame,
+		} = await server.ssrLoadModule('/tests/_fixtures/server-host.tsrx');
 		const { renderToString } = await server.ssrLoadModule('octane/server');
 		container.innerHTML = (await renderToString(VisualStates, {})).html;
 		expect(container.querySelector<HTMLElement>('#template')?.style.transform).toBe('scale(2)');
@@ -35,6 +37,21 @@ it('hydrates the server motion host with its first-frame style, children and ref
 		expect(inheritedList.style.opacity).toBe('0.25');
 		expect(inheritedList.style.transform).toBe('translateX(3px)');
 		expect(container.querySelector('circle')?.getAttribute('cx')).toBe('12');
+		const authoredCx = motionValue(5);
+		container.innerHTML = (
+			await renderToString(ServerFrame, { cx: authoredCx, animate: false })
+		).html;
+		const authoredCircle = container.querySelector('circle');
+		const authoredRoot = hydrateRoot(container, AuthoredFrame, { cx: authoredCx, animate: false });
+		await act(() => {});
+		expect(container.querySelector('circle')).toBe(authoredCircle);
+		await act(() => authoredRoot.render(AuthoredFrame, { cx: authoredCx, animate: true }));
+		await new Promise<void>((done) =>
+			requestAnimationFrame(() => requestAnimationFrame(() => done())),
+		);
+		expect(authoredCx.get()).toBe(6);
+		expect(authoredCircle?.getAttribute('cx')).toBe('6');
+		await act(() => authoredRoot.unmount());
 		container.innerHTML = (await renderToString(ServerView, { label: 'First' })).html;
 		const host = container.querySelector('div')!;
 		const svg = host.querySelector('svg');
@@ -99,8 +116,8 @@ it('clears an initial MotionValue after a static style takes ownership and is re
 
 it.each([
 	['MotionValue', 'number', '2'],
-	['MotionValue', 'MotionValue', '6'],
-	['number', 'MotionValue', '6'],
+	['MotionValue', 'MotionValue', '2'],
+	['number', 'MotionValue', '2'],
 	['MotionValue', 'updated MotionValue', '8'],
 ] as const)(
 	'handles a first-frame SVG attribute changing from %s to %s',

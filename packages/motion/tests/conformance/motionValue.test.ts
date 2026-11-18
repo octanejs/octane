@@ -1,23 +1,227 @@
 import { describe, it, expect, vi } from 'vitest';
-import { motionValue } from 'motion';
+import { animate, motionValue } from 'motion';
 import { mount, nextPaint } from '../_helpers';
-import { MVBox } from '../_fixtures/mv.tsrx';
+import {
+	MVBox,
+	AuthoredValueAnimation,
+	ReducedAuthoredValueAnimation,
+	ReboundValueAnimation,
+	ReboundRootAnimation,
+} from '../_fixtures/mv.tsrx';
 import { StyleXLater } from '../_fixtures/style-rebind.tsrx';
 import { StyleOpacity } from '../_fixtures/style-opacity.tsrx';
 import { StyleXY } from '../_fixtures/style-xy.tsrx';
+import { ControllerGroup } from '../_fixtures/controller.tsrx';
+import type { LegacyAnimationControls } from 'motion-dom';
 import { removeTransformFn, patchTransformFn } from '../../src/useMotionValue';
 
 describe('useMotionValue', function useMotionValueSuite() {
+	it('drives authored MotionValues through animation and transitionEnd on HTML and SVG hosts', async () => {
+		const x = motionValue(3),
+			cx = motionValue(5),
+			samples: number[] = [];
+		const unsubscribe = x.on('change', (value) => samples.push(value));
+		let doubled!: { get(): number };
+		const onReady = (derived: { get(): number }) => {
+			doubled = derived;
+		};
+		const r = mount(AuthoredValueAnimation, { x, cx, run: false, onReady });
+		try {
+			r.update(AuthoredValueAnimation, { x, cx, run: true, onReady });
+			await new Promise((resolve) => setTimeout(resolve, 90));
+			expect(samples.some((value) => value > 3 && value < 36)).toBe(true);
+			await new Promise((resolve) => setTimeout(resolve, 160));
+			expect(x.get()).toBe(42);
+			expect(doubled.get()).toBe(84);
+			expect(cx.get()).toBe(18);
+			expect(r.find('#animated-cx').getAttribute('cx')).toBe('18');
+		} finally {
+			unsubscribe();
+			r.unmount();
+		}
+	});
+
+	it('suppresses a canceled transitionEnd and rebinds a fresh authored value', async () => {
+		const original = motionValue(3),
+			fresh = motionValue(9),
+			cx = motionValue(5);
+		const onReady = () => {};
+		const r = mount(AuthoredValueAnimation, { x: original, cx, run: false, onReady });
+		try {
+			r.update(AuthoredValueAnimation, { x: original, cx, run: true, onReady });
+			await new Promise((resolve) => setTimeout(resolve, 45));
+			r.update(AuthoredValueAnimation, { x: fresh, cx, run: false, onReady });
+			await new Promise((resolve) => setTimeout(resolve, 220));
+			expect(fresh.get()).toBe(3);
+			expect(original.get()).not.toBe(42);
+			fresh.set(11);
+			expect(r.find('#animated-x').style.transform).toContain('translateX(11px)');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it.each(['add', 'remove', 'fresh'] as const)(
+		'cancels an unchanged declarative target when authored MotionValue ownership changes: %s',
+		async (mode) => {
+			const original = motionValue(0),
+				fresh = motionValue(7);
+			const initial = mode === 'add' ? undefined : original;
+			const next = mode === 'remove' ? undefined : fresh;
+			const r = mount(ReboundValueAnimation, { x: initial, run: false });
+			try {
+				r.update(ReboundValueAnimation, { x: initial, run: true });
+				await new Promise((resolve) => setTimeout(resolve, 50));
+				r.update(ReboundValueAnimation, { x: next, run: true });
+				await new Promise((resolve) => setTimeout(resolve, 240));
+				if (next) {
+					expect(fresh.get()).toBe(7);
+					expect(r.find('#rebound-x').style.transform).toContain('translateX(7px)');
+				} else expect(r.find('#rebound-x').style.transform).not.toContain('120px');
+				expect(original.get()).not.toBe(120);
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
+	it('preserves an independent imperative animation when adopting an authored value', async () => {
+		const x = motionValue(7);
+		const r = mount(ReboundValueAnimation, { run: false });
+		try {
+			r.update(ReboundValueAnimation, { run: true });
+			const host = r.find('#rebound-x');
+			const controls = animate(host, { y: 100 }, { duration: 0.3, ease: 'linear' });
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			r.update(ReboundValueAnimation, { x, run: true });
+			await new Promise((resolve) => setTimeout(resolve, 320));
+			expect(x.get()).toBe(7);
+			expect(host.style.transform).toContain('translateY(100px)');
+			controls.stop();
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('keeps controller and independent animations running across controller subscription replacement', async () => {
+		const x = motionValue(0),
+			rows = [{ id: 'one', target: 0, value: x }];
+		let first!: LegacyAnimationControls;
+		const onReady = (controls: LegacyAnimationControls) => {
+			first = controls;
+		};
+		const r = mount(ControllerGroup, { rows, onReady });
+		try {
+			void first.start({ x: 100, transition: { duration: 0.3, ease: 'linear' } });
+			const host = r.find('#one');
+			const controls = animate(host, { y: 100 }, { duration: 0.3, ease: 'linear' });
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			r.update(ControllerGroup, { rows, second: true, onReady });
+			await new Promise((resolve) => setTimeout(resolve, 320));
+			expect(x.get()).toBe(100);
+			expect(host.style.transform).toContain('translateY(100px)');
+			controls.stop();
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('adopts an immediate SVG-root imperative animation while updating an authored attribute', async () => {
+		const viewBox = motionValue('0 0 10 10'),
+			x = motionValue(4);
+		const r = mount(ReboundRootAnimation, { run: false });
+		try {
+			const host = r.find('#rebound-root');
+			const controls = animate(host, { y: 'var(--target)' }, { duration: 0.25, ease: 'linear' });
+			r.update(ReboundRootAnimation, { viewBox, x, run: true });
+			await new Promise((resolve) => setTimeout(resolve, 100));
+			const mid = Number(host.style.transform.match(/translateY\(([\d.]+)px\)/)?.[1]);
+			expect(mid).toBeGreaterThan(0);
+			expect(mid).toBeLessThan(100);
+			await new Promise((resolve) => setTimeout(resolve, 220));
+			expect(viewBox.get()).toBe('0 0 20 20');
+			expect(host.getAttribute('viewBox')).toBe('0 0 20 20');
+			expect(host.style.transform).toContain('translateY(var(--target))');
+			expect(x.get()).toBe(4);
+			r.update(ReboundRootAnimation, { viewBox: '0 0 30 30', x, run: true });
+			x.set(9);
+			expect(host.getAttribute('viewBox')).toBe('0 0 30 30');
+			expect(host.style.transform).toContain('translateX(9px)');
+			controls.stop();
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('updates an authored public value during a focus gesture and reduced-motion animation', async () => {
+		const x = motionValue(3),
+			cx = motionValue(5),
+			onReady = () => {};
+		const r = mount(AuthoredValueAnimation, { x, cx, run: false, focus: true, onReady });
+		try {
+			const host = r.find('#animated-x') as HTMLElement;
+			host.focus();
+			await new Promise((resolve) => setTimeout(resolve, 200));
+			expect(x.get()).toBe(60);
+			host.blur();
+			await new Promise((resolve) => setTimeout(resolve, 200));
+			expect(x.get()).toBe(3);
+		} finally {
+			r.unmount();
+		}
+		const reducedX = motionValue(3),
+			reducedCx = motionValue(5);
+		const reduced = mount(ReducedAuthoredValueAnimation, {
+			x: reducedX,
+			cx: reducedCx,
+			run: false,
+			onReady,
+		});
+		try {
+			reduced.update(ReducedAuthoredValueAnimation, {
+				x: reducedX,
+				cx: reducedCx,
+				run: true,
+				onReady,
+			});
+			await new Promise((resolve) => setTimeout(resolve, 80));
+			expect(reducedX.get()).toBe(42);
+		} finally {
+			reduced.unmount();
+		}
+	});
+
+	it('cancels a queued instant transitionEnd when a newer target commits', async () => {
+		const x = motionValue(3),
+			cx = motionValue(5),
+			values: number[] = [],
+			onReady = () => {};
+		const stop = x.on('change', (value) => values.push(value));
+		const r = mount(ReducedAuthoredValueAnimation, { x, cx, run: false, onReady });
+		try {
+			r.update(ReducedAuthoredValueAnimation, { x, cx, run: true, onReady });
+			await Promise.resolve();
+			r.update(ReducedAuthoredValueAnimation, { x, cx, run: false, onReady });
+			await new Promise((resolve) => setTimeout(resolve, 80));
+			expect(values).not.toContain(42);
+			expect(x.get()).toBe(3);
+		} finally {
+			stop();
+			r.unmount();
+		}
+	});
+
 	it('retains subscriptions when a render keeps the same MotionValue inventory', async () => {
 		const x = motionValue(10);
 		const subscribe = vi.spyOn(x, 'on');
 		const r = mount(StyleXLater, { x });
 		try {
 			await nextPaint();
-			expect(subscribe).toHaveBeenCalledOnce();
+			const subscriptions = subscribe.mock.calls.length;
+			expect(subscriptions).toBeGreaterThan(0);
 			r.update(StyleXLater, { x });
 			await nextPaint();
-			expect(subscribe).toHaveBeenCalledOnce();
+			expect(subscribe).toHaveBeenCalledTimes(subscriptions);
 			x.set(20);
 			expect(r.find('#box').style.transform).toBe('translateX(20px)');
 		} finally {
