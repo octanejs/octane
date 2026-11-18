@@ -745,7 +745,7 @@ function equalsOption<T>(options: ScopeSignalOptions<T> | undefined): SignalEqua
 	if (options === null || typeof options !== 'object') throw new TypeError(formatClientError(160));
 	const equals = options.equals;
 	if (equals !== undefined && typeof equals !== 'function')
-		throw new TypeError(formatClientError(365));
+		throw new TypeError(formatClientError(366));
 	return equals;
 }
 

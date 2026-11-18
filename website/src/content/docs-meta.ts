@@ -239,9 +239,17 @@ export const docsMeta: DocMeta[] = [
 			{
 				id: 'shared-state',
 				title: 'Own shared state with a scope',
-				searchTerms: ['createScope', 'query', 'createResource'],
+				searchTerms: [
+					'createScope',
+					'query',
+					'createResource',
+					'octane/signals/react',
+					'useSignalValue',
+					'SignalScopeProvider',
+				],
 			},
 			{ id: 'explicit-resources', title: 'Load data in an explicit scope', level: 3 },
+			{ id: 'react-components', title: 'Read a scope from React', level: 3 },
 			{ id: 'async-derived', title: 'Derive values across await' },
 			{ id: 'availability', title: 'Choose what to show while waiting', level: 3 },
 			{

@@ -372,6 +372,15 @@ Stored JSX resolves its dynamic element record and children in the represented r
 
 Styled native returned fragments use an inspectable `Fragment` descriptor, including static and empty fragments. This lets server styles enter the current request when a stored fragment renders. Unstyled static fragments retain their positional-array representation. Styles are not queued globally for a later, unrelated server render.
 
+## React components
+
+`octane/signals/react` reads the same handles from React 19 components with no Octane compiler. It imports only `react` (an optional peer); `octane/signals` itself stays renderer-free.
+
+- `useSignalValue(handle$)` subscribes with `useSyncExternalStore`. Its subscribe and snapshot callbacks are stable per handle, so a new handle resubscribes and an unchanged one does not. It subscribes as a renderer binding, not through the public `subscribe`: when the handle's scope retires, the component re-reads and the read throws `ScopeDisposedError` to the nearest error boundary instead of showing a retired value. A derived value re-renders its readers only when the value changes.
+- The server snapshot is the same read. Render each request with its own scope, serialize it, and hydrate with `createScope({ scopeKey, seed })`; the seeded values win over the client's initial values.
+- A read that throws throws from the component: a pending async handle suspends, and a failed one reaches the error boundary.
+- `SignalScopeProvider` passes a scope to `useSignalScope()`. It borrows the scope and never disposes it. The application creates one per root or request and disposes it after unmounting the tree that reads it. React does not own scopes here: a scope created during render is lost when StrictMode or Suspense discards that render, and one created in an effect is missing from the first render and from SSR.
+
 ## Server rendering and historical adoption
 
 For streaming pages, read queries inside separate `@try`/`@pending`/`@catch`

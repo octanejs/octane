@@ -274,6 +274,41 @@ keeps showing it during a retry. Use `reload()` to show pending UI instead.
 Resources selecting the same request in the same scope share the load. Call
 `close()` when the account session ends.
 
+<h3 id="react-components">Read a scope from React</h3>
+
+React components read the same handles through `octane/signals/react`, with no
+Octane compiler. `useSignalValue(handle$)` re-renders when the value changes,
+and writes still go through the handle. `SignalScopeProvider` passes a scope to
+`useSignalScope()` below it.
+
+```tsx
+import { createRoot } from 'react-dom/client';
+import { createScope } from 'octane/signals';
+import { SignalScopeProvider, useSignalValue } from 'octane/signals/react';
+
+const cart = createScope({ scopeKey: 'cart' });
+const quantity$ = cart.signal$('quantity', 1);
+const total$ = cart.derived$('total', () => quantity$.get() * 12);
+
+function Total() {
+	return <output>{useSignalValue(total$)}</output>;
+}
+
+root.render(
+	<SignalScopeProvider scope={cart}>
+		<Total />
+		<button onClick={() => quantity$.set((n) => n + 1)}>Add</button>
+	</SignalScopeProvider>,
+);
+```
+
+The provider borrows the scope and never disposes it. Create one scope per root
+or server request, and dispose it after unmounting the tree that reads it. A
+component still mounted when its scope retires throws `ScopeDisposedError` to
+the nearest error boundary rather than showing the retired value. A pending
+async handle suspends, and a failed one throws. To hydrate, create the client
+scope with `seed: serverScope.serialize()`.
+
 <h2 id="async-derived">Derive values across await</h2>
 
 Use `derived$` for a calculation that depends on other signals, including one
@@ -609,18 +644,20 @@ when the document ends. For a host that also places streamed HTML, see
 <h2 id="reference">Application API reference</h2>
 
 Import these APIs from `octane/signals`, except for the component hook
-`useSignal$`, which comes from `octane/signals/client`. Octane selects the
-hook's server implementation when it compiles a component for SSR.
+`useSignal$`, which comes from `octane/signals/client`, and the React bindings
+from `octane/signals/react`. Octane selects the `useSignal$` server
+implementation when it compiles a component for SSR.
 
-| Export                                        | When to use it                                                                                                                                                                                                                                     |
-| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `signal$`, `useSignal$`                       | Create writable state and update it with `.set(valueOrUpdater)`. A `signal$` can belong to a module or component and stores a function initial value as data. The component hook `useSignal$` calls a function initializer once for its hook slot. |
-| `derived$`                                    | Calculate a read-only value from other signals. Use it directly inside a component or at module level. For async work, `await read(handle$)` tracks a dependency across an earlier `await`.                                                        |
-| `query$`, `skip`                              | Load data for a selected key. Return `skip` from the selector to leave the query idle. Use `.refetch()` to refresh while showing a ready value, or `.reset()` to show pending UI.                                                                  |
-| `createScope`                                 | Own state for a lifetime you manage, such as a cart or an account session. Create keyed signals with `scope.signal$` and synchronous calculations with `scope.derived$`. Call `scope.dispose()` when the owner closes.                             |
-| `query`, `createResource`                     | In an explicit scope, `query` defines a reusable request. Calling that function with an argument describes a load. `createResource` selects the request, starts the load in the scope, and returns the handle you read.                            |
-| `optimistic$`, `action$`, `isActionUncertain` | Show an edit while saving it. `optimistic$` overlays the edit on a ready source. `action$` gives each save its own operation. Use `isActionUncertain` to recognize a receipt or error that needs reconciliation with the server.                   |
-| `isSignalHandle`, `isWritableSignal`          | Check an unknown value before treating it as a readable handle or writing to it with `.set()`.                                                                                                                                                     |
+| Export                                                    | When to use it                                                                                                                                                                                                                                     |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `signal$`, `useSignal$`                                   | Create writable state and update it with `.set(valueOrUpdater)`. A `signal$` can belong to a module or component and stores a function initial value as data. The component hook `useSignal$` calls a function initializer once for its hook slot. |
+| `derived$`                                                | Calculate a read-only value from other signals. Use it directly inside a component or at module level. For async work, `await read(handle$)` tracks a dependency across an earlier `await`.                                                        |
+| `query$`, `skip`                                          | Load data for a selected key. Return `skip` from the selector to leave the query idle. Use `.refetch()` to refresh while showing a ready value, or `.reset()` to show pending UI.                                                                  |
+| `createScope`                                             | Own state for a lifetime you manage, such as a cart or an account session. Create keyed signals with `scope.signal$` and synchronous calculations with `scope.derived$`. Call `scope.dispose()` when the owner closes.                             |
+| `query`, `createResource`                                 | In an explicit scope, `query` defines a reusable request. Calling that function with an argument describes a load. `createResource` selects the request, starts the load in the scope, and returns the handle you read.                            |
+| `optimistic$`, `action$`, `isActionUncertain`             | Show an edit while saving it. `optimistic$` overlays the edit on a ready source. `action$` gives each save its own operation. Use `isActionUncertain` to recognize a receipt or error that needs reconciliation with the server.                   |
+| `isSignalHandle`, `isWritableSignal`                      | Check an unknown value before treating it as a readable handle or writing to it with `.set()`.                                                                                                                                                     |
+| `SignalScopeProvider`, `useSignalScope`, `useSignalValue` | From `octane/signals/react`: pass a scope to React components and read a handle's value in them.                                                                                                                                                   |
 
 Read a handle with `.get()` for its current value. Use `.latest(fallback)`
 to show the last successful value and `.snapshot()` to inspect pending or error
