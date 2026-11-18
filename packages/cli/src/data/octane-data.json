@@ -7766,6 +7766,16 @@
       "message": "A signal's watched option must be a function.",
       "runtime": ["client", "server"],
       "status": "active"
+    },
+    "368": {
+      "message": "A signal transaction must be a function.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "369": {
+      "message": "A signal transaction must be synchronous: its function returned a promise.",
+      "runtime": ["client", "server"],
+      "status": "active"
     }
   },
   "strongDiagnostics": {

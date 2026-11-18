@@ -30,6 +30,7 @@ import {
 	setWatched,
 	setHistoricalReader,
 	signalBatch,
+	signalTransaction,
 	startSignalBatch,
 	stopEffect,
 	unchangedLiveRead,
@@ -251,6 +252,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 	declare set: Scope['set'];
 	declare isPending: Scope['isPending'];
 	declare batch: Scope['batch'];
+	declare transaction: Scope['transaction'];
 	declare effect: Scope['effect'];
 	declare action: Scope['action'];
 	declare serialize: Scope['serialize'];
@@ -843,6 +845,11 @@ export function installPublicScope(): void {
 	prototype.batch = function <T>(this: ScopeImpl, write: () => T): T {
 		assertAlive(this);
 		return signalBatch(write);
+	};
+	prototype.transaction = function <T>(this: ScopeImpl, write: () => T) {
+		assertAlive(this);
+		if (typeof write !== 'function') throw new TypeError(formatClientError(368));
+		return signalTransaction(write);
 	};
 	prototype.effect = function (this: ScopeImpl, run: () => void | (() => void)): () => void {
 		assertAlive(this);

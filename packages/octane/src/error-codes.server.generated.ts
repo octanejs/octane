@@ -257,6 +257,8 @@ type ServerErrorArguments = {
 	365: [];
 	366: [];
 	367: [];
+	368: [];
+	369: [];
 };
 
 export function formatServerError<Code extends keyof ServerErrorArguments>(
@@ -1052,6 +1054,13 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 				return formatDevErrorMessage("A signal's equals option must be a function.", args);
 			case 367:
 				return formatDevErrorMessage("A signal's watched option must be a function.", args);
+			case 368:
+				return formatDevErrorMessage('A signal transaction must be a function.', args);
+			case 369:
+				return formatDevErrorMessage(
+					'A signal transaction must be synchronous: its function returned a promise.',
+					args,
+				);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}
