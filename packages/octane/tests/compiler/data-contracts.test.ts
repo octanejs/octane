@@ -225,6 +225,18 @@ export const twice = write({ name: 'books.later', input });
 				'/app/books.data.ts',
 			),
 		).toEqual([]);
+		expect(
+			codes(
+				`export type { DataCall } from 'octane/data/server';\n${contracts}`,
+				'/app/books.data.ts',
+			),
+		).toEqual([]);
+		const inline = analyzeDataContracts(
+			`import { type DataCall } from 'octane/data/server';\n${contracts}`,
+			'/app/books.data.ts',
+		).diagnostics;
+		expect(inline.map((diagnostic) => diagnostic.code)).toEqual(['OCTANE_DATA_CONTRACT_MODULE']);
+		expect(inline[0]!.message).toContain("import type { … } from 'octane/data/server'");
 		const effects = `${contracts}import { handler } from 'octane/data/server';
 console.log(stats);
 if (import.meta.env) globalThis.ready = true;

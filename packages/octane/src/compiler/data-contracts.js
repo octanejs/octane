@@ -566,14 +566,20 @@ function contractName(kind, call) {
 
 /** Why a contract module's top-level statement is not inert, or null. */
 function contractModuleProblem(statement) {
-	// A type-only import never reaches the browser.
-	if (statement.importKind === 'type') return null;
+	// `import type` and `export type … from` never reach the browser. An inline
+	// `import { type X }` can: `verbatimModuleSyntax` keeps it as `import 'x'`.
+	if (statement.importKind === 'type' || statement.exportKind === 'type') return null;
 	const source =
 		statement.type === 'ImportDeclaration' || statement.source ? statement.source?.value : null;
 	if (typeof source === 'string') {
-		return SERVER_MODULES.some((server) => source === server || source.startsWith(`${server}/`))
-			? `A contract module is imported by the browser too, so it cannot import \`${source}\`. Import contracts into the server module instead.`
-			: null;
+		if (!SERVER_MODULES.some((server) => source === server || source.startsWith(`${server}/`)))
+			return null;
+		return statement.specifiers?.length > 0 &&
+			statement.specifiers.every(
+				(specifier) => (specifier.importKind ?? specifier.exportKind) === 'type',
+			)
+			? `A contract module is imported by the browser too, and an inline \`type\` modifier can keep \`${source}\` as an import there. Write \`import type { … } from '${source}'\`.`
+			: `A contract module is imported by the browser too, so it cannot import \`${source}\`. Import contracts into the server module instead.`;
 	}
 	const declaration =
 		statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'

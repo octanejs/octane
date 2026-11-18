@@ -28,8 +28,8 @@ export const stats = read({ name: 'served.stats', output: schema<{ total: number
 
 // @ts-expect-error the function returns the contract's output
 read({ name: 'served.bad', output: Book.one }, () => ({ id: 1 }));
-// @ts-expect-error the function takes the contract's input
 write(
+	// @ts-expect-error the function takes the contract's input
 	{ name: 'served.badInput', input: schema<{ title: string }>() },
 	(input: { name: string }) => {},
 );
