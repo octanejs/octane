@@ -303,18 +303,26 @@ export async function runCodemod(
 	for (const file of conflicts.keys()) exports.delete(file);
 	const strictConfig = (config?.strictNullChecks ?? config?.strict) ? config : null;
 	let program: ts.Program | undefined;
+	const proofPath = (name: string) => ts.sys.realpath?.(name) ?? name;
 	function typesOf(file: string): TransformOptions['types'] {
 		if (!strictConfig || options.projectTypes === false) return;
 		// Even one input can import a large graph. Bind it only for a rewrite that needs its types.
+		// With TypeScript's default symlink handling, package imports resolve to physical files;
+		// use the same identity for selected roots and path-bearing compiler options.
+		const preserve = strictConfig.preserveSymlinks === true;
 		if (!program) {
-			const options = { ...strictConfig, noEmit: true, noUncheckedIndexedAccess: true };
+			const physicalRoot = preserve ? root : proofPath(root);
+			const proofConfig =
+				physicalRoot === root ? strictConfig : (tsconfigOptions(physicalRoot) ?? strictConfig);
+			const selected = files.filter((name) => /\.[cm]?tsx?$/.test(name));
+			const proofOptions = { ...proofConfig, noEmit: true, noUncheckedIndexedAccess: true };
 			program = ts.createProgram(
-				files.filter((name) => /\.[cm]?tsx?$/.test(name)),
-				options,
-				libCachingHost(options),
+				preserve ? selected : selected.map(proofPath),
+				proofOptions,
+				libCachingHost(proofOptions),
 			);
 		}
-		const sourceFile = program.getSourceFile(file);
+		const sourceFile = program.getSourceFile(preserve ? file : proofPath(file));
 		if (sourceFile) return { sourceFile, checker: program.getTypeChecker() };
 	}
 	const contextsOf = contextIndex(exports, known);
