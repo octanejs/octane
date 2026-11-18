@@ -61,6 +61,8 @@ export interface TransformOptions {
 	localReactContext?(module: string, name: string, member: boolean): boolean;
 	/** Severity for a direct render of a local React class component. */
 	localReactClass?(module: string, name: string): 'error' | 'warning' | undefined;
+	/** Whether a selected imported component renders its children in native output. */
+	forwardedClassChild?(module: string, name: string): boolean;
 	/** Resolve a source-backed workspace hook after verifying its implementation and its call sites. */
 	resolveStoreHook?(
 		module: string,

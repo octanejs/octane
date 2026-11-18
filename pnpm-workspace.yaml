@@ -630,8 +630,8 @@ minimumReleaseAgeExclude:
   - '@tsrx/react-runtime@0.1.12'
   - '@tsrx/solid-runtime@0.1.12'
   - cn@0.2.6
-  - '@tanstack/react-virtual@3.14.12'
-  - '@tanstack/virtual-core@3.17.10'
+  - '@tanstack/react-virtual@3.14.26'
+  - '@tanstack/virtual-core@3.19.11'
   - '@tanstack/react-router@1.170.41'
   - '@tanstack/router-core@1.171.34'
   - '@tanstack/start-client-core@1.170.34'
