@@ -194,6 +194,8 @@ const SKIP_KEYS = new Set([
 	'metadata',
 	'comments',
 	'tokens',
+	'tsrx_tokens',
+	'tsrx_keyword_tokens',
 	'typeAnnotation',
 	'returnType',
 	'typeParameters',

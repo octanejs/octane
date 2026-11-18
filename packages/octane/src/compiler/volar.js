@@ -476,44 +476,12 @@ function projectArmExits(ast, exits) {
 	});
 }
 
-const OCTANE_PLATFORM_WITH_AUTHORED_SUSPENSE = {
-	...OCTANE_PLATFORM,
-	hooks: {
-		...OCTANE_PLATFORM.hooks,
-		createPendingBoundary(_content, _fallback, context) {
-			// Reuse the authored value binding without replacing its mapped import.
-			// Returning null keeps the shared boundary lowering; only its redundant
-			// helper import is suppressed. Other directive imports remain unchanged.
-			context.needs_suspense = false;
-			return null;
-		},
-	},
-};
-const octaneTransformWithAuthoredSuspense = createJsxTransform(
-	OCTANE_PLATFORM_WITH_AUTHORED_SUSPENSE,
-);
-
-/** @param {import('@tsrx/core/types').AST.Program} ast */
-function selectOctaneTransform(ast, dynamicTypeLocal = undefined) {
-	const hasSuspenseImport = ast.body.some(
-		(statement) =>
-			statement.type === 'ImportDeclaration' &&
-			statement.importKind !== 'type' &&
-			statement.source.value === DOM_RENDERER_MODULE &&
-			statement.specifiers.some(
-				(specifier) =>
-					specifier.type === 'ImportSpecifier' &&
-					specifier.importKind !== 'type' &&
-					specifier.local.name === 'Suspense' &&
-					(specifier.imported.name ?? specifier.imported.value) === 'Suspense',
-			),
-	);
-	if (dynamicTypeLocal === undefined)
-		return hasSuspenseImport ? octaneTransformWithAuthoredSuspense : octaneTransform;
-	const platform = hasSuspenseImport ? OCTANE_PLATFORM_WITH_AUTHORED_SUSPENSE : OCTANE_PLATFORM;
+/** @param {string | undefined} dynamicTypeLocal */
+function selectOctaneTransform(dynamicTypeLocal) {
+	if (dynamicTypeLocal === undefined) return octaneTransform;
 	return createJsxTransform({
-		...platform,
-		imports: { ...platform.imports, dynamicTypeLocal },
+		...OCTANE_PLATFORM,
+		imports: { ...OCTANE_PLATFORM.imports, dynamicTypeLocal },
 	});
 }
 
@@ -556,9 +524,8 @@ function createRendererTypePragma(renderer, ast, strong = false, typeIntrinsics 
 	const start = ast.loc?.start ?? { line: 1, column: 0 };
 	return {
 		type: 'Block',
-		// @tsrx/core's semantic-comment formatter turns this into the canonical
-		// `/** @jsxImportSource … */` spelling during the one type-only print.
-		value: `*@jsxImportSource ${typeIntrinsics === undefined && strong && intrinsics === DOM_RENDERER_MODULE ? 'octane/strong' : intrinsics}`,
+		// Printed verbatim as the canonical `/** @jsxImportSource … */` spelling.
+		value: `* @jsxImportSource ${typeIntrinsics === undefined && strong && intrinsics === DOM_RENDERER_MODULE ? 'octane/strong' : intrinsics} `,
 		start: ast.start ?? 0,
 		end: ast.start ?? 0,
 		loc: { start: { ...start }, end: { ...start } },
@@ -772,10 +739,10 @@ export function compileToVolarMappings(source, filename, options) {
 				type: options?.intrinsics !== undefined ? 'Block' : authoredPragma.type,
 				value:
 					options?.intrinsics !== undefined
-						? `*@jsxImportSource ${options.intrinsics}`
+						? `* @jsxImportSource ${options.intrinsics} `
 						: authoredPragma.type === 'Line'
 							? ' @jsxImportSource octane/strong'
-							: '*@jsxImportSource octane/strong',
+							: '* @jsxImportSource octane/strong ',
 			}
 		: null;
 	const printComments = typePragma
@@ -809,7 +776,7 @@ export function compileToVolarMappings(source, filename, options) {
 	// @tsrx/core: `ast` (passed below as `ast_from_source`) stays the
 	// original parse, and replacement nodes keep authored locations so
 	// mappings/hover still work.
-	const transform = selectOctaneTransform(ast, dynamicJsxTypes?.componentAlias);
+	const transform = selectOctaneTransform(dynamicJsxTypes?.componentAlias);
 	const projected = projectServerContextCalls(
 		renderer.target === 'dom'
 			? projectComponentChildren(
@@ -924,7 +891,7 @@ const DIRECTIVE_GENERATED_NAMES = {
 	// `@try` names the OUTERMOST boundary it produced: the `<Suspense>` when a
 	// `@pending` clause is present, the error boundary otherwise. Only one of
 	// the two is ever stamped, so listing both is not ambiguous.
-	JSXTryExpression: ['Suspense', 'TsrxErrorBoundary'],
+	JSXTryExpression: ['__Suspense', '__TsrxErrorBoundary'],
 };
 
 /** The same, for clause keywords the parser records a span for. */
@@ -1075,7 +1042,7 @@ export function compileTypesInspection(source, filename, options) {
 	const dynamicJsxTypes = prepareDynamicJsxTypes(ast, typeOnlyComments);
 	const transformAst =
 		renderer.target === 'valdi' ? dynamicJsxTypes.ast : projectArmExits(dynamicJsxTypes.ast);
-	const transform = selectOctaneTransform(ast, dynamicJsxTypes?.componentAlias);
+	const transform = selectOctaneTransform(dynamicJsxTypes?.componentAlias);
 	const transformed = transform(
 		projectServerContextCalls(
 			renderer.target === 'dom'

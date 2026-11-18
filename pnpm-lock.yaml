@@ -590,35 +590,35 @@ catalogs:
       specifier: 3.28.0
       version: 3.28.0
     '@tsrx/content-mapper':
-      specifier: 0.1.2
-      version: 0.1.2
+      specifier: 0.1.4
+      version: 0.1.4
     '@tsrx/core':
-      specifier: ^0.5.5
-      version: 0.5.5
+      specifier: ^0.6.3
+      version: 0.6.3
     '@tsrx/oxc':
-      specifier: 0.23.0
-      version: 0.23.0
+      specifier: 0.24.0
+      version: 0.24.0
     '@tsrx/prettier-plugin':
-      specifier: ^0.6.3
-      version: 0.6.3
+      specifier: ^0.7.3
+      version: 0.7.3
     '@tsrx/react':
-      specifier: ^0.4.5
-      version: 0.4.5
+      specifier: ^0.5.3
+      version: 0.5.3
     '@tsrx/ripple':
-      specifier: ^0.2.0
-      version: 0.2.0
+      specifier: ^0.2.11
+      version: 0.2.11
     '@tsrx/solid':
-      specifier: ^0.3.5
-      version: 0.3.5
+      specifier: ^0.4.3
+      version: 0.4.3
     '@tsrx/typescript-plugin':
-      specifier: ^0.6.3
-      version: 0.6.3
+      specifier: ^0.7.3
+      version: 0.7.3
     '@tsrx/vite-plugin-react':
-      specifier: ^0.0.120
-      version: 0.0.120
+      specifier: ^0.0.124
+      version: 0.0.124
     '@tsrx/vite-plugin-solid':
-      specifier: ^0.0.117
-      version: 0.0.117
+      specifier: ^0.0.121
+      version: 0.0.121
     '@types/babel__core':
       specifier: 7.20.5
       version: 7.20.5
@@ -1411,7 +1411,7 @@ catalogs:
 overrides:
   '@playwright/test': ^1.61.1
   playwright: ^1.61.1
-  esrap: ^2.3.2
+  esrap: ^2.4.2
   '@tanstack/devtools>solid-js': 1.9.14
   '@tanstack/devtools-ui>solid-js': 1.9.14
   '@tanstack/devtools-client>solid-js': 1.9.14
@@ -1423,12 +1423,11 @@ packageExtensionsChecksum: sha256-XN5zp/IiFh7oL3uoVIj9kQwS10aRIZS77YifBp5DLNo=
 
 patchedDependencies:
   '@sveltejs/acorn-typescript@1.0.13': d0b06e4e1c663671981b2a666be1812ef129b83de2adc585bd72171bbc979387
-  '@tsrx/core@0.5.5': e7415e93ecc2fc037320fad0b46b063c795c673477c6bbca2474d9c4eb377f96
-  '@tsrx/oxc@0.23.0': eb1fdf3caf79bc632213653d782f46bee49af25c8b13a0c809353e0ae3ba1d94
+  '@tsrx/core@0.6.3': 77c411e19b7587228cc51f90f9e7e7501821cf15719bd4879f02d16927f688ab
+  '@tsrx/oxc@0.24.0': 2bc9ce0f8259870621e3e68fda45a58cd19a3858474abedac4d43a1656cfe94d
   '@vitest/browser-playwright@4.1.10': 1957634122dfa6f4790b66e73a42343637af36d3fb182eb25e07fa261dbc27dd
   '@vitest/browser@4.1.10': d32609637593fc211ed808df6fbea6cb1da80adb049c0b0752bda8e1586d0ae0
   '@vitest/mocker@4.1.10': 538740e541a5a8ef50611b521995775cac3031548f696745eb4b90a7bd659ca4
-  esrap@2.3.2: b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e
   httpxy@0.5.5: eb6bec83dc65e7713c89c2bc997b0e2adfc3a34b75d1df00c05fc3a654a169cd
 
 importers:
@@ -1464,13 +1463,13 @@ importers:
         version: 0.2.3(@babel/core@7.29.7(supports-color@10.2.2))(@babel/plugin-transform-runtime@7.29.7(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2))(@babel/runtime@7.29.7)(rolldown@1.2.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
       '@tsrx/content-mapper':
         specifier: catalog:default
-        version: 0.1.2
+        version: 0.1.4
       '@tsrx/prettier-plugin':
         specifier: catalog:default
-        version: 0.6.3(prettier@3.9.9)
+        version: 0.7.3(prettier@3.9.9)
       '@tsrx/typescript-plugin':
         specifier: catalog:default
-        version: 0.6.3(@tsrx/content-mapper@0.1.2)(@tsrx/react@0.4.5(react@19.3.0))(@tsrx/ripple@0.2.0(typescript@5.9.3))(@tsrx/solid@0.3.5(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3))(octane@packages+octane)(typescript@5.9.3)
+        version: 0.7.3(@tsrx/content-mapper@0.1.4)(@tsrx/react@0.5.3(react@19.3.0))(@tsrx/ripple@0.2.0(typescript@5.9.3))(@tsrx/solid@0.4.3(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3))(octane@packages+octane)(typescript@5.9.3)
       '@types/node':
         specifier: catalog:default
         version: 24.13.3
@@ -2459,7 +2458,7 @@ importers:
         version: link:../../packages/rspeedy-plugin-octane
       '@tsrx/typescript-plugin':
         specifier: catalog:default
-        version: 0.6.3(@tsrx/content-mapper@0.1.2)(@tsrx/react@0.4.5(react@19.3.0))(@tsrx/ripple@0.2.0(typescript@5.9.3))(@tsrx/solid@0.3.5(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3))(octane@packages+octane)(typescript@5.9.3)
+        version: 0.7.3(@tsrx/content-mapper@0.1.4)(@tsrx/react@0.5.3(react@19.3.0))(@tsrx/ripple@0.2.0(typescript@5.9.3))(@tsrx/solid@0.4.3(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3))(octane@packages+octane)(typescript@5.9.3)
       octane:
         specifier: workspace:*
         version: link:../../packages/octane
@@ -2728,10 +2727,10 @@ importers:
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@tsrx/vite-plugin-react':
         specifier: catalog:default
-        version: 0.0.120(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 0.0.124(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
       vite:
         specifier: catalog:default
         version: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
@@ -2744,7 +2743,7 @@ importers:
     devDependencies:
       '@tsrx/ripple':
         specifier: catalog:default
-        version: 0.2.0(typescript@5.9.3)
+        version: 0.2.11(typescript@5.9.3)
       vite:
         specifier: catalog:default
         version: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
@@ -2763,10 +2762,10 @@ importers:
         version: 3.0.1(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
       '@tsrx/solid':
         specifier: catalog:default
-        version: 0.3.5(@solidjs/web@2.0.0(solid-js@2.0.0))(solid-js@2.0.0)
+        version: 0.4.3(@solidjs/web@2.0.0(solid-js@2.0.0))(solid-js@2.0.0)
       '@tsrx/vite-plugin-solid':
         specifier: catalog:default
-        version: 0.0.117(@solidjs/web@2.0.0(solid-js@2.0.0))(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 0.0.121(@solidjs/web@2.0.0(solid-js@2.0.0))(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
       vite:
         specifier: catalog:default
         version: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
@@ -3195,7 +3194,7 @@ importers:
     dependencies:
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.5.5(patch_hash=e7415e93ecc2fc037320fad0b46b063c795c673477c6bbca2474d9c4eb377f96)
+        version: 0.6.3(patch_hash=77c411e19b7587228cc51f90f9e7e7501821cf15719bd4879f02d16927f688ab)
       alien-signals:
         specifier: catalog:default
         version: 3.2.1
@@ -3477,7 +3476,7 @@ importers:
     dependencies:
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.5.5(patch_hash=e7415e93ecc2fc037320fad0b46b063c795c673477c6bbca2474d9c4eb377f96)
+        version: 0.6.3(patch_hash=77c411e19b7587228cc51f90f9e7e7501821cf15719bd4879f02d16927f688ab)
       miniflare:
         specifier: catalog:default
         version: 4.20260714.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
@@ -3531,10 +3530,10 @@ importers:
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@tsrx/vite-plugin-react':
         specifier: catalog:default
-        version: 0.0.120(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 0.0.124(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
       vite:
         specifier: catalog:default
         version: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
@@ -3687,10 +3686,10 @@ importers:
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@tsrx/vite-plugin-react':
         specifier: catalog:default
-        version: 0.0.120(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 0.0.124(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
       vite:
         specifier: catalog:default
         version: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
@@ -3703,7 +3702,7 @@ importers:
     devDependencies:
       '@tsrx/ripple':
         specifier: catalog:default
-        version: 0.2.0(typescript@5.9.3)
+        version: 0.2.11(typescript@5.9.3)
       vite:
         specifier: catalog:default
         version: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
@@ -3722,10 +3721,10 @@ importers:
         version: 3.0.1(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
       '@tsrx/solid':
         specifier: catalog:default
-        version: 0.3.5(@solidjs/web@2.0.0(solid-js@2.0.0))(solid-js@2.0.0)
+        version: 0.4.3(@solidjs/web@2.0.0(solid-js@2.0.0))(solid-js@2.0.0)
       '@tsrx/vite-plugin-solid':
         specifier: catalog:default
-        version: 0.0.117(@solidjs/web@2.0.0(solid-js@2.0.0))(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 0.0.121(@solidjs/web@2.0.0(solid-js@2.0.0))(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
       vite:
         specifier: catalog:default
         version: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
@@ -3998,7 +3997,7 @@ importers:
         version: 1.167.1(@tanstack/query-core@5.102.8)(@tanstack/react-query@5.101.3(react@19.2.3))(@tanstack/react-router@1.170.41(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(@tanstack/router-core@1.171.34)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@tanstack/react-start':
         specifier: 1.168.60
-        version: 1.168.60(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.27.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.27.7)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
+        version: 1.168.60(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.27.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.27.7)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
       '@tanstack/react-start-client':
         specifier: 1.168.39
         version: 1.168.39(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -4222,7 +4221,7 @@ importers:
         version: 1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tanstack/react-start':
         specifier: 1.168.60
-        version: 1.168.60(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
+        version: 1.168.60(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
       react:
         specifier: catalog:default
         version: 19.2.7
@@ -5442,7 +5441,7 @@ importers:
         version: 4.2.6(graphql@16.14.2)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rxjs@7.8.2)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -5501,7 +5500,7 @@ importers:
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -5618,7 +5617,7 @@ importers:
         version: 14.6.3(@testing-library/dom@10.4.1)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.8)
+        version: 0.5.3(react@19.2.8)
       '@types/luxon':
         specifier: 3.7.4
         version: 3.7.4
@@ -5745,14 +5744,14 @@ importers:
     dependencies:
       better-auth:
         specifier: 1.7.4
-        version: 1.7.4(6a69ce2600eb714d7ae5c9f8e53cea5d)
+        version: 1.7.4(7a3679bfac6edad0111abd3bb9d550d3)
       nanostores:
         specifier: 1.5.3
         version: 1.5.3
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       octane:
         specifier: workspace:*
         version: link:../octane
@@ -5777,7 +5776,7 @@ importers:
         version: 0.53.0(@floating-ui/dom@1.8.0)(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@types/hast@3.0.5)(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(refractor@5.0.0)(yjs@13.6.31)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -5849,7 +5848,7 @@ importers:
         version: 6.9.1
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:cmdk-react-oracle
         version: 19.2.17
@@ -5882,7 +5881,7 @@ importers:
         version: link:../cli
       '@tsrx/oxc':
         specifier: catalog:default
-        version: 0.23.0(patch_hash=eb1fdf3caf79bc632213653d782f46bee49af25c8b13a0c809353e0ae3ba1d94)(svelte@5.57.2)
+        version: 0.24.0(patch_hash=2bc9ce0f8259870621e3e68fda45a58cd19a3858474abedac4d43a1656cfe94d)(svelte@5.57.2)
       octane:
         specifier: workspace:*
         version: link:../octane
@@ -5925,7 +5924,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:react-colorful-react-oracle
         version: 19.2.17
@@ -6002,7 +6001,7 @@ importers:
         version: link:../testing-library
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -6063,7 +6062,7 @@ importers:
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       dexie:
         specifier: catalog:default
         version: 4.4.4
@@ -6118,7 +6117,7 @@ importers:
         version: 0.5.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@vitest/coverage-v8':
         specifier: catalog:default
         version: 4.1.10(@vitest/browser@4.1.10)(vitest@4.1.10)
@@ -6145,7 +6144,7 @@ importers:
         version: 3.1.1(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -6179,7 +6178,7 @@ importers:
         version: 3.2.2(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -6216,7 +6215,7 @@ importers:
         version: link:../dnd-kit-core
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -6253,7 +6252,7 @@ importers:
         version: link:../dnd-kit-core
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -6277,7 +6276,7 @@ importers:
         version: 3.2.2(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -6342,7 +6341,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/prop-types':
         specifier: 15.7.15
         version: 15.7.15
@@ -6433,7 +6432,7 @@ importers:
         version: 9.6.1(@types/react@19.2.18)(immer@11.1.15)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(three@0.172.0)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -6597,7 +6596,7 @@ importers:
         version: 2.0.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -6711,7 +6710,7 @@ importers:
         version: 14.6.1(@testing-library/dom@10.4.1)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@18.2.0)
+        version: 0.5.3(react@18.2.0)
       '@types/react':
         specifier: 18.3.19
         version: 18.3.19
@@ -6786,7 +6785,7 @@ importers:
         version: 14.6.1(@testing-library/dom@10.4.1)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -6816,7 +6815,7 @@ importers:
         version: 2.1.2(gsap@3.15.0)(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -6861,7 +6860,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -6931,7 +6930,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -6999,7 +6998,7 @@ importers:
         version: 6.9.1
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -7054,7 +7053,7 @@ importers:
         version: link:../testing-library
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -7157,7 +7156,7 @@ importers:
         version: 8.1.0
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/node':
         specifier: catalog:default
         version: 24.13.3
@@ -7181,7 +7180,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: 19.2.17
         version: 19.2.17
@@ -7260,7 +7259,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/node':
         specifier: catalog:default
         version: 24.13.3
@@ -7314,7 +7313,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -7417,7 +7416,7 @@ importers:
         version: 0.51.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3)(yjs@13.6.31)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -7472,7 +7471,7 @@ importers:
         version: 16.3.1(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.3)
+        version: 0.5.3(react@19.2.3)
       '@types/react':
         specifier: catalog:livestore-react-oracle
         version: 19.2.7
@@ -7555,7 +7554,7 @@ importers:
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -7610,7 +7609,7 @@ importers:
         version: 9.5.0(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -7671,7 +7670,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.0.0)
+        version: 0.5.3(react@19.0.0)
       '@types/node':
         specifier: catalog:default
         version: 24.13.3
@@ -7762,7 +7761,7 @@ importers:
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -7805,7 +7804,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: 19.2.7
         version: 19.2.7
@@ -7866,7 +7865,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -7933,7 +7932,7 @@ importers:
         version: 6.9.1
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -7957,7 +7956,7 @@ importers:
     dependencies:
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.5.5(patch_hash=e7415e93ecc2fc037320fad0b46b063c795c673477c6bbca2474d9c4eb377f96)
+        version: 0.6.3(patch_hash=77c411e19b7587228cc51f90f9e7e7501821cf15719bd4879f02d16927f688ab)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -7977,15 +7976,15 @@ importers:
         specifier: catalog:default
         version: 1.7.0
       esrap:
-        specifier: ^2.3.2
-        version: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
+        specifier: ^2.4.2
+        version: 2.4.2
     devDependencies:
       '@tsrx/oxc':
         specifier: catalog:default
-        version: 0.23.0(patch_hash=eb1fdf3caf79bc632213653d782f46bee49af25c8b13a0c809353e0ae3ba1d94)(svelte@5.57.2)
+        version: 0.24.0(patch_hash=2bc9ce0f8259870621e3e68fda45a58cd19a3858474abedac4d43a1656cfe94d)(svelte@5.57.2)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react-dom':
         specifier: catalog:default
         version: 19.2.4(@types/react@19.2.18)
@@ -8033,7 +8032,7 @@ importers:
     devDependencies:
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.5.5(patch_hash=e7415e93ecc2fc037320fad0b46b063c795c673477c6bbca2474d9c4eb377f96)
+        version: 0.6.3(patch_hash=77c411e19b7587228cc51f90f9e7e7501821cf15719bd4879f02d16927f688ab)
       '@types/node':
         specifier: catalog:default
         version: 24.13.3
@@ -8167,7 +8166,7 @@ importers:
         version: 2.1.10(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -8307,7 +8306,7 @@ importers:
         version: 8.0.1(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react-test-renderer@18.3.1(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -8374,7 +8373,7 @@ importers:
         version: 8.0.1(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -8453,7 +8452,7 @@ importers:
         version: 0.20.2(@types/react@19.2.18)(immer@11.1.15)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7))
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -8481,7 +8480,7 @@ importers:
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -8517,7 +8516,7 @@ importers:
         version: 6.9.1
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@wagmi/connectors':
         specifier: catalog:default
         version: 8.2.0(@coinbase/wallet-sdk@4.3.6(@types/react@19.2.18)(bufferutil@4.1.0)(immer@11.1.15)(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.4.0(react@19.2.7))(utf-8-validate@5.0.10)(zod@4.6.2))(@safe-global/safe-apps-provider@0.18.6(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.2))(@safe-global/safe-apps-sdk@9.1.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.2))(@wagmi/core@3.6.5(@tanstack/query-core@5.102.8)(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.4.0(react@19.2.7))(viem@2.55.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.2)))(@walletconnect/ethereum-provider@2.21.1(@types/react@19.2.18)(bufferutil@4.1.0)(db0@0.3.4)(encoding@0.1.13)(react@19.2.7)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.2))(typescript@5.9.3)(viem@2.55.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.2))
@@ -8544,7 +8543,7 @@ importers:
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -8571,7 +8570,7 @@ importers:
         version: 1.1.0
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -8635,7 +8634,7 @@ importers:
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -8662,7 +8661,7 @@ importers:
         version: 2.12.0(react-redux@9.3.0(@types/react@19.2.18)(react@19.2.7)(redux@5.0.1))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -8702,7 +8701,7 @@ importers:
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -8730,7 +8729,7 @@ importers:
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -8766,7 +8765,7 @@ importers:
         version: 14.6.1(@testing-library/dom@10.4.1)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.3)
+        version: 0.5.3(react@19.2.3)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -8901,7 +8900,7 @@ importers:
         version: 2.1.3(@swc/helpers@0.5.23)
       '@tsrx/typescript-plugin':
         specifier: catalog:default
-        version: 0.6.3(@tsrx/content-mapper@0.1.2)(@tsrx/react@0.4.5(react@19.3.0))(@tsrx/ripple@0.2.0(typescript@5.9.3))(@tsrx/solid@0.3.5(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3))(octane@packages+octane)(typescript@5.9.3)
+        version: 0.7.3(@tsrx/content-mapper@0.1.4)(@tsrx/react@0.5.3(react@19.3.0))(@tsrx/ripple@0.2.0(typescript@5.9.3))(@tsrx/solid@0.4.3(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3))(octane@packages+octane)(typescript@5.9.3)
       '@types/node':
         specifier: catalog:default
         version: 24.13.3
@@ -8932,7 +8931,7 @@ importers:
         version: 0.9.7(@react-rxjs/core@0.10.8(react@19.2.7)(rxjs@7.8.2))(react@19.2.7)(rxjs@7.8.2)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -8959,7 +8958,7 @@ importers:
         version: 5.2.1(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -8996,7 +8995,7 @@ importers:
         version: 2.2.1(react@19.2.7)(typescript@5.9.3)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -9020,7 +9019,7 @@ importers:
         version: 2.2.5(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -9105,7 +9104,7 @@ importers:
         version: 10.4.1(@testing-library/dom@10.4.1)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: 19.2.17
         version: 19.2.17
@@ -9196,7 +9195,7 @@ importers:
         version: 1.8.0(@date-fns/tz@1.5.0)(@types/react@19.2.18)(date-fns@4.4.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -9295,7 +9294,7 @@ importers:
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -9489,7 +9488,7 @@ importers:
         version: 6.9.1
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -9529,7 +9528,7 @@ importers:
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/stylis':
         specifier: catalog:default
         version: 4.2.7
@@ -9694,7 +9693,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -9780,7 +9779,7 @@ importers:
         version: 6.9.1
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:tanstack-devtools-react-oracle
         version: 19.2.17
@@ -9817,7 +9816,7 @@ importers:
         version: link:../testing-library
       '@tanstack/react-form':
         specifier: catalog:default
-        version: 1.33.5(@tanstack/react-start@1.168.60(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20)))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        version: 1.33.5(@tanstack/react-start@1.168.60(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20)))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@testing-library/jest-dom':
         specifier: catalog:default
         version: 6.9.1
@@ -9826,7 +9825,7 @@ importers:
         version: 14.6.1(@testing-library/dom@10.4.1)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -9872,7 +9871,7 @@ importers:
         version: 2.0.2(@jest/globals@30.4.1(supports-color@10.2.2))(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(bufferutil@4.1.0)(expect@30.4.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(utf-8-validate@5.0.10)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -9924,7 +9923,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -9967,7 +9966,7 @@ importers:
         version: 1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -10010,7 +10009,7 @@ importers:
         version: 1.167.3(@tanstack/query-core@5.102.8)(@tanstack/react-query@5.102.8(react@19.2.7))(@tanstack/react-router@1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@tanstack/router-core@1.171.34)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -10180,7 +10179,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -10321,7 +10320,7 @@ importers:
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -10367,7 +10366,7 @@ importers:
         version: 2.1.4(@swc/helpers@0.5.23)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/three':
         specifier: catalog:default
         version: 0.172.0
@@ -10428,7 +10427,7 @@ importers:
         version: 3.28.0
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: 19.2.17
         version: 19.2.17
@@ -10498,7 +10497,7 @@ importers:
         version: 14.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -10577,7 +10576,7 @@ importers:
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/lodash.debounce':
         specifier: 4.0.9
         version: 4.0.9
@@ -10617,7 +10616,7 @@ importers:
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -10799,7 +10798,7 @@ importers:
         version: 10.1.2(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@visx/annotation':
         specifier: catalog:default
         version: 4.0.0(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -10903,7 +10902,7 @@ importers:
         version: 5.102.8(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -10933,7 +10932,7 @@ importers:
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -10985,7 +10984,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -11040,7 +11039,7 @@ importers:
         version: 16.3.1(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.3)
+        version: 0.5.3(react@19.2.3)
       '@types/react':
         specifier: catalog:xstate-react-oracle
         version: 19.2.17
@@ -11101,7 +11100,7 @@ importers:
         version: 16.3.1(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.3)
+        version: 0.5.3(react@19.2.3)
       '@types/react':
         specifier: catalog:xstate-store-react-oracle
         version: 19.2.17
@@ -11147,7 +11146,7 @@ importers:
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/jsdom':
         specifier: catalog:default
         version: 30.0.0
@@ -11202,7 +11201,7 @@ importers:
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       '@types/react':
         specifier: catalog:zag-react-oracle
         version: 19.2.7
@@ -11242,7 +11241,7 @@ importers:
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
+        version: 0.5.3(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -11626,10 +11625,10 @@ importers:
         version: 3.23.0
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.5.5(patch_hash=e7415e93ecc2fc037320fad0b46b063c795c673477c6bbca2474d9c4eb377f96)
+        version: 0.6.3(patch_hash=77c411e19b7587228cc51f90f9e7e7501821cf15719bd4879f02d16927f688ab)
       '@tsrx/prettier-plugin':
         specifier: catalog:default
-        version: 0.6.3(prettier@3.9.9)
+        version: 0.7.3(prettier@3.9.9)
       '@types/qrcode':
         specifier: ^1.5.6
         version: 1.5.6
@@ -11643,8 +11642,8 @@ importers:
         specifier: catalog:default
         version: 1.7.0
       esrap:
-        specifier: ^2.3.2
-        version: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
+        specifier: ^2.4.2
+        version: 2.4.2
       nitro:
         specifier: ^3.0.260311-beta
         version: 3.0.260311-beta(chokidar@5.0.0)(dotenv@17.4.2)(idb-keyval@6.3.0)(jiti@2.7.0)(lru-cache@11.5.2)(miniflare@4.20260714.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(rollup@4.62.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(wrangler@4.112.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))
@@ -11898,10 +11897,6 @@ packages:
 
   '@babel/helper-member-expression-to-functions@7.29.7':
     resolution: {integrity: sha512-j+7JYmk1JYDtACIGj0QJqqWZjoUpMoEikQGADMaHgCMCSDqd2+P32rfcibUNrGOMWrlzK1WJBdxrB3JJQZwWtg==}
-    engines: {node: '>=6.9.0'}
-
-  '@babel/helper-module-imports@7.18.6':
-    resolution: {integrity: sha512-0NFvs3VkuSYbFi1x2Vd6tKrywq+z/cLeYC/RJNFrIX/30Bf5aiGYbtvGXolEktzJH8o5E5KJ3tT+nkxuuZFVlA==}
     engines: {node: '>=6.9.0'}
 
   '@babel/helper-module-imports@7.29.7':
@@ -20510,22 +20505,8 @@ packages:
     peerDependencies:
       solid-js: ^1.6.12
 
-  '@solidjs/babel-plugin@2.0.0-rc.14':
-    resolution: {integrity: sha512-zMbK1GMHnChgfnalS5Q6rwPeQ9UoC7snavzes90R7+6J+8Fa7Yq4AfgqrfaAKYAjlpMgT0E8AmVwYCdIvSsG/A==}
-    peerDependencies:
-      '@babel/core': ^7.20.12
-      '@tsrx/core': 0.1.63
-    peerDependenciesMeta:
-      '@tsrx/core':
-        optional: true
-
   '@solidjs/compiler-darwin-arm64@2.0.0':
     resolution: {integrity: sha512-pPHERRXgCcsfCsaC8sgK94uVlp4WGUcHTfMeBiAfme2amQ7vFn7dpjSD3TIVKY4jeYQTKjIKOYP0c5mqIR1LeA==}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@solidjs/compiler-darwin-arm64@2.0.0-rc.14':
-    resolution: {integrity: sha512-WiOnnVov6XfT7QG9OrgqWfoJMrUYYbjO88qMzJ09tijV6Phu+BoeK2J3I0B3IpPPrOTMQ2mXpcwdvnSLuAtWdw==}
     cpu: [arm64]
     os: [darwin]
 
@@ -20534,19 +20515,8 @@ packages:
     cpu: [x64]
     os: [darwin]
 
-  '@solidjs/compiler-darwin-x64@2.0.0-rc.14':
-    resolution: {integrity: sha512-pW1kmlbkRLjLBnsDL+lF8LKrdjK141uCYt2RFNcodud/JOqIWTMK3v+zULeJelqbQX78CjhQ5xz0V2ApKb6UsA==}
-    cpu: [x64]
-    os: [darwin]
-
   '@solidjs/compiler-linux-arm64-gnu@2.0.0':
     resolution: {integrity: sha512-H/R9SUmuqd4P/IuuXTlRM1LhgUWe2EjLP3iMUo+L4IO1rmOSqfMUZp9h52eQnDsOdoIZCaKsw+b0qC5WooxDlg==}
-    cpu: [arm64]
-    os: [linux]
-    libc: [glibc]
-
-  '@solidjs/compiler-linux-arm64-gnu@2.0.0-rc.14':
-    resolution: {integrity: sha512-2d8F8x4sBae7DQHi9wholdzHir8UsHVHpPRPj4NRr4seD5rWkpIbQ3Pwk/9FMZoM4KZmCZ+6+SInQm7iGALgTw==}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
@@ -20557,18 +20527,8 @@ packages:
     os: [linux]
     libc: [glibc]
 
-  '@solidjs/compiler-linux-x64-gnu@2.0.0-rc.14':
-    resolution: {integrity: sha512-dXt4PJeEKSD07X/k5PcsFczxJLof72hEw3aVu8S0WBWh+KTYjYx9tg3Hnnl0KntR61PyphUjwIOICsWWsgKQTA==}
-    cpu: [x64]
-    os: [linux]
-    libc: [glibc]
-
   '@solidjs/compiler-wasm32-wasi@2.0.0':
     resolution: {integrity: sha512-JnF21DJ/jx5fghYKIB6ANihHMM4aWg4JFe5pFLGDvqSeURZJdJGjwyyxOv3siEMUdkBzVGHXotTsviTcRyB5hQ==}
-    engines: {node: '>=14.0.0'}
-
-  '@solidjs/compiler-wasm32-wasi@2.0.0-rc.14':
-    resolution: {integrity: sha512-cTaAmM7Ca6JisgvnqsLT9Fce4sDmonCaTvBb5eF2iEfdt8htFZ2Z9RlUEK2yG6LxCN89/K/vZLbI7giLA4HUjw==}
     engines: {node: '>=14.0.0'}
 
   '@solidjs/compiler-win32-x64-msvc@2.0.0':
@@ -20576,39 +20536,12 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@solidjs/compiler-win32-x64-msvc@2.0.0-rc.14':
-    resolution: {integrity: sha512-JosTalJd6Pgb8mjNgPCEauQSOi647Vlm2mS0qvO3hYLvzcrODmrYsHIY1/DqbI1FxQdc9vUOKJ5zCHvhjlScuA==}
-    cpu: [x64]
-    os: [win32]
-
   '@solidjs/compiler@2.0.0':
     resolution: {integrity: sha512-Spgqz1+eojQ2pDl4yajnajIjX/kSusjTK/6mC6Fm7sAZ3YBI0yP4/epRR1hV08TU3YAH4xLBmZ6wjb1zC134Sw==}
-
-  '@solidjs/compiler@2.0.0-rc.14':
-    resolution: {integrity: sha512-eCTVcxXl1UHOisRMYg+hABwiiTkfTmSkaOFtAb8bjzeqpLlju3lo6pT2qWPfUbrvnslbNGnLZd+HZSIVgZu9VQ==}
 
   '@solidjs/signals@2.0.0':
     resolution: {integrity: sha512-jrcT6XTVvsYRpesRp0At/mSUnsWr6jiprK8C93Oat56B8n7X9BMSe58Rxl6qSZUhBN0L+sxm8GzeO7HdhBXvDw==}
     engines: {node: '>=22.12.0'}
-
-  '@solidjs/signals@2.0.0-rc.14':
-    resolution: {integrity: sha512-s3v1wpPcX3wfNO0WUERrPrXS+qqJ4ylzH9QTIRKqrgcMVeLEOXgFa3hZrhEoVTp+lVAgido2NH6GCI79twe2fg==}
-    engines: {node: '>=22.12.0'}
-
-  '@solidjs/vite-plugin@3.0.0-next.49':
-    resolution: {integrity: sha512-s50Tz24Nh061/lTSvG6VyVIAraQ4gYnnwjUCe2XfDAHY2jD85vYIckJiH1XV4ZnF4I79PaOsSoa7HhzZGO99+w==}
-    engines: {node: '>=22.12.0'}
-    peerDependencies:
-      '@solidjs/start-devtools': ^1.0.0-next.2
-      '@solidjs/web': ^2.0.0-rc.14
-      '@testing-library/jest-dom': ^5.16.6 || ^5.17.0 || ^6.0.0 || ^7.0.0
-      solid-js: ^2.0.0-rc.14
-      vite: ^8.0.0 || ^9.0.0
-    peerDependenciesMeta:
-      '@solidjs/start-devtools':
-        optional: true
-      '@testing-library/jest-dom':
-        optional: true
 
   '@solidjs/vite-plugin@3.0.1':
     resolution: {integrity: sha512-dyRU4LJXhzEEgtF32AtUdjqaUuMVYTVLQvhYlT6HcYBvf10yIVmKgW9cg42b5YDxkl6BgAJ9o0OjUnAy3qKb9A==}
@@ -21946,84 +21879,87 @@ packages:
   '@ts-morph/common@0.27.0':
     resolution: {integrity: sha512-Wf29UqxWDpc+i61k3oIOzcUfQt79PIT9y/MWfAGlrkjg6lBC1hwDECLXPVJAhWjiGbfBCxZd65F/LIZF3+jeJQ==}
 
-  '@tsrx/content-mapper@0.1.2':
-    resolution: {integrity: sha512-rLKHpF/9WtOl2LAc1LpQtWb2rQhmpiVs2r2Mlp4RyQ1KJVVvn+ivZlHOt/krIZmPm9IJHxjTV8Dqf9gSfOfqJQ==}
+  '@tsrx/content-mapper@0.1.4':
+    resolution: {integrity: sha512-qzx/fM/9e/ByxAV6JmUjQOqFiECW626Zdjyzhy6AHqrGDeiIkc/sH2Qo2qW8DUQZ8B0SQLJxnzp9DLqoYrsvDw==}
 
   '@tsrx/core@0.2.0':
     resolution: {integrity: sha512-IuzVAVOtGNxJnI1nnExyUoLErUpVjtHd0Hlaf4wlfVU2ENUNzrWnyrKBz2ogvV3vbgeNSdjSnJPhCRYTaayKAw==}
 
-  '@tsrx/core@0.5.5':
-    resolution: {integrity: sha512-22Eym4Dtxm1d4INJHT560WQC9cxKT/YWXKztM7utjzHLtVB8egSycFmFt3D9g01Tb6G4g7GiF5YpgCOexx15uA==}
+  '@tsrx/core@0.3.3':
+    resolution: {integrity: sha512-7DafQrpMFRSACmGGeqm0fU1Va0QTdun85Te6o4MKBIJrT+kpslB2ahm9X8oq0167UgJCNN1//0zv1kRXOCxsCA==}
 
-  '@tsrx/oxc-darwin-arm64@0.23.0':
-    resolution: {integrity: sha512-4boisFxGlNesqjh30ZWUzZflzlW0453qrgnLjHyWSOPpVT3zUAEo/9GfnkXWw0gtCsHedcunqjtlb2LIYwsyEw==}
+  '@tsrx/core@0.6.3':
+    resolution: {integrity: sha512-2zfanQkWeZRKAmr382s4Q/Hm9ZLHyYZf1upbgVpBox7Z4UXJOKwAhrjuqWbVy5AQ49M6xQ+GpiTkyVlUfMBx6g==}
+
+  '@tsrx/oxc-darwin-arm64@0.24.0':
+    resolution: {integrity: sha512-WJ8JRjojNOnS6QbcWCZnpfS1ZGVCEGbfNAM1sV7dn2Nt3owAO4eswhFrE2hM1TUhAuIZ0qFiZhfmvxfij5QnPA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [darwin]
 
-  '@tsrx/oxc-darwin-x64@0.23.0':
-    resolution: {integrity: sha512-9PC/WAOz4z2QAx6ktUI6UI5PFHtHAxIaoGLgxErbZHg+h0TaY4TO1KvvzT+QrZyxKIFxdCyppIXTsf4xeTVIAw==}
+  '@tsrx/oxc-darwin-x64@0.24.0':
+    resolution: {integrity: sha512-Cc01XQljp1s4dOdbn1oP0MXVGfnNV1ZJ9u/kr6PeLCY8NJVD7FfRQW7LXeyMk451fOd9B6rR3a7fwOsPL9zeKQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [darwin]
 
-  '@tsrx/oxc-linux-arm64-gnu@0.23.0':
-    resolution: {integrity: sha512-4HoNRvdsSqS6AUCKs0GNqLagBKcXeZhc88tGp56O7K3LY1qkJveG3lMGT6AU5BJmicOyyUqvSorja2f9L64OXg==}
+  '@tsrx/oxc-linux-arm64-gnu@0.24.0':
+    resolution: {integrity: sha512-HgKPo9eac0lr2ocJ58ZIOsrlWG3cbR2tUOxzgS+/djFPxLtQyTj/boiqhweL1mIhlwbnSg5JeyNZX1U9hYLe5Q==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  '@tsrx/oxc-linux-arm64-musl@0.23.0':
-    resolution: {integrity: sha512-h2O17Zrke1vht7PXxqyc5QQyRpA0Ve/sfyl+epCUpPGFK8JbPIffBAh3StqgWLOGr9MDYRqDr045+L2aFxMtnA==}
+  '@tsrx/oxc-linux-arm64-musl@0.24.0':
+    resolution: {integrity: sha512-MTu7siW5c//vIJdk/qaajg/7dvfRz9YSiWWMUh8+C2Xp58AlG+zdPH/gP4nUC5RirXaQF4N2ENmgLJoEGnukqw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [linux]
     libc: [musl]
 
-  '@tsrx/oxc-linux-x64-gnu@0.23.0':
-    resolution: {integrity: sha512-3G6tl6R/AlStmZbf6CIc92Oku2unOtCw4YcfGC94ilQKtHlKi80q48qhznOPxlDnoOI9EH73Yj0qdEefWiYh1w==}
+  '@tsrx/oxc-linux-x64-gnu@0.24.0':
+    resolution: {integrity: sha512-aFpd8kRNk9uBk8NLo8dDz6Fa8bGDC3iES5b4bE6Skzr7C352/CDXwCiCPoLZY0Ii0Wbzdg6BLlhuQq+yE6g80g==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@tsrx/oxc-linux-x64-musl@0.23.0':
-    resolution: {integrity: sha512-v/o3v4jyE88sjotElHKdVOtspK6pMLbhu0PlgYfmbllT+ecSOKXb6L1CLK7vFARwn0gVl8uxPZ5GabTueBNrsA==}
+  '@tsrx/oxc-linux-x64-musl@0.24.0':
+    resolution: {integrity: sha512-EFh4koE5btFajgH98tbQ42KSvCxGN6exjLRD0iKFHYaw16RzmPJh9xQX6PVLmWwv+FjlUanFxZXOkMWMQaEPUQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [linux]
     libc: [musl]
 
-  '@tsrx/oxc-win32-arm64-msvc@0.23.0':
-    resolution: {integrity: sha512-jt6ylBQaGVA9B9YiMGvdq0/JtEzgPDysUQx0i+Jt94DZBnjJU2AzErBlkmqc3EsmgCLnsPMoX1SRs20Za9Pqpw==}
+  '@tsrx/oxc-win32-arm64-msvc@0.24.0':
+    resolution: {integrity: sha512-uhrere/MmHBiBKDdpvpMoF3blSe4iYGBnrLAUidZXP7VmnuQz9LUtdGchuBYdCP3tUQuBpv6MumbU4VlsYNE9Q==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [win32]
 
-  '@tsrx/oxc-win32-x64-msvc@0.23.0':
-    resolution: {integrity: sha512-PzTKUfbuOWcshVMtyLaIFZQD/8z/aSInYU7z+KCApbi/4yJEQJex3G0i9SyNBMT7a0DBtwvJNwDT9Vewuu5MTw==}
+  '@tsrx/oxc-win32-x64-msvc@0.24.0':
+    resolution: {integrity: sha512-QKnA8ScqxU1plH1+PEGYyAX0KiqNVLu9VnLs/kuiEN3pxmVfewiIcKb4YHmOuDWa+Ofi9gJIMBsSBJjCisMwXA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [win32]
 
-  '@tsrx/oxc@0.23.0':
-    resolution: {integrity: sha512-2J1IGGvyx5H11wIE24hPH3NkdveDaNvVIcOJVrVkX/FCUKrn8Dj7FKw/qEPSOH8vX4a3tiTCxcvaIQdoggqcyA==}
+  '@tsrx/oxc@0.24.0':
+    resolution: {integrity: sha512-P+E1qvimUW1DdoQE8uHyZ44U2xVDugYkDn3xsTnbw7eYP/tTrHuFGLIjKZr5tSw7wPvj4deMO9BKmGtbMAFdpg==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
 
-  '@tsrx/prettier-plugin@0.6.3':
-    resolution: {integrity: sha512-9xlyZwErBhytMmTGFkFG2b8EFUvJ7ch2fXOusI+/p8/lvJTTp3bMVLUjj2a0iVVmefp2mKOm7cC9Ek7tcqcaeQ==}
+  '@tsrx/prettier-plugin@0.7.3':
+    resolution: {integrity: sha512-J3wF/P6fpSabIngMz2i/2YYgoMC/+Vq+6NGDTS/6vTDLTJBwwlwfHKjBOXjSQQugoFNnmKGoWfsS0OnMXFVYuw==}
     peerDependencies:
       prettier: '>=3.6.0'
 
-  '@tsrx/react-runtime@0.1.12':
-    resolution: {integrity: sha512-8KjuDpt8cYmJUvyyKuQh3Fin4UttyFH1X93WmowdJf00gqLuqmSC9Jzx6aqIhru3Tk+RhuLv6s8x3jO0LrkLLw==}
+  '@tsrx/react-runtime@0.2.0':
+    resolution: {integrity: sha512-mZcn0s31ScxdDSdPV+pfI4rVNINODl5lBHl3JR+CFnuTh6TdoCT4KgG6w7pUWIwUqYgeixjmW/dmFDwdc1RKsA==}
     peerDependencies:
       react: '>=18'
 
-  '@tsrx/react@0.4.5':
-    resolution: {integrity: sha512-erSR9o6aaVa8c+DxipyeFEBt1eXEphtKBgD9It/AqdTDZ0eiPcc333TT3ztqZcbEU5R5Qou2r2aUIswsL0YJMQ==}
+  '@tsrx/react@0.5.3':
+    resolution: {integrity: sha512-iWd5IPS3FI41TOpDf+xj+XhWCAyoqwGf0suJEBae9O7tbexDqYjYKS8OljdeqdIb+RGT8nhqgCeuwkzMW/7uIg==}
     peerDependencies:
       react: '>=18'
 
@@ -22035,34 +21971,45 @@ packages:
       typescript:
         optional: true
 
+  '@tsrx/ripple@0.2.11':
+    resolution: {integrity: sha512-MtmGin82M8nWdRswmjFAjkl0iENTrMTlZStU49cQSgHtsCeacgSbiIyVy6iCx+7z9OCbYogR1W6dk7IskJ4NRA==}
+    peerDependencies:
+      typescript: '>=5.9.3'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
   '@tsrx/runtime@0.2.0':
     resolution: {integrity: sha512-eMsHoysp2AO5Q2Aa178V+qSDNnYgiEPih0fQkMdaE3gWCWiKVoskrQEWIkK6WaXwJ6fTyo6Fw4bCfGksvproAA==}
 
-  '@tsrx/runtime@0.2.4':
-    resolution: {integrity: sha512-rLwKYml/Qbb1D9LtB+NE5bcJDs/SowSKaL+lMR0m6Mr61lKZNuK43IFK+jxFmLvRlG+7ico1kOszMyhA5rObNA==}
+  '@tsrx/runtime@0.2.3':
+    resolution: {integrity: sha512-OTyZfuGOusdikUdT+Tva6W8HoCcHcPKrwZiJaW0r30oZsze63vU+V5Q1vEKjZpvlI1tyel2WXg90Pghdbjn4BA==}
 
-  '@tsrx/solid-runtime@0.1.12':
-    resolution: {integrity: sha512-kcv4iafZUYUbgexR7JBLJTMhIBjScWWbSlJKfQcoc/8JVnSW+crI1Sb+kN+n4Wuvjlhwf0rMaOtHhfxy1CyScg==}
+  '@tsrx/runtime@0.2.5':
+    resolution: {integrity: sha512-ueNjgjxe+LhLehJm46c4WeOsaiVKFV36DXwGRK4XGQUUMMto4zyxNp4LB/nLAmLhOed9CcIq/WMzHXvny+WPHA==}
+
+  '@tsrx/solid-runtime@0.1.13':
+    resolution: {integrity: sha512-3JgsUsXACSAuiWpLEYsCxcXkpWRi+fWoiKJDp07MiBMT1ch23aO1bXUzipM7pzrUUJK/2sv/vl8kouUkDBH/WA==}
     peerDependencies:
       '@solidjs/web': 2.0.0-rc.3
       solid-js: 2.0.0-rc.3
 
-  '@tsrx/solid@0.3.5':
-    resolution: {integrity: sha512-9al+TeaHxAJRLzZ0hwgx4yoRvdufkPoWIN2Mh8P4jxQTrgnoZzsv7uL6amP5grv7tMlIhVNrbXpOePlTSzjmGw==}
+  '@tsrx/solid@0.4.3':
+    resolution: {integrity: sha512-PhY/aX3HP1FmMe+/5E6U5cmJrR3lRswLpdnXIlmAlMj7LbNU4+aqfiSqGE40z6p16JxPm/xqQjenZfztXFhRZg==}
     peerDependencies:
       '@solidjs/web': 2.0.0-rc.3
       solid-js: 2.0.0-rc.3
 
-  '@tsrx/typescript-plugin@0.6.3':
-    resolution: {integrity: sha512-987H5i0hgHDgClhojw8OtnSj8DC1xOWV6tTlFIQVIjy6OgmQeZCjj/yPkMVoYOJme5bNgOy7aJVoJw8nipv8cQ==}
+  '@tsrx/typescript-plugin@0.7.3':
+    resolution: {integrity: sha512-kkvPU2ED1055AeHdioDxxAj+FNhQjyTFOCTU/7bZMnGFxZGoBJtO1Hoo8AL/L35L+EZY6qgxvo/+xYlT0FY0xA==}
     hasBin: true
     peerDependencies:
-      '@tsrx/content-mapper': 0.1.2
-      '@tsrx/preact': 0.3.5
-      '@tsrx/react': 0.4.5
+      '@tsrx/content-mapper': 0.1.4
+      '@tsrx/preact': 0.4.3
+      '@tsrx/react': 0.5.3
       '@tsrx/ripple': ^0.2.0
-      '@tsrx/solid': 0.3.5
-      '@tsrx/vue': 0.3.5
+      '@tsrx/solid': 0.4.3
+      '@tsrx/vue': 0.4.3
       octane: '*'
       typescript: ^5.9.3 || ^6.0.0 || ^7.1.0-dev.20260923.1
     peerDependenciesMeta:
@@ -22083,13 +22030,13 @@ packages:
       typescript:
         optional: true
 
-  '@tsrx/vite-plugin-react@0.0.120':
-    resolution: {integrity: sha512-rNge8Ua26yUiM262TqQaM2hIJG7YrXlCL7C3U9xlZbSwxMBVQDF6/MKfo1lI8aT5pHmp2NKwaVXP+rEV8aRVcA==}
+  '@tsrx/vite-plugin-react@0.0.124':
+    resolution: {integrity: sha512-IwWlqOtkSO48w3zbNxAywq26z4cWz/9aOGuvQdGQkjhV1mBdj1ziGMHluEYJDl6nnyDK6QQkzaj44wNTgThSxQ==}
     peerDependencies:
       vite: '*'
 
-  '@tsrx/vite-plugin-solid@0.0.117':
-    resolution: {integrity: sha512-IrXw3rCggjPRgYQFzU93RRim8T1laDdBw2OmpBDt4d7QUsWX6ecMhF9L6r299s7PiNDSmn5OdaL1bj6bsqQJ0A==}
+  '@tsrx/vite-plugin-solid@0.0.121':
+    resolution: {integrity: sha512-Wdh2aFSJLgBSTVN78aC/C7xBVJ188YsxByKMq6xkbdKzqf7ncJuum2KtKEPAjwG7z2Jdjlz7VdfI/6lXbc7pRg==}
     peerDependencies:
       vite: '*'
 
@@ -26406,8 +26353,8 @@ packages:
     resolution: {integrity: sha512-Ap6G0WQwcU/LHsvLwON1fAQX9Zp0A2Y6Y/cJBl9r/JbW90Zyg4/zbG6zzKa2OTALELarYHmKu0GhpM5EO+7T0g==}
     engines: {node: '>=0.10'}
 
-  esrap@2.3.2:
-    resolution: {integrity: sha512-40GyiEJevYKXzYTHtZkFqAgTjLOuFcaXMao8TPyOlnWTlkHDlvZ6mPMJaJyOqVwrVCgomEG1WhJd81w0X+IcCw==}
+  esrap@2.4.2:
+    resolution: {integrity: sha512-WpVZsWnSheHBy+fGrO/0duwnbe6ODZH1QyBbjupreSCJGojaBWRncrq+HVeIJ8eHQjEwSJg9hC4yPJyNVOrpqg==}
     peerDependencies:
       '@typescript-eslint/types': ^8.2.0
     peerDependenciesMeta:
@@ -27318,9 +27265,6 @@ packages:
   html-encoding-sniffer@6.0.0:
     resolution: {integrity: sha512-CV9TW3Y3f8/wT0BRFc1/KAVQ3TUHiXmaAb6VW9vtiMFf7SLoMd1PdAc4W3KFOFETBJUb90KatHqlsZMWV+R9Gg==}
     engines: {node: ^20.19.0 || ^22.12.0 || >=24.0.0}
-
-  html-entities@2.3.3:
-    resolution: {integrity: sha512-DV5Ln36z34NNTDgnz0EWGBLZENelNAtkiFA4kyNOG2tDI6Mz1uSWiq1wAKdyjnJwyDiDO7Fa2SO1CTxPXL8VxA==}
 
   html-escaper@2.0.2:
     resolution: {integrity: sha512-H2iMtd0I4Mt5eYiapRdIDjp+XzelXQ0tFE4JS7YFwFevXXMmOp9myNrUvCg0D6ws8iqkRPBfKHgbwig1SmlLfg==}
@@ -36056,11 +36000,6 @@ snapshots:
       '@babel/types': 7.29.7
     transitivePeerDependencies:
       - supports-color
-
-  '@babel/helper-module-imports@7.18.6':
-    dependencies:
-      '@babel/types': 7.29.8
-    optional: true
 
   '@babel/helper-module-imports@7.29.7(supports-color@10.2.2)':
     dependencies:
@@ -47812,38 +47751,16 @@ snapshots:
     dependencies:
       solid-js: 1.9.14
 
-  '@solidjs/babel-plugin@2.0.0-rc.14(@babel/core@7.29.7(supports-color@10.2.2))':
-    dependencies:
-      '@babel/core': 7.29.7(supports-color@10.2.2)
-      '@babel/helper-module-imports': 7.18.6
-      '@babel/plugin-syntax-jsx': 7.29.7(@babel/core@7.29.7(supports-color@10.2.2))
-      '@babel/types': 7.29.8
-      html-entities: 2.3.3
-      parse5: 7.3.0
-    optional: true
-
   '@solidjs/compiler-darwin-arm64@2.0.0':
-    optional: true
-
-  '@solidjs/compiler-darwin-arm64@2.0.0-rc.14':
     optional: true
 
   '@solidjs/compiler-darwin-x64@2.0.0':
     optional: true
 
-  '@solidjs/compiler-darwin-x64@2.0.0-rc.14':
-    optional: true
-
   '@solidjs/compiler-linux-arm64-gnu@2.0.0':
     optional: true
 
-  '@solidjs/compiler-linux-arm64-gnu@2.0.0-rc.14':
-    optional: true
-
   '@solidjs/compiler-linux-x64-gnu@2.0.0':
-    optional: true
-
-  '@solidjs/compiler-linux-x64-gnu@2.0.0-rc.14':
     optional: true
 
   '@solidjs/compiler-wasm32-wasi@2.0.0':
@@ -47853,17 +47770,7 @@ snapshots:
       '@napi-rs/wasm-runtime': 1.2.1(@emnapi/core@1.11.3)(@emnapi/runtime@1.11.3)
     optional: true
 
-  '@solidjs/compiler-wasm32-wasi@2.0.0-rc.14':
-    dependencies:
-      '@emnapi/core': 1.11.3
-      '@emnapi/runtime': 1.11.3
-      '@napi-rs/wasm-runtime': 1.2.1(@emnapi/core@1.11.3)(@emnapi/runtime@1.11.3)
-    optional: true
-
   '@solidjs/compiler-win32-x64-msvc@2.0.0':
-    optional: true
-
-  '@solidjs/compiler-win32-x64-msvc@2.0.0-rc.14':
     optional: true
 
   '@solidjs/compiler@2.0.0':
@@ -47875,76 +47782,36 @@ snapshots:
       '@solidjs/compiler-wasm32-wasi': 2.0.0
       '@solidjs/compiler-win32-x64-msvc': 2.0.0
 
-  '@solidjs/compiler@2.0.0-rc.14':
-    optionalDependencies:
-      '@solidjs/compiler-darwin-arm64': 2.0.0-rc.14
-      '@solidjs/compiler-darwin-x64': 2.0.0-rc.14
-      '@solidjs/compiler-linux-arm64-gnu': 2.0.0-rc.14
-      '@solidjs/compiler-linux-x64-gnu': 2.0.0-rc.14
-      '@solidjs/compiler-wasm32-wasi': 2.0.0-rc.14
-      '@solidjs/compiler-win32-x64-msvc': 2.0.0-rc.14
-    optional: true
-
   '@solidjs/signals@2.0.0': {}
 
-  '@solidjs/signals@2.0.0-rc.14':
-    optional: true
-
-  '@solidjs/vite-plugin@3.0.0-next.49(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))':
+  '@solidjs/vite-plugin@3.0.1(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))':
     dependencies:
       '@ampproject/remapping': 2.3.0
-      '@babel/core': 7.29.7(supports-color@10.2.2)
-      '@solidjs/babel-plugin': 2.0.0-rc.14(@babel/core@7.29.7(supports-color@10.2.2))
-      '@solidjs/compiler': 2.0.0-rc.14
+      '@solidjs/compiler': 2.0.0
       '@solidjs/web': 2.0.0(solid-js@1.9.14)
-      '@types/babel__core': 7.20.5
+      magic-string: 0.30.21
       merge-anything: 5.1.7
       solid-js: 1.9.14
       vite: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
       vitefu: 1.1.3(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
     optionalDependencies:
+      '@babel/core': 7.29.7(supports-color@10.2.2)
       '@testing-library/jest-dom': 6.9.1
-    transitivePeerDependencies:
-      - '@tsrx/core'
-      - supports-color
     optional: true
 
-  '@solidjs/vite-plugin@3.0.0-next.49(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))':
+  '@solidjs/vite-plugin@3.0.1(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))':
     dependencies:
       '@ampproject/remapping': 2.3.0
-      '@babel/core': 7.29.7(supports-color@10.2.2)
-      '@solidjs/babel-plugin': 2.0.0-rc.14(@babel/core@7.29.7(supports-color@10.2.2))
-      '@solidjs/compiler': 2.0.0-rc.14
+      '@solidjs/compiler': 2.0.0
       '@solidjs/web': 2.0.0(solid-js@1.9.14)
-      '@types/babel__core': 7.20.5
+      magic-string: 0.30.21
       merge-anything: 5.1.7
       solid-js: 1.9.14
       vite: 8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
       vitefu: 1.1.3(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
     optionalDependencies:
-      '@testing-library/jest-dom': 6.9.1
-    transitivePeerDependencies:
-      - '@tsrx/core'
-      - supports-color
-    optional: true
-
-  '@solidjs/vite-plugin@3.0.0-next.49(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))':
-    dependencies:
-      '@ampproject/remapping': 2.3.0
       '@babel/core': 7.29.7(supports-color@10.2.2)
-      '@solidjs/babel-plugin': 2.0.0-rc.14(@babel/core@7.29.7(supports-color@10.2.2))
-      '@solidjs/compiler': 2.0.0-rc.14
-      '@solidjs/web': 2.0.0(solid-js@2.0.0)
-      '@types/babel__core': 7.20.5
-      merge-anything: 5.1.7
-      solid-js: 2.0.0
-      vite: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
-      vitefu: 1.1.3(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
-    optionalDependencies:
       '@testing-library/jest-dom': 6.9.1
-    transitivePeerDependencies:
-      - '@tsrx/core'
-      - supports-color
     optional: true
 
   '@solidjs/vite-plugin@3.0.1(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))':
@@ -48578,13 +48445,13 @@ snapshots:
       - solid-js
       - utf-8-validate
 
-  '@tanstack/react-form@1.33.5(@tanstack/react-start@1.168.60(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20)))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@tanstack/react-form@1.33.5(@tanstack/react-start@1.168.60(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20)))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
       '@tanstack/form-core': 1.33.5
       '@tanstack/react-store': 0.11.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react: 19.2.7
     optionalDependencies:
-      '@tanstack/react-start': 1.168.60(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
+      '@tanstack/react-start': 1.168.60(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
     transitivePeerDependencies:
       - react-dom
 
@@ -48696,14 +48563,14 @@ snapshots:
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
 
-  '@tanstack/react-start-rsc@0.1.59(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.27.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.27.7)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
+  '@tanstack/react-start-rsc@0.1.59(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.27.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.27.7)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
     dependencies:
       '@tanstack/react-router': 1.170.41(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@tanstack/router-core': 1.171.34
       '@tanstack/router-utils': 1.162.3(supports-color@10.2.2)
       '@tanstack/start-client-core': 1.170.34
       '@tanstack/start-fn-stubs': 1.162.0
-      '@tanstack/start-plugin-core': 1.171.49(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.27.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.27.7)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
+      '@tanstack/start-plugin-core': 1.171.49(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.27.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.27.7)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
       '@tanstack/start-storage-context': 1.167.36
       pathe: 2.0.3
       react: 19.2.3
@@ -48724,14 +48591,14 @@ snapshots:
       - vite-plugin-solid
       - webpack
 
-  '@tanstack/react-start-rsc@0.1.59(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
+  '@tanstack/react-start-rsc@0.1.59(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
     dependencies:
       '@tanstack/react-router': 1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tanstack/router-core': 1.171.34
       '@tanstack/router-utils': 1.162.3(supports-color@10.2.2)
       '@tanstack/start-client-core': 1.170.34
       '@tanstack/start-fn-stubs': 1.162.0
-      '@tanstack/start-plugin-core': 1.171.49(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
+      '@tanstack/start-plugin-core': 1.171.49(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
       '@tanstack/start-storage-context': 1.167.36
       pathe: 2.0.3
       react: 19.2.7
@@ -48753,14 +48620,14 @@ snapshots:
       - webpack
     optional: true
 
-  '@tanstack/react-start-rsc@0.1.59(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
+  '@tanstack/react-start-rsc@0.1.59(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
     dependencies:
       '@tanstack/react-router': 1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tanstack/router-core': 1.171.34
       '@tanstack/router-utils': 1.162.3(supports-color@10.2.2)
       '@tanstack/start-client-core': 1.170.34
       '@tanstack/start-fn-stubs': 1.162.0
-      '@tanstack/start-plugin-core': 1.171.49(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
+      '@tanstack/start-plugin-core': 1.171.49(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
       '@tanstack/start-storage-context': 1.167.36
       pathe: 2.0.3
       react: 19.2.7
@@ -48801,15 +48668,15 @@ snapshots:
     transitivePeerDependencies:
       - crossws
 
-  '@tanstack/react-start@1.168.60(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.27.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.27.7)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
+  '@tanstack/react-start@1.168.60(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.27.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.27.7)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
     dependencies:
       '@tanstack/react-router': 1.170.41(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@tanstack/react-start-client': 1.168.39(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
-      '@tanstack/react-start-rsc': 0.1.59(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.27.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.27.7)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
+      '@tanstack/react-start-rsc': 0.1.59(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.27.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.27.7)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
       '@tanstack/react-start-server': 1.167.46(crossws@0.4.10(srvx@0.11.22))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@tanstack/router-utils': 1.162.3(supports-color@10.2.2)
       '@tanstack/start-client-core': 1.170.34
-      '@tanstack/start-plugin-core': 1.171.49(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.27.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.27.7)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
+      '@tanstack/start-plugin-core': 1.171.49(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.27.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.27.7)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
       '@tanstack/start-server-core': 1.169.39(crossws@0.4.10(srvx@0.11.22))
       pathe: 2.0.3
       react: 19.2.3
@@ -48831,15 +48698,15 @@ snapshots:
       - vite-plugin-solid
       - webpack
 
-  '@tanstack/react-start@1.168.60(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
+  '@tanstack/react-start@1.168.60(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
     dependencies:
       '@tanstack/react-router': 1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tanstack/react-start-client': 1.168.39(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@tanstack/react-start-rsc': 0.1.59(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
+      '@tanstack/react-start-rsc': 0.1.59(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
       '@tanstack/react-start-server': 1.167.46(crossws@0.4.10(srvx@0.11.22))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tanstack/router-utils': 1.162.3(supports-color@10.2.2)
       '@tanstack/start-client-core': 1.170.34
-      '@tanstack/start-plugin-core': 1.171.49(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
+      '@tanstack/start-plugin-core': 1.171.49(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
       '@tanstack/start-server-core': 1.169.39(crossws@0.4.10(srvx@0.11.22))
       pathe: 2.0.3
       react: 19.2.7
@@ -48862,15 +48729,15 @@ snapshots:
       - webpack
     optional: true
 
-  '@tanstack/react-start@1.168.60(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
+  '@tanstack/react-start@1.168.60(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
     dependencies:
       '@tanstack/react-router': 1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tanstack/react-start-client': 1.168.39(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@tanstack/react-start-rsc': 0.1.59(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
+      '@tanstack/react-start-rsc': 0.1.59(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
       '@tanstack/react-start-server': 1.167.46(crossws@0.4.10(srvx@0.11.22))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tanstack/router-utils': 1.162.3(supports-color@10.2.2)
       '@tanstack/start-client-core': 1.170.34
-      '@tanstack/start-plugin-core': 1.171.49(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
+      '@tanstack/start-plugin-core': 1.171.49(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
       '@tanstack/start-server-core': 1.169.39(crossws@0.4.10(srvx@0.11.22))
       pathe: 2.0.3
       react: 19.2.7
@@ -48971,7 +48838,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@tanstack/router-plugin@1.168.42(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(esbuild@0.27.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.27.7)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
+  '@tanstack/router-plugin@1.168.42(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(esbuild@0.27.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.27.7)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
     dependencies:
       '@babel/core': 7.29.7(supports-color@10.2.2)
       '@babel/template': 7.29.7
@@ -48986,7 +48853,7 @@ snapshots:
       '@rsbuild/core': 2.1.6(core-js@3.49.0)
       '@tanstack/react-router': 1.170.41(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       vite: 8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
-      vite-plugin-solid: 3.0.0-next.27(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+      vite-plugin-solid: 3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
       webpack: 5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.27.7)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20)
     transitivePeerDependencies:
       - '@farmfe/core'
@@ -48998,7 +48865,7 @@ snapshots:
       - supports-color
       - unloader
 
-  '@tanstack/router-plugin@1.168.42(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
+  '@tanstack/router-plugin@1.168.42(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
     dependencies:
       '@babel/core': 7.29.7(supports-color@10.2.2)
       '@babel/template': 7.29.7
@@ -49013,7 +48880,7 @@ snapshots:
       '@rsbuild/core': 2.1.6(core-js@3.49.0)
       '@tanstack/react-router': 1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       vite: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
-      vite-plugin-solid: 3.0.0-next.27(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+      vite-plugin-solid: 3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
       webpack: 5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20)
     transitivePeerDependencies:
       - '@farmfe/core'
@@ -49026,7 +48893,7 @@ snapshots:
       - unloader
     optional: true
 
-  '@tanstack/router-plugin@1.168.42(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
+  '@tanstack/router-plugin@1.168.42(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
     dependencies:
       '@babel/core': 7.29.7(supports-color@10.2.2)
       '@babel/template': 7.29.7
@@ -49041,7 +48908,7 @@ snapshots:
       '@rsbuild/core': 2.1.6(core-js@3.49.0)
       '@tanstack/react-router': 1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       vite: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
-      vite-plugin-solid: 3.0.0-next.27(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+      vite-plugin-solid: 3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
       webpack: 5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20)
     transitivePeerDependencies:
       - '@farmfe/core'
@@ -49098,7 +48965,7 @@ snapshots:
 
   '@tanstack/start-fn-stubs@1.162.0': {}
 
-  '@tanstack/start-plugin-core@1.171.49(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.27.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.27.7)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
+  '@tanstack/start-plugin-core@1.171.49(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.27.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.27.7)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
     dependencies:
       '@babel/code-frame': 7.29.7
       '@babel/core': 7.29.7(supports-color@10.2.2)
@@ -49106,7 +48973,7 @@ snapshots:
       '@jridgewell/remapping': 2.3.5
       '@tanstack/router-core': 1.171.34
       '@tanstack/router-generator': 1.167.40(supports-color@10.2.2)
-      '@tanstack/router-plugin': 1.168.42(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(esbuild@0.27.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.27.7)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
+      '@tanstack/router-plugin': 1.168.42(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(esbuild@0.27.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.27.7)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
       '@tanstack/router-utils': 1.162.3(supports-color@10.2.2)
       '@tanstack/start-server-core': 1.169.39(crossws@0.4.10(srvx@0.11.22))
       exsolve: 1.1.1
@@ -49138,7 +49005,7 @@ snapshots:
       - vite-plugin-solid
       - webpack
 
-  '@tanstack/start-plugin-core@1.171.49(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
+  '@tanstack/start-plugin-core@1.171.49(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
     dependencies:
       '@babel/code-frame': 7.29.7
       '@babel/core': 7.29.7(supports-color@10.2.2)
@@ -49146,7 +49013,7 @@ snapshots:
       '@jridgewell/remapping': 2.3.5
       '@tanstack/router-core': 1.171.34
       '@tanstack/router-generator': 1.167.40(supports-color@10.2.2)
-      '@tanstack/router-plugin': 1.168.42(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
+      '@tanstack/router-plugin': 1.168.42(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
       '@tanstack/router-utils': 1.162.3(supports-color@10.2.2)
       '@tanstack/start-server-core': 1.169.39(crossws@0.4.10(srvx@0.11.22))
       exsolve: 1.1.1
@@ -49179,7 +49046,7 @@ snapshots:
       - webpack
     optional: true
 
-  '@tanstack/start-plugin-core@1.171.49(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
+  '@tanstack/start-plugin-core@1.171.49(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
     dependencies:
       '@babel/code-frame': 7.29.7
       '@babel/core': 7.29.7(supports-color@10.2.2)
@@ -49187,7 +49054,7 @@ snapshots:
       '@jridgewell/remapping': 2.3.5
       '@tanstack/router-core': 1.171.34
       '@tanstack/router-generator': 1.167.40(supports-color@10.2.2)
-      '@tanstack/router-plugin': 1.168.42(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
+      '@tanstack/router-plugin': 1.168.42(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.41(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
       '@tanstack/router-utils': 1.162.3(supports-color@10.2.2)
       '@tanstack/start-server-core': 1.169.39(crossws@0.4.10(srvx@0.11.22))
       exsolve: 1.1.1
@@ -49835,7 +49702,7 @@ snapshots:
       minimatch: 10.2.5
       path-browserify: 1.0.1
 
-  '@tsrx/content-mapper@0.1.2':
+  '@tsrx/content-mapper@0.1.4':
     dependencies:
       jsonc-parser: 3.3.1
 
@@ -49848,54 +49715,70 @@ snapshots:
       '@types/estree': 1.0.9
       '@types/estree-jsx': 1.0.5
       acorn: 8.18.0
-      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
+      esrap: 2.4.2
       get-tsconfig: 5.0.0-beta.6
       magic-string: 0.30.21
       zimmerframe: 1.1.4
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/core@0.5.5(patch_hash=e7415e93ecc2fc037320fad0b46b063c795c673477c6bbca2474d9c4eb377f96)':
+  '@tsrx/core@0.3.3':
     dependencies:
-      '@jridgewell/sourcemap-codec': 1.5.5
+      '@jridgewell/sourcemap-codec': 1.6.0
       '@noble/hashes': 2.2.0
       '@sveltejs/acorn-typescript': 1.0.13(patch_hash=d0b06e4e1c663671981b2a666be1812ef129b83de2adc585bd72171bbc979387)(acorn@8.18.0)
-      '@tsrx/runtime': 0.2.4
+      '@tsrx/runtime': 0.2.3
       '@types/estree': 1.0.9
       '@types/estree-jsx': 1.0.5
       acorn: 8.18.0
-      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
+      esrap: 2.4.2
       get-tsconfig: 5.0.0-beta.6
       magic-string: 0.30.21
       zimmerframe: 1.1.4
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/oxc-darwin-arm64@0.23.0':
+  '@tsrx/core@0.6.3(patch_hash=77c411e19b7587228cc51f90f9e7e7501821cf15719bd4879f02d16927f688ab)':
+    dependencies:
+      '@jridgewell/sourcemap-codec': 1.6.0
+      '@noble/hashes': 2.2.0
+      '@sveltejs/acorn-typescript': 1.0.13(patch_hash=d0b06e4e1c663671981b2a666be1812ef129b83de2adc585bd72171bbc979387)(acorn@8.18.0)
+      '@tsrx/runtime': 0.2.5
+      '@types/estree': 1.0.9
+      '@types/estree-jsx': 1.0.5
+      acorn: 8.18.0
+      esrap: 2.4.2
+      get-tsconfig: 5.0.0-beta.6
+      magic-string: 0.30.21
+      zimmerframe: 1.1.4
+    transitivePeerDependencies:
+      - '@typescript-eslint/types'
+
+  '@tsrx/oxc-darwin-arm64@0.24.0':
     optional: true
 
-  '@tsrx/oxc-darwin-x64@0.23.0':
+  '@tsrx/oxc-darwin-x64@0.24.0':
     optional: true
 
-  '@tsrx/oxc-linux-arm64-gnu@0.23.0':
+  '@tsrx/oxc-linux-arm64-gnu@0.24.0':
     optional: true
 
-  '@tsrx/oxc-linux-arm64-musl@0.23.0':
+  '@tsrx/oxc-linux-arm64-musl@0.24.0':
     optional: true
 
-  '@tsrx/oxc-linux-x64-gnu@0.23.0':
+  '@tsrx/oxc-linux-x64-gnu@0.24.0':
     optional: true
 
-  '@tsrx/oxc-linux-x64-musl@0.23.0':
+  '@tsrx/oxc-linux-x64-musl@0.24.0':
     optional: true
 
-  '@tsrx/oxc-win32-arm64-msvc@0.23.0':
+  '@tsrx/oxc-win32-arm64-msvc@0.24.0':
     optional: true
 
-  '@tsrx/oxc-win32-x64-msvc@0.23.0':
+  '@tsrx/oxc-win32-x64-msvc@0.24.0':
     optional: true
 
-  '@tsrx/oxc@0.23.0(patch_hash=eb1fdf3caf79bc632213653d782f46bee49af25c8b13a0c809353e0ae3ba1d94)(svelte@5.57.2)':
+  '@tsrx/oxc@0.24.0(patch_hash=2bc9ce0f8259870621e3e68fda45a58cd19a3858474abedac4d43a1656cfe94d)(svelte@5.57.2)':
     dependencies:
       '@oxc-project/types': 0.150.0
       oxfmt-current: oxfmt@0.68.0(svelte@5.57.2)
@@ -49904,111 +49787,111 @@ snapshots:
       pathe: 2.0.3
       tinyglobby: 0.2.17
     optionalDependencies:
-      '@tsrx/oxc-darwin-arm64': 0.23.0
-      '@tsrx/oxc-darwin-x64': 0.23.0
-      '@tsrx/oxc-linux-arm64-gnu': 0.23.0
-      '@tsrx/oxc-linux-arm64-musl': 0.23.0
-      '@tsrx/oxc-linux-x64-gnu': 0.23.0
-      '@tsrx/oxc-linux-x64-musl': 0.23.0
-      '@tsrx/oxc-win32-arm64-msvc': 0.23.0
-      '@tsrx/oxc-win32-x64-msvc': 0.23.0
+      '@tsrx/oxc-darwin-arm64': 0.24.0
+      '@tsrx/oxc-darwin-x64': 0.24.0
+      '@tsrx/oxc-linux-arm64-gnu': 0.24.0
+      '@tsrx/oxc-linux-arm64-musl': 0.24.0
+      '@tsrx/oxc-linux-x64-gnu': 0.24.0
+      '@tsrx/oxc-linux-x64-musl': 0.24.0
+      '@tsrx/oxc-win32-arm64-msvc': 0.24.0
+      '@tsrx/oxc-win32-x64-msvc': 0.24.0
     transitivePeerDependencies:
       - svelte
       - vite-plus
 
-  '@tsrx/prettier-plugin@0.6.3(prettier@3.9.9)':
+  '@tsrx/prettier-plugin@0.7.3(prettier@3.9.9)':
     dependencies:
-      '@tsrx/core': 0.5.5(patch_hash=e7415e93ecc2fc037320fad0b46b063c795c673477c6bbca2474d9c4eb377f96)
+      '@tsrx/core': 0.6.3(patch_hash=77c411e19b7587228cc51f90f9e7e7501821cf15719bd4879f02d16927f688ab)
       prettier: 3.9.9
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/react-runtime@0.1.12(react@18.2.0)':
+  '@tsrx/react-runtime@0.2.0(react@18.2.0)':
     dependencies:
-      '@tsrx/runtime': 0.2.4
+      '@tsrx/runtime': 0.2.5
       react: 18.2.0
 
-  '@tsrx/react-runtime@0.1.12(react@19.0.0)':
+  '@tsrx/react-runtime@0.2.0(react@19.0.0)':
     dependencies:
-      '@tsrx/runtime': 0.2.4
+      '@tsrx/runtime': 0.2.5
       react: 19.0.0
 
-  '@tsrx/react-runtime@0.1.12(react@19.2.3)':
+  '@tsrx/react-runtime@0.2.0(react@19.2.3)':
     dependencies:
-      '@tsrx/runtime': 0.2.4
+      '@tsrx/runtime': 0.2.5
       react: 19.2.3
 
-  '@tsrx/react-runtime@0.1.12(react@19.2.7)':
+  '@tsrx/react-runtime@0.2.0(react@19.2.7)':
     dependencies:
-      '@tsrx/runtime': 0.2.4
+      '@tsrx/runtime': 0.2.5
       react: 19.2.7
 
-  '@tsrx/react-runtime@0.1.12(react@19.2.8)':
+  '@tsrx/react-runtime@0.2.0(react@19.2.8)':
     dependencies:
-      '@tsrx/runtime': 0.2.4
+      '@tsrx/runtime': 0.2.5
       react: 19.2.8
 
-  '@tsrx/react-runtime@0.1.12(react@19.3.0)':
+  '@tsrx/react-runtime@0.2.0(react@19.3.0)':
     dependencies:
-      '@tsrx/runtime': 0.2.4
+      '@tsrx/runtime': 0.2.5
       react: 19.3.0
     optional: true
 
-  '@tsrx/react@0.4.5(react@18.2.0)':
+  '@tsrx/react@0.5.3(react@18.2.0)':
     dependencies:
-      '@tsrx/core': 0.5.5(patch_hash=e7415e93ecc2fc037320fad0b46b063c795c673477c6bbca2474d9c4eb377f96)
-      '@tsrx/react-runtime': 0.1.12(react@18.2.0)
-      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
+      '@tsrx/core': 0.6.3(patch_hash=77c411e19b7587228cc51f90f9e7e7501821cf15719bd4879f02d16927f688ab)
+      '@tsrx/react-runtime': 0.2.0(react@18.2.0)
+      esrap: 2.4.2
       react: 18.2.0
       zimmerframe: 1.1.4
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/react@0.4.5(react@19.0.0)':
+  '@tsrx/react@0.5.3(react@19.0.0)':
     dependencies:
-      '@tsrx/core': 0.5.5(patch_hash=e7415e93ecc2fc037320fad0b46b063c795c673477c6bbca2474d9c4eb377f96)
-      '@tsrx/react-runtime': 0.1.12(react@19.0.0)
-      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
+      '@tsrx/core': 0.6.3(patch_hash=77c411e19b7587228cc51f90f9e7e7501821cf15719bd4879f02d16927f688ab)
+      '@tsrx/react-runtime': 0.2.0(react@19.0.0)
+      esrap: 2.4.2
       react: 19.0.0
       zimmerframe: 1.1.4
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/react@0.4.5(react@19.2.3)':
+  '@tsrx/react@0.5.3(react@19.2.3)':
     dependencies:
-      '@tsrx/core': 0.5.5(patch_hash=e7415e93ecc2fc037320fad0b46b063c795c673477c6bbca2474d9c4eb377f96)
-      '@tsrx/react-runtime': 0.1.12(react@19.2.3)
-      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
+      '@tsrx/core': 0.6.3(patch_hash=77c411e19b7587228cc51f90f9e7e7501821cf15719bd4879f02d16927f688ab)
+      '@tsrx/react-runtime': 0.2.0(react@19.2.3)
+      esrap: 2.4.2
       react: 19.2.3
       zimmerframe: 1.1.4
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/react@0.4.5(react@19.2.7)':
+  '@tsrx/react@0.5.3(react@19.2.7)':
     dependencies:
-      '@tsrx/core': 0.5.5(patch_hash=e7415e93ecc2fc037320fad0b46b063c795c673477c6bbca2474d9c4eb377f96)
-      '@tsrx/react-runtime': 0.1.12(react@19.2.7)
-      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
+      '@tsrx/core': 0.6.3(patch_hash=77c411e19b7587228cc51f90f9e7e7501821cf15719bd4879f02d16927f688ab)
+      '@tsrx/react-runtime': 0.2.0(react@19.2.7)
+      esrap: 2.4.2
       react: 19.2.7
       zimmerframe: 1.1.4
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/react@0.4.5(react@19.2.8)':
+  '@tsrx/react@0.5.3(react@19.2.8)':
     dependencies:
-      '@tsrx/core': 0.5.5(patch_hash=e7415e93ecc2fc037320fad0b46b063c795c673477c6bbca2474d9c4eb377f96)
-      '@tsrx/react-runtime': 0.1.12(react@19.2.8)
-      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
+      '@tsrx/core': 0.6.3(patch_hash=77c411e19b7587228cc51f90f9e7e7501821cf15719bd4879f02d16927f688ab)
+      '@tsrx/react-runtime': 0.2.0(react@19.2.8)
+      esrap: 2.4.2
       react: 19.2.8
       zimmerframe: 1.1.4
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/react@0.4.5(react@19.3.0)':
+  '@tsrx/react@0.5.3(react@19.3.0)':
     dependencies:
-      '@tsrx/core': 0.5.5(patch_hash=e7415e93ecc2fc037320fad0b46b063c795c673477c6bbca2474d9c4eb377f96)
-      '@tsrx/react-runtime': 0.1.12(react@19.3.0)
-      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
+      '@tsrx/core': 0.6.3(patch_hash=77c411e19b7587228cc51f90f9e7e7501821cf15719bd4879f02d16927f688ab)
+      '@tsrx/react-runtime': 0.2.0(react@19.3.0)
+      esrap: 2.4.2
       react: 19.3.0
       zimmerframe: 1.1.4
     transitivePeerDependencies:
@@ -50018,7 +49901,19 @@ snapshots:
   '@tsrx/ripple@0.2.0(typescript@5.9.3)':
     dependencies:
       '@tsrx/core': 0.2.0
-      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
+      esrap: 2.4.2
+      is-reference: 3.0.3
+      source-map: 0.7.6
+      zimmerframe: 1.1.4
+    optionalDependencies:
+      typescript: 5.9.3
+    transitivePeerDependencies:
+      - '@typescript-eslint/types'
+
+  '@tsrx/ripple@0.2.11(typescript@5.9.3)':
+    dependencies:
+      '@tsrx/core': 0.3.3
+      esrap: 2.4.2
       is-reference: 3.0.3
       source-map: 0.7.6
       zimmerframe: 1.1.4
@@ -50029,71 +49924,73 @@ snapshots:
 
   '@tsrx/runtime@0.2.0': {}
 
-  '@tsrx/runtime@0.2.4': {}
+  '@tsrx/runtime@0.2.3': {}
 
-  '@tsrx/solid-runtime@0.1.12(@solidjs/web@2.0.0(solid-js@2.0.0))(solid-js@2.0.0)':
+  '@tsrx/runtime@0.2.5': {}
+
+  '@tsrx/solid-runtime@0.1.13(@solidjs/web@2.0.0(solid-js@2.0.0))(solid-js@2.0.0)':
     dependencies:
       '@solidjs/web': 2.0.0(solid-js@2.0.0)
-      '@tsrx/runtime': 0.2.4
+      '@tsrx/runtime': 0.2.5
       solid-js: 2.0.0
 
-  '@tsrx/solid-runtime@0.1.12(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3)':
+  '@tsrx/solid-runtime@0.1.13(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3)':
     dependencies:
       '@solidjs/web': 2.0.0-rc.3(solid-js@2.0.0-rc.3)
-      '@tsrx/runtime': 0.2.4
+      '@tsrx/runtime': 0.2.5
       solid-js: 2.0.0-rc.3
     optional: true
 
-  '@tsrx/solid@0.3.5(@solidjs/web@2.0.0(solid-js@2.0.0))(solid-js@2.0.0)':
+  '@tsrx/solid@0.4.3(@solidjs/web@2.0.0(solid-js@2.0.0))(solid-js@2.0.0)':
     dependencies:
       '@solidjs/web': 2.0.0(solid-js@2.0.0)
-      '@tsrx/core': 0.5.5(patch_hash=e7415e93ecc2fc037320fad0b46b063c795c673477c6bbca2474d9c4eb377f96)
-      '@tsrx/solid-runtime': 0.1.12(@solidjs/web@2.0.0(solid-js@2.0.0))(solid-js@2.0.0)
-      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
+      '@tsrx/core': 0.6.3(patch_hash=77c411e19b7587228cc51f90f9e7e7501821cf15719bd4879f02d16927f688ab)
+      '@tsrx/solid-runtime': 0.1.13(@solidjs/web@2.0.0(solid-js@2.0.0))(solid-js@2.0.0)
+      esrap: 2.4.2
       solid-js: 2.0.0
       zimmerframe: 1.1.4
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/solid@0.3.5(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3)':
+  '@tsrx/solid@0.4.3(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3)':
     dependencies:
       '@solidjs/web': 2.0.0-rc.3(solid-js@2.0.0-rc.3)
-      '@tsrx/core': 0.5.5(patch_hash=e7415e93ecc2fc037320fad0b46b063c795c673477c6bbca2474d9c4eb377f96)
-      '@tsrx/solid-runtime': 0.1.12(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3)
-      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
+      '@tsrx/core': 0.6.3(patch_hash=77c411e19b7587228cc51f90f9e7e7501821cf15719bd4879f02d16927f688ab)
+      '@tsrx/solid-runtime': 0.1.13(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3)
+      esrap: 2.4.2
       solid-js: 2.0.0-rc.3
       zimmerframe: 1.1.4
     transitivePeerDependencies:
       - '@typescript-eslint/types'
     optional: true
 
-  '@tsrx/typescript-plugin@0.6.3(@tsrx/content-mapper@0.1.2)(@tsrx/react@0.4.5(react@19.3.0))(@tsrx/ripple@0.2.0(typescript@5.9.3))(@tsrx/solid@0.3.5(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3))(octane@packages+octane)(typescript@5.9.3)':
+  '@tsrx/typescript-plugin@0.7.3(@tsrx/content-mapper@0.1.4)(@tsrx/react@0.5.3(react@19.3.0))(@tsrx/ripple@0.2.0(typescript@5.9.3))(@tsrx/solid@0.4.3(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3))(octane@packages+octane)(typescript@5.9.3)':
     dependencies:
       '@volar/language-core': 2.4.28
       '@volar/typescript': 2.4.28(typescript@5.9.3)
       jsonc-parser: 3.3.1
       resolve-pkg-maps: 1.0.0
     optionalDependencies:
-      '@tsrx/content-mapper': 0.1.2
-      '@tsrx/react': 0.4.5(react@19.3.0)
+      '@tsrx/content-mapper': 0.1.4
+      '@tsrx/react': 0.5.3(react@19.3.0)
       '@tsrx/ripple': 0.2.0(typescript@5.9.3)
-      '@tsrx/solid': 0.3.5(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3)
+      '@tsrx/solid': 0.4.3(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3)
       octane: link:packages/octane
       typescript: 5.9.3
 
-  '@tsrx/vite-plugin-react@0.0.120(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))':
+  '@tsrx/vite-plugin-react@0.0.124(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))':
     dependencies:
-      '@tsrx/core': 0.5.5(patch_hash=e7415e93ecc2fc037320fad0b46b063c795c673477c6bbca2474d9c4eb377f96)
-      '@tsrx/react': 0.4.5(react@19.2.7)
+      '@tsrx/core': 0.6.3(patch_hash=77c411e19b7587228cc51f90f9e7e7501821cf15719bd4879f02d16927f688ab)
+      '@tsrx/react': 0.5.3(react@19.2.7)
       vite: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
     transitivePeerDependencies:
       - '@typescript-eslint/types'
       - react
 
-  '@tsrx/vite-plugin-solid@0.0.117(@solidjs/web@2.0.0(solid-js@2.0.0))(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))':
+  '@tsrx/vite-plugin-solid@0.0.121(@solidjs/web@2.0.0(solid-js@2.0.0))(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))':
     dependencies:
-      '@tsrx/core': 0.5.5(patch_hash=e7415e93ecc2fc037320fad0b46b063c795c673477c6bbca2474d9c4eb377f96)
-      '@tsrx/solid': 0.3.5(@solidjs/web@2.0.0(solid-js@2.0.0))(solid-js@2.0.0)
+      '@tsrx/core': 0.6.3(patch_hash=77c411e19b7587228cc51f90f9e7e7501821cf15719bd4879f02d16927f688ab)
+      '@tsrx/solid': 0.4.3(@solidjs/web@2.0.0(solid-js@2.0.0))(solid-js@2.0.0)
       vite: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
     transitivePeerDependencies:
       - '@solidjs/web'
@@ -53865,7 +53762,7 @@ snapshots:
 
   before-after-hook@4.0.0: {}
 
-  better-auth@1.7.4(6a69ce2600eb714d7ae5c9f8e53cea5d):
+  better-auth@1.7.4(7a3679bfac6edad0111abd3bb9d550d3):
     dependencies:
       '@better-auth/core': 1.7.4(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@cloudflare/workers-types@4.20251118.0)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.2))(jose@6.2.3)(kysely@0.29.5)(nanostores@1.5.3)
       '@better-auth/drizzle-adapter': 1.7.4(@better-auth/core@1.7.4(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@cloudflare/workers-types@4.20251118.0)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.2))(jose@6.2.3)(kysely@0.29.5)(nanostores@1.5.3))(@better-auth/utils@0.4.2)
@@ -53886,7 +53783,7 @@ snapshots:
       zod: 4.6.2
     optionalDependencies:
       '@lynx-js/react': 0.123.0(@lynx-js/types@4.1.0)(@types/react@18.3.31)
-      '@tanstack/react-start': 1.168.60(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
+      '@tanstack/react-start': 1.168.60(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
       solid-js: 1.9.14
@@ -56149,9 +56046,9 @@ snapshots:
     dependencies:
       estraverse: 5.3.0
 
-  esrap@2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e):
+  esrap@2.4.2:
     dependencies:
-      '@jridgewell/sourcemap-codec': 1.5.5
+      '@jridgewell/sourcemap-codec': 1.6.0
 
   esrecurse@4.3.0:
     dependencies:
@@ -57342,9 +57239,6 @@ snapshots:
       '@exodus/bytes': 1.15.1(@noble/hashes@2.2.0)
     transitivePeerDependencies:
       - '@noble/hashes'
-
-  html-entities@2.3.3:
-    optional: true
 
   html-escaper@2.0.2: {}
 
@@ -65589,7 +65483,7 @@ snapshots:
 
   solid-js@2.0.0-rc.3:
     dependencies:
-      '@solidjs/signals': 2.0.0-rc.14
+      '@solidjs/signals': 2.0.0
       csstype: 3.2.3
       seroval: 1.5.6
       seroval-plugins: 1.5.6(seroval@1.5.6)
@@ -66149,7 +66043,7 @@ snapshots:
       clsx: 2.1.1
       devalue: 5.9.2
       esm-env: 1.2.2
-      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
+      esrap: 2.4.2
       is-reference: 3.0.3
       locate-character: 3.0.0
       magic-string: 0.30.21
@@ -67418,42 +67312,42 @@ snapshots:
       - tsx
       - yaml
 
-  vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
+  vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
     dependencies:
-      '@solidjs/vite-plugin': 3.0.0-next.49(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+      '@solidjs/vite-plugin': 3.0.1(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
     transitivePeerDependencies:
+      - '@babel/core'
+      - '@solidjs/babel-plugin'
       - '@solidjs/start-devtools'
       - '@solidjs/web'
       - '@testing-library/jest-dom'
-      - '@tsrx/core'
       - solid-js
-      - supports-color
       - vite
     optional: true
 
-  vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
+  vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
     dependencies:
-      '@solidjs/vite-plugin': 3.0.0-next.49(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+      '@solidjs/vite-plugin': 3.0.1(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
     transitivePeerDependencies:
+      - '@babel/core'
+      - '@solidjs/babel-plugin'
       - '@solidjs/start-devtools'
       - '@solidjs/web'
       - '@testing-library/jest-dom'
-      - '@tsrx/core'
       - solid-js
-      - supports-color
       - vite
     optional: true
 
-  vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
+  vite-plugin-solid@3.0.0-next.27(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
     dependencies:
-      '@solidjs/vite-plugin': 3.0.0-next.49(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+      '@solidjs/vite-plugin': 3.0.1(@babel/core@7.29.7(supports-color@10.2.2))(@solidjs/web@2.0.0(solid-js@2.0.0))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
     transitivePeerDependencies:
+      - '@babel/core'
+      - '@solidjs/babel-plugin'
       - '@solidjs/start-devtools'
       - '@solidjs/web'
       - '@testing-library/jest-dom'
-      - '@tsrx/core'
       - solid-js
-      - supports-color
       - vite
     optional: true
 

@@ -883,7 +883,7 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 			{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 		);
 		for (const [keyword, expected] of [
-			['@try', 'Suspense'],
+			['@try', '__Suspense'],
 			['@pending', 'fallback'],
 			['@catch', 'fallback'],
 		]) {
