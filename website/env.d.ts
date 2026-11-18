@@ -68,6 +68,12 @@ declare module 'octane/compiler' {
 			}>;
 		};
 	};
+	/** Every diagnostic a module produces; the best-practices docs test asserts Avoid examples. */
+	export function collectDiagnostics(
+		source: string,
+		id: string,
+		options?: { dev?: boolean; strong?: boolean },
+	): { diagnostics: Array<{ code: string }>; error: unknown };
 }
 
 // The Volar (language-service) pipeline — the playground's TYPES output pane.
@@ -124,4 +130,12 @@ declare module '*.mdx' {
 	const MDXContent: (props?: Record<string, unknown>) => OctaneNode;
 	export default MDXContent;
 	export const frontmatter: Record<string, unknown>;
+}
+
+// Plain `.md` documents (such as docs/best-practices.md) compile through the same
+// pipeline to the same component module shape.
+declare module '*.md' {
+	import type { OctaneNode } from 'octane';
+	const MDContent: (props?: Record<string, unknown>) => OctaneNode;
+	export default MDContent;
 }

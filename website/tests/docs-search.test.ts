@@ -5,23 +5,29 @@ import { cleanup, fireEvent, render, waitFor } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router/compiled';
 import { getRouter } from '../src/router.ts';
 import { docs } from '../src/content/docs.ts';
-import { headingsFor, loadSearchIndex, searchDocs } from '../src/lib/docs-search.ts';
+import { docSource, headingsFor, loadSearchIndex, searchDocs } from '../src/lib/docs-search.ts';
 import { loadSiteSearchIndex } from '../src/lib/site-search.ts';
 
-const rawDocs = import.meta.glob('../src/content/docs/*.mdx', {
+const rawDocs = import.meta.glob('../src/content/docs/*.{md,mdx}', {
 	query: '?raw',
 	import: 'default',
 	eager: true,
 }) as Record<string, string>;
 
 function rawDoc(slug: string): string {
-	const entry = Object.entries(rawDocs).find(([path]) => path.endsWith(`/${slug}.mdx`));
+	const entry = Object.entries(rawDocs).find(
+		([path]) => /\/([^/]+)\.mdx?$/.exec(path)?.[1] === slug,
+	);
 	if (!entry) throw new Error(`missing raw doc for ${slug}`);
-	return entry[1];
+	return docSource(entry[0], entry[1]);
 }
 
+/** The page title: MDX frontmatter `title:`, or a plain Markdown doc's leading `# ` heading. */
 function frontmatterTitle(source: string): string | undefined {
-	return source.match(/^---\s*$([\s\S]*?)^---\s*$/m)?.[1].match(/^title:\s*(.+)$/m)?.[1];
+	return (
+		source.match(/^---\s*$([\s\S]*?)^---\s*$/m)?.[1].match(/^title:\s*(.+)$/m)?.[1] ??
+		source.match(/^# (.+)$/m)?.[1]
+	);
 }
 
 afterEach(cleanup);

@@ -160,6 +160,47 @@ function blocksFor(raw: string): SearchBlock[] {
 	return blocks;
 }
 
+/**
+ * GitHub's heading anchor for `heading`, so a plain Markdown document links the
+ * same section on GitHub and on the site (the site's rehype step uses it too).
+ */
+export function githubSlug(heading: string): string {
+	return heading
+		.toLowerCase()
+		.replace(/[^\w\- ]/g, '')
+		.trim()
+		.replace(/ /g, '-');
+}
+
+/**
+ * Rewrite a plain Markdown document's `## ` and `### ` headings (outside code
+ * fences) into the `<h2 id="…">` shape the sectionizer reads, with GitHub's ids.
+ */
+export function liftMarkdownHeadings(markdown: string): string {
+	let inFence = false;
+	return markdown
+		.split('\n')
+		.map((line) => {
+			if (line.trimStart().startsWith('```')) inFence = !inFence;
+			const heading = inFence ? null : /^(#{2,3}) (.+)$/.exec(line);
+			if (!heading) return line;
+			const level = heading[1].length;
+			const title = heading[2].replace(/`/g, '').trim();
+			return `<h${level} id="${githubSlug(title)}">${title}</h${level}>`;
+		})
+		.join('\n');
+}
+
+/** A raw doc source in the sectionizer's shape: `.md` headings are lifted, `.mdx` authors its own. */
+export function docSource(path: string, raw: string): string {
+	return path.endsWith('.md') ? liftMarkdownHeadings(raw) : raw;
+}
+
+/** `…/docs/quick-start.mdx` or `…/docs/best-practices.md` → its slug. */
+export function docSlugOf(path: string): string {
+	return path.slice(path.lastIndexOf('/') + 1).replace(/\.mdx?$/, '');
+}
+
 const HEADING = /<h2\s+id="([^"]+)"[^>]*>([\s\S]*?)<\/h2>/g;
 const DOC_HEADING = /<h([23])\s+id="([^"]+)"[^>]*>([\s\S]*?)<\/h\1>/g;
 

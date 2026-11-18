@@ -20,7 +20,7 @@ const communitySearchNames = new Set(
 describe('docs snapshot', () => {
 	it('carries every website doc plus the repo deep dives', async () => {
 		const websiteDocs = (await readdir(join(repoRoot, 'website/src/content/docs'))).map((file) =>
-			file.replace(/\.mdx$/, ''),
+			file.replace(/\.mdx?$/, ''),
 		);
 		const snapshotWebsiteSlugs = DOCS.filter((doc) => doc.source === 'website').map(
 			(doc) => doc.slug,
