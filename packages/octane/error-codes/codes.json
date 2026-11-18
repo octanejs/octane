@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 367,
+  "nextCode": 368,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -2197,6 +2197,12 @@
     },
     "366": {
       "message": "A signal's equals option must be a function.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "367": {
+      "message": "A signal's watched option must be a function.",
       "argumentCount": 0,
       "runtime": ["client", "server"],
       "status": "active"

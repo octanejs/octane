@@ -256,6 +256,7 @@ type ServerErrorArguments = {
 	364: [];
 	365: [];
 	366: [];
+	367: [];
 };
 
 export function formatServerError<Code extends keyof ServerErrorArguments>(
@@ -1049,6 +1050,8 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 				return formatDevErrorMessage('No <SignalScopeProvider> above this component.', args);
 			case 366:
 				return formatDevErrorMessage("A signal's equals option must be a function.", args);
+			case 367:
+				return formatDevErrorMessage("A signal's watched option must be a function.", args);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

@@ -86,6 +86,14 @@ export interface ScopeSignalOptions<T> {
 	 * Object.is alone. It runs untracked and must not write signals.
 	 */
 	readonly equals?: SignalEquals<T>;
+	/**
+	 * Runs, untracked, when the signal gains its first observer: an effect or
+	 * subscriber that reads it, directly or through derived values. The function
+	 * it returns runs when the last observer leaves or the scope is disposed, and
+	 * the next first observer runs `watched` again. A read with no observer
+	 * neither starts nor keeps it.
+	 */
+	readonly watched?: () => void | (() => void);
 }
 
 export interface SignalOptions {

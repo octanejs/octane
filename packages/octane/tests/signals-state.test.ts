@@ -962,6 +962,162 @@ describe('scoped synchronous signals', () => {
 	});
 });
 
+describe('watched', () => {
+	function tracked(log: string[], name: string) {
+		return () => {
+			log.push(`watch ${name}`);
+			return () => log.push(`unwatch ${name}`);
+		};
+	}
+
+	for (const key of ['source', null]) {
+		const kind = key === null ? 'keyless' : 'keyed';
+
+		it(`starts a ${kind} signal with its first observer and stops it with its last`, () => {
+			const scope = owner();
+			const log: string[] = [];
+			const source$ = scope.signal$(key, 1, { watched: tracked(log, 'source') });
+			source$.get();
+			expect(log).toEqual([]);
+
+			const stopEffect = scope.effect(() => {
+				source$.get();
+			});
+			expect(log).toEqual(['watch source']);
+			const stopSubscriber = source$.subscribe(() => {});
+			source$.set(2);
+			stopEffect();
+			expect(log).toEqual(['watch source']);
+			stopSubscriber();
+			expect(log).toEqual(['watch source', 'unwatch source']);
+
+			const stopAgain = source$.subscribe(() => {});
+			expect(log).toEqual(['watch source', 'unwatch source', 'watch source']);
+			stopAgain();
+			expect(log).toEqual(['watch source', 'unwatch source', 'watch source', 'unwatch source']);
+		});
+
+		it(`observes a ${kind} signal through derived values, and only while they are observed`, () => {
+			const scope = owner();
+			const log: string[] = [];
+			const source$ = scope.signal$(key, 1, { watched: tracked(log, 'source') });
+			const keyed$ = scope.derived$('doubled', () => source$.get() * 2);
+			const keyless$ = scope.derived$(null, () => keyed$.get() + 1);
+			// A read links the chain, and links are kept, but nothing observes it.
+			expect(keyless$.get()).toBe(3);
+			expect(log).toEqual([]);
+
+			const stop = keyless$.subscribe(() => {});
+			expect(log).toEqual(['watch source']);
+			stop();
+			expect(log).toEqual(['watch source', 'unwatch source']);
+			expect(keyless$.get()).toBe(3);
+			scope.effect(() => {
+				keyed$.get();
+			});
+			expect(log).toEqual(['watch source', 'unwatch source', 'watch source']);
+		});
+
+		it(`runs a ${kind} signal's cleanup once when its scope is disposed`, () => {
+			const scope = createScope({ scopeKey: `watched-dispose-${kind}` });
+			const reader = owner();
+			const log: string[] = [];
+			const source$ = scope.signal$(key, 1, { watched: tracked(log, 'source') });
+			const stopEffect = reader.effect(() => {
+				try {
+					source$.get();
+				} catch {}
+			});
+			const stopSubscriber = source$.subscribe(() => {});
+			scope.dispose();
+			expect(log).toEqual(['watch source', 'unwatch source']);
+			stopEffect();
+			stopSubscriber();
+			expect(log).toEqual(['watch source', 'unwatch source']);
+		});
+	}
+
+	it('moves observation when a derived value changes what it reads', () => {
+		const scope = owner();
+		const log: string[] = [];
+		const left$ = scope.signal$(null, 'left', { watched: tracked(log, 'left') });
+		const right$ = scope.signal$('right', 'right', { watched: tracked(log, 'right') });
+		const useLeft$ = scope.signal$(null, true);
+		const picked$ = scope.derived$('picked', () => (useLeft$.get() ? left$.get() : right$.get()));
+		const seen: string[] = [];
+		scope.effect(() => {
+			seen.push(picked$.get());
+		});
+		useLeft$.set(false);
+		useLeft$.set(true);
+		expect(seen).toEqual(['left', 'right', 'left']);
+		expect(log).toEqual([
+			'watch left',
+			'watch right',
+			'unwatch left',
+			'watch left',
+			'unwatch right',
+		]);
+	});
+
+	it('starts a derived value with its first observer', () => {
+		const scope = owner();
+		const log: string[] = [];
+		const source$ = scope.signal$(null, 1, { watched: tracked(log, 'source') });
+		const derived$ = scope.derived$('derived', () => source$.get() + 1, {
+			watched: tracked(log, 'derived'),
+		});
+		const stop = derived$.subscribe(() => {});
+		stop();
+		expect(log).toEqual(['watch source', 'watch derived', 'unwatch derived', 'unwatch source']);
+	});
+
+	for (const key of ['feed', null])
+		it(`connects ${key === null ? 'a keyless' : 'a keyed'} external source that restarts when its input changes`, () => {
+			const scope = owner();
+			const listeners = new Map<string, (value: string) => void>();
+			const log: string[] = [];
+			const room$ = scope.signal$(null, 'a');
+			const feed$ = scope.signal$<string | undefined>(key, undefined, {
+				watched: () =>
+					scope.effect(() => {
+						const room = room$.get();
+						log.push(`connect ${room}`);
+						listeners.set(room, (value) => feed$.set(value));
+						feed$.set(`${room}: hello`);
+						return () => {
+							log.push(`disconnect ${room}`);
+							listeners.delete(room);
+						};
+					}),
+			});
+
+			const seen: (string | undefined)[] = [];
+			const stop = scope.effect(() => {
+				seen.push(feed$.get());
+			});
+			// The first observer reads the current snapshot.
+			expect(seen.at(-1)).toBe('a: hello');
+			listeners.get('a')!('a: news');
+			room$.set('b');
+			expect(listeners.has('a')).toBe(false);
+			listeners.get('b')!('b: news');
+			expect(seen.at(-1)).toBe('b: news');
+
+			stop();
+			expect(log).toEqual(['connect a', 'disconnect a', 'connect b', 'disconnect b']);
+			expect(listeners.size).toBe(0);
+			room$.set('c');
+			expect(log).toEqual(['connect a', 'disconnect a', 'connect b', 'disconnect b']);
+		});
+
+	it('rejects a watched option that is not a function', () => {
+		const scope = owner();
+		expect(() => scope.signal$(null, 1, { watched: 1 as never })).toThrow(TypeError);
+		expect(() => scope.derived$('bad', () => 1, { watched: 'no' as never })).toThrow(TypeError);
+	});
+});
+
 describe('equals', () => {
 	type Point = { x: number; y: number };
 	const samePoint = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
