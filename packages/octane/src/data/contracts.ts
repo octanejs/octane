@@ -5,6 +5,8 @@
  * them.
  */
 
+import type { Implementation } from './server.js';
+
 /** The validator interface shared by Zod, Valibot, ArkType and others. */
 export interface StandardSchema<Input = unknown, Output = Input> {
 	readonly '~standard': {
@@ -77,6 +79,22 @@ export interface Entity<T> {
 	readonly one: StandardSchema<unknown, T>;
 	/** A list of records, as an output schema. A read whose `output` it is selects every one. */
 	readonly list: StandardSchema<unknown, T[]>;
+}
+
+/**
+ * The function each contract declared with one serves it with, for
+ * `defineHandler`. A client build of a `*.data.ts` module drops these
+ * functions and the imports only they use, so none reaches the browser.
+ */
+export const served = new WeakMap<object, (input: any, call: any) => unknown>();
+
+/**
+ * A contract declared with the function that serves it. `Context` is what
+ * that function needs from the handler's context; `defineHandler` serves it
+ * only for a handler whose context provides it.
+ */
+export interface Served<Context> {
+	readonly '~served': (context: Context) => void;
 }
 
 /** The entity each `one` and `list` schema holds, so a contract can select it without restating it. */
@@ -346,7 +364,7 @@ const isCount = (value: unknown, min: number, max: number) =>
  * view's own record only. A row keeps its identity until its record or one of
  * its related records changes.
  */
-export function view<T, P = void, const W extends ViewRelations<T> = {}>(options: {
+interface ViewOptions<T, P, W> {
 	name: string;
 	of: Entity<T>;
 	with?: W;
@@ -362,7 +380,20 @@ export function view<T, P = void, const W extends ViewRelations<T> = {}>(options
 	persist?: boolean;
 	cancel?: boolean;
 	version?: string;
-}): View<P, T, ViewRow<T, W>> {
+}
+
+export function view<T, P = void, const W extends ViewRelations<T> = {}>(
+	options: ViewOptions<T, P, W>,
+): View<P, T, ViewRow<T, W>>;
+/** A view with the function that serves it: see `Served`. */
+export function view<T, P = void, const W extends ViewRelations<T> = {}, Context = {}>(
+	options: ViewOptions<T, P, W>,
+	run: Implementation<Context, View<P, T, ViewRow<T, W>>>,
+): View<P, T, ViewRow<T, W>> & Served<Context>;
+export function view<T, P, W extends ViewRelations<T>>(
+	options: ViewOptions<T, P, W>,
+	run?: (input: any, call: any) => unknown,
+): View<P, T, ViewRow<T, W>> {
 	const {
 		of,
 		with: relations,
@@ -403,7 +434,7 @@ export function view<T, P = void, const W extends ViewRelations<T> = {}>(options
 			},
 		},
 	};
-	return {
+	return serve(run, {
 		...read({
 			...rest,
 			input,
@@ -415,10 +446,18 @@ export function view<T, P = void, const W extends ViewRelations<T> = {}>(options
 			],
 		}),
 		view: { of, where: rule ?? (() => true), compare, limit, max, joins },
-	};
+	});
 }
 
-export function read<Output, Input = void>(options: {
+function serve<T extends object>(
+	run: ((input: any, call: any) => unknown) | undefined,
+	contract: T,
+): T {
+	if (run) served.set(contract, run);
+	return contract;
+}
+
+interface ReadOptions<Input, Output> {
 	name: string;
 	input?: StandardSchema<unknown, Input>;
 	output: StandardSchema<unknown, Output>;
@@ -437,8 +476,21 @@ export function read<Output, Input = void>(options: {
 	cancel?: boolean;
 	/** Saved values from another version are discarded. */
 	version?: string;
-}): Read<Input, Output> {
-	return {
+}
+
+export function read<Output, Input = void>(
+	options: ReadOptions<Input, Output>,
+): Read<Input, Output>;
+/** A read with the function that serves it: see `Served`. */
+export function read<Output, Input = void, Context = {}>(
+	options: ReadOptions<Input, Output>,
+	run: Implementation<Context, Read<Input, Output>>,
+): Read<Input, Output> & Served<Context>;
+export function read<Output, Input>(
+	options: ReadOptions<Input, Output>,
+	run?: (input: any, call: any) => unknown,
+): Read<Input, Output> {
+	return serve(run, {
 		kind: 'read',
 		name: options.name,
 		input: options.input,
@@ -452,10 +504,10 @@ export function read<Output, Input = void>(options: {
 		persist: options.persist ?? true,
 		cancel: options.cancel ?? false,
 		version: options.version ?? '',
-	};
+	});
 }
 
-export function write<Input, Output = unknown>(options: {
+interface WriteOptions<Input, Output> {
 	name: string;
 	input: StandardSchema<unknown, Input>;
 	output?: StandardSchema<unknown, Output>;
@@ -480,9 +532,22 @@ export function write<Input, Output = unknown>(options: {
 	 */
 	form?: { readonly [K in keyof Input & string]?: FieldCodec };
 	invalidates?: Tags<Input>;
-}): Write<Input, Output> {
+}
+
+export function write<Input, Output = unknown>(
+	options: WriteOptions<Input, Output>,
+): Write<Input, Output>;
+/** A write with the function that serves it: see `Served`. */
+export function write<Input, Output = unknown, Context = {}>(
+	options: WriteOptions<Input, Output>,
+	run: Implementation<Context, Write<Input, Output>>,
+): Write<Input, Output> & Served<Context>;
+export function write<Input, Output>(
+	options: WriteOptions<Input, Output>,
+	run?: (input: any, call: any) => unknown,
+): Write<Input, Output> {
 	const { creates, patches, removes } = options;
-	return {
+	return serve(run, {
 		kind: 'write',
 		name: options.name,
 		input: options.input,
@@ -501,7 +566,7 @@ export function write<Input, Output = unknown>(options: {
 			(options.output === (creates ?? patches)?.one ? (output: Output) => output : undefined),
 		form: options.form as FormFields | undefined,
 		invalidates: options.invalidates ?? [],
-	};
+	});
 }
 
 /**

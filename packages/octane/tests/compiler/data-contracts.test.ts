@@ -6,6 +6,7 @@ import {
 	analyzeDataContracts,
 	createDataProgram,
 	formatDataDiagnostic,
+	stripDataImplementations,
 } from '../../src/compiler/data-contracts.js';
 
 type Diagnostic = { code: string; start: { line: number } };
@@ -217,6 +218,13 @@ export const twice = write({ name: 'books.later', input });
 			'OCTANE_DATA_CONTRACT_MODULE:6',
 		]);
 		expect(codes(contracts, '/app/books.data.ts')).toEqual([]);
+		// A type-only import never reaches the browser, so even a server module's is fine.
+		expect(
+			codes(
+				`import type { DataCall } from 'octane/data/server';\n${contracts}`,
+				'/app/books.data.ts',
+			),
+		).toEqual([]);
 		const effects = `${contracts}import { handler } from 'octane/data/server';
 console.log(stats);
 if (import.meta.env) globalThis.ready = true;
@@ -455,5 +463,45 @@ store.read(extra);
 		writeFileSync(join(root, 'entry.ts'), `import { contracts } from 'octane/data/manifest';\n`);
 		program.invalidate(join(root, 'entry.ts'));
 		expect(program.importsManifest()).toBe(true);
+	});
+});
+
+describe('the browser copy of a contract module', () => {
+	const served = `import { entity, read, view, write } from 'octane/data';
+import { z } from 'zod';
+import { db, sql } from './db.server.ts';
+import { audit } from './audit.ts';
+import { shelfOrder } from './order.ts';
+import type { DataCall } from 'octane/data/server';
+
+export const Book = entity('book', z.object({ id: z.string(), title: z.string() }));
+const books = db.table('book');
+const byTitle = books.index('title');
+export const book = read({ name: 'books.one', input: z.string(), output: Book.one }, (id, call: DataCall) =>
+	byTitle.get(sql(id), call.signal),
+);
+export const shelf = view(
+	{ name: 'books.shelf', of: Book, order: shelfOrder, where: (db) => db.title !== '' },
+	({ offset }) => books.page(offset),
+);
+export const add = write({ name: 'books.add', input: z.string() }, (title) => audit(books.insert(title))) as never;
+export const plain = read({ name: 'books.count', output: z.number() });
+`;
+
+	it('drops each function, and what only the functions used, from a client build', () => {
+		const client = stripDataImplementations(served, '/app/books.data.ts')!.code;
+		expect(client).not.toMatch(/db\.server|audit|sql|db\.table|books\.page|byTitle/);
+		// The contracts stay whole, with what their options use; a `where` parameter named
+		// like the server import is its own binding.
+		expect(client).toContain("import { shelfOrder } from './order.ts'");
+		expect(client).toContain("import { z } from 'zod'");
+		expect(client).toContain('(db) => db.title');
+		expect(client).toContain("read({ name: 'books.count', output: z.number() })");
+		expect(analyzeDataContracts(client, '/app/books.data.ts').diagnostics).toEqual([]);
+	});
+
+	it('leaves a module with no functions, and any other module, alone', () => {
+		expect(stripDataImplementations(contracts, '/app/books.data.ts')).toBeNull();
+		expect(stripDataImplementations(served, '/app/books.ts')).toBeNull();
 	});
 });

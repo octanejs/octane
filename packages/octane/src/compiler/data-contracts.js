@@ -26,6 +26,8 @@ import {
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { parseModule } from '#octane/compiler-parser';
+import { print as esrapPrint } from 'esrap';
+import esrapTsx from 'esrap/languages/tsx';
 import { unwrapTsExpr } from './descriptor-lowering.js';
 
 const DATA_CONTRACT_DECLARATION = 'OCTANE_DATA_CONTRACT_DECLARATION';
@@ -35,6 +37,8 @@ const DATA_CONTRACT_ESCAPE = 'OCTANE_DATA_CONTRACT_ESCAPE';
 
 const FACTORIES = new Set(['entity', 'feed', 'read', 'view', 'write']);
 const DATA_MODULE = /\.data\.[cm]?[jt]s$/;
+/** The factories that take the function serving their contract as a second argument. */
+const WITH_RUN = new Set(['read', 'view', 'write']);
 const DATA_SPECIFIER = /\.data(?:\.[cm]?[jt]s)?$/;
 const SERVER_MODULES = ['octane/server', 'octane/data/server', 'octane/data/octane/server'];
 
@@ -426,6 +430,110 @@ export function analyzeDataContracts(source, filename, contractExports) {
 	return { declarations, uses, reexports, diagnostics };
 }
 
+/**
+ * The browser's copy of a `*.data.ts` module. A contract declared with the
+ * function that serves it, `read({ … }, run)`, loses `run`, and so do the
+ * imports and module-level `const`s that only those functions used, so no
+ * server code or server-only import reaches the client. Returns null for a
+ * module that declares no such contract.
+ */
+export function stripDataImplementations(source, filename) {
+	if (!DATA_MODULE.test(filename.replace(/[?#].*$/, ''))) return null;
+	const ast = parseModule(source, filename);
+	const factories = new Set();
+	for (const statement of ast.body) {
+		if (statement.type !== 'ImportDeclaration' || statement.source.value !== 'octane/data')
+			continue;
+		for (const specifier of statement.specifiers) {
+			const imported = specifier.imported?.name ?? specifier.imported?.value;
+			if (specifier.importKind !== 'type' && WITH_RUN.has(imported))
+				factories.add(specifier.local.name);
+		}
+	}
+	/** Drop a served factory call's second argument through any TS wrapper around it. */
+	const withoutRun = (node) => {
+		if (node !== unwrapTsExpr(node)) {
+			const expression = withoutRun(node.expression);
+			return expression === node.expression ? node : { ...node, expression };
+		}
+		return node.type === 'CallExpression' &&
+			node.callee.type === 'Identifier' &&
+			factories.has(node.callee.name) &&
+			node.arguments.length > 1
+			? { ...node, arguments: node.arguments.slice(0, 1) }
+			: node;
+	};
+	let stripped = false;
+	const body = ast.body.map((statement) => {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+		if (declaration?.type !== 'VariableDeclaration') return statement;
+		const declarations = declaration.declarations.map((declarator) => {
+			const init = declarator.init && withoutRun(declarator.init);
+			return init === declarator.init ? declarator : { ...declarator, init };
+		});
+		if (declarations.every((declarator, index) => declarator === declaration.declarations[index]))
+			return statement;
+		stripped = true;
+		const copy = { ...declaration, declarations };
+		return statement === declaration ? copy : { ...statement, declaration: copy };
+	});
+	if (!stripped) return null;
+
+	// What the functions alone used goes too, until nothing more does.
+	const before = rootReferences(ast);
+	let program = { ...ast, body };
+	for (;;) {
+		const after = rootReferences(program);
+		const unused = (name) => before.has(name) && !after.has(name);
+		const next = [];
+		for (const statement of program.body) {
+			if (statement.type === 'ImportDeclaration' && statement.specifiers.length > 0) {
+				const specifiers = statement.specifiers.filter(
+					(specifier) => !unused(specifier.local.name),
+				);
+				if (specifiers.length === statement.specifiers.length) next.push(statement);
+				else if (specifiers.length > 0) next.push({ ...statement, specifiers });
+			} else if (
+				statement.type === 'VariableDeclaration' &&
+				statement.declarations.every(
+					(declarator) => declarator.id.type === 'Identifier' && unused(declarator.id.name),
+				)
+			) {
+				continue;
+			} else next.push(statement);
+		}
+		if (
+			next.length === program.body.length &&
+			next.every((statement, i) => statement === program.body[i])
+		)
+			break;
+		program = { ...program, body: next };
+	}
+	const printed = esrapPrint(program, esrapTsx(), {
+		sourceMapSource: filename,
+		sourceMapContent: source,
+	});
+	return { code: printed.code, map: printed.map };
+}
+
+/** The module-scope bindings a program's runtime code refers to. */
+function rootReferences(program) {
+	const lexical = createLexicalAnalysis(program);
+	const names = new Set();
+	walk(program.body, program, 'body', (node, parent, key) => {
+		if (node.type === 'ImportDeclaration') return false;
+		if (
+			node.type === 'Identifier' &&
+			isIdentifierReference(node, parent, key, lexical) &&
+			lexical.resolveBinding(lexical.nodeScopes.get(node) ?? lexical.rootScope, node.name)
+				?.scope === lexical.rootScope
+		)
+			names.add(node.name);
+	});
+	return names;
+}
+
 /** Visits `node` and, unless `visit` returns false, its runtime children. */
 function walk(node, parent, key, visit) {
 	if (Array.isArray(node)) {
@@ -458,6 +566,8 @@ function contractName(kind, call) {
 
 /** Why a contract module's top-level statement is not inert, or null. */
 function contractModuleProblem(statement) {
+	// A type-only import never reaches the browser.
+	if (statement.importKind === 'type') return null;
 	const source =
 		statement.type === 'ImportDeclaration' || statement.source ? statement.source?.value : null;
 	if (typeof source === 'string') {

@@ -180,4 +180,21 @@ describe('octane/data contract check in the build plugins', () => {
 			await server.close();
 		}
 	}, 60_000);
+
+	it('keeps a contract’s own function and its server modules out of a web build', async () => {
+		const root = createFixture({
+			'src/db.server.ts': "export const SECRET = 'server-only-secret';\n",
+			'src/books.data.ts': `import { read } from 'octane/data';
+import { SECRET } from './db.server.ts';
+const any = { '~standard': { version: 1, vendor: 'test', validate: (value: unknown) => ({ value }) } };
+export const book = read({ name: 'books.one', output: any }, () => SECRET);
+`,
+			'src/entry.ts': "import { book } from './books.data.ts';\nexport const name = book.name;\n",
+		});
+		roots.push(root);
+		expect((await rspackBuild(root)).errors).toEqual([]);
+		const bundle = readFileSync(join(root, 'dist-rspack/main.js'), 'utf8');
+		expect(bundle).toContain('books.one');
+		expect(bundle).not.toContain('server-only-secret');
+	}, 60_000);
 });

@@ -1242,6 +1242,57 @@ once per key. Pass it what it needs from the contract, such as
 [contract check](#contract-check) cannot follow into a helper. The `Implementation<C,
 T>` type names the function that serves contract `T` under context `C`.
 
+<h3 id="served-contracts">Declare a contract with its function</h3>
+
+A read, view or write can also take the function that serves it as a second
+argument, so the contract and its implementation sit together in the
+`*.data.ts` module:
+
+```ts
+// books.data.ts
+import { entity, read, write } from 'octane/data';
+import type { DataCall } from 'octane/data/server';
+import { z } from 'zod';
+import { db } from './db.server.ts';
+
+export const Book = entity('book', z.object({ id: z.string(), title: z.string() }));
+
+/** What these functions need from the handler's `context`. */
+type Call = DataCall & { account: string };
+
+export const book = read(
+	{ name: 'books.one', input: z.string(), output: Book.one },
+	(id, { account }: Call) => db.book(account, id),
+);
+export const addBook = write(
+	{ name: 'books.add', input: z.object({ title: z.string() }), output: Book.one, creates: Book },
+	(input, { account, operationId }: Call) => db.addBook(account, operationId, input.title),
+);
+```
+
+```ts
+// data.server.ts
+import { createDataHandler } from 'octane/data/server';
+import * as Books from './books.data.ts';
+
+export const handler = createDataHandler({ context }, (_, defineHandler) => defineHandler(Books));
+```
+
+`defineHandler(Books)` serves each contract with its own function. Pass an
+object for contracts declared without one; a contract that has its own
+function cannot also have a key there. Annotate `call` with what your function
+needs from `context`: `defineHandler` accepts the module only when your
+handler's `context` provides it.
+
+Nothing else changes. The name is still the request's stable identity, the
+schemas still validate every input before your function runs and every result
+before it leaves, and your function still decides who may do what. The Octane
+Vite and Rspack plugins build the browser's copy of the module without these
+functions, and without the imports and module-level constants only they used,
+so `db.server.ts` never reaches the client. Without one of those plugins, keep
+your functions in `defineHandler`'s object instead. Feeds take their
+function in `defineHandler`'s object only.
+
 <h3 id="module-server">Serve through a server function</h3>
 
 The pattern from [your first read](#first-handler) is the recommended one in
@@ -2250,9 +2301,9 @@ flag.
 
 <h3 id="reference-server">octane/data/server</h3>
 
-| Export              | What it is for                                                                                                                                                                                                                          |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `createDataHandler` | Serve contracts. Options: `context`, `allowedOrigins`, `secret`, `grant`. `define` receives `handle` and [`defineHandler`](#define-handler). Returns a `fetch`-style handler with `transport`, `serve`, `listen`, `accept` and `forms`. |
+| Export              | What it is for                                                                                                                                                                                                                                                                                                         |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createDataHandler` | Serve contracts. Options: `context`, `allowedOrigins`, `secret`, `grant`. `define` receives `handle` and [`defineHandler`](#define-handler), which also serves [contracts declared with their function](#served-contracts). Returns a `fetch`-style handler with `transport`, `serve`, `listen`, `accept` and `forms`. |
 
 <h3 id="reference-bindings">octane/data/octane and octane/data/react</h3>
 

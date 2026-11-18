@@ -5,9 +5,15 @@
  */
 import * as devalue from 'devalue';
 import { describe, expect, it } from 'vitest';
-import type { DataRequest } from '../src/data/index.js';
-import { createDataHandler, type DataServer, type Implementations } from '../src/data/server.js';
+import { DataError, entity, read, write, type DataRequest } from '../src/data/index.js';
+import {
+	createDataHandler,
+	type DataCall,
+	type DataServer,
+	type Implementations,
+} from '../src/data/server.js';
 import * as Todos from './_data-todos.js';
+import { schema } from './_data-todos.js';
 
 type Context = { viewer: string };
 const context = (_request: Request, caller?: { viewer?: unknown }) => ({
@@ -140,5 +146,113 @@ describe('octane/data defineHandler', () => {
 				defineHandler(Todos, missing as Implementations<Context, typeof Todos>),
 			),
 		).toThrow('octane/data: no handler for "addTodo"');
+	});
+});
+
+describe('contracts declared with the function that serves them', () => {
+	interface Note {
+		id: string;
+		text: string;
+		owner: string;
+	}
+	const Note = entity(
+		'note',
+		schema<Note>((value) => typeof value?.text === 'string' && typeof value?.owner === 'string'),
+	);
+	type Call = DataCall & { viewer: string };
+	const notes = new Map<string, Note>();
+	const ran: string[] = [];
+	const Notes = {
+		Note,
+		note: read(
+			{
+				name: 'notes.one',
+				input: schema<{ id: string }>((value) => typeof value?.id === 'string'),
+				output: Note.one,
+			},
+			(input, { viewer }: Call) => {
+				ran.push('note');
+				const note = notes.get(input.id);
+				// Authorization stays the function's: it sees the context the handler made.
+				if (note?.owner !== viewer) throw new DataError('forbidden');
+				return note;
+			},
+		),
+		save: write(
+			{
+				name: 'notes.save',
+				input: schema<{ text: string }>((value) => typeof value?.text === 'string'),
+				output: Note.one,
+				creates: Note,
+			},
+			(input, { viewer, operationId }: Call) => {
+				ran.push('save');
+				// An empty text breaks the output schema, so the reply cannot carry it.
+				const note = {
+					id: operationId,
+					text: input.text,
+					owner: input.text ? viewer : (null as any),
+				};
+				notes.set(note.id, note);
+				return note;
+			},
+		),
+		count: read({
+			name: 'notes.count',
+			output: schema<number>((value) => typeof value === 'number'),
+		}),
+	};
+
+	it('serves each by its own function, validating input and output on the server', async () => {
+		const server = createDataHandler({ context }, (_, defineHandler) =>
+			defineHandler(Notes, { count: () => notes.size }),
+		);
+		const transport = server.transport(new Request('https://app.test/data'));
+		const send = (request: DataRequest) => transport(request, new AbortController().signal);
+
+		expect(
+			await send({ kind: 'write', name: 'notes.save', input: { text: 'Kelp' }, operationId: 'n1' }),
+		).toEqual({ ok: true, value: { id: 'n1', text: 'Kelp', owner: 'ada' } });
+		expect(await send({ kind: 'read', name: 'notes.one', input: { id: 'n1' } })).toEqual({
+			ok: true,
+			value: { id: 'n1', text: 'Kelp', owner: 'ada' },
+		});
+		expect(await send({ kind: 'read', name: 'notes.count', input: undefined })).toEqual({
+			ok: true,
+			value: 1,
+		});
+
+		// Invalid input never reaches the function; an invalid result never leaves the server.
+		ran.length = 0;
+		expect(await send({ kind: 'read', name: 'notes.one', input: { id: 7 } })).toMatchObject({
+			ok: false,
+			code: 'invalid',
+		});
+		expect(ran).toEqual([]);
+		// The write ran, so a reply that breaks its output cannot say it was refused.
+		await expect(
+			send({ kind: 'write', name: 'notes.save', input: { text: '' }, operationId: 'n2' }),
+		).rejects.toThrow('octane/data: invalid write result');
+		expect(ran).toEqual(['save']);
+
+		// Another viewer is refused by the function itself.
+		const other = createDataHandler({ context: () => ({ viewer: 'bo' }) }, (_, defineHandler) =>
+			defineHandler(Notes, { count: () => 0 }),
+		).transport(new Request('https://app.test/data'));
+		expect(
+			await other(
+				{ kind: 'read', name: 'notes.one', input: { id: 'n1' } },
+				new AbortController().signal,
+			),
+		).toMatchObject({ ok: false, code: 'forbidden' });
+	});
+
+	it('still refuses a contract with neither its own function nor one in the object', () => {
+		expect(() =>
+			createDataHandler(
+				{ context },
+				(_, defineHandler) => (defineHandler as (group: object) => unknown)(Notes) as never,
+			),
+		).toThrow('octane/data: no handler for "count"');
 	});
 });
