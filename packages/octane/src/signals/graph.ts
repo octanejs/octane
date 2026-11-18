@@ -2490,7 +2490,7 @@ function unwatch(node: ReactiveNode): void {
 
 function startWatch(node: ReactiveNode): void {
 	const hook = watchHooks.get(node);
-	if (hook !== undefined) hook.cleanup = untrack(hook.watched);
+	if (hook !== undefined) hook.cleanup = runHook(hook.watched);
 }
 
 function stopWatch(node: ReactiveNode): void {
@@ -2498,7 +2498,20 @@ function stopWatch(node: ReactiveNode): void {
 	const cleanup = hook?.cleanup;
 	if (typeof cleanup === 'function') {
 		hook!.cleanup = undefined;
-		untrack(cleanup);
+		runHook(cleanup);
+	}
+}
+
+/**
+ * A hook runs inside another node's link or unlink, so its error is reported rather
+ * than thrown: the read, stop or disposal that reached it still completes.
+ */
+function runHook(hook: () => void | (() => void)): void | (() => void) {
+	try {
+		return untrack(hook);
+	} catch (error) {
+		if (typeof reportError === 'function') reportError(error);
+		else console.error(error);
 	}
 }
 
@@ -3133,8 +3146,9 @@ export function retireGraph(owner: GraphOwner, nodes: Iterable<ScopedNode>): voi
 				propagate(node.subs, executionDepth !== 0);
 				shallowPropagate(node.subs);
 			}
-			while (node.deps) unlink(node.deps, node);
+			// Readers first, so a watched node stops before its sources do.
 			while (node.subs) unlink(node.subs);
+			while (node.deps) unlink(node.deps, node);
 			node.flags = REACTIVE_NONE;
 		}
 		// A keyless cell's readers learn of it as they would of a keyed node: their next

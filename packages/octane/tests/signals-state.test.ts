@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	createScope,
 	ScopeDisposedError,
@@ -1110,6 +1110,52 @@ describe('watched', () => {
 			room$.set('c');
 			expect(log).toEqual(['connect a', 'disconnect a', 'connect b', 'disconnect b']);
 		});
+
+	it('reports a throwing watched or cleanup and still links, stops and unwatches', () => {
+		const reported: unknown[] = [];
+		vi.stubGlobal('reportError', (error: unknown) => reported.push(error));
+		try {
+			const scope = owner();
+			const log: string[] = [];
+			const source$ = scope.signal$(null, 1, { watched: tracked(log, 'source') });
+			let calls = 0;
+			const derived$ = scope.derived$(null, () => source$.get(), {
+				watched: () => {
+					if (++calls === 1) throw new Error('start');
+					return () => {
+						throw new Error('stop');
+					};
+				},
+			});
+			const stop = derived$.subscribe(() => {});
+			stop();
+			// The first observer is unlinked, so the next one starts it again.
+			const stopAgain = derived$.subscribe(() => {});
+			stopAgain();
+			expect(reported.map((error) => (error as Error).message)).toEqual(['start', 'stop']);
+			expect(log).toEqual(['watch source', 'unwatch source', 'watch source', 'unwatch source']);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
+	it('stops a disposed derived value before its sources', () => {
+		const sources = owner();
+		const scope = createScope({ scopeKey: 'watched-dispose-order' });
+		const log: string[] = [];
+		const source$ = sources.signal$('source', 1, { watched: tracked(log, 'source') });
+		const derived$ = scope.derived$('derived', () => source$.get(), {
+			watched: tracked(log, 'derived'),
+		});
+		// Observed from another scope, so disposal itself unlinks the derived value.
+		sources.effect(() => {
+			try {
+				derived$.get();
+			} catch {}
+		});
+		scope.dispose();
+		expect(log).toEqual(['watch source', 'watch derived', 'unwatch derived', 'unwatch source']);
+	});
 
 	it('rejects a watched option that is not a function', () => {
 		const scope = owner();

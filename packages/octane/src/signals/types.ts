@@ -91,7 +91,8 @@ export interface ScopeSignalOptions<T> {
 	 * subscriber that reads it, directly or through derived values. The function
 	 * it returns runs when the last observer leaves or the scope is disposed, and
 	 * the next first observer runs `watched` again. A read with no observer
-	 * neither starts nor keeps it.
+	 * neither starts nor keeps it. An error either throws is reported, as
+	 * `reportError` does, rather than thrown to the read or stop that ran it.
 	 */
 	readonly watched?: () => void | (() => void);
 }
