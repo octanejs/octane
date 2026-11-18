@@ -1199,9 +1199,9 @@ export function Pane() { const value = hooks.useReading?.(); return <p>{String(v
 		for (const projectTypes of [true, false]) {
 			const result = await run(projectTypes);
 			expect(warnings(result)).toEqual([
-				['src/asserted.tsx', 'warning'],
+				['src/asserted.tsx', 'error'],
 				['src/namespace.tsx', 'warning'],
-				['src/pane.tsx', 'warning'],
+				['src/pane.tsx', 'error'],
 			]);
 			expect(result.files.find((file) => file.file === 'src/pane.tsx')).toMatchObject({
 				strong: true,
@@ -1236,6 +1236,41 @@ export function Pane() { const value = hooks.useReading?.(); return <p>{String(v
 		}
 	},
 );
+
+it('blocks a native setup call to a retained wrapper around a proven React workspace hook', async () => {
+	const { app } = project({
+		'app/src/helper.ts': `import { useSnapshot } from 'observer';
+export function useReading() { return useSnapshot(); }
+export function usePure() { return 1; }`,
+		'app/src/Reading.tsx': `import { useRef, useState } from 'react';
+import { useReading } from './helper';
+export function View() {
+ const ref = useRef<HTMLOutputElement>(null);
+ const [tick] = useState(0);
+ const value = useReading();
+ return <output ref={ref}>{String(value) + tick}</output>;
+}`,
+		'app/src/Pure.tsx': `import { usePure } from './helper';
+export function Pure() { const value = usePure(); return <output>{String(value)}</output>; }`,
+	});
+	const selected = ['Reading.tsx', 'Pure.tsx'].map((name) => path.join(app, 'src', name));
+	const before = selected.map((file) => fs.readFileSync(file, 'utf8'));
+	const options = { root: app, strong: true, verify: true };
+	const preview = await runCodemod(selected, { ...options, write: false });
+	expect(preview.files.find(({ file }) => file === 'src/Reading.tsx').notes).toContainEqual(
+		expect.objectContaining({ rule: 'retained-workspace-hook', severity: 'error', line: 6 }),
+	);
+	expect(preview.files.find(({ file }) => file === 'src/Pure.tsx').notes).toEqual([]);
+	const result = await runCodemod(selected, options);
+	expect(result.files).toEqual([
+		expect.objectContaining({
+			file: 'src/Reading.tsx',
+			changed: false,
+			notes: [expect.objectContaining({ severity: 'error' })],
+		}),
+	]);
+	expect(selected.map((file) => fs.readFileSync(file, 'utf8'))).toEqual(before);
+});
 
 it.each([
 	['an empty record', '{}', true],
