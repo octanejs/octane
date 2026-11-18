@@ -92,6 +92,7 @@ import {
 } from './arm-exits.js';
 import { assertNoBareHoles } from './bare-holes.js';
 import { assertForOfHeaders } from './for-headers.js';
+import { assertNoDirectiveBodyVars } from './directive-body-vars.js';
 import {
 	isComponentTag,
 	isKnownStringChildExpression,
@@ -120,7 +121,7 @@ import {
 	prepareHydrateBoundaries,
 	prepareServerHydrateBoundaries,
 } from './hydrate-boundaries.js';
-import { assertNoLiveClientOnlyImports } from './client-only-server.js';
+import { assertNoLiveClientOnlyImports, withoutProgramLoc } from './client-only-server.js';
 import { nsForChildren, nsForSelf } from './jsx-namespace.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { analyzeStrongMode, assertStrongMode } from './strong-mode.js';
@@ -9330,6 +9331,10 @@ function mapCallToForOf(expr, ctx) {
 	) {
 		return null;
 	}
+	// The eligibility guard reflects on its receiver, which would add Proxy
+	// traps before native map runs. Keep source-visible Proxies on the authored
+	// callback path; arbitrary external receivers cannot be classified safely.
+	if (isSourceProxyMapReceiver(expr.callee.object, ctx)) return null;
 	const arrow = expr.arguments[0];
 	const params = arrow.params || [];
 	// `(item)` and `(item, index)` map to a for-of header; the rarely-used
@@ -9389,6 +9394,20 @@ function mapCallToForOf(expr, ctx) {
 		// their authored order when the key itself can observe them.
 		const key = unwrapTsExpr(keyExpr);
 		const componentTag = isComponentTag(body);
+		// A component row can run (or throw) before the next map callback. A
+		// property read in that next callback can also throw, so preserve the
+		// authored callback phase before rendering ordinal component rows.
+		if (
+			componentTag &&
+			key?.type === 'Identifier' &&
+			key.name === params[1]?.name &&
+			containsRenderCall(
+				attributes.filter((attribute) => attribute !== keyAttr),
+				null,
+				(node) => node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression',
+			)
+		)
+			return null;
 		const ordinalKey =
 			!componentTag &&
 			params[0].type === 'Identifier' &&
@@ -9444,6 +9463,53 @@ function mapCallToForOf(expr, ctx) {
 		},
 	});
 	return inheritOriginLoc(forNode, expr);
+}
+
+function isProxyConstruction(value, lexical) {
+	return (
+		value?.type === 'NewExpression' &&
+		value.callee?.type === 'Identifier' &&
+		value.callee.name === 'Proxy' &&
+		lexical.nodeScopes.has(value.callee) &&
+		lexical.resolveBinding(lexical.nodeScopes.get(value.callee), 'Proxy') === null
+	);
+}
+
+function isSourceProxyMapReceiver(node, ctx) {
+	const receiver = unwrapTsExpr(node);
+	if (
+		(receiver?.type !== 'Identifier' && receiver?.type !== 'NewExpression') ||
+		!(ctx.mapMayHaveProxy ??= ctx.mapSource.includes('Proxy'))
+	)
+		return false;
+	const module = ctx.activityModuleAst;
+	if (module == null) return false;
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(module));
+	if (isProxyConstruction(receiver, lexical)) return true;
+	if (receiver.type !== 'Identifier') return false;
+	if (ctx.mapProxyBindings === undefined) {
+		const bindings = (ctx.mapProxyBindings = new Map());
+		function visit(current) {
+			if (current == null || typeof current !== 'object') return;
+			if (current.type === 'VariableDeclaration' && current.kind === 'const') {
+				for (const declaration of current.declarations) {
+					if (
+						declaration.id.type !== 'Identifier' ||
+						!isProxyConstruction(unwrapTsExpr(declaration.init), lexical)
+					)
+						continue;
+					const scope = lexical.nodeScopes.get(declaration);
+					let names = bindings.get(scope);
+					if (names === undefined) bindings.set(scope, (names = new Set()));
+					names.add(declaration.id.name);
+				}
+			}
+			forEachRuntimeAstChild(current, visit);
+		}
+		visit(module);
+	}
+	const binding = lexical.resolveBinding(lexical.nodeScopes.get(receiver), receiver.name);
+	return binding != null && ctx.mapProxyBindings.get(binding.scope)?.has(receiver.name) === true;
 }
 
 function isModuleConstTag(tag, ctx) {
@@ -12275,6 +12341,7 @@ function prepareAuthoredAst(source, cleanFilename, options) {
 	);
 	analyzeTsrx(ast, cleanFilename);
 	assertForOfHeaders(ast, source, cleanFilename);
+	assertNoDirectiveBodyVars(ast, source, cleanFilename);
 	assertTemplateJumps(ast, source, cleanFilename);
 	assertNoBareHoles(ast, source, cleanFilename);
 	adoptParserAst(ast);
@@ -41208,7 +41275,7 @@ function printNodeWithMap(node, ctx) {
 		baseVisitors.TSImportType = printImportType;
 	}
 	const visitors = withDeferredImports(baseVisitors);
-	const { code, map } = esrapPrint(printable, visitors, {
+	const { code, map } = esrapPrint(withoutProgramLoc(printable), visitors, {
 		// esrap indents every continuation of a block comment. TS consumers need
 		// authored annotation bytes, including indentation inside nested comments.
 		indent: ctx.output === 'ts' ? '' : undefined,
