@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'octane';
-import type { CSSProperties } from 'react';
+import type { CSSProperties } from 'octane';
 import { useIsomorphicLayoutEffect } from '../hooks/useIsomorphicLayoutEffect.js';
 import { useResizeObserver } from '../hooks/useResizeObserver.js';
 import { useStableCallback } from '../hooks/useStableCallback.js';

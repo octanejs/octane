@@ -20,6 +20,10 @@ const styles = {
 	'-webkit-line-clamp': 2,
 	transitionDuration: '200ms',
 	'transition-duration': '200ms',
+	caret: 'auto',
+	color: 'red',
+	cssFloat: 'left',
+	viewTransitionScope: 'all !important',
 } satisfies CSSProperties;
 
 const customOnly = { '--accent': 'red', '--scale': 2 } satisfies SignalCSSProperties;

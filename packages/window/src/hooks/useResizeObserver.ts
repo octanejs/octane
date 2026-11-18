@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'octane';
-import type { CSSProperties } from 'react';
+import type { CSSProperties } from 'octane';
 import { getSlot, subSlot } from '../internal.js';
 import { parseNumericStyleValue } from '../utils/parseNumericStyleValue.js';
 import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect.js';

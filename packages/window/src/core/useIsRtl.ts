@@ -1,5 +1,5 @@
 import { useLayoutEffect, useState } from 'octane';
-import type { HTMLAttributes } from 'react';
+import type { HTMLAttributes } from 'octane';
 import { getSlot, subSlot } from '../internal.js';
 import { isRtl } from '../utils/isRtl.js';
 

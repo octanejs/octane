@@ -55,8 +55,15 @@ import type { SignalHandle } from './signals/types.js';
  */
 export interface OctaneElement<P = any> extends ElementDescriptor<P> {}
 
-/** Inline styles use Octane's numeric length coercion for both property spellings. */
-export interface CSSProperties extends React.CSSProperties, CSS.PropertiesHyphen<string | number> {
+/**
+ * Inline styles use Octane's numeric length coercion for both property spellings.
+ * React's csstype copy can differ from Octane's in an install, so single-word
+ * properties come from React alone, and the members redeclared below are omitted.
+ */
+export interface CSSProperties
+	extends
+		Omit<React.CSSProperties, 'viewTransitionScope'>,
+		Omit<CSS.PropertiesHyphen<string | number>, keyof React.CSSProperties> {
 	cssFloat?: React.CSSProperties['float'];
 	/** Element-scoped View Transition isolation, including authored `!important` values. */
 	viewTransitionScope?: 'none' | 'all' | (string & {}) | undefined;

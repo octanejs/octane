@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties } from 'octane';
 import { shallowCompare } from './shallowCompare.js';
 
 // Custom comparison function for React.memo()

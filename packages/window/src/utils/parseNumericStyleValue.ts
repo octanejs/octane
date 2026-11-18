@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties } from 'octane';
 
 export function parseNumericStyleValue(value: CSSProperties['height']): number | undefined {
 	if (value !== undefined) {

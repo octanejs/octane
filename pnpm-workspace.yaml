@@ -491,7 +491,7 @@ catalogs:
     stylis: ^4.4.0
     '@types/stylis': ^4.2.7
     '@emotion/is-prop-valid': 1.4.0
-    csstype: 3.2.3
+    csstype: ^3.2.4
     svelte: ^5.57.2
     svelte-check: ^4.7.3
     shadcn: 4.21.0
