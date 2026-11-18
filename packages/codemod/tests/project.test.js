@@ -1481,6 +1481,60 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 		}
 	});
 
+	it('reports React classes passed through selected components that render their children', async () => {
+		const root = project({
+			'tsconfig.json': JSON.stringify({
+				compilerOptions: {
+					jsx: 'react-jsx',
+					moduleResolution: 'bundler',
+					allowImportingTsExtensions: true,
+				},
+			}),
+			'Frame.tsx': `import { Component } from 'react';
+export class Frame extends Component { render() { return <b>class</b>; } }`,
+			'Gate.tsx': `import type { ReactNode } from 'react';
+export function Gate({ open, children }: { open: boolean; children: ReactNode }) {
+	return open ? <>{children}</> : null;
+}`,
+			'Discard.tsx': `import type { ReactNode } from 'react';
+export function Discard({ children }: { children: ReactNode }) { return <i>discarded</i>; }`,
+			'App.tsx': `import { Frame } from './Frame.tsx';
+import { Gate } from './Gate.tsx';
+import { Discard } from './Discard.tsx';
+import { ReactCompat } from 'octane/react';
+export function App({ open }: { open: boolean }) { return <Gate open={open}><Frame /></Gate>; }
+export function Ignored() { return <Discard><Frame /></Discard>; }
+export function Hosted() { return <ReactCompat><Frame /></ReactCompat>; }`,
+		});
+		fs.symlinkSync(
+			path.join(REPO, 'packages/codemod/node_modules'),
+			path.join(root, 'node_modules'),
+		);
+		for (const includeClass of [false, true]) {
+			const inputs = ['App.tsx', 'Gate.tsx', 'Discard.tsx'];
+			if (includeClass) inputs.push('Frame.tsx');
+			const preview = await runCodemod(
+				inputs.map((file) => path.join(root, file)),
+				{
+					root,
+					strong: true,
+					verify: true,
+					projectTypes: false,
+					write: false,
+				},
+			);
+			const app = preview.files.find(({ file }) => file === 'App.tsx');
+			expect(app.code).toContain('<Gate open={open}><Frame /></Gate>');
+			expect(app.notes.filter(({ rule }) => rule === 'class-component')).toEqual([
+				expect.objectContaining({
+					severity: includeClass ? 'error' : 'warning',
+					line: 5,
+					message: expect.stringContaining(includeClass ? 'can render' : 'renders'),
+				}),
+			]);
+		}
+	});
+
 	it('reports imported React classes in ordinary native HTML children', async () => {
 		const view = (
 			jsx,

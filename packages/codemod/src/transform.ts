@@ -9006,8 +9006,48 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			}
 			const tag = node.openingElement.tagName;
 			const callee = this.callee(tag);
-			if (callee?.module !== 'react' && callee?.module !== 'octane')
-				return this.checkReactClassRoot(node, conditional, retained);
+			if (callee?.module !== 'react' && callee?.module !== 'octane') {
+				this.checkReactClassRoot(node, conditional, retained);
+				if (
+					!retained &&
+					this.options.localReactClass &&
+					ts.isIdentifier(tag) &&
+					isComponentName(tag.text)
+				) {
+					for (const child of node.children) {
+						const output = isJsx(child)
+							? child
+							: ts.isJsxExpression(child) && !child.dotDotDotToken
+								? child.expression
+								: undefined;
+						if (
+							output &&
+							nativeOutputOwner(
+								output,
+								(tag, prop) => {
+									const binding = this.directImportedValue(tag)?.entry;
+									return !!(
+										prop === 'children' &&
+										binding &&
+										this.options.forwardedClassChild?.(binding.module, binding.imported)
+									);
+								},
+								{
+									typeOf: (node) => this.typeOf(node),
+									text: (node) => textKind(this.typeOf(node)) !== 0,
+								},
+							)
+						)
+							this.checkNativeOutput(
+								output,
+								conditional === 'map' ? 'map' : true,
+								false,
+								descriptorValue,
+							);
+					}
+				}
+				return;
+			}
 			if (callee.name === 'Fragment' || callee.name === 'Suspense') {
 				const member = ts.isPropertyAccessExpression(tag);
 				const reference = member ? tag.expression : tag;
