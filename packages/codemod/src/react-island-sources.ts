@@ -845,6 +845,210 @@ function closedNamedImport(checker: ts.TypeChecker, reference: ts.Node) {
 	);
 }
 
+/** A closed module-local get-or-create helper whose cache contains only React roots. */
+function cachedReactRoot(
+	call: ts.CallExpression,
+	{ sf, checker }: ReturnType<typeof bind>,
+	source: string,
+	uses: ReturnType<typeof localUses>,
+) {
+	if (
+		ts.isOptionalChain(call) ||
+		call.arguments.length !== 1 ||
+		call.arguments.some(ts.isSpreadElement) ||
+		!ts.isIdentifier(call.expression)
+	)
+		return false;
+	const helper = checker.getSymbolAtLocation(call.expression)?.valueDeclaration;
+	if (
+		!helper ||
+		!ts.isFunctionDeclaration(helper) ||
+		!helper.name ||
+		helper.asteriskToken ||
+		helper.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword) ||
+		helper.parent !== sf ||
+		ts.getCombinedModifierFlags(helper) & ts.ModifierFlags.Export ||
+		helper.parameters.length !== 1 ||
+		!ts.isIdentifier(helper.parameters[0].name) ||
+		!helper.body ||
+		helper.body.statements.length !== 5 ||
+		hasEval(sf) ||
+		hasPrototypeAccess(sf) ||
+		!hasSingleRuntimeImport(sf, source, 'react-dom/client')
+	)
+		return false;
+	const parameter = helper.parameters[0].name;
+	const [read, branch, create, store, finish] = helper.body.statements;
+	const local = (statement: ts.Statement) => {
+		if (
+			!ts.isVariableStatement(statement) ||
+			!(statement.declarationList.flags & ts.NodeFlags.Const)
+		)
+			return;
+		const [declaration, extra] = statement.declarationList.declarations;
+		return !extra && declaration && ts.isIdentifier(declaration.name) && declaration.initializer
+			? declaration
+			: undefined;
+	};
+	const existing = local(read);
+	const root = local(create);
+	if (!existing || !root) return false;
+	const get = skipWrappers(existing.initializer!);
+	const factory = skipWrappers(root.initializer!);
+	const set = ts.isExpressionStatement(store) && skipWrappers(store.expression);
+	if (
+		!ts.isCallExpression(get) ||
+		ts.isOptionalChain(get) ||
+		!ts.isPropertyAccessExpression(get.expression) ||
+		get.expression.name.text !== 'get' ||
+		!ts.isIdentifier(get.expression.expression) ||
+		get.arguments.length !== 1 ||
+		!ts.isCallExpression(factory) ||
+		ts.isOptionalChain(factory) ||
+		factory.arguments.length !== 1 ||
+		!closedNamedImport(checker, factory.expression) ||
+		imported(checker, factory.expression)?.module !== 'react-dom/client' ||
+		imported(checker, factory.expression)?.name !== 'createRoot' ||
+		!set ||
+		!ts.isCallExpression(set) ||
+		ts.isOptionalChain(set) ||
+		!ts.isPropertyAccessExpression(set.expression) ||
+		set.expression.name.text !== 'set' ||
+		!ts.isIdentifier(set.expression.expression) ||
+		set.arguments.length !== 2 ||
+		!ts.isIfStatement(branch) ||
+		branch.elseStatement ||
+		!ts.isIdentifier(branch.expression) ||
+		!ts.isReturnStatement(branch.thenStatement) ||
+		!branch.thenStatement.expression ||
+		!ts.isReturnStatement(finish) ||
+		!finish.expression
+	)
+		return false;
+	const same = (node: ts.Node, name: ts.Identifier) =>
+		ts.isIdentifier(node) &&
+		checker.getSymbolAtLocation(node) === checker.getSymbolAtLocation(name);
+	if (
+		!same(get.arguments[0], parameter) ||
+		!same(factory.arguments[0], parameter) ||
+		!same(set.arguments[0], parameter) ||
+		!same(branch.expression, existing.name as ts.Identifier) ||
+		!same(branch.thenStatement.expression, existing.name as ts.Identifier) ||
+		!same(set.arguments[1], root.name as ts.Identifier) ||
+		!same(finish.expression, root.name as ts.Identifier) ||
+		!same(set.expression.expression, get.expression.expression)
+	)
+		return false;
+	const cache = checker.getSymbolAtLocation(get.expression.expression)?.valueDeclaration;
+	if (
+		!cache ||
+		!ts.isVariableDeclaration(cache) ||
+		!ts.isIdentifier(cache.name) ||
+		!cache.initializer ||
+		!(cache.parent.flags & ts.NodeFlags.Const) ||
+		!ts.isVariableStatement(cache.parent.parent) ||
+		cache.parent.parent.parent !== sf ||
+		ts.getCombinedModifierFlags(cache) & ts.ModifierFlags.Export ||
+		cache.parent.parent.end > helper.getStart(sf) ||
+		cache.parent.parent.end > call.getStart(sf)
+	)
+		return false;
+	const allocation = skipWrappers(cache.initializer);
+	const globalObject = (node: ts.Node) =>
+		ts.isIdentifier(node) && ['globalThis', 'window', 'self', 'global'].includes(node.text);
+	const globalMutation = (node: ts.Node) => {
+		const parent = node.parent;
+		if (ts.isElementAccessExpression(parent) && parent.argumentExpression === node)
+			return globalObject(parent.expression);
+		if (ts.isPropertyAccessExpression(parent) && parent.name === node)
+			return globalObject(parent.expression);
+		if (ts.isCallExpression(parent) && parent.arguments[1] === node)
+			return !!parent.arguments[0] && globalObject(parent.arguments[0]);
+		if (ts.isPropertyAssignment(parent) && parent.name === node) {
+			const object = parent.parent;
+			const call = object.parent;
+			return (
+				ts.isCallExpression(call) &&
+				call.arguments.includes(object) &&
+				!!call.arguments[0] &&
+				globalObject(call.arguments[0])
+			);
+		}
+		return false;
+	};
+	if (
+		!ts.isNewExpression(allocation) ||
+		!ts.isIdentifier(allocation.expression) ||
+		allocation.expression.text !== 'WeakMap' ||
+		!!allocation.arguments?.length ||
+		checker.getSymbolAtLocation(allocation.expression)?.valueDeclaration?.getSourceFile() === sf ||
+		contains(sf, (node) => {
+			if (
+				node === allocation.expression ||
+				!(ts.isIdentifier(node) || ts.isStringLiteralLike(node)) ||
+				node.text !== 'WeakMap'
+			)
+				return false;
+			if (globalMutation(node)) return true;
+			if (!ts.isIdentifier(node) || inTypeNode(node)) return false;
+			const parent = node.parent;
+			if (
+				(ts.isNewExpression(parent) && parent.expression === node) ||
+				(ts.isPropertyAccessExpression(parent) && parent.name === node) ||
+				(ts.isPropertyAssignment(parent) && parent.name === node)
+			)
+				return false;
+			return checker.getSymbolAtLocation(node)?.valueDeclaration?.getSourceFile() !== sf;
+		})
+	)
+		return false;
+	const exact = (name: ts.Identifier, expected: ts.Node[]) => {
+		const refs = uses(name).filter((ref) => !inTypeNode(ref));
+		return refs.length === expected.length && refs.every((ref) => expected.includes(ref));
+	};
+	if (
+		!exact(parameter, [get.arguments[0], factory.arguments[0], set.arguments[0]]) ||
+		!exact(existing.name as ts.Identifier, [branch.expression, branch.thenStatement.expression]) ||
+		!exact(root.name as ts.Identifier, [set.arguments[1], finish.expression]) ||
+		uses(helper.name).some((ref) => {
+			const use = ref.parent;
+			return (
+				!inTypeNode(ref) &&
+				(!ts.isCallExpression(use) || use.expression !== ref || !callsRootMethod(use))
+			);
+		})
+	)
+		return false;
+	const readReceiver = get.expression.expression;
+	const storeReceiver = set.expression.expression;
+	return uses(cache.name).every((ref) => {
+		if (ref === readReceiver || ref === storeReceiver || inTypeNode(ref)) return true;
+		const member = ref.parent;
+		const operation = member.parent;
+		if (
+			!ts.isPropertyAccessExpression(member) ||
+			member.expression !== ref ||
+			!ts.isCallExpression(operation) ||
+			operation.expression !== member ||
+			ts.isOptionalChain(operation) ||
+			operation.arguments.length !== 1 ||
+			operation.arguments.some(ts.isSpreadElement)
+		)
+			return false;
+		if (member.name.text === 'delete') return true;
+		const unmount = operation.parent;
+		return (
+			member.name.text === 'get' &&
+			ts.isPropertyAccessExpression(unmount) &&
+			unmount.expression === operation &&
+			unmount.name.text === 'unmount' &&
+			ts.isCallExpression(unmount.parent) &&
+			unmount.parent.expression === unmount &&
+			unmount.parent.arguments.length === 0
+		);
+	});
+}
+
 /** Direct createRoot handles and hydrateRoot calls with verified import provenance. */
 function clientRootArgument(
 	{ sf, checker }: ReturnType<typeof bind>,
@@ -867,6 +1071,12 @@ function clientRootArgument(
 		)
 			return;
 		const receiver = skipWrappers(callee.expression);
+		if (
+			runtime === 'react-dom/client' &&
+			ts.isCallExpression(receiver) &&
+			cachedReactRoot(receiver, { sf, checker }, source, (uses ??= localUses(sf, checker)))
+		)
+			return call.arguments[0];
 		const privateField = runtime === 'react-dom/client' && privateRootField(receiver);
 		let root = receiver;
 		let handle: ts.Identifier | undefined;
