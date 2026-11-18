@@ -1,0 +1,313 @@
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+const { animateMock } = vi.hoisted(() => ({ animateMock: vi.fn() }));
+vi.mock('motion', async (original) => ({
+	...(await original<typeof import('motion')>()),
+	animate: animateMock,
+}));
+import { resolve } from 'node:path';
+import { act, flushSync, hydrateRoot } from 'octane';
+import { octane } from 'octane/compiler/vite';
+import { createServer } from 'vite';
+import { mount, nextPaint } from '../_helpers';
+import { RetainedToggle, RetainedRemovable } from '../_fixtures/retained-presence.tsrx';
+
+beforeEach(() => {
+	animateMock.mockReset();
+});
+
+describe('retained presence', () => {
+	it('retains the original keyed child through exit and reentry, then cleans it once', async () => {
+		const finishes: Array<() => void> = [];
+		const stops: Array<ReturnType<typeof vi.fn>> = [];
+		animateMock.mockImplementation(() => {
+			const stop = vi.fn();
+			stops.push(stop);
+			return {
+				then(done: () => void) {
+					finishes.push(done);
+				},
+				stop,
+			};
+		});
+		const trace: string[] = [];
+		const record = (event: string) => trace.push(event);
+		const ref = { current: null as HTMLButtonElement | null };
+		const r = mount(RetainedToggle, { show: true, record, hostRef: ref });
+		try {
+			const original = r.find('#row');
+			original.click();
+			await nextPaint();
+			expect(original.textContent).toBe('Row:1');
+			r.update(RetainedToggle, { show: false, record, hostRef: ref });
+			await nextPaint();
+			expect(r.find('#row')).toBe(original);
+			expect(original.hasAttribute('inert')).toBe(true);
+			expect(original.getAttribute('aria-hidden')).toBe('true');
+			expect(ref.current).toBe(original);
+			expect(trace).toEqual(['mount']);
+			expect(animateMock.mock.calls.at(-1)?.[0]).toBe(original);
+
+			r.update(RetainedToggle, { show: true, record, hostRef: ref, label: 'Again' });
+			await nextPaint();
+			expect(r.find('#row')).toBe(original);
+			expect(original.textContent).toBe('Again:1');
+			expect(original.hasAttribute('inert')).toBe(false);
+			expect(stops[0]).toHaveBeenCalledOnce();
+			finishes[0]();
+			expect(trace).toEqual(['mount']);
+
+			r.update(RetainedToggle, { show: false, record, hostRef: ref });
+			await nextPaint();
+			finishes[1]();
+			await nextPaint();
+			expect(r.container.querySelector('#row')).toBeNull();
+			expect(ref.current).toBeNull();
+			expect(trace).toEqual(
+				expect.arrayContaining(['mount', 'host-complete', 'cleanup', 'complete']),
+			);
+			expect(trace).toHaveLength(4);
+			expect(trace.indexOf('host-complete')).toBeLessThan(trace.indexOf('complete'));
+			r.update(RetainedToggle, { show: true, record, hostRef: ref });
+			await nextPaint();
+			expect(r.find('#row')).not.toBe(original);
+			expect(trace.at(-1)).toBe('mount');
+		} finally {
+			r.unmount();
+		}
+	});
+	it('replaces a present key directly without animating an old clone', async () => {
+		const trace: string[] = [];
+		const record = (event: string) => trace.push(event);
+		const r = mount(RetainedToggle, { show: true, record, rowKey: 'a' });
+		try {
+			const original = r.find('#row');
+			r.update(RetainedToggle, { show: true, record, rowKey: 'b', label: 'New' });
+			await nextPaint();
+			expect(r.container.querySelectorAll('#row')).toHaveLength(1);
+			expect(r.find('#row')).not.toBe(original);
+			expect(animateMock).not.toHaveBeenCalled();
+			expect(trace.filter((event) => event === 'cleanup')).toHaveLength(1);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('replaces a different key immediately and ignores the old exit completion', async () => {
+		let finish!: () => void;
+		const stop = vi.fn();
+		animateMock.mockReturnValue({
+			then(done: () => void) {
+				finish = done;
+			},
+			stop,
+		});
+		const trace: string[] = [];
+		const record = (event: string) => trace.push(event);
+		const r = mount(RetainedToggle, { show: true, record, rowKey: 'a' });
+		try {
+			const original = r.find('#row');
+			r.update(RetainedToggle, { show: false, record, rowKey: 'a' });
+			r.update(RetainedToggle, { show: true, record, rowKey: 'b', label: 'New' });
+			await nextPaint();
+			expect(r.find('#row')).not.toBe(original);
+			expect(r.find('#row').textContent).toBe('New:0');
+			expect(stop).toHaveBeenCalledOnce();
+			finish();
+			expect(trace.filter((event) => event === 'cleanup')).toHaveLength(1);
+			expect(trace).not.toContain('complete');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('keeps the ordinary clone exit for an independently removed host while the owner is present', async () => {
+		let finish!: () => void;
+		animateMock.mockReturnValue({
+			then(done: () => void) {
+				finish = done;
+			},
+			stop: vi.fn(),
+		});
+		const record = vi.fn();
+		const r = mount(RetainedRemovable, { show: true, record });
+		try {
+			const original = r.find('#exit-host');
+			r.find('#remove-host').click();
+			await nextPaint();
+			const clone = r.find('#exit-host');
+			expect(clone).not.toBe(original);
+			expect(animateMock.mock.calls.at(-1)?.[0]).toBe(clone);
+			expect(record).not.toHaveBeenCalled();
+			finish();
+			expect(r.container.querySelector('#exit-host')).toBeNull();
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('settles when the last exit host disappears but allows replacement in the same commit', async () => {
+		const finishes: Array<() => void> = [];
+		animateMock.mockImplementation(() => ({
+			then(done: () => void) {
+				finishes.push(done);
+			},
+			stop: vi.fn(),
+		}));
+		const trace: string[] = [];
+		const record = (event: string) => trace.push(event);
+		const r = mount(RetainedRemovable, { show: true, record });
+		try {
+			r.update(RetainedRemovable, { show: false, record });
+			r.find('#replace-host').click();
+			await nextPaint();
+			expect(r.container.querySelector('#removable')).not.toBeNull();
+			expect(trace).toEqual([]);
+			r.find('#remove-host').click();
+			await nextPaint();
+			await nextPaint();
+			expect(r.container.querySelector('#removable')).toBeNull();
+			expect(trace.sort()).toEqual(['cleanup', 'complete']);
+			for (const finish of finishes) finish();
+			expect(trace).toHaveLength(2);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('retires immediately when the retained child has no eligible exit target', async () => {
+		const trace: string[] = [];
+		const record = (event: string) => trace.push(event);
+		const r = mount(RetainedToggle, { show: true, record, exit: false });
+		try {
+			r.update(RetainedToggle, { show: false, record, exit: false });
+			await nextPaint();
+			expect(r.container.querySelector('#row')).toBeNull();
+			expect(trace).toEqual(expect.arrayContaining(['mount', 'cleanup', 'complete']));
+			expect(trace).toHaveLength(3);
+			expect(animateMock).not.toHaveBeenCalled();
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('rechecks the committed key after a host completion callback synchronously reenters', async () => {
+		let finish!: () => void;
+		animateMock.mockReturnValue({
+			then(done: () => void) {
+				finish = done;
+			},
+			stop: vi.fn(),
+		});
+		const trace: string[] = [];
+		const record = (event: string) => trace.push(event);
+		let r!: ReturnType<typeof mount>;
+		const hostComplete = () =>
+			flushSync(() => r.update(RetainedToggle, { show: true, record, hostComplete }));
+		r = mount(RetainedToggle, { show: true, record, hostComplete });
+		try {
+			const original = r.find('#row');
+			r.update(RetainedToggle, { show: false, record, hostComplete });
+			finish();
+			await nextPaint();
+			expect(r.find('#row')).toBe(original);
+			expect(trace).toEqual(['mount', 'host-complete']);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('retires an exiting child when Activity disconnects its effects', async () => {
+		let finish!: () => void;
+		const stop = vi.fn();
+		animateMock.mockReturnValue({
+			then(done: () => void) {
+				finish = done;
+			},
+			stop,
+		});
+		const trace: string[] = [];
+		const record = (event: string) => trace.push(event);
+		const r = mount(RetainedToggle, { show: true, record });
+		try {
+			r.update(RetainedToggle, { show: false, record });
+			r.update(RetainedToggle, { show: false, record, activity: 'hidden' });
+			await nextPaint();
+			expect(r.container.querySelector('#row')).toBeNull();
+			expect(stop).toHaveBeenCalledOnce();
+			finish();
+			expect(trace.filter((event) => event === 'complete')).toHaveLength(1);
+		} finally {
+			r.unmount();
+		}
+	});
+	it('retires immediately when animation features are disabled', async () => {
+		const trace: string[] = [];
+		const record = (event: string) => trace.push(event);
+		const r = mount(RetainedToggle, { show: true, record, disabled: true });
+		try {
+			r.update(RetainedToggle, { show: false, record, disabled: true });
+			await nextPaint();
+			expect(r.container.querySelector('#row')).toBeNull();
+			expect(trace.filter((event) => event === 'complete')).toHaveLength(1);
+			expect(animateMock).not.toHaveBeenCalled();
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('does not apply a canceled exit transitionEnd or complete after disposal', async () => {
+		const finishes: Array<() => void> = [];
+		animateMock.mockImplementation(() => ({
+			then(done: () => void) {
+				finishes.push(done);
+			},
+			stop: vi.fn(),
+		}));
+		const trace: string[] = [];
+		const record = (event: string) => trace.push(event);
+		const r = mount(RetainedToggle, { show: true, record, end: true });
+		r.update(RetainedToggle, { show: false, record, end: true });
+		expect(animateMock.mock.calls[0][1]).toEqual({ opacity: 0 });
+		r.update(RetainedToggle, { show: true, record, end: true });
+		finishes[0]();
+		expect(animateMock).toHaveBeenCalledOnce();
+		r.update(RetainedToggle, { show: false, record, end: true });
+		r.unmount();
+		finishes[1]();
+		expect(trace).not.toContain('complete');
+		expect(animateMock).toHaveBeenCalledTimes(2);
+	});
+
+	it('renders the present child on the server and hydrates the same host', async () => {
+		const server = await createServer({
+			root: resolve(import.meta.dirname, '../..'),
+			configFile: false,
+			plugins: [octane()],
+			server: { middlewareMode: true, watch: null, ws: false },
+			optimizeDeps: { noDiscovery: true },
+			ssr: { noExternal: ['@octanejs/motion'] },
+		});
+		const container = document.createElement('main');
+		document.body.appendChild(container);
+		try {
+			const { RetainedToggle: ServerToggle, InvalidPresence } = await server.ssrLoadModule(
+				'/tests/_fixtures/retained-presence.tsrx',
+			);
+			const { renderToString } = await server.ssrLoadModule('octane/server');
+			const record = vi.fn();
+			container.innerHTML = (await renderToString(ServerToggle, { show: true, record })).html;
+			const host = container.querySelector('#row');
+			expect(host).not.toBeNull();
+			const root = hydrateRoot(container, RetainedToggle, { show: true, record });
+			await act(() => {});
+			expect(container.querySelector('#row')).toBe(host);
+			await act(() => root.unmount());
+			expect(() => renderToString(InvalidPresence, { record })).toThrow(
+				'one optional keyed element',
+			);
+		} finally {
+			container.remove();
+			await server.close();
+		}
+	}, 15_000);
+});

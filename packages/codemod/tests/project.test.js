@@ -9439,7 +9439,7 @@ export const views = [Motion, motion.div];`,
 		for (const name of ['useIsPresent', 'Reorder', 'HTMLMotionProps']) {
 			expect(unsupported?.notes).toContainEqual(
 				expect.objectContaining({
-					rule: 'bindings',
+					rule: name === 'useIsPresent' ? 'motion-presence-owner' : 'bindings',
 					severity: 'error',
 					message: expect.stringContaining(name),
 				}),
@@ -9464,6 +9464,52 @@ export const views = [Motion, motion.div];`,
 		expect(migrated.dependencies.map(({ name }) => name)).toEqual(['@octanejs/motion']);
 		expect(JSON.parse(fs.readFileSync(manifest, 'utf8')).dependencies['@octanejs/motion']).toBe(
 			`^${catalogVersion('@octanejs/motion')}`,
+		);
+	});
+
+	it('refuses to write a React component using useIsPresent until its owner is migrated', async () => {
+		const source = `import { AnimatePresence, motion, useIsPresent } from 'framer-motion';
+function Row() { const present = useIsPresent(); return <motion.button inert={!present} exit={{ opacity: 0 }}>Row</motion.button>; }
+export function App({ show }: { show: boolean }) { return <AnimatePresence>{show && <Row key="row" />}</AnimatePresence>; }`;
+		const root = project({ 'package.json': '{ "name": "app" }', 'view.tsx': source });
+		const result = await runCodemod([path.join(root, 'view.tsx')], {
+			root,
+			verify: false,
+			write: true,
+		});
+		expect(fs.readFileSync(path.join(root, 'view.tsx'), 'utf8')).toBe(source);
+		expect(fs.existsSync(path.join(root, 'view.tsrx'))).toBe(false);
+		expect(result.files[0].changed).toBe(false);
+		expect(result.files[0].notes).toContainEqual(
+			expect.objectContaining({ rule: 'motion-presence-owner', severity: 'error' }),
+		);
+	});
+
+	it('retains React useIsPresent even when the installed binding exports it', async () => {
+		const binding = '@octanejs/motion';
+		const root = project({
+			'package.json': JSON.stringify({ dependencies: { [binding]: catalogVersion(binding) } }),
+			'view.ts': "export { useIsPresent } from 'framer-motion';",
+			[`node_modules/${binding}/package.json`]: JSON.stringify({
+				name: binding,
+				type: 'module',
+				version: catalogVersion(binding),
+				exports: { '.': './index.ts' },
+			}),
+			[`node_modules/${binding}/index.ts`]: 'export const useIsPresent = () => true;',
+		});
+		const result = await runCodemod([path.join(root, 'view.ts')], {
+			root,
+			verify: false,
+			write: false,
+		});
+		expect(result.files[0].code).toContain('framer-motion');
+		expect(result.files[0].notes).toContainEqual(
+			expect.objectContaining({
+				rule: 'motion-presence-owner',
+				severity: 'error',
+				message: expect.stringContaining('RetainedPresence'),
+			}),
 		);
 	});
 

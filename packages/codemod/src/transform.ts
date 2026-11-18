@@ -180,6 +180,7 @@ export const CONTEXT_PROVIDER_GETTER = 'context-provider-getter';
 export const ELEMENT_CHILD_ALIAS = 'element-child-path-alias';
 export const INTL_PROVIDER_DEFAULTS = 'intl-provider-defaults';
 export const REACT_TYPE_PROJECTION = 'react-type-projection';
+export const MOTION_PRESENCE_OWNER = 'motion-presence-owner';
 export const BUFFERED_SSR_OPTIONS = 'buffered-ssr-options';
 export const BUFFERED_SSR_REACT_COMPONENT = 'buffered-ssr-react-component';
 
@@ -4259,6 +4260,15 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		const hasDifferentType = (name: string | undefined) =>
 			binding === '@octanejs/motion' && name === 'MotionConfigContext';
 		const check = (site: ts.Node, name?: string, needsType = false) => {
+			if (binding === '@octanejs/motion' && name === 'useIsPresent') {
+				this.note(
+					MOTION_PRESENCE_OWNER,
+					'error',
+					site,
+					'`@octanejs/motion` useIsPresent requires an explicit RetainedPresence owner. Review and migrate the owner manually before changing this import.',
+				);
+				return false;
+			}
 			const missingType = needsType && hasDifferentType(name);
 			if (name !== undefined && available.has(name) && !missingType) return true;
 			this.note(

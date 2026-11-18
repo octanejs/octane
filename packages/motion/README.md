@@ -51,6 +51,7 @@ function List(props) @{
   `onDrag*`), `layout`, `layoutId`, `variants`, plus any DOM props (className, style,
   events, …) and `style` MotionValues spread/bound onto the element.
 - `AnimatePresence` — exit animations on removal.
+- `RetainedPresence` + `useIsPresent()` — explicitly retain one optional keyed child and its original DOM through an exit. The child can become inert while exiting and reenter on the same node. This owner supports one exiting motion host; replacing the key retires the old child immediately, and hiding Activity retires an active exit. Nested owners, multiple exits, `wait`, and `popLayout` are outside this bounded API. The codemod retains React `useIsPresent` imports for manual owner review.
 - `MotionConfig` — global `transition` / `reducedMotion` defaults via context.
 - `useReducedMotion()` — a live `prefers-reduced-motion` subscription; operating-system
   setting changes update mounted consumers.

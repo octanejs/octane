@@ -34,6 +34,7 @@ import {
 	MAP_CALLBACK_SCOPE,
 	MAP_PARAMETER_TDZ,
 	MAP_PARAMETER_WRITE,
+	MOTION_PRESENCE_OWNER,
 	projectTypeAt,
 	REACT_TYPE_PROJECTION,
 	textKind,
@@ -1644,7 +1645,8 @@ export async function runCodemod(
 				note.rule === CONTEXT_PROVIDER_GETTER ||
 				note.rule === INTL_PROVIDER_DEFAULTS ||
 				note.rule === ELEMENT_CHILD_ALIAS ||
-				note.rule === REACT_TYPE_PROJECTION,
+				note.rule === REACT_TYPE_PROJECTION ||
+				note.rule === MOTION_PRESENCE_OWNER,
 		);
 		if (write && blockedTransform)
 			return blockedWrite(

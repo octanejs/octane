@@ -63,6 +63,7 @@ import {
 	type LayoutBox,
 } from './layout';
 import { LayoutAnimation } from './layout-animation';
+import { RetainedPresenceContext } from './presence';
 
 // A plain-TS component gets its OWN block per instance (componentSlot), so fixed
 // slot symbols don't collide across instances — and these are distinct within one.
@@ -74,6 +75,9 @@ const ANIMATE = Symbol.for('octane-motion:animate');
 const ANIMATE_COMPLETE = Symbol.for('octane-motion:animate-complete');
 const GESTURE = Symbol.for('octane-motion:gesture');
 const EXIT = Symbol.for('octane-motion:exit');
+const PRESENCE_HOST = Symbol.for('octane-motion:presence-host');
+const PRESENCE_STATE = Symbol.for('octane-motion:presence-state');
+const PRESENCE_EXIT = Symbol.for('octane-motion:presence-exit');
 const LAYOUT = Symbol.for('octane-motion:layout');
 const DRAG = Symbol.for('octane-motion:drag');
 const DRAG_LISTENER = Symbol.for('octane-motion:drag-listener');
@@ -402,6 +406,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		const layoutGroup = useContext(LayoutGroupContext);
 		const lazy = useContext(LazyMotionContext);
 		const inherited = useContext(VariantContext);
+		const presence = useContext(RetainedPresenceContext);
 		// Read the PARENT's stagger orchestration before providing our own below.
 		const parentStagger = useContext(StaggerContext);
 		const features = preloadedFeatures ? domMax : lazy.features;
@@ -450,6 +455,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 				({
 					host: { current: null as HTMLElement | null },
 					animationComplete: undefined,
+					presence: null,
 					initialAnimationKey: initialLabel === false ? true : null,
 					frame: firstFrame(
 						tag,
@@ -532,6 +538,75 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		latest.layoutIdKey = layoutIdKey;
 		latest.layoutMode = layoutAnimationMode(props.layout);
 
+		if (presence) {
+			useInsertionEffect(
+				() => {
+					latest.presence = presence;
+				},
+				[presence],
+				PRESENCE_STATE,
+			);
+		}
+		const eligibleExit = !!(presence && animationEnabled && exitS.values);
+		if (eligibleExit) {
+			useInsertionEffect(() => presence!.register(latest), [presence], PRESENCE_HOST);
+			useLayoutEffect(
+				() => {
+					if (presence!.present) return;
+					const generation = presence!.generation;
+					const node = latest.host.current as HTMLElement | null;
+					if (!node?.isConnected || getRendererOwnerVisibility(scope) !== 'visible') {
+						presence!.complete(generation);
+						return;
+					}
+					const { transitionEnd, ...target } = exitS.values;
+					let active = true;
+					let controls: any;
+					let endControls: any;
+					const finish = () => {
+						if (!active) return;
+						const notify = () => {
+							if (!active) return;
+							try {
+								latest.animationComplete?.(props.exit);
+							} catch (error) {
+								if (typeof reportError === 'function') reportError(error);
+								else console.error(error);
+							}
+							if (active) presence!.complete(generation);
+						};
+						if (transitionEnd) {
+							endControls = animateTarget(
+								node,
+								transitionEnd,
+								{ duration: 0 },
+								latest.shouldReduceMotion,
+							);
+							whenDone(endControls, notify);
+						} else notify();
+					};
+					if (Object.keys(target).length) {
+						controls = animateTarget(
+							node,
+							target,
+							exitS.transition ?? latest.transition,
+							latest.shouldReduceMotion,
+						);
+						whenDone(controls, finish);
+					} else finish();
+					return () => {
+						active = false;
+						controls?.stop();
+						endControls?.stop();
+						if (!scope.block.disposed && getRendererOwnerVisibility(scope) === 'activity')
+							presence!.complete(generation);
+					};
+				},
+				[presence!.present, presence!.generation],
+				PRESENCE_EXIT,
+			);
+		}
+
 		// `initial`: apply instantly on mount (before the animate effect runs).
 		// OCTANE DIVERGENCE[motion-initial-only-no-style-materialization][conformance:initial-only-no-style-materialization]
 		useLayoutEffect(
@@ -551,7 +626,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		const animationKey = stableKey(resolvedAnimate);
 		const animationComplete = props.onAnimationComplete;
 		// An existing animation can finish after a render that never commits.
-		if (animationEnabled && resolvedAnimate && animationComplete) {
+		if (animationEnabled && (resolvedAnimate || presence) && animationComplete) {
 			useInsertionEffect(
 				() => {
 					latest.animationComplete = animationComplete;
@@ -918,7 +993,12 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 				if (latest.layoutEnabled && layoutId && n?.isConnected) {
 					recordLayoutCell(layoutId, boxOf(n));
 				}
-				if (!latest.animationEnabled) return;
+				if (
+					(latest.presence &&
+						(!latest.presence.present || !latest.presence.isCurrent(latest.presence.generation))) ||
+					!latest.animationEnabled
+				)
+					return;
 				const exit = latest.exit;
 				if (!exit || !n || !n.isConnected || n.parentNode == null) return;
 				if (!scope.block.disposed && getRendererOwnerVisibility(scope) !== 'visible') return;
@@ -1173,6 +1253,7 @@ export function LazyMotion(props: LazyMotionProps, _scope?: unknown) {
 	);
 }
 
+export { RetainedPresence, useIsPresent, type RetainedPresenceProps } from './presence';
 export { useAnimate } from './useAnimate';
 export { useMotionValue } from './useMotionValue';
 export { useScroll } from './useScroll';
