@@ -21,6 +21,8 @@ const PATHS = {
 	'octane/jsx-runtime': [fileURLToPath(new URL('../../src/jsx-runtime.d.ts', import.meta.url))],
 	'octane/signals/client': [CLIENT_HOOKS],
 	'octane/signals/server': [SERVER_HOOKS],
+	// The fixture root is virtual: resolve 'react' to the declarations Octane imports.
+	react: [join(dirname(createRequire(OCTANE).resolve('@types/react/package.json')), 'index.d.ts')],
 };
 // The repository's TypeScript 7, whose `typescript/unstable/sync` API builds
 // the same fixtures as a native program.
@@ -197,6 +199,25 @@ const badPlain: CSSProperties = { left: task$ };
 declare const wrong$: SignalHandle<boolean>;
 // @ts-expect-error A length signal must contain an accepted CSS length.
 const badSignal: SignalCSSProperties = { left: wrong$ };
+`);
+	});
+
+	it('keeps CSSProperties assignable to React when @types/react resolves a newer csstype', () => {
+		// csstype 3.2.4 narrowed `caret` values and first typed `viewTransitionScope`;
+		// a consumer can resolve it for @types/react while Octane keeps 3.2.3.
+		fixture(`/** @jsxImportSource octane */
+import type * as React from 'react';
+import type { CSSProperties } from 'octane';
+declare module 'react' {
+  interface CSSProperties {
+    caret?: 'auto' | 'manual' | undefined;
+    viewTransitionScope?: 'all' | 'none' | undefined;
+  }
+}
+declare const octane: CSSProperties;
+const react: React.CSSProperties = octane;
+const style: CSSProperties = { caret: 'manual', 'margin-top': 1, viewTransitionScope: 'none' };
+const host = <div style={style} />;
 `);
 	});
 

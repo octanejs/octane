@@ -55,11 +55,34 @@ import type { SignalHandle } from './signals/types.js';
  */
 export interface OctaneElement<P = any> extends ElementDescriptor<P> {}
 
-/** Inline styles use Octane's numeric length coercion for both property spellings. */
-export interface CSSProperties extends React.CSSProperties, CSS.PropertiesHyphen<string | number> {
+/**
+ * React's style type for `K`, or `Fallback` while the csstype that `@types/react`
+ * resolves does not declare it yet.
+ */
+type ReactStyleOr<K extends string, Fallback> = K extends keyof React.CSSProperties
+	? React.CSSProperties[K]
+	: Fallback;
+
+/**
+ * Inline styles use Octane's numeric length coercion for both property spellings.
+ * The hyphenated keys that React already types (`caret`, `color`, …) come from
+ * React's side alone: `@types/react` and Octane can resolve different csstype
+ * versions, and those keys must not have to agree across them.
+ */
+export interface CSSProperties
+	extends
+		React.CSSProperties,
+		Omit<CSS.PropertiesHyphen<string | number>, keyof React.CSSProperties> {
 	cssFloat?: React.CSSProperties['float'];
-	/** Element-scoped View Transition isolation, including authored `!important` values. */
-	viewTransitionScope?: 'none' | 'all' | (string & {}) | undefined;
+	/**
+	 * Element-scoped View Transition isolation. Until csstype types it, authored
+	 * `!important` values are accepted; afterwards React's type applies, so the
+	 * object stays assignable to `React.CSSProperties`.
+	 */
+	viewTransitionScope?: ReactStyleOr<
+		'viewTransitionScope',
+		'none' | 'all' | (string & {}) | undefined
+	>;
 }
 
 /** Native DOM style values; plain CSSProperties remains usable by CSS-consuming libraries. */
