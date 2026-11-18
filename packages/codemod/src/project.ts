@@ -1,5 +1,6 @@
 import { createScopedStorePlanner, runtimeTargets } from './scoped-store-contract.js';
 import { parseStaticSvg } from './path-svg.js';
+import { libCachingHost } from './lib-host.js';
 import { resourceHints, retainedLiteralExports, storeSources } from './store-inputs.js';
 import type {
 	CodemodOptions,
@@ -300,10 +301,14 @@ export async function runCodemod(
 	function typesOf(file: string): TransformOptions['types'] {
 		if (!strictConfig || options.projectTypes === false) return;
 		// Even one input can import a large graph. Bind it only for a rewrite that needs its types.
-		program ??= ts.createProgram(
-			files.filter((name) => /\.[cm]?tsx?$/.test(name)),
-			{ ...strictConfig, noEmit: true, noUncheckedIndexedAccess: true },
-		);
+		if (!program) {
+			const options = { ...strictConfig, noEmit: true, noUncheckedIndexedAccess: true };
+			program = ts.createProgram(
+				files.filter((name) => /\.[cm]?tsx?$/.test(name)),
+				options,
+				libCachingHost(options),
+			);
+		}
 		const sourceFile = program.getSourceFile(file);
 		if (sourceFile) return { sourceFile, checker: program.getTypeChecker() };
 	}
@@ -3195,13 +3200,14 @@ function readMotionExports(manifest: unknown, dir: string): ReadonlySet<string> 
 		!fs.realpathSync(entry).startsWith(dir + path.sep)
 	)
 		return null;
-	const program = ts.createProgram([entry], {
+	const options = {
 		module: ts.ModuleKind.ESNext,
 		moduleResolution: ts.ModuleResolutionKind.Bundler,
 		target: ts.ScriptTarget.ESNext,
 		skipLibCheck: true,
 		types: [],
-	});
+	};
+	const program = ts.createProgram([entry], options, libCachingHost(options));
 	const source = program.getSourceFile(entry);
 	if (!source) return null;
 	const checker = program.getTypeChecker();
