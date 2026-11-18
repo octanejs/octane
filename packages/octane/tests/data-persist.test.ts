@@ -390,10 +390,14 @@ describe('octane/data persistent cache', () => {
 		await retry;
 		await vi.waitFor(() => expect(handle.getSnapshot().value).toEqual(books()));
 		expect(handle.getSnapshot().error).toBe(offline);
+		expect(handle.getSnapshot().stale).toBe(true);
 		stop();
 		await store.dispose();
 		const reopened = createDataStore({ transport, persist: cache(storage, 'ada') });
-		expect((await value<Book[]>(reopened, shelf)).value).toEqual(books());
+		const restored = await value<Book[]>(reopened, shelf);
+		expect(restored.value).toEqual(books());
+		expect(restored.handle.getSnapshot().stale).toBe(true);
+		restored.stop();
 		await reopened.dispose();
 	});
 
@@ -444,6 +448,54 @@ describe('octane/data persistent cache', () => {
 		expect((await value<Book[]>(reopened, shelf)).value).toEqual([]);
 		await reopened.dispose();
 	});
+
+	it.each([
+		['book', 'book'],
+		['old', 'new'],
+	])(
+		'invalidates an unread concurrent restore with tags %s to %s without deleting its cached value',
+		async (seedTag, currentTag) => {
+			const storage = memoryStorage();
+			const tagged = read({
+				name: shelf.name,
+				output: shelf.output,
+				tags: [currentTag],
+				fresh: 60_000,
+				restore: 'concurrent',
+			});
+			const seed = read({ name: shelf.name, output: shelf.output, tags: [seedTag], fresh: 60_000 });
+			const before = createDataStore({
+				transport: server(books()).transport,
+				persist: cache(storage, 'ada'),
+			});
+			await before.prefetch(seed, undefined);
+			await before.dispose();
+			const key = Promise.withResolvers<string>();
+			const offline = new Error('offline');
+			const transport = vi.fn<Transport>(() => Promise.reject(offline));
+			const store = createDataStore({
+				transport,
+				persist: cache(storage, 'ada', { key: () => key.promise }),
+			});
+			const handle = store.read(tagged);
+			const stop = handle.subscribe(() => {});
+			await vi.waitFor(() => expect(handle.getSnapshot().error).toBe(offline));
+			store.invalidate([currentTag]);
+			await vi.waitFor(() => expect(transport).toHaveBeenCalledTimes(2));
+			key.resolve(KEY);
+			await vi.waitFor(() =>
+				expect(handle.getSnapshot()).toMatchObject({ value: books(), stale: true, error: offline }),
+			);
+			stop();
+			await store.dispose();
+			const reopened = createDataStore({ transport, persist: cache(storage, 'ada') });
+			const restored = await value<Book[]>(reopened, tagged);
+			expect(restored.value).toEqual(books());
+			expect(restored.handle.getSnapshot().stale).toBe(true);
+			restored.stop();
+			await reopened.dispose();
+		},
+	);
 
 	it('abandons an unobserved restore after live failure and retries on resubscribe', async () => {
 		const storage = memoryStorage();

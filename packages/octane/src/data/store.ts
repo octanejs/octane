@@ -1530,6 +1530,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			if (!current()) return;
 			const reload = new Set<Entry>();
 			const error = entry.error;
+			const stale = entry.stale;
 			adopt(entry, value, 0, age, reload);
 			entry.error = error;
 			if (entry.span) {
@@ -1542,7 +1543,10 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				};
 				index(entry);
 			}
-			entry.stale = stored.stale;
+			entry.stale = stale || stored.stale;
+			// The saved contract may have used different tags, so its durable tag
+			// marks need not describe an invalidation of the current contract.
+			if (stale && !stored.stale) persisted!.mark(entry.key);
 			reloadAll(reload);
 		});
 	}
@@ -1700,7 +1704,11 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	/** Discard any load in flight, since it may predate the change, and reload if observed. */
 	function invalidateEntry(entry: Entry): void {
 		entry.stale = true;
-		persisted?.mark(entry.key);
+		if (entry.startup?.pending && !entry.hasBase) {
+			// Marking an unread entry would persist a deletion. Retry its restore
+			// after superseding; tag invalidation independently records staleness.
+			entry.checkedStorage = false;
+		} else persisted?.mark(entry.key);
 		supersede(entry);
 		if (entry.subscribers.size > 0) {
 			void load(entry);
@@ -1797,13 +1805,6 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 					if (retired) return NEVER;
 					const current = entryFor(read, input);
 					if (current.startup && current.inflight) return (current.wanted = current.inflight);
-					if (current.startup?.pending && !current.hasBase) {
-						// The previous live request failed before restore finished. Retry both
-						// paths without marking the still-unread persisted value for deletion.
-						current.checkedStorage = false;
-						supersede(current);
-						return (current.wanted = load(current));
-					}
 					invalidateEntry(current);
 					return (current.wanted = load(current));
 				},
