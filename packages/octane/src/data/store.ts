@@ -338,6 +338,14 @@ interface StoredRecord {
 	readonly seq: number;
 }
 
+interface Startup {
+	readonly promise: Promise<void>;
+	readonly wake: () => void;
+	pending: boolean;
+	live: boolean;
+	restored: boolean;
+}
+
 /** @internal */
 export interface Entry {
 	readonly read: Read<any, any>;
@@ -374,8 +382,8 @@ export interface Entry {
 	span: Span | null;
 	/** Whether persistent storage has been asked for this entry's value. */
 	checkedStorage: boolean;
-	/** The first concurrent restore has a required live request that refresh can join. */
-	startup: boolean;
+	/** A concurrent first read waits for availability while refresh still joins its live request. */
+	startup: Startup | null;
 	/** The last projection of a read's value, so an unchanged one keeps its identity. */
 	projected: { base: unknown; parts: Map<unknown, unknown>; value: unknown } | null;
 	/** For a view with relations, the keys of `joining` it is listed under. */
@@ -1175,7 +1183,12 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		// A confirmed value is never replaced by a provisional one.
 		const preview = !usable && entry.preview !== null;
 		return {
-			status: usable || preview ? 'ready' : entry.error === undefined ? 'pending' : 'error',
+			status:
+				usable || preview
+					? 'ready'
+					: entry.error === undefined || entry.startup?.pending
+						? 'pending'
+						: 'error',
 			value: usable
 				? entry.span
 					? evaluate(entry)
@@ -1264,7 +1277,13 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	/** Start the retention clock for an entry nothing observes. */
 	function idle(entry: Entry): void {
 		// A load in flight is demand: retention starts when it lands.
-		if (entry.subscribers.size > 0 || entry.inflight || entry.keepTimer !== undefined) return;
+		if (
+			entry.subscribers.size > 0 ||
+			entry.inflight ||
+			entry.startup?.pending ||
+			entry.keepTimer !== undefined
+		)
+			return;
 		// A timer that long would fire at once: a value kept that long is kept for the session.
 		if (entry.read.keep >= 2 ** 31) return;
 		entry.keepTimer = setHostTimeout(() => {
@@ -1481,7 +1500,13 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 
 	/** Whether a load of `entry` would serve no one: it cancels, nothing observes it, and no caller waits on it. */
 	function unwanted(entry: Entry): boolean {
-		return entry.read.cancel && entry.subscribers.size === 0 && entry.wanted !== entry.inflight;
+		const waiting = entry.inflight ?? (entry.startup?.pending ? entry.startup.promise : null);
+		return (
+			entry.read.cancel &&
+			entry.subscribers.size === 0 &&
+			waiting !== null &&
+			entry.wanted !== waiting
+		);
 	}
 
 	/**
@@ -1544,14 +1569,39 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		return done;
 	}
 
+	/** Wake first readers as soon as a confirmed value is available, or both startup paths have settled. */
+	function finishStartup(entry: Entry, startup: Startup): void {
+		if (entry.startup !== startup) return;
+		const usable = entry.hasBase && hostDateNow() - entry.fetchedAt < entry.read.expire;
+		const wake = startup.pending && (usable || (startup.live && startup.restored));
+		if (wake) startup.pending = false;
+		if (startup.live && !startup.pending) entry.startup = null;
+		commitReached([entry]);
+		if (wake) startup.wake();
+	}
+
+	/** Superseding an attempt must release its readers before abort listeners can replace the entry. */
+	function stopStartup(entry: Entry): void {
+		const startup = entry.startup;
+		entry.startup = null;
+		if (startup?.pending) {
+			startup.pending = false;
+			startup.wake();
+		}
+	}
+
 	function load(entry: Entry): Promise<void> {
 		if (entry.inflight) return entry.inflight;
+		if (entry.startup?.pending) return entry.startup.promise;
 		const fromStorage = persisted && !entry.hasBase && !entry.checkedStorage && entry.read.persist;
 		if (fromStorage) {
 			if (entry.read.restore !== 'concurrent') return restore(entry);
 			entry.checkedStorage = true;
-			entry.startup = true;
+			let wake!: () => void;
+			const promise = new Promise<void>((resolve) => (wake = resolve));
+			entry.startup = { promise, wake, pending: true, live: false, restored: false };
 		}
+		const startup = entry.startup;
 		const startedSeq = ++sequence;
 		// A value is as old as the request that read it, so tabs compare loads by when they started.
 		const startedAt = hostDateNow();
@@ -1614,24 +1664,32 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			)
 			.then(() => {
 				if (!current()) return;
-				entry.startup = false;
+				if (startup?.pending && entry.wanted === done) entry.wanted = startup.promise;
 				fly(entry, null);
 				entry.abort = null;
-				commitReached([entry]);
+				if (startup) {
+					startup.live = true;
+					finishStartup(entry, startup);
+				} else commitReached([entry]);
 				idle(entry);
 			});
 		fly(entry, done);
 		touch(entry);
-		if (fromStorage)
-			void restoreValue(entry, attempt).then(() => {
-				if (current() && entries.get(entry.key) === entry && entry.hasBase) commitReached([entry]);
-			});
+		if (startup) {
+			const restored = () => {
+				if (!current() || entries.get(entry.key) !== entry) return;
+				startup.restored = true;
+				finishStartup(entry, startup);
+				idle(entry);
+			};
+			void restoreValue(entry, attempt).then(restored, restored);
+		}
 		return done;
 	}
 
 	/** Discard any load or restore in flight; returns the attempt that supersedes it. */
 	function supersede(entry: Entry): number {
-		entry.startup = false;
+		stopStartup(entry);
 		entry.abort?.abort();
 		entry.abort = null;
 		entry.preview = null;
@@ -1726,7 +1784,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 					return () => {
 						created.subscribers.delete(notify);
 						if (retired) return;
-						if (created.abort && unwanted(created)) {
+						if ((created.abort || created.startup?.pending) && unwanted(created)) {
 							// Abort listeners may synchronously forget this entry.
 							if (created.startup && !created.hasBase) created.checkedStorage = false;
 							supersede(created);
@@ -1763,7 +1821,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			snapshot: null,
 			span: null,
 			checkedStorage: false,
-			startup: false,
+			startup: null,
 			projected: null,
 			related: EMPTY as string[],
 		};
@@ -2174,6 +2232,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		staleSeedTags = undefined;
 		forms.clear();
 		for (const entry of entries.values()) {
+			stopStartup(entry);
 			entry.abort?.abort();
 			clearHostTimeout(entry.keepTimer);
 			clearHostTimeout(entry.expireTimer);
@@ -2418,7 +2477,16 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		},
 		loading(handle) {
 			const entry = handles.get(handle);
-			return entry ? prefetch(entry.read, entry.input) : NEVER;
+			if (!entry) return NEVER;
+			if (retired || fenced) return prefetch(entry.read, entry.input);
+			const current = entries.get(entry.key);
+			if (current?.startup?.pending) {
+				current.wanted = current.inflight ?? current.startup.promise;
+				return current.startup.promise;
+			}
+			const live = prefetch(entry.read, entry.input);
+			const startup = entries.get(entry.key)?.startup;
+			return startup?.pending ? startup.promise : live;
 		},
 		fence(on) {
 			if (on === !!fenced) return;

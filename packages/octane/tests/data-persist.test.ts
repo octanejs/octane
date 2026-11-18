@@ -4,6 +4,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createPersistence } from '../src/data/persist.js';
+import { loading } from '../src/data/store.js';
 import { IDBFactory } from 'fake-indexeddb';
 import 'fake-indexeddb/auto';
 import {
@@ -244,7 +245,9 @@ describe('octane/data persistent cache', () => {
 		const stop = handle.subscribe(() => {});
 		await vi.waitFor(() => expect(transport).toHaveBeenCalledTimes(1));
 		const refresh = handle.refresh();
+		const waiting = loading(store, handle);
 		disk.resolve();
+		await waiting;
 		await vi.waitFor(() => expect(handle.getSnapshot().value).toEqual(books()));
 		expect(handle.getSnapshot().refreshing).toBe(true);
 		live.resolve({ ok: true, value: [] });
@@ -305,22 +308,94 @@ describe('octane/data persistent cache', () => {
 		await before.dispose();
 		const key = Promise.withResolvers<string>();
 		const offline = new Error('offline');
-		const contract = read({ name: shelf.name, output: shelf.output, restore: 'concurrent' });
+		const contract = read({
+			name: shelf.name,
+			output: shelf.output,
+			cancel: true,
+			restore: 'concurrent',
+		});
+		const transport = vi.fn(() => Promise.reject(offline));
 		const store = createDataStore({
-			transport: () => Promise.reject(offline),
+			transport,
 			persist: cache(storage, 'ada', { key: () => key.promise }),
 		});
 		const handle = store.read(contract);
 		const stop = handle.subscribe(() => {});
+		const waiting = loading(store, handle);
+		let settled = false;
+		void waiting.then(() => (settled = true));
 		await vi.waitFor(() => expect(handle.getSnapshot().error).toBe(offline));
+		expect(handle.getSnapshot().status).toBe('pending');
+		expect(loading(store, handle)).toBe(waiting);
+		expect(settled).toBe(false);
+		stop();
 		key.resolve(KEY);
+		await waiting;
 		await vi.waitFor(() => expect(handle.getSnapshot().value).toEqual(books()));
 		expect(handle.getSnapshot()).toMatchObject({
 			status: 'ready',
 			error: offline,
 			refreshing: false,
 		});
+		expect(transport).toHaveBeenCalledTimes(1);
+		await store.dispose();
+	});
+
+	it('exposes the live error only after a concurrent restore misses', async () => {
+		const key = Promise.withResolvers<string>();
+		const offline = new Error('offline');
+		const transport = vi.fn(() => Promise.reject(offline));
+		const contract = read({ name: shelf.name, output: shelf.output, restore: 'concurrent' });
+		const store = createDataStore({
+			transport,
+			persist: cache(memoryStorage(), 'ada', { key: () => key.promise }),
+		});
+		const handle = store.read(contract);
+		const waiting = loading(store, handle);
+		await vi.waitFor(() => expect(handle.getSnapshot().error).toBe(offline));
+		expect(handle.getSnapshot().status).toBe('pending');
+		key.resolve(KEY);
+		await waiting;
+		expect(handle.getSnapshot()).toMatchObject({
+			status: 'error',
+			error: offline,
+			value: undefined,
+		});
+		expect(transport).toHaveBeenCalledTimes(1);
+		await store.dispose();
+	});
+
+	it('abandons an unobserved restore after live failure and retries on resubscribe', async () => {
+		const storage = memoryStorage();
+		const before = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada'),
+		});
+		await before.prefetch(shelf, undefined);
+		await before.dispose();
+		const key = Promise.withResolvers<string>();
+		const offline = new Error('offline');
+		const transport = vi.fn<Transport>(() => Promise.reject(offline));
+		const contract = read({
+			name: shelf.name,
+			output: shelf.output,
+			cancel: true,
+			restore: 'concurrent',
+		});
+		const store = createDataStore({
+			transport,
+			persist: cache(storage, 'ada', { key: () => key.promise }),
+		});
+		const handle = store.read(contract);
+		const stop = handle.subscribe(() => {});
+		await vi.waitFor(() => expect(handle.getSnapshot().error).toBe(offline));
 		stop();
+		const stopAgain = handle.subscribe(() => {});
+		await vi.waitFor(() => expect(transport).toHaveBeenCalledTimes(2));
+		key.resolve(KEY);
+		await vi.waitFor(() => expect(handle.getSnapshot().value).toEqual(books()));
+		expect(handle.getSnapshot().error).toBe(offline);
+		stopAgain();
 		await store.dispose();
 	});
 

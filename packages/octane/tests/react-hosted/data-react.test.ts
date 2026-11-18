@@ -3,11 +3,18 @@
  * tree. Two components that read the same store show the same value, the same
  * pending edit and the same rollback.
  */
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { webcrypto } from 'node:crypto';
 import * as React from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
-import { createDataStore, type DataStore } from '../../src/data/index.js';
+import {
+	createDataStore,
+	memoryStorage,
+	read,
+	type DataReply,
+	type DataStore,
+} from '../../src/data/index.js';
 import { DataProvider, useDataStore, useForm, useRead } from '../../src/data/react.js';
 import { createServer, setDone, todos } from '../_data-todos.js';
 
@@ -70,6 +77,57 @@ afterEach(() => {
 });
 
 describe('octane/data/react', () => {
+	it('keeps a first reader suspended after a live failure until a late cache can restore', async () => {
+		vi.stubGlobal('crypto', webcrypto);
+		const storage = memoryStorage();
+		const secret = 'a session secret of at least sixteen bytes';
+		const persist = { storage, partition: 'reader', key: secret };
+		const before = createDataStore({ transport: createServer().transport, persist });
+		await before.prefetch(todos, undefined);
+		await before.dispose();
+		const key = Promise.withResolvers<string>();
+		const live = Promise.withResolvers<DataReply>();
+		const transport = vi.fn(() => live.promise);
+		const concurrent = read({ name: todos.name, output: todos.output, restore: 'concurrent' });
+		const store = createDataStore({ transport, persist: { ...persist, key: () => key.promise } });
+		function CachedTitles() {
+			const list = useRead(useDataStore().read(concurrent));
+			return h('output', null, list[0]?.title);
+		}
+		container = document.createElement('div');
+		root = createRoot(container);
+		try {
+			await act(() =>
+				root!.render(
+					h(
+						DataProvider,
+						{ store },
+						h(
+							Boundary,
+							null,
+							h(React.Suspense, { fallback: h('p', null, 'Loading') }, h(CachedTitles)),
+						),
+					),
+				),
+			);
+			await act(async () => {
+				live.reject(new Error('offline'));
+			});
+			expect(container.textContent).toBe('Loading');
+			await act(async () => {
+				key.resolve(secret);
+				await new Promise((resolve) => setTimeout(resolve, 30));
+			});
+			expect(container.querySelector('output')?.textContent).toBe('Tides');
+			expect(transport).toHaveBeenCalledTimes(1);
+		} finally {
+			await act(() => root!.unmount());
+			root = undefined;
+			await store.dispose();
+			vi.unstubAllGlobals();
+		}
+	});
+
 	it('clears a mounted form after its store retires', async () => {
 		const contract = { ...setDone, form: { id: 'text', done: 'checkbox' } as const };
 		const store = createDataStore({
