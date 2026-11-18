@@ -2510,7 +2510,8 @@ function runHook(hook: () => void | (() => void)): void | (() => void) {
 	try {
 		return untrack(hook);
 	} catch (error) {
-		if (typeof reportError === 'function') reportError(error);
+		const report = (globalThis as { reportError?: (error: unknown) => void }).reportError;
+		if (typeof report === 'function') report(error);
 		else console.error(error);
 	}
 }
