@@ -68,7 +68,8 @@ it('cites only diagnostic codes the compiler defines', () => {
 			(match) => match[1],
 		),
 	]);
-	const cited = new Set(guide.match(/OCTANE_[A-Z_]+/g));
+	// A family wildcard such as `OCTANE_DATA_*` names no single code.
+	const cited = new Set(guide.match(/\bOCTANE_[A-Z_]+\b(?!\*)/g));
 	expect([...cited].filter((code) => !known.has(code))).toEqual([]);
 });
 
