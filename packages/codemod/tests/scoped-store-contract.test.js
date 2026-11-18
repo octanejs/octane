@@ -353,6 +353,46 @@ export function useChannel<T>(input: T): T extends Token ? string : { text: stri
 				);
 		}
 	}
+	delete config.compilerOptions.preserveSymlinks;
+	fs.writeFileSync(configPath, JSON.stringify(config));
+	const realpath = ts.sys.realpath;
+	const fallback = vi
+		.spyOn(ts.sys, 'realpath')
+		.mockImplementation((name) => (name.startsWith(linked + path.sep) ? name : realpath(name)));
+	try {
+		const app = path.join(linked, 'app');
+		const result = await runCodemod([path.join(app, 'src/pane.tsx')], {
+			root: app,
+			strong: true,
+			verify: true,
+			write: false,
+		});
+		const pane = result.files.find(({ file }) => file === 'src/pane.tsx');
+		expect(pane.rules['store-hook']).toBeUndefined();
+		expect(pane.notes).toContainEqual(
+			expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+		);
+	} finally {
+		fallback.mockRestore();
+	}
+	if (process.platform === 'darwin') {
+		const unicode = physical + '-caf\u00e9';
+		fs.renameSync(physical, unicode);
+		temporary.push(unicode);
+		const observer = path.join(unicode, 'app/node_modules/observer');
+		fs.unlinkSync(observer);
+		fs.symlinkSync(path.join(unicode, 'observer'), observer, 'dir');
+		const app = path.join(unicode.normalize('NFD'), 'app');
+		const result = await runCodemod([path.join(app, 'src/pane.tsx')], {
+			root: app,
+			strong: true,
+			verify: true,
+			write: false,
+		});
+		expect(
+			result.files.find(({ file }) => file === 'src/pane.tsx').rules['store-hook'],
+		).toBeTruthy();
+	}
 });
 
 it.each([
