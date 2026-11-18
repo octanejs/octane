@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import type { LegacyAnimationControls } from 'motion-dom';
 const { animateMock } = vi.hoisted(() => ({
 	animateMock: vi.fn<
 		(...args: unknown[]) => { stop: () => void; finished?: { then(done: () => void): unknown } }
@@ -168,6 +169,27 @@ describe('variants', () => {
 				['parent', 'second'],
 			]);
 			expect(animateMock).not.toHaveBeenCalled();
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('clears named completion state across controller subscriptions', async () => {
+		animateMock.mockClear();
+		const controls = () =>
+			({ start: () => Promise.resolve(), subscribe: () => () => {} }) as LegacyAnimationControls;
+		const first = controls(),
+			second = controls(),
+			onComplete = vi.fn();
+		const r = mount(EqualVariantCompletion, { label: 'first', onComplete });
+		try {
+			r.update(EqualVariantCompletion, { label: first, onComplete });
+			r.update(EqualVariantCompletion, { label: second, onComplete });
+			expect(onComplete).not.toHaveBeenCalled();
+			r.update(EqualVariantCompletion, { label: 'second', onComplete });
+			await nextPaint();
+			expect(animateMock).toHaveBeenCalledOnce();
+			expect(onComplete.mock.calls).toEqual([['parent', 'second']]);
 		} finally {
 			r.unmount();
 		}

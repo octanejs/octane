@@ -177,19 +177,23 @@ describe('octane/react/server — buffered SSR + client hydration (§9.3)', () =
 		const serverProps = (id: string) => ({
 			component: signalServer.SignalReader,
 			props: { id },
+			serverSignalOwner: request,
 		});
 		const container = document.createElement('div');
 		try {
-			container.innerHTML = runWithSignalOwner(request, () => {
-				signalServer.label$.set('request');
-				return reactRenderToString(
-					page(
-						h(OctaneCompatServer<signalClient.SignalReaderProps>, serverProps('left')),
-						h(OctaneCompatInlineServer<signalClient.SignalReaderProps>, serverProps('right')),
-						h(OctaneCompatServer<signalClient.SignalReaderProps>, serverProps('other')),
-					),
-				);
-			});
+			runWithSignalOwner(request, () => signalServer.label$.set('request'));
+			container.innerHTML = reactRenderToString(
+				page(
+					h(OctaneCompatServer<signalClient.SignalReaderProps>, serverProps('left')),
+					h(OctaneCompatInlineServer<signalClient.SignalReaderProps>, serverProps('right')),
+					h(OctaneCompatServer<signalClient.SignalReaderProps>, serverProps('other')),
+				),
+			);
+			expect(
+				[...container.querySelectorAll('script[type="application/json"]')].some((script) =>
+					script.textContent?.includes('request'),
+				),
+			).toBe(true);
 		} finally {
 			request.dispose();
 		}
@@ -1142,6 +1146,88 @@ describe('octane/react/server — buffered SSR + client hydration (§9.3)', () =
 });
 
 describe('octane/react/server — Fizz streaming retry state (§9.1)', () => {
+	it('borrows distinct owners for interleaved suspended hosted attempts and replays', async () => {
+		const { View, label$ } = loadCompiledFixtureSource<{
+			View: (props: { gate?: Promise<string> }) => unknown;
+			label$: signals.WritableSignal<string>;
+		}>(
+			`import { use } from 'octane'; import { signal$ } from 'octane/signals';
+			export const label$ = signal$('default');
+			export function View({ gate }) @{ if (gate) use(gate); <output>{label$.get() as string}</output> }`,
+			{
+				id: 'streamed-signal-owner.tsrx',
+				mode: 'server',
+				runtimeModules: { 'octane/signals': signals },
+			},
+		);
+		const first = signals.createScope({ scopeKey: 'hosted:request' });
+		const second = signals.createScope({ scopeKey: 'hosted:request' });
+		const a = deferred<string>();
+		const b = deferred<string>();
+		try {
+			signals.runWithSignalOwner(first, () => label$.set('request A'));
+			signals.runWithSignalOwner(second, () => label$.set('request B'));
+			const start = (
+				Host: typeof OctaneCompatServer,
+				owner: signals.SignalOwner,
+				gate: Promise<string>,
+			) =>
+				streamPage(
+					h(
+						React.Suspense,
+						{ fallback: h('p', null, 'loading') },
+						h(Host, { component: View, props: { gate }, serverSignalOwner: owner }),
+					),
+				);
+			const one = start(OctaneCompatServer, first, a.promise);
+			const two = start(OctaneCompatInlineServer, second, b.promise);
+			await nextTurns();
+			b.resolve('B');
+			await two.done;
+			a.resolve('A');
+			await one.done;
+			expect(one.errors).toEqual([]);
+			expect(two.errors).toEqual([]);
+			expect(one.html()).toContain('request A');
+			expect(one.html()).not.toContain('request B');
+			expect(two.html()).toContain('request B');
+			expect(two.html()).not.toContain('request A');
+			expect(reactRenderToString(h(OctaneCompatServer, { component: View }))).toContain('default');
+			expect(first.retired).toBe(false);
+			expect(second.retired).toBe(false);
+		} finally {
+			first.dispose();
+			second.dispose();
+		}
+	});
+
+	it('restores the ambient owner after a borrowed hosted attempt throws', () => {
+		const ambient = signals.createScope({ scopeKey: 'hosted:ambient' });
+		const borrowed = signals.createScope({ scopeKey: 'hosted:borrowed' });
+		let observed: string | undefined;
+		try {
+			signals.runWithSignalOwner(ambient, () => {
+				expect(() =>
+					reactRenderToString(
+						h(OctaneCompatServer, {
+							component: () => {
+								observed = signals.currentSignalOwner()?.scopeKey;
+								throw new Error('hosted render failed');
+							},
+							serverSignalOwner: borrowed,
+						}),
+					),
+				).toThrow('hosted render failed');
+				expect(observed).toBe(borrowed.scopeKey);
+				expect(signals.currentSignalOwner()).toBe(ambient);
+			});
+			expect(borrowed.retired).toBe(false);
+		} finally {
+			ambient.dispose();
+			borrowed.dispose();
+		}
+	});
+
 	it('sends hints from a retried island to the matching streamed request', async () => {
 		const { HintIsland } = loadCompiledFixtureSource(
 			`import { preinit, use } from 'octane';

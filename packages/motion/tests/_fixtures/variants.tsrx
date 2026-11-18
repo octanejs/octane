@@ -1,5 +1,6 @@
 import { motion, MotionConfig } from '@octanejs/motion';
 import * as m from '@octanejs/motion/react-m';
+import type { LegacyAnimationControls } from 'motion-dom';
 
 const PV = { hidden: { opacity: 0 }, visible: { opacity: 1 } };
 const CV = { hidden: { x: 0 }, visible: { x: 100 } };
@@ -47,7 +48,7 @@ export function EqualVariantCompletion({
 	childLabel,
 	child = false,
 }: {
-	label: string | { opacity: number };
+	label: string | { opacity: number } | LegacyAnimationControls;
 	onComplete?: (host: string, definition: unknown) => void;
 	transition?: { duration: number };
 	childLabel?: string;

@@ -5,8 +5,10 @@ import {
 	type UseInViewOptions,
 	domMax,
 	useInView,
+	useAnimationControls,
 } from '@octanejs/motion';
 import * as m from '@octanejs/motion/react-m';
+import type { LegacyAnimationControls } from 'motion-dom';
 
 declare function expectType<T>(value: T): void;
 
@@ -18,6 +20,7 @@ type SpanIsTyped = Assert<IsAny<typeof m.span> extends false ? true : false>;
 
 expectType<MotionComponent>(m.div);
 expectType<MotionComponent>(m.span);
+expectType<LegacyAnimationControls>(useAnimationControls());
 expectType<boolean>(domMax.animation);
 expectType<boolean>(domMax.layout);
 expectType<boolean>(useInView({ current: document.createElement('div') }));
