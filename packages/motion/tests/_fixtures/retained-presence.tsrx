@@ -8,6 +8,8 @@ function Row({
 	exit = true,
 	label = 'Row',
 	hostComplete,
+	animate = 1,
+	display,
 	disabled = false,
 	end = false,
 }: {
@@ -16,6 +18,8 @@ function Row({
 	exit?: boolean;
 	label?: string;
 	hostComplete?: () => void;
+	animate?: number;
+	display?: string;
 	disabled?: boolean;
 	end?: boolean;
 }) @{
@@ -30,7 +34,7 @@ function Row({
 		id="row"
 		ref={hostRef}
 		initial={false}
-		animate={{ opacity: 1 }}
+		animate={{ opacity: animate, ...(display ? { display } : {}) }}
 		exit={exit ? { opacity: 0, ...(end ? { transitionEnd: { display: 'none' } } : {}) } : undefined}
 		transition={{ duration: 0.42 }}
 		inert={!present}
@@ -52,6 +56,8 @@ export function RetainedToggle({
 	exit,
 	label,
 	hostComplete,
+	animate,
+	display,
 	disabled,
 	end,
 	activity = 'visible',
@@ -65,6 +71,8 @@ export function RetainedToggle({
 	activity?: 'visible' | 'hidden';
 	rowKey?: string;
 	hostComplete?: () => void;
+	animate?: number;
+	display?: string;
 	disabled?: boolean;
 	end?: boolean;
 }) @{
@@ -78,6 +86,8 @@ export function RetainedToggle({
 					exit={exit}
 					label={label}
 					hostComplete={hostComplete}
+					animate={animate}
+					display={display}
 					disabled={disabled}
 					end={end}
 				/>

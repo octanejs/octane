@@ -456,6 +456,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 					host: { current: null as HTMLElement | null },
 					animationComplete: undefined,
 					presence: null,
+					presenceAnimate: undefined,
 					initialAnimationKey: initialLabel === false ? true : null,
 					frame: firstFrame(
 						tag,
@@ -542,6 +543,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 			useInsertionEffect(
 				() => {
 					latest.presence = presence;
+					latest.presenceAnimate = resolvedAnimate;
 				},
 				[presence],
 				PRESENCE_STATE,
@@ -560,6 +562,16 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 						return;
 					}
 					const { transitionEnd, ...target } = exitS.values;
+					let endState:
+						| Array<{
+								key: string;
+								attribute: string | null;
+								inline: string | null;
+								priority: string;
+								value: any;
+								hadValue: boolean;
+						  }>
+						| undefined;
 					let active = true;
 					let controls: any;
 					let endControls: any;
@@ -576,6 +588,28 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 							if (active) presence!.complete(generation);
 						};
 						if (transitionEnd) {
+							// End values can land before their completion callback. Capture only
+							// those fields immediately before applying them, for possible reentry.
+							const visual = visualElementStore.get(node);
+							for (const key in transitionEnd) {
+								const name = motionAttributeName(key);
+								const attribute = svg && isMotionSVGAttribute(name, svgRoot) ? name : null;
+								const value = visual?.getValue(key);
+								const authored = props.style?.[key];
+								(endState ??= []).push({
+									key,
+									attribute,
+									inline: attribute
+										? node.getAttribute(attribute)
+										: node.style.getPropertyValue(name),
+									priority: attribute ? '' : node.style.getPropertyPriority(name),
+									value:
+										value?.get() ??
+										(isMotionValue(authored) ? authored.get() : authored) ??
+										latest.frame?.values?.[key],
+									hadValue: !!value,
+								});
+							}
 							endControls = animateTarget(
 								node,
 								transitionEnd,
@@ -598,6 +632,28 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 						active = false;
 						controls?.stop();
 						endControls?.stop();
+						if (endControls && latest.presence?.present && endState) {
+							const visual = visualElementStore.get(node);
+							for (const field of endState) {
+								if (latest.presenceAnimate && Object.hasOwn(latest.presenceAnimate, field.key))
+									continue;
+								if (field.hadValue) visual?.getValue(field.key)?.set(field.value);
+								else visual?.removeValue(field.key);
+								if (field.attribute) {
+									if (field.inline === null) node.removeAttribute(field.attribute);
+									else node.setAttribute(field.attribute, field.inline);
+								} else if (isTransformKey(field.key)) {
+									if (field.value === undefined) removeTransformFn(node, field.key);
+									else applyStyleValue(node, field.key, field.value);
+								} else if (field.inline)
+									node.style.setProperty(
+										motionAttributeName(field.key),
+										field.inline,
+										field.priority,
+									);
+								else node.style.removeProperty(motionAttributeName(field.key));
+							}
+						}
 						if (!scope.block.disposed && getRendererOwnerVisibility(scope) === 'activity')
 							presence!.complete(generation);
 					};
@@ -644,7 +700,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		useLayoutEffect(
 			() => {
 				const node: HTMLElement = latest.host.current;
-				if (!animationEnabled) return;
+				if (!animationEnabled || presence?.present === false) return;
 				// OCTANE DIVERGENCE[motion-lazy-initial-false-first-frame][conformance:lazy-initial-false-first-frame]
 				if (latest.initialAnimationKey !== null) {
 					const skip = latest.initialAnimationKey === animationKey;
@@ -685,7 +741,13 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 					};
 				}
 			},
-			[animationEnabled, animationKey, stableKey(transition), shouldReduceMotion],
+			[
+				animationEnabled,
+				animationKey,
+				stableKey(transition),
+				shouldReduceMotion,
+				presence?.present,
+			],
 			ANIMATE,
 		);
 

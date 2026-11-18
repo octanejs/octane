@@ -58,7 +58,7 @@ describe('retained presence', () => {
 
 			r.update(RetainedToggle, { show: false, record, hostRef: ref });
 			await nextPaint();
-			finishes[1]();
+			finishes[2]();
 			await nextPaint();
 			expect(r.container.querySelector('#row')).toBeNull();
 			expect(ref.current).toBeNull();
@@ -75,6 +75,54 @@ describe('retained presence', () => {
 			r.unmount();
 		}
 	});
+	it('animates the original host back to its present target on same-key reentry', () => {
+		const finishes: Array<() => void> = [];
+		animateMock.mockImplementation((node: HTMLElement, target: Record<string, string | number>) => {
+			if (target.opacity === 0) node.style.opacity = '0.4';
+			else if (target.opacity !== undefined) node.style.opacity = String(target.opacity);
+			return {
+				stop: vi.fn(),
+				then(done: () => void) {
+					finishes.push(done);
+				},
+			};
+		});
+		const record = vi.fn();
+		const r = mount(RetainedToggle, { show: true, record });
+		try {
+			const original = r.find('#row');
+			r.update(RetainedToggle, { show: false, record });
+			expect(original.style.opacity).toBe('0.4');
+			r.update(RetainedToggle, { show: true, record });
+			expect(r.find('#row')).toBe(original);
+			expect(original.style.opacity).toBe('1');
+			expect(animateMock.mock.calls.map((call) => call[1])).toEqual([
+				{ opacity: 0 },
+				{ opacity: 1 },
+			]);
+			finishes[0]();
+			expect(record).not.toHaveBeenCalledWith('complete');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('coalesces a changed animate target with the same reentry', () => {
+		animateMock.mockReturnValue({ stop: vi.fn(), then() {} });
+		const record = vi.fn();
+		const r = mount(RetainedToggle, { show: true, record });
+		try {
+			r.update(RetainedToggle, { show: false, record });
+			r.update(RetainedToggle, { show: true, record, animate: 0.8 });
+			expect(animateMock.mock.calls.map((call) => call[1])).toEqual([
+				{ opacity: 0 },
+				{ opacity: 0.8 },
+			]);
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('replaces a present key directly without animating an old clone', async () => {
 		const trace: string[] = [];
 		const record = (event: string) => trace.push(event);
@@ -270,13 +318,49 @@ describe('retained presence', () => {
 		expect(animateMock.mock.calls[0][1]).toEqual({ opacity: 0 });
 		r.update(RetainedToggle, { show: true, record, end: true });
 		finishes[0]();
-		expect(animateMock).toHaveBeenCalledOnce();
+		expect(animateMock).toHaveBeenCalledTimes(2);
 		r.update(RetainedToggle, { show: false, record, end: true });
 		r.unmount();
-		finishes[1]();
+		finishes[2]();
 		expect(trace).not.toContain('complete');
-		expect(animateMock).toHaveBeenCalledTimes(2);
+		expect(animateMock).toHaveBeenCalledTimes(3);
 	});
+
+	it.each(['absent', 'authored'] as const)(
+		'restores an %s end-only field if reentry interrupts transitionEnd completion',
+		(mode) => {
+			const finishes: Array<() => void> = [];
+			animateMock.mockImplementation(
+				(node: HTMLElement, target: Record<string, string | number>) => {
+					if (target.display !== undefined) node.style.display = String(target.display);
+					return {
+						stop: vi.fn(),
+						then(done: () => void) {
+							finishes.push(done);
+						},
+					};
+				},
+			);
+			const record = vi.fn();
+			const display = mode === 'authored' ? 'block' : undefined;
+			const r = mount(RetainedToggle, { show: true, record, end: true, display });
+			try {
+				const original = r.find('#row');
+				if (display) original.style.setProperty('display', display, 'important');
+				r.update(RetainedToggle, { show: false, record, end: true, display });
+				finishes[0]();
+				expect(original.style.display).toBe('none');
+				r.update(RetainedToggle, { show: true, record, end: true });
+				expect(original.style.display).toBe(display ?? '');
+				expect(original.style.getPropertyPriority('display')).toBe(display ? 'important' : '');
+				finishes[1]();
+				expect(r.find('#row')).toBe(original);
+				expect(record).not.toHaveBeenCalledWith('complete');
+			} finally {
+				r.unmount();
+			}
+		},
+	);
 
 	it('renders the present child on the server and hydrates the same host', async () => {
 		const server = await createServer({
