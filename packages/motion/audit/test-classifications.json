@@ -7,6 +7,11 @@
       "reason": "Checks Octane MotionConfig context behavior."
     },
     {
+      "path": "packages/motion/tests/conformance/controller.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane controller host subscriptions, committed variants, cancellation, SVG MotionValues, and hydration identity."
+    },
+    {
       "path": "packages/motion/tests/conformance/drag.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks pointer drag behavior in the Octane host integration."
