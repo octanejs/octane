@@ -74,6 +74,7 @@ export {
 export { HYDRATE_QUERY_PARAM } from './hydrate-boundaries.js';
 export { DATA_WORKER_PATH } from '../data/worker-path.js';
 export { createDataProgram, DATA_MANIFEST_MODULE, formatDataDiagnostic } from './data-contracts.js';
+import { stripDataImplementations } from './data-contracts.js';
 export { analyzeIslandsShell } from './islands-shell.js';
 export {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
@@ -1836,6 +1837,10 @@ class OctaneBundlerCompiler {
 		const passThrough = () => {
 			return targetRuntimeRequests(code, 'runtime-requests') ?? this._passThrough(code, collected);
 		};
+		// The browser's copy of a contract module keeps its contracts, never the functions serving them.
+		const dataClient = environment === 'client' ? stripDataImplementations(code, file) : null;
+		if (dataClient !== null)
+			return { ...dataClient, kind: 'data-client', ...finishMetadata(collected) };
 		const clientOnlyImports =
 			environment === 'server' && Array.isArray(options.clientOnlyImports)
 				? options.clientOnlyImports
