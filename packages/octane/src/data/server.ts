@@ -8,12 +8,14 @@ import * as devalue from 'devalue';
 import {
 	DataError,
 	parse,
+	served,
 	type DataReply,
 	type DataRequest,
 	type Feed,
 	type FeedFrame,
 	type FeedRequest,
 	type Read,
+	type Served,
 	type Transport,
 	type View,
 	type Write,
@@ -162,31 +164,46 @@ export type Handle<C> = <T extends DataHandler['contract']>(
 	run: Implementation<C, T>,
 ) => DataHandler;
 
-/** One implementation for each contract a module exports, under its export name. */
+/**
+ * One implementation for each contract a module exports, under its export
+ * name, except a contract declared with its own. One declared with a function
+ * that needs more context than `C` provides is `never`, so it cannot be served.
+ */
 export type Implementations<C, G> = {
-	[K in keyof G as G[K] extends DataHandler['contract'] ? K : never]: Implementation<C, G[K]>;
+	[
+		K in keyof G as G[K] extends DataHandler['contract']
+			? G[K] extends Served<C & DataCall>
+				? never
+				: K
+			: never
+	]: G[K] extends Served<any> ? never : Implementation<C, G[K]>;
 };
 
 /**
  * Serve every contract a module exports, given its namespace:
  * `defineHandler(Books, { stats: (input, call) => …, addBook: … })`. The
  * type requires exactly one implementation per contract, so adding one to
- * the module fails to compile until it is served. Other exports are ignored.
+ * the module fails to compile until it is served. A contract declared with
+ * its implementation, `read({ … }, (input, call) => …)`, is served by it;
+ * when every one is, `defineHandler(Books)` needs no object. Other exports
+ * are ignored.
  */
 export type DefineHandler<C> = <G extends object>(
 	group: G,
-	implementations: NoInfer<Implementations<C, G>>,
+	...implementations: {} extends Implementations<C, G>
+		? [implementations?: NoInfer<Implementations<C, G>>]
+		: [implementations: NoInfer<Implementations<C, G>>]
 ) => DataHandler[];
 
 const handle: Handle<any> = (contract, run) => ({ contract, run });
 
-const defineHandler: DefineHandler<any> = (group: any, implementations: any) => {
+const defineHandler: DefineHandler<any> = (group: any, implementations?: any) => {
 	const handlers: DataHandler[] = [];
 	for (const key in group) {
 		const contract = group[key];
 		const kind = contract?.kind;
 		if (kind !== 'read' && kind !== 'write' && kind !== 'feed') continue;
-		const run = implementations[key];
+		const run = implementations?.[key] ?? served.get(contract);
 		if (typeof run !== 'function') throw new Error(`octane/data: no handler for "${key}"`);
 		handlers.push({ contract, run });
 	}

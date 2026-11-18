@@ -133,10 +133,11 @@ export interface OctaneTransformResult
 	/**
 	 * `compile`: full Octane compilation. `slots`: hook slotting of a plain
 	 * module. `client-only-stub`: an export-preserving server stub.
-	 * `runtime-requests`: only runtime requests were rewritten. `none`: the
+	 * `runtime-requests`: only runtime requests were rewritten. `data-client`:
+	 * a `*.data.ts` module without the functions serving its contracts. `none`: the
 	 * source is unchanged and returned only to report watch dependencies.
 	 */
-	kind: 'compile' | 'slots' | 'client-only-stub' | 'runtime-requests' | 'none';
+	kind: 'compile' | 'slots' | 'client-only-stub' | 'runtime-requests' | 'data-client' | 'none';
 	diagnostics?: readonly CompileDiagnostic[];
 	renderer?: OctaneResolvedRenderer;
 	clientReference?: OctaneClientReference;

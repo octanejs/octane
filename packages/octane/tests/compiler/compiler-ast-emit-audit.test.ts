@@ -46,10 +46,12 @@ describe('compiler AST emit architecture', () => {
 
 		// Volar delegates its one Program print to @tsrx/core's transform() with
 		// boundaryTokens enabled. Plain-hook memo lowering owns a TS-preserving
-		// whole-Program print; its surgical fallback never prints fragments.
+		// whole-Program print; its surgical fallback never prints fragments. A
+		// contract module's client copy is one Program print of its copy-on-write AST.
 		expect(printSites.sort()).toEqual([
 			'client-only-server.js',
 			'compile.js',
+			'data-contracts.js',
 			'plain-hook-memo.js',
 		]);
 	});
