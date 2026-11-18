@@ -4734,8 +4734,8 @@
       "name": "@octanejs/tanstack-virtual",
       "version": "0.1.69",
       "category": "Tables",
-      "upstream": { "package": "@tanstack/react-virtual", "version": "3.14.12" },
-      "surface": "Complete 3.14.12 hook adapter and direct virtual-core 3.17.10 re-exports, with precise public hook signatures, direct DOM container sizing and end-anchor synchronization. All 26 exports have strict pinned public type probes.",
+      "upstream": { "package": "@tanstack/react-virtual", "version": "3.14.26" },
+      "surface": "Complete 3.14.26 hook adapter and direct virtual-core 3.19.11 re-exports, with precise public hook signatures, direct DOM container sizing and end-anchor synchronization. All 26 exports have strict pinned public type probes.",
       "divergences": [
         "octane's `flushSync` called while a flush is already on the stack degrades to a plain call drained by the ambient flush (re-entrancy guard) — sync scroll notifies dispatched from inside a discrete-event flush land at that flush's boundary instead of nested; consumer-invisible, pinned by a conformance test."
       ],

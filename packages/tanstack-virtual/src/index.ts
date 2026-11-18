@@ -32,7 +32,7 @@ import {
 	observeWindowRect,
 	windowScroll,
 } from '@tanstack/virtual-core';
-import type { PartialKeys, VirtualizerOptions } from '@tanstack/virtual-core';
+import type { PartialKeys, VirtualItem, VirtualizerOptions } from '@tanstack/virtual-core';
 import { splitSlot, subSlot } from './internal';
 
 export * from '@tanstack/virtual-core';
@@ -104,6 +104,10 @@ function useVirtualizerBase<TScrollElement extends Element | Window, TItemElemen
 	directRef.current.enabled = directDomUpdates;
 	directRef.current.mode = directDomUpdatesMode;
 
+	// Set while the virtualizer measures an item through `measureElement`, which is
+	// passed as a ref and therefore runs while the renderer is committing.
+	const measuringFromRef = useRef(false, subSlot(slot, 'uvb:mr'));
+
 	const applyContainerSize = (instance: Virtualizer<TScrollElement, TItemElement>) => {
 		const state = directRef.current;
 		if (!state.enabled || !state.container) return;
@@ -115,28 +119,34 @@ function useVirtualizerBase<TScrollElement extends Element | Window, TItemElemen
 		}
 	};
 
+	// Writes one item's main-axis position to its element. Idempotent — guarded
+	// by lastPositions.
+	const applyItemPosition = (
+		instance: Virtualizer<TScrollElement, TItemElement>,
+		item: VirtualItem,
+		el: HTMLElement,
+	) => {
+		const state = directRef.current;
+		const horizontal = !!instance.options.horizontal;
+		const next = item.start - instance.options.scrollMargin;
+		if (state.lastPositions.get(el) === next) return;
+		state.lastPositions.set(el, next);
+		if (state.mode === 'transform') {
+			el.style.transform = horizontal
+				? `translate3d(${next}px, 0, 0)`
+				: `translate3d(0, ${next}px, 0)`;
+		} else {
+			el.style[horizontal ? 'left' : 'top'] = `${next}px`;
+		}
+	};
+
 	const applyDirectStyles = (instance: Virtualizer<TScrollElement, TItemElement>) => {
 		const state = directRef.current;
 		if (!state.enabled || !state.container) return;
 		applyContainerSize(instance);
-		const horizontal = !!instance.options.horizontal;
-		const useTransform = state.mode === 'transform';
-		const posAxis = horizontal ? 'left' : 'top';
-		const scrollMargin = instance.options.scrollMargin;
-		const items = instance.getVirtualItems();
-		for (const item of items) {
-			const next = item.start - scrollMargin;
+		for (const item of instance.getVirtualItems()) {
 			const el = instance.elementsCache.get(item.key) as HTMLElement | undefined;
-			if (!el) continue;
-			if (state.lastPositions.get(el) === next) continue;
-			state.lastPositions.set(el, next);
-			if (useTransform) {
-				el.style.transform = horizontal
-					? `translate3d(${next}px, 0, 0)`
-					: `translate3d(0, ${next}px, 0)`;
-			} else {
-				el.style[posAxis] = `${next}px`;
-			}
+			if (el) applyItemPosition(instance, item, el);
 		}
 	};
 
@@ -165,7 +175,9 @@ function useVirtualizerBase<TScrollElement extends Element | Window, TItemElemen
 				}
 			}
 			if (shouldRerender) {
-				if (useFlushSync && sync) {
+				// A sync notify raised from `measureElement` (a ref callback) arrives
+				// mid-commit, which already runs at sync priority, so it skips flushSync.
+				if (useFlushSync && sync && !measuringFromRef.current) {
 					// OCTANE DIVERGENCE[nested-flushsync-degradation][conformance:nested-flush-sync-scroll]:
 					// nested flushSync degrades to the ambient flush under Octane.
 					flushSync(rerender);
@@ -180,16 +192,31 @@ function useVirtualizerBase<TScrollElement extends Element | Window, TItemElemen
 	const [instance] = useState(
 		() => {
 			const v = new Virtualizer<TScrollElement, TItemElement>(resolvedOptions);
+			const measureElement = v.measureElement;
+			v.measureElement = (node: TItemElement | null) => {
+				measuringFromRef.current = true;
+				try {
+					measureElement(node);
+				} finally {
+					measuringFromRef.current = false;
+				}
+				// A row can mount in a commit that does not re-render this component,
+				// which the applyDirectStyles effect never sees. Position it as it
+				// registers; rows the effect covers are skipped by lastPositions.
+				const state = directRef.current;
+				if (node !== null && state.enabled && state.container) {
+					const item = v.measurementsCache[v.indexFromElement(node)];
+					if (item) applyItemPosition(v, item, node as unknown as HTMLElement);
+				}
+			};
 			return Object.assign(v, {
 				containerRef: (node: HTMLElement | null) => {
 					const state = directRef.current;
 					state.container = node;
 					state.lastSize = null;
-					if (node && state.enabled) {
-						const total = v.getTotalSize();
-						state.lastSize = total;
-						const axis = v.options.horizontal ? 'width' : 'height';
-						node.style[axis] = `${total}px`;
+					// Sizes the container and positions rows whose refs attached first.
+					if (node !== null) {
+						applyDirectStyles(v);
 					}
 				},
 			});

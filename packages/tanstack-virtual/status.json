@@ -1,15 +1,15 @@
 {
   "upstream": {
     "package": "@tanstack/react-virtual",
-    "version": "3.14.12"
+    "version": "3.14.26"
   },
-  "surface": "Complete 3.14.12 hook adapter and direct virtual-core 3.17.10 re-exports, with precise public hook signatures, direct DOM container sizing and end-anchor synchronization. All 26 exports have strict pinned public type probes.",
+  "surface": "Complete 3.14.26 hook adapter and direct virtual-core 3.19.11 re-exports, with precise public hook signatures, direct DOM container sizing and end-anchor synchronization. All 26 exports have strict pinned public type probes.",
   "divergences": [
     "octane's `flushSync` called while a flush is already on the stack degrades to a plain call drained by the ambient flush (re-entrancy guard) \u2014 sync scroll notifies dispatched from inside a discrete-event flush land at that flush's boundary instead of nested; consumer-invisible, pinned by a conformance test."
   ],
   "ssr": "DOM-free initial-offset rendering plus real server/client hydration with retained rows, interactive extent updates and exact observer cleanup.",
   "notes": [
-    "All seven upstream unit cases and all 35 browser cases execute against React and Octane. Two additional browser cases verify direct-DOM prepends in position and transform modes.",
+    "All 11 upstream unit cases and all 44 browser cases execute against React and Octane. Three additional browser cases verify direct-DOM prepends in position and transform modes and that a held initial end reconcile keeps a reader in history after an append (#2860).",
     "The pristine compiler fixture runs React Compiler; the native counterpart runs the Octane compiler and preserves the same browser assertions.",
     "Real Chromium covers smooth scrolling and measurement paths. Render-count guards are deterministic; no wall-clock performance claim is made."
   ],

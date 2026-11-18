@@ -236,6 +236,92 @@ Each key identifies one signal within that scope. An explicit `scope.derived$`
 calculation is synchronous. `subscribe` observes changes and returns a
 function that stops the subscription.
 
+<h3 id="effects">Run an effect when values change</h3>
+
+`scope.effect(run)` runs `run` at once and again after each batch that changes
+a signal it read. A function it returns runs before the next run and when the
+effect stops. The effect lives until you call the stop function it returns or
+dispose its scope.
+
+```ts
+import { createScope } from 'octane/signals';
+
+const cart = createScope({ scopeKey: 'cart' });
+const quantity$ = cart.signal$('quantity', 1);
+const label$ = cart.derived$(null, () => `${quantity$.get()} items`);
+
+const stop = cart.effect(() => {
+	document.title = label$.get();
+	return () => {
+		document.title = '';
+	};
+});
+```
+
+A `null` key, as in `label$`, declares a keyless signal or calculation. It is
+not serialized, seeded, inspected, or staged by a transition, so use it only
+for values the client computes for itself.
+
+<h3 id="equality-and-watched">Control when a signal changes or starts</h3>
+
+Writes use `Object.is`. Pass `equals` as the third argument to `scope.signal$`
+or `scope.derived$` to treat more values as unchanged: the signal keeps its
+previous value, and nothing downstream recomputes or is notified. `equals`
+must not write signals.
+
+Pass `watched` to start work only while something observes the signal: an
+effect, a subscription, or a rendered binding, directly or through derived
+values. It runs when the first observer arrives, and the function it returns
+runs when the last one leaves or the scope is disposed. A plain `.get()` with
+no observer does not start it. Here `chat.subscribe` is an application function
+that returns an unsubscribe function.
+
+```ts
+import { createScope } from 'octane/signals';
+import { chat, type Message } from './chat';
+
+const room = createScope({ scopeKey: 'room' });
+const roomId$ = room.signal$('room-id', 'general');
+const messages$ = room.signal$<Message[]>('messages', [], {
+	equals: (previous, next) =>
+		previous.length === next.length && previous.every((message, i) => message.id === next[i].id),
+	watched: () =>
+		room.effect(() => chat.subscribe(roomId$.get(), (messages) => messages$.set(messages))),
+});
+```
+
+Returning the effect's stop function connects the source while the messages
+are observed and reconnects it when `roomId$` changes.
+
+<h3 id="transactions">Group writes you can undo</h3>
+
+`scope.batch(fn)` delays notifications until `fn` returns and keeps its writes
+even if `fn` throws. `scope.transaction(fn)` is a batch that rolls back: if `fn`
+throws or returns a promise, every signal it changed gets its previous value
+back before anything is notified, and the error is rethrown. Otherwise it
+returns `{ value, changes, undo, redo }`.
+
+```ts
+import { createScope } from 'octane/signals';
+
+const editor = createScope({ scopeKey: 'editor' });
+const title$ = editor.signal$('title', '');
+const tags$ = editor.signal$<string[]>('tags', []);
+
+const edit = editor.transaction(() => {
+	title$.set('Release notes');
+	tags$.set(['docs']);
+	if (title$.get().length > 80) throw new Error('Title is too long');
+});
+
+edit.undo(); // Restores both signals in one batch.
+edit.redo();
+```
+
+`changes` lists each changed signal once as `{ signal$, previous, next }`.
+A transaction inside another one joins it: an inner failure rolls back only
+its own writes.
+
 <h3 id="explicit-resources">Load data in an explicit scope</h3>
 
 For the same user lookup, `query$` combines selection and loading in one
@@ -319,7 +405,7 @@ function Total() {
 	return <output>{useSignalValue(total$)}</output>;
 }
 
-root.render(
+createRoot(document.getElementById('root')!).render(
 	<SignalScopeProvider scope={cart}>
 		<Total />
 		<button onClick={() => quantity$.set((n) => n + 1)}>Add</button>
@@ -427,6 +513,7 @@ overwriting a newer one.
 
 In a client event handler, use `startTransition` to keep the current card
 visible while the next user's data loads. Urgent edits can still update the UI.
+This also works when the current result came from the server during hydration.
 
 ```ts
 import { startTransition } from 'octane';
@@ -673,17 +760,17 @@ Import these APIs from `octane/signals`, except for the component hook
 from `octane/signals/react`. Octane selects the `useSignal$` server
 implementation when it compiles a component for SSR.
 
-| Export                                                    | When to use it                                                                                                                                                                                                                                     |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `signal$`, `useSignal$`                                   | Create writable state and update it with `.set(valueOrUpdater)`. A `signal$` can belong to a module or component and stores a function initial value as data. The component hook `useSignal$` calls a function initializer once for its hook slot. |
-| `derived$`                                                | Calculate a read-only value from other signals. Use it directly inside a component or at module level. For async work, `await read(handle$)` tracks a dependency across an earlier `await`.                                                        |
-| `query$`, `skip`                                          | Load data for a selected key. Return `skip` from the selector to leave the query idle. Use `.refetch()` to refresh while showing a ready value, or `.reset()` to show pending UI.                                                                  |
-| `createScope`                                             | Own state for a lifetime you manage, such as a cart or an account session. Create keyed signals with `scope.signal$` and synchronous calculations with `scope.derived$`. Call `scope.dispose()` when the owner closes.                             |
-| `query`, `createResource`                                 | In an explicit scope, `query` defines a reusable request. Calling that function with an argument describes a load. `createResource` selects the request, starts the load in the scope, and returns the handle you read.                            |
-| `optimistic$`, `action$`, `isActionUncertain`             | Show an edit while saving it. `optimistic$` overlays the edit on a ready source. `action$` gives each save its own operation. Use `isActionUncertain` to recognize a receipt or error that needs reconciliation with the server.                   |
-| `createFamily`                                            | Keep one keyless signal per key, such as one per row, in a scope. Evict members with `.delete(key)` or the `idle` option so keys that come and go don't grow the scope.                                                                            |
-| `isSignalHandle`, `isWritableSignal`                      | Check an unknown value before treating it as a readable handle or writing to it with `.set()`.                                                                                                                                                     |
-| `SignalScopeProvider`, `useSignalScope`, `useSignalValue` | From `octane/signals/react`: pass a scope to React components and read a handle's value in them.                                                                                                                                                   |
+| Export                                                    | When to use it                                                                                                                                                                                                                                                                                   |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `signal$`, `useSignal$`                                   | Create writable state and update it with `.set(valueOrUpdater)`. A `signal$` can belong to a module or component and stores a function initial value as data. The component hook `useSignal$` calls a function initializer once for its hook slot.                                               |
+| `derived$`                                                | Calculate a read-only value from other signals. Use it directly inside a component or at module level. For async work, `await read(handle$)` tracks a dependency across an earlier `await`.                                                                                                      |
+| `query$`, `skip`                                          | Load data for a selected key. Return `skip` from the selector to leave the query idle. Use `.refetch()` to refresh while showing a ready value, or `.reset()` to show pending UI.                                                                                                                |
+| `createScope`                                             | Own state for a lifetime you manage, such as a cart or an account session. Create keyed signals with `scope.signal$` and synchronous calculations with `scope.derived$`, and use `scope.effect`, `scope.batch`, and `scope.transaction` with them. Call `scope.dispose()` when the owner closes. |
+| `query`, `createResource`                                 | In an explicit scope, `query` defines a reusable request. Calling that function with an argument describes a load. `createResource` selects the request, starts the load in the scope, and returns the handle you read.                                                                          |
+| `optimistic$`, `action$`, `isActionUncertain`             | Show an edit while saving it. `optimistic$` overlays the edit on a ready source. `action$` gives each save its own operation. Use `isActionUncertain` to recognize a receipt or error that needs reconciliation with the server.                                                                 |
+| `createFamily`                                            | Keep one keyless signal per key, such as one per row, in a scope. Evict members with `.delete(key)` or the `idle` option so keys that come and go don't grow the scope.                                                                                                                          |
+| `isSignalHandle`, `isWritableSignal`                      | Check an unknown value before treating it as a readable handle or writing to it with `.set()`.                                                                                                                                                                                                   |
+| `SignalScopeProvider`, `useSignalScope`, `useSignalValue` | From `octane/signals/react`: pass a scope to React components and read a handle's value in them.                                                                                                                                                                                                 |
 
 Read a handle with `.get()` for its current value. Use `.latest(fallback)`
 to show the last successful value and `.snapshot()` to inspect pending or error

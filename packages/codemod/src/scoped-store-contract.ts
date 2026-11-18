@@ -5,6 +5,7 @@ import path from 'node:path';
 import ts from 'typescript';
 import { skipWrappers } from './expression-wrappers.js';
 import { namedRuntimeImport, safeSetupLiteral } from './local-react-hook.js';
+import { libCachingHost } from './lib-host.js';
 
 export interface ScopedStoreHookPlan {
 	/** The authored native module and the actual export behind any re-export. */
@@ -176,7 +177,12 @@ function modulePlan(
 	outputDir: string,
 	bridge: string,
 ) {
-	const program = ts.createProgram([entry, ...candidates], { ...options, noEmit: true });
+	const programOptions = { ...options, noEmit: true };
+	const program = ts.createProgram(
+		[entry, ...candidates],
+		programOptions,
+		libCachingHost(programOptions),
+	);
 	const checker = program.getTypeChecker();
 	const root = program.getSourceFile(entry);
 	if (!root) return null;
