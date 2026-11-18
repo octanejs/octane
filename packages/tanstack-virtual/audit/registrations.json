@@ -2,7 +2,7 @@
   {
     "id": "react-case-v1:9426f5a2194d84a3d77d",
     "declarationId": "react-case-v1:9426f5a2194d84a3d77d",
-    "source": "packages/react-virtual/e2e/app/test/cached-measurements.spec.ts:3:1",
+    "source": "packages/react-virtual/e2e/app/test/cached-measurements.spec.ts:31:1",
     "kind": "test",
     "title": "preserves item sizes when list is hidden with useCachedMeasurements",
     "estimatedRegistrations": 1,
@@ -208,7 +208,7 @@
     "declarationId": "react-case-v1:3735724f27725f37642c",
     "source": "packages/react-virtual/e2e/app/test/measure-element.spec.ts:3:1",
     "kind": "test",
-    "title": "positions items correctly after expand → collapse → delete → expand",
+    "title": "positions items correctly after expand \u2192 collapse \u2192 delete \u2192 expand",
     "estimatedRegistrations": 1,
     "registrationIndex": 0,
     "dynamicExpansion": null,
@@ -368,7 +368,7 @@
   {
     "id": "react-case-v1:6f64e7ecc4c9cae613a8",
     "declarationId": "react-case-v1:6f64e7ecc4c9cae613a8",
-    "source": "packages/react-virtual/e2e/app/test/smooth-scroll.spec.ts:3:1",
+    "source": "packages/react-virtual/e2e/app/test/smooth-scroll.spec.ts:27:1",
     "kind": "test",
     "title": "smooth scrolls to index 1000",
     "estimatedRegistrations": 1,
@@ -380,7 +380,7 @@
   {
     "id": "react-case-v1:b298b6a9bb0ff3e91037",
     "declarationId": "react-case-v1:b298b6a9bb0ff3e91037",
-    "source": "packages/react-virtual/e2e/app/test/smooth-scroll.spec.ts:28:1",
+    "source": "packages/react-virtual/e2e/app/test/smooth-scroll.spec.ts:49:1",
     "kind": "test",
     "title": "smooth scrolls to index 100",
     "estimatedRegistrations": 1,
@@ -392,7 +392,7 @@
   {
     "id": "react-case-v1:92b21313101bf8ae8db0",
     "declarationId": "react-case-v1:92b21313101bf8ae8db0",
-    "source": "packages/react-virtual/e2e/app/test/smooth-scroll.spec.ts:37:1",
+    "source": "packages/react-virtual/e2e/app/test/smooth-scroll.spec.ts:56:1",
     "kind": "test",
     "title": "smooth scrolls to index 0 after scrolling away",
     "estimatedRegistrations": 1,
@@ -404,7 +404,7 @@
   {
     "id": "react-case-v1:df83d3b1c3536fbca148",
     "declarationId": "react-case-v1:df83d3b1c3536fbca148",
-    "source": "packages/react-virtual/e2e/app/test/smooth-scroll.spec.ts:58:1",
+    "source": "packages/react-virtual/e2e/app/test/smooth-scroll.spec.ts:74:1",
     "kind": "test",
     "title": "smooth scrolls to index 500 with start alignment",
     "estimatedRegistrations": 1,
@@ -416,7 +416,7 @@
   {
     "id": "react-case-v1:c6cd2ab68f202e73e871",
     "declarationId": "react-case-v1:c6cd2ab68f202e73e871",
-    "source": "packages/react-virtual/e2e/app/test/smooth-scroll.spec.ts:83:1",
+    "source": "packages/react-virtual/e2e/app/test/smooth-scroll.spec.ts:97:1",
     "kind": "test",
     "title": "smooth scrolls to index 500 with center alignment",
     "estimatedRegistrations": 1,
@@ -428,7 +428,7 @@
   {
     "id": "react-case-v1:8f98d73ebd1d031b85fe",
     "declarationId": "react-case-v1:8f98d73ebd1d031b85fe",
-    "source": "packages/react-virtual/e2e/app/test/smooth-scroll.spec.ts:108:1",
+    "source": "packages/react-virtual/e2e/app/test/smooth-scroll.spec.ts:120:1",
     "kind": "test",
     "title": "smooth scrolls sequentially to multiple targets",
     "estimatedRegistrations": 1,
@@ -440,7 +440,7 @@
   {
     "id": "react-case-v1:ebdf2687ccf3a3e36e8b",
     "declarationId": "react-case-v1:ebdf2687ccf3a3e36e8b",
-    "source": "packages/react-virtual/e2e/app/test/smooth-scroll.spec.ts:127:1",
+    "source": "packages/react-virtual/e2e/app/test/smooth-scroll.spec.ts:136:1",
     "kind": "test",
     "title": "interrupting smooth scroll with another smooth scroll",
     "estimatedRegistrations": 1,
@@ -464,7 +464,7 @@
   {
     "id": "react-case-v1:71b70a3ef4c1645fee52",
     "declarationId": "react-case-v1:71b70a3ef4c1645fee52",
-    "source": "packages/react-virtual/tests/index.test.tsx:113:1",
+    "source": "packages/react-virtual/tests/index.test.tsx:117:1",
     "kind": "test",
     "title": "should render",
     "estimatedRegistrations": 1,
@@ -476,7 +476,7 @@
   {
     "id": "react-case-v1:cb02e7e91b8c4c842340",
     "declarationId": "react-case-v1:cb02e7e91b8c4c842340",
-    "source": "packages/react-virtual/tests/index.test.tsx:123:1",
+    "source": "packages/react-virtual/tests/index.test.tsx:127:1",
     "kind": "test",
     "title": "should render with overscan",
     "estimatedRegistrations": 1,
@@ -488,7 +488,7 @@
   {
     "id": "react-case-v1:b0eaaef9100083ceb4e3",
     "declarationId": "react-case-v1:b0eaaef9100083ceb4e3",
-    "source": "packages/react-virtual/tests/index.test.tsx:133:1",
+    "source": "packages/react-virtual/tests/index.test.tsx:137:1",
     "kind": "test",
     "title": "should render given dynamic size",
     "estimatedRegistrations": 1,
@@ -500,7 +500,7 @@
   {
     "id": "react-case-v1:86ececdd9e957cd57a31",
     "declarationId": "react-case-v1:86ececdd9e957cd57a31",
-    "source": "packages/react-virtual/tests/index.test.tsx:144:1",
+    "source": "packages/react-virtual/tests/index.test.tsx:148:1",
     "kind": "test",
     "title": "should use rangeExtractor",
     "estimatedRegistrations": 1,
@@ -512,7 +512,7 @@
   {
     "id": "react-case-v1:87905758ffa95441b427",
     "declarationId": "react-case-v1:87905758ffa95441b427",
-    "source": "packages/react-virtual/tests/index.test.tsx:152:1",
+    "source": "packages/react-virtual/tests/index.test.tsx:156:1",
     "kind": "test",
     "title": "should handle count change",
     "estimatedRegistrations": 1,
@@ -524,7 +524,7 @@
   {
     "id": "react-case-v1:c5022ae30902abeba7de",
     "declarationId": "react-case-v1:c5022ae30902abeba7de",
-    "source": "packages/react-virtual/tests/index.test.tsx:166:1",
+    "source": "packages/react-virtual/tests/index.test.tsx:170:1",
     "kind": "test",
     "title": "should handle gap change",
     "estimatedRegistrations": 1,
@@ -536,9 +536,180 @@
   {
     "id": "react-case-v1:3148a808c3add2f926ae",
     "declarationId": "react-case-v1:3148a808c3add2f926ae",
-    "source": "packages/react-virtual/tests/index.test.tsx:183:1",
+    "source": "packages/react-virtual/tests/index.test.tsx:187:1",
     "kind": "test",
     "title": "should handle handle height change",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-registration-v1:bf490172e7f85b694050",
+    "declarationId": "react-case-v1:f0468c65f5a42be1f1db",
+    "source": "packages/react-virtual/e2e/app/test/cached-measurements.spec.ts:4:3:registration:0",
+    "kind": "test",
+    "title": "`re-pins after a cached row grows (deferred observer: ${deferred})`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const deferred of [false, true]) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:3ee87c613e1845aa9e24",
+    "declarationId": "react-case-v1:f0468c65f5a42be1f1db",
+    "source": "packages/react-virtual/e2e/app/test/cached-measurements.spec.ts:4:3:registration:1",
+    "kind": "test",
+    "title": "`re-pins after a cached row grows (deferred observer: ${deferred})`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const deferred of [false, true]) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-case-v1:d538ca46487a58eef19b",
+    "declarationId": "react-case-v1:d538ca46487a58eef19b",
+    "source": "packages/react-virtual/e2e/app/test/command-retire.spec.ts:22:1",
+    "kind": "test",
+    "title": "scrollToIndex lands on the fresh target when rows above shrink in the same handler",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:f1e0f8b3b15df194367d",
+    "declarationId": "react-case-v1:f1e0f8b3b15df194367d",
+    "source": "packages/react-virtual/e2e/app/test/command-retire.spec.ts:37:1",
+    "kind": "test",
+    "title": "scrollToOffset retires after a row above grows, without waiting for the safety valve",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:87f1b89c9c2dc0121494",
+    "declarationId": "react-case-v1:87f1b89c9c2dc0121494",
+    "source": "packages/react-virtual/e2e/app/test/ios-programmatic-landing.spec.ts:20:3",
+    "kind": "test",
+    "title": "`a programmatic landing (${button}) with no touch doesn't snap after it lands (#1250)`",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const button of ['#scroll-to-offset']) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-case-v1:223d2ae403f15630ea0e",
+    "declarationId": "react-case-v1:223d2ae403f15630ea0e",
+    "source": "packages/react-virtual/e2e/app/test/lanes-change.spec.ts:27:1",
+    "kind": "test",
+    "title": "rows stay aligned after changing lanes while scrolled to the end (#1036)",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-registration-v1:f2ddac0335f6facaf99f",
+    "declarationId": "react-case-v1:09790962bc25d1ef85b7",
+    "source": "packages/react-virtual/e2e/app/test/resize-delivery.spec.ts:20:3:registration:0",
+    "kind": "test",
+    "title": "`resizing rows can ${direction} the rendered range without observer loop errors`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const direction of ['grow', 'shrink'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:9a4103fa5562377ffc19",
+    "declarationId": "react-case-v1:09790962bc25d1ef85b7",
+    "source": "packages/react-virtual/e2e/app/test/resize-delivery.spec.ts:20:3:registration:1",
+    "kind": "test",
+    "title": "`resizing rows can ${direction} the rendered range without observer loop errors`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const direction of ['grow', 'shrink'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-case-v1:a610b8b2e61e5edfb9cb",
+    "declarationId": "react-case-v1:a610b8b2e61e5edfb9cb",
+    "source": "packages/react-virtual/e2e/app/test/smooth-prepend.spec.ts:34:1",
+    "kind": "test",
+    "title": "a prepend mid-flight does not abandon a smooth scrollToIndex",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:fd418ff15773e3438b19",
+    "declarationId": "react-case-v1:fd418ff15773e3438b19",
+    "source": "packages/react-virtual/tests/index.test.tsx:195:1",
+    "kind": "test",
+    "title": "should not flushSync while measuring an item from its ref callback",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:757e705bd22d48cd508d",
+    "declarationId": "react-case-v1:757e705bd22d48cd508d",
+    "source": "packages/react-virtual/tests/index.test.tsx:212:1",
+    "kind": "test",
+    "title": "getOffsetForIndex in a layout effect sees the rows measured in the same commit",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:01d5671ad90b447965e4",
+    "declarationId": "react-case-v1:01d5671ad90b447965e4",
+    "source": "packages/react-virtual/tests/index.test.tsx:314:1",
+    "kind": "test",
+    "title": "directDomUpdates positions a row a child mounts without the owner",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:d9ef63eecc631caa462c",
+    "declarationId": "react-case-v1:d9ef63eecc631caa462c",
+    "source": "packages/react-virtual/tests/index.test.tsx:367:1",
+    "kind": "test",
+    "title": "directDomUpdates positions rows a child mounts together with the container",
     "estimatedRegistrations": 1,
     "registrationIndex": 0,
     "dynamicExpansion": null,
