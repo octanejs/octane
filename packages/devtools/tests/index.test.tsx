@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { act, cleanup, render, screen } from '@octanejs/testing-library';
 import { createPortal, type OctaneNode } from 'octane';
 import { octaneDevtools } from '../src/index';
+import { OctaneDevtoolsEventClient, type WireTreeNode } from '../src/client';
 
 type Listener = () => void;
 
@@ -52,6 +53,14 @@ describe('octaneDevtools', () => {
 		expect(getSubscribeCalls()).toBe(1);
 		expect(first).toBeTruthy();
 		expect(second).toBeTruthy();
+	});
+
+	it('contains a panel render failure instead of throwing into the host app (#3021)', async () => {
+		render(octaneDevtools().render());
+		// A malformed snapshot makes the Components tab throw while rendering.
+		const malformed = { id: 1, name: 'Broken', kind: 'component' } as WireTreeNode;
+		new OctaneDevtoolsEventClient().emit('tree', { nodes: [malformed] });
+		expect(await screen.findByText(/^Octane DevTools failed:/)).toBeTruthy();
 	});
 
 	it('keeps the selected panel tab when the host renders the plugin again', async () => {

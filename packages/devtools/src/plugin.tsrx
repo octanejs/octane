@@ -14,8 +14,13 @@ import { OctanePanel } from './panel/OctanePanel.tsrx';
 export function octaneDevtools() {
 	const client = new OctaneDevtoolsEventClient();
 	let stop: (() => void) | null = null;
+	// A panel failure stays inside the panel instead of reaching the app's boundary.
 	const OctaneDevtoolsPanel = () => @{
-		<OctanePanel client={client} />
+		@try {
+			<OctanePanel client={client} />
+		} @catch (error) {
+			<div class="odt-root">{'Octane DevTools failed: ' + String(error)}</div>
+		}
 	};
 	return {
 		id: 'octane',
