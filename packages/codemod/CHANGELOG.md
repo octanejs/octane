@@ -1,5 +1,36 @@
 # @octanejs/codemod
 
+## 0.2.7
+
+### Patch Changes
+
+- 22d39db: Block migration of components rendered by a proven retained React DOM root returned from a closed local WeakMap cache.
+- 58bce5b: Parse TypeScript's library files once per process and share them between the programs a migration builds, instead of parsing the whole default library, `lib.dom.d.ts` included, for each one.
+- b8da914: Block native setup calls that enter a proven React hook through a retained workspace wrapper.
+- def6e02: Enable the React Intl and scoped-store migration adapters when the project uses Octane 0.21.
+- 5870e0e: Keep project type proofs stable when a project is reached through a parent symlink.
+- 6fe1345: Report imported React classes when selected components render their children.
+- 5569066: Add `useAnimationControls` and subscribe committed motion hosts to shared animation controllers.
+- Updated dependencies [23c13d1]
+- Updated dependencies [03addab]
+- Updated dependencies [12dbf62]
+- Updated dependencies [5faf206]
+- Updated dependencies [e44f566]
+- Updated dependencies [1985ce9]
+- Updated dependencies [f94ced3]
+- Updated dependencies [40d070e]
+- Updated dependencies [249dce4]
+- Updated dependencies [e50b52b]
+- Updated dependencies [60dff19]
+- Updated dependencies [643f476]
+- Updated dependencies [1cd087c]
+- Updated dependencies [1ffb942]
+- Updated dependencies [e2beb61]
+- Updated dependencies [799c4d4]
+- Updated dependencies [494e47b]
+- Updated dependencies [2e1f7f1]
+  - octane@0.21.0
+
 ## 0.2.6
 
 ### Patch Changes
