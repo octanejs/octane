@@ -188,6 +188,22 @@ describe('octane/signals/react', () => {
 		expect(container.textContent).toBe('retired');
 	});
 
+	it('reports a scope retired between render and subscription to the boundary', async () => {
+		const scope = createScope({ scopeKey: 'retired-before-subscribe' });
+		const value$ = scope.signal$('value', 'live');
+		function RetireBeforeSubscribe() {
+			React.useLayoutEffect(() => scope.dispose(), []);
+			return null;
+		}
+		let container!: HTMLElement;
+		await act(() => {
+			({ container } = mount(
+				h(Boundary, null, h(Value, { handle: value$ }), h(RetireBeforeSubscribe)),
+			));
+		});
+		expect(container.textContent).toBe('retired');
+	});
+
 	it('isolates separate roots with separate scopes', async () => {
 		const scopes = [labelScope('app', 0), labelScope('app', 0)];
 		const mounted = scopes.map((scope) => mount(h(SignalScopeProvider, { scope }, h(Label))));
