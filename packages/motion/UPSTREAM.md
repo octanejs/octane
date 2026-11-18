@@ -33,6 +33,7 @@ The binding reuses Motion's framework-neutral animation engine and ports a bound
 | `useIsPresent` with retained keyed presence | `RetainedPresence` + `useIsPresent` | Explicit bounded Octane owner; ordinary `AnimatePresence` keeps its clone behavior | `conformance/retained-presence.test.ts` |
 | `MotionConfig` | `MotionConfig` | Ported default transition context | `conformance/config.test.ts` |
 | `useMotionValue`, `useMotionValueEvent` | same | Ported | curated upstream useMotionValue lane + conformance |
+| `useAnimationControls` | same | Octane hook and committed host lifecycle over `motion-dom` visual elements | `conformance/controller.test.ts` |
 | `useAnimate`, `useScroll`, `useTransform`, `useSpring` | same | Ported bounded forms | corresponding conformance suites |
 | `useInView` | same | Octane state and effect slots over Motion's `inView` | `conformance/useInView.test.ts` |
 | framework-neutral exports from `motion` | root re-exports | Reused unchanged | package dependency and typecheck |

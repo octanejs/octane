@@ -9,13 +9,51 @@ import { act, flushSync, hydrateRoot } from 'octane';
 import { octane } from 'octane/compiler/vite';
 import { createServer } from 'vite';
 import { mount, nextPaint } from '../_helpers';
-import { RetainedToggle, RetainedRemovable } from '../_fixtures/retained-presence.tsrx';
+import {
+	RetainedToggle,
+	RetainedRemovable,
+	RetainedControllerToggle,
+} from '../_fixtures/retained-presence.tsrx';
 
 beforeEach(() => {
 	animateMock.mockReset();
 });
 
 describe('retained presence', () => {
+	it('restarts an exit after controller replacement or a controller-to-declarative switch', async () => {
+		const finishes: Array<() => void> = [],
+			stops: Array<ReturnType<typeof vi.fn>> = [];
+		animateMock.mockImplementation(() => {
+			const stop = vi.fn();
+			stops.push(stop);
+			return {
+				then(done: () => void) {
+					finishes.push(done);
+				},
+				stop,
+			};
+		});
+		const trace: string[] = [],
+			record = (event: string) => trace.push(event);
+		const r = mount(RetainedControllerToggle, { show: true, record });
+		try {
+			r.update(RetainedControllerToggle, { show: false, record });
+			r.click('#switch-controller');
+			r.click('#switch-controller');
+			expect(finishes).toHaveLength(3);
+			expect(stops[0]).toHaveBeenCalledOnce();
+			expect(stops[1]).toHaveBeenCalledOnce();
+			finishes[0]();
+			finishes[1]();
+			expect(trace).toEqual([]);
+			finishes[2]();
+			await nextPaint();
+			expect(r.container.querySelector('#controller-exit')).toBeNull();
+			expect(trace).toEqual(['host-complete', 'complete']);
+		} finally {
+			r.unmount();
+		}
+	});
 	it('retains the original keyed child through exit and reentry, then cleans it once', async () => {
 		const finishes: Array<() => void> = [];
 		const stops: Array<ReturnType<typeof vi.fn>> = [];

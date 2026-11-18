@@ -1,6 +1,7 @@
-import { motion, m, RetainedPresence, useIsPresent } from '@octanejs/motion';
+import { motion, m, RetainedPresence, useAnimationControls, useIsPresent } from '@octanejs/motion';
 import { Activity, useLayoutEffect, useState } from 'octane';
 import type { Ref } from 'octane';
+import type { LegacyAnimationControls } from 'motion-dom';
 
 function Row({
 	record,
@@ -134,5 +135,52 @@ export function RetainedRemovable({
 }) @{
 	<RetainedPresence onExitComplete={() => record('complete')}>
 		{show ? <RemovableRow key="row" record={record} /> : null}
+	</RetainedPresence>
+}
+
+function ControllerRow({
+	record,
+	onReady,
+	forceSecond,
+}: {
+	record: (event: string) => void;
+	onReady?: (controls: LegacyAnimationControls) => void;
+	forceSecond?: boolean;
+}) @{
+	const first = useAnimationControls(),
+		second = useAnimationControls();
+	const [mode, setMode] = useState(0);
+	useLayoutEffect(() => onReady?.(first), [first, onReady]);
+	<div>
+		<button id="switch-controller" onClick={() => setMode(mode + 1)}>
+			Switch
+		</button>
+		<motion.div
+			id="controller-exit"
+			initial={false}
+			style={{ opacity: 0 }}
+			animate={forceSecond ? second : mode === 0 ? first : mode === 1 ? second : { opacity: 1 }}
+			exit={{ opacity: 0 }}
+			transition={{ duration: 0.15, ease: 'linear' }}
+			onAnimationComplete={() => record('host-complete')}
+		/>
+	</div>
+}
+
+export function RetainedControllerToggle({
+	show,
+	record,
+	onReady,
+	forceSecond,
+}: {
+	show: boolean;
+	record: (event: string) => void;
+	onReady?: (controls: LegacyAnimationControls) => void;
+	forceSecond?: boolean;
+}) @{
+	<RetainedPresence onExitComplete={() => record('complete')}>
+		{show ? (
+			<ControllerRow key="row" record={record} onReady={onReady} forceSecond={forceSecond} />
+		) : null}
 	</RetainedPresence>
 }

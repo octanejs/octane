@@ -8,8 +8,10 @@ import {
 	useIsPresent,
 	RetainedPresence,
 	type RetainedPresenceProps,
+	useAnimationControls,
 } from '@octanejs/motion';
 import * as m from '@octanejs/motion/react-m';
+import type { LegacyAnimationControls } from 'motion-dom';
 
 declare function expectType<T>(value: T): void;
 
@@ -24,6 +26,7 @@ expectType<MotionComponent>(m.span);
 expectType<boolean>(useIsPresent());
 type RetainedPresenceIsTyped = Assert<IsAny<typeof RetainedPresence> extends false ? true : false>;
 expectType<RetainedPresenceProps>({ children: null });
+expectType<LegacyAnimationControls>(useAnimationControls());
 expectType<boolean>(domMax.animation);
 expectType<boolean>(domMax.layout);
 expectType<boolean>(useInView({ current: document.createElement('div') }));

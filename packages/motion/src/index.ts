@@ -9,6 +9,8 @@
 import { animate, hover, press, inView } from 'motion';
 import {
 	buildHTMLStyles,
+	HTMLVisualElement,
+	isAnimationControls,
 	buildSVGAttrs,
 	camelCaseAttributes,
 	camelToDash,
@@ -64,6 +66,7 @@ import {
 } from './layout';
 import { LayoutAnimation } from './layout-animation';
 import { RetainedPresenceContext } from './presence';
+import { stopVisualElement } from './useAnimationControls';
 
 // A plain-TS component gets its OWN block per instance (componentSlot), so fixed
 // slot symbols don't collide across instances — and these are distinct within one.
@@ -73,6 +76,8 @@ const HOST_REF = Symbol.for('octane-motion:hostRef');
 const ENTER = Symbol.for('octane-motion:enter');
 const ANIMATE = Symbol.for('octane-motion:animate');
 const ANIMATE_COMPLETE = Symbol.for('octane-motion:animate-complete');
+const CONTROLLER_PROPS = Symbol.for('octane-motion:controller-props');
+const CONTROLLER = Symbol.for('octane-motion:controller');
 const GESTURE = Symbol.for('octane-motion:gesture');
 const EXIT = Symbol.for('octane-motion:exit');
 const PRESENCE_HOST = Symbol.for('octane-motion:presence-host');
@@ -393,7 +398,7 @@ function firstFrame(tag: string, svg: boolean, props: any, target: any, atEnd: b
 		originalAttrs[key] = resolveMotionValue(source);
 		if (isMotionValue(source)) (motionAttrs ??= new Set()).add(key);
 	}
-	return { style, attrs: state.attrs, originalAttrs, motionAttrs, originalStyle };
+	return { values, style, attrs: state.attrs, originalAttrs, motionAttrs, originalStyle };
 }
 
 export type MotionComponent = (props: any, scope: any) => OctaneElement;
@@ -443,7 +448,8 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		// label rather than its own `animate`.
 		const inheritsAnimate = props.animate === undefined && isVariantLabel(inherited.animate);
 		const initial = resolveVariant(initialLabel, props);
-		const animateTargets = resolveVariant(animateLabel, props);
+		const controller = isAnimationControls(animateLabel) ? animateLabel : undefined;
+		const animateTargets = controller ? undefined : resolveVariant(animateLabel, props);
 		const { values: resolvedInitial } = splitVariant(initial);
 		const { values: resolvedAnimate, transition: animateVariantTransition } =
 			splitVariant(animateTargets);
@@ -457,12 +463,25 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 					animationComplete: undefined,
 					presence: null,
 					presenceAnimate: undefined,
+					presenceInterruptedTarget: undefined,
+					presenceFallbackRebind: undefined,
+					committedControllerProps: undefined,
+					nextController: undefined,
+					controller: undefined,
+					controllerVisual: undefined,
+					controllerSnapshot: undefined,
+					hostMounted: false,
+					motionStyleMounted: false,
 					initialAnimationKey: initialLabel === false ? true : null,
 					frame: firstFrame(
 						tag,
 						svg,
 						props,
-						resolvedAnimate && (initialLabel === false ? animateTargets : initial),
+						controller
+							? initialLabel === false
+								? undefined
+								: initial
+							: resolvedAnimate && (initialLabel === false ? animateTargets : initial),
 						initialLabel === false,
 					),
 					layout: null,
@@ -539,6 +558,134 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		latest.layoutIdKey = layoutIdKey;
 		latest.layoutMode = layoutAnimationMode(props.layout);
 
+		if (controller || latest.controllerVisual) {
+			// Commands must see only props from an accepted commit, even if another
+			// render is suspended or abandoned.
+			useInsertionEffect(
+				() => {
+					const committed =
+						props.transition === undefined && config.transition
+							? { ...props, transition: config.transition }
+							: props;
+					latest.committedControllerProps = committed;
+					latest.nextController = controller;
+					if (controller && latest.controller && latest.controller !== controller)
+						latest.presenceFallbackRebind?.();
+					if (controller && latest.controller === controller && latest.controllerVisual) {
+						const visual = latest.controllerVisual;
+						const previousStyle = visual.props.style;
+						visual.update(committed, null);
+						for (const key in committed.style) {
+							const value = committed.style[key];
+							if (
+								isTransformKey(key) &&
+								!isMotionValue(value) &&
+								!Object.is(previousStyle?.[key], value)
+							)
+								visual.getValue(key)?.set(value);
+						}
+						visual.shouldReduceMotion = shouldReduceMotion;
+					}
+				},
+				null,
+				CONTROLLER_PROPS,
+			);
+		}
+		if (controller) {
+			useLayoutEffect(
+				() => {
+					if (!animationEnabled) return;
+					const node = latest.host.current;
+					const Visual = svg ? SVGVisualElement : HTMLVisualElement;
+					const snapshot = latest.controllerSnapshot;
+					const seed = !latest.hostMounted ? { ...latest.frame?.values } : { ...snapshot?.values };
+					latest.controllerSnapshot = undefined;
+					const scraped = svg
+						? scrapeSVGMotionValuesFromProps(latest.committedControllerProps, {})
+						: scrapeHTMLMotionValuesFromProps(latest.committedControllerProps, {});
+					if (snapshot) {
+						for (const key in scraped) {
+							if (isMotionValue(scraped[key]) && scraped[key] !== snapshot.authored[key])
+								seed[key] = scraped[key].get();
+						}
+					}
+					const visual = new Visual({
+						props: latest.committedControllerProps,
+						presenceContext: null,
+						reducedMotionConfig: shouldReduceMotion ? 'always' : 'never',
+						visualState: {
+							latestValues: seed,
+							renderState: { style: {}, vars: {}, transform: {}, transformOrigin: {}, attrs: {} },
+						},
+					} as any);
+					if (snapshot) {
+						for (const key in snapshot.base) {
+							const authored = scraped[key];
+							if (!isMotionValue(authored) || authored === snapshot.authored[key])
+								visual.setBaseTarget(key, snapshot.base[key]);
+						}
+					}
+					if (latest.hostMounted && !Object.keys(seed).length) {
+						for (const key of new Set([
+							...Object.keys(latest.frame?.values ?? {}),
+							...Object.keys(scraped),
+						])) {
+							const authored = scraped[key];
+							const value = isMotionValue(authored)
+								? authored.get()
+								: visual.readValueFromInstance(node, key);
+							if (value != null) {
+								seed[key] = value;
+								visual.setBaseTarget(key, value);
+							}
+						}
+					}
+					visual.mount(node);
+					latest.controller = controller;
+					latest.controllerVisual = visual;
+					const release = () => {
+						if (latest.nextController && latest.nextController !== controller) {
+							const base: Record<string, any> = {};
+							for (const key in visual.latestValues) {
+								const value = visual.getBaseTarget(key);
+								if (value !== undefined) base[key] = value;
+							}
+							latest.controllerSnapshot = {
+								values: { ...visual.latestValues },
+								base,
+								authored: svg
+									? scrapeSVGMotionValuesFromProps(visual.props, {})
+									: scrapeHTMLMotionValuesFromProps(visual.props, {}),
+							};
+						}
+						stopVisualElement(visual);
+						visual.unmount();
+						if (visualElementStore.get(node) === visual) visualElementStore.delete(node);
+						if (latest.controllerVisual === visual) {
+							latest.controllerVisual = undefined;
+							latest.controller = undefined;
+						}
+					};
+					let unsubscribe: () => void;
+					try {
+						unsubscribe = controller.subscribe(visual);
+					} catch (error) {
+						release();
+						throw error;
+					}
+					return () => {
+						try {
+							unsubscribe();
+						} finally {
+							release();
+						}
+					};
+				},
+				[animationEnabled, controller],
+				CONTROLLER,
+			);
+		}
+
 		if (presence) {
 			useInsertionEffect(
 				() => {
@@ -550,13 +697,52 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 			);
 		}
 		const eligibleExit = !!(presence && animationEnabled && exitS.values);
-		if (eligibleExit) {
+		if (eligibleExit)
 			useInsertionEffect(() => presence!.register(latest), [presence], PRESENCE_HOST);
+		if (presence) {
 			useLayoutEffect(
 				() => {
-					if (presence!.present) return;
-					const generation = presence!.generation;
 					const node = latest.host.current as HTMLElement | null;
+					const interrupted = latest.presenceInterruptedTarget;
+					latest.presenceInterruptedTarget = undefined;
+					if (presence!.present) {
+						if (!controller || !interrupted || !node) return;
+						const visual = visualElementStore.get(node);
+						let fallback: Record<string, any> | undefined;
+						for (const key in interrupted) {
+							const value = visual?.getBaseTarget(key);
+							if (value !== undefined) (fallback ??= {})[key] = value;
+						}
+						if (fallback) {
+							const controls = animateTarget(
+								node,
+								fallback,
+								latest.transition,
+								latest.shouldReduceMotion,
+							);
+							const animations: Record<string, any> = {};
+							for (const key in fallback) {
+								const animation = visual?.getValue(key)?.animation;
+								if (animation) animations[key] = animation;
+							}
+							const rebind = () => {
+								let owned: Record<string, any> | undefined;
+								for (const key in animations)
+									if (visual?.getValue(key)?.animation === animations[key])
+										(owned ??= {})[key] = fallback[key];
+								if (owned) latest.presenceInterruptedTarget = owned;
+							};
+							latest.presenceFallbackRebind = rebind;
+							return () => {
+								if (latest.presenceFallbackRebind === rebind)
+									latest.presenceFallbackRebind = undefined;
+								controls.stop();
+							};
+						}
+						return;
+					}
+					if (!eligibleExit) return;
+					const generation = presence!.generation;
 					if (!node?.isConnected || getRendererOwnerVisibility(scope) !== 'visible') {
 						presence!.complete(generation);
 						return;
@@ -654,11 +840,12 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 								else node.style.removeProperty(motionAttributeName(field.key));
 							}
 						}
+						if (controls && latest.presence?.present) latest.presenceInterruptedTarget = target;
 						if (!scope.block.disposed && getRendererOwnerVisibility(scope) === 'activity')
 							presence!.complete(generation);
 					};
 				},
-				[presence!.present, presence!.generation],
+				[presence!.present, presence!.generation, controller, eligibleExit],
 				PRESENCE_EXIT,
 			);
 		}
@@ -668,7 +855,8 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		useLayoutEffect(
 			() => {
 				const node: HTMLElement = latest.host.current;
-				if (animationEnabled && resolvedInitial) {
+				latest.hostMounted = true;
+				if (animationEnabled && resolvedInitial && !controller) {
 					animate(node, resolvedInitial, { duration: 0 });
 				}
 			},
@@ -815,6 +1003,8 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 					motionStyleKeys.delete(node);
 				}
 
+				const initialControllerFrame = controller && !latest.motionStyleMounted;
+				latest.motionStyleMounted = true;
 				if (!style || typeof style !== 'object') return;
 				const appliedKeys: string[] = [];
 				const cleanups: Array<() => void> = [];
@@ -833,8 +1023,10 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 						appliedKeys.push(key);
 						cleanups.push(v.on('change', apply));
 					} else if (isTransformKey(key)) {
-						latest.layout?.stop();
-						applyStyleValue(node, key, v, transformState);
+						if (!initialControllerFrame || !Object.hasOwn(latest.frame?.values ?? {}, key)) {
+							latest.layout?.stop();
+							applyStyleValue(node, key, v, transformState);
+						}
 						appliedKeys.push(key);
 					}
 				}
@@ -855,35 +1047,89 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 				const node: HTMLElement = latest.host.current;
 				if (!gesturesEnabled) return;
 				const cleanups: Array<() => void> = [];
+				// Motion priority is focus < hover < tap. Keep this local to the host's
+				// gesture subscription and only resolve per-key fallback for controller hosts.
+				let active = 0;
+				let focusTarget: any, hoverTarget: any, tapTarget: any;
+				const dispatch = (
+					bit: number,
+					valuesKey: string,
+					transitionKey: string,
+					entering: boolean,
+				) => {
+					const visual = latest.controllerVisual;
+					let activated = bit === 4 ? tapTarget : bit === 2 ? hoverTarget : focusTarget;
+					if (entering) {
+						active |= bit;
+						if (visual) activated = { ...latest[valuesKey] };
+						if (bit === 4) tapTarget = activated;
+						else if (bit === 2) hoverTarget = activated;
+						else focusTarget = activated;
+					} else {
+						active &= ~bit;
+						if (bit === 4) tapTarget = undefined;
+						else if (bit === 2) hoverTarget = undefined;
+						else focusTarget = undefined;
+					}
+					if (!visual) {
+						animateTarget(
+							node,
+							entering ? latest[valuesKey] : latest.base,
+							entering ? (latest[transitionKey] ?? latest.transition) : latest.transition,
+							latest.shouldReduceMotion,
+						);
+						return;
+					}
+					let target: Record<string, any> | undefined;
+					for (const key in activated ?? latest[valuesKey]) {
+						let value: any;
+						let protectedByHigher = false;
+						for (let priority = 4; priority; priority >>= 1) {
+							if (!(active & priority)) continue;
+							const candidate =
+								priority === 4 ? tapTarget : priority === 2 ? hoverTarget : focusTarget;
+							if (!candidate || !Object.hasOwn(candidate, key)) continue;
+							if (priority > bit) protectedByHigher = true;
+							else value = candidate[key];
+							break;
+						}
+						if (protectedByHigher) continue;
+						if (!entering && value === undefined) {
+							const frameValues = latest.frame?.values;
+							if (
+								(frameValues && Object.hasOwn(frameValues, key)) ||
+								visual.props.style?.[key] !== undefined ||
+								(svg && visual.props[key] !== undefined)
+							)
+								value = visual.getBaseTarget(key);
+						}
+						if (value !== undefined) (target ??= {})[key] = value;
+					}
+					if (target)
+						animateTarget(
+							node,
+							target,
+							entering ? (latest[transitionKey] ?? latest.transition) : latest.transition,
+							latest.shouldReduceMotion,
+						);
+				};
 				const gesture = (
 					bind: (el: Element, onStart: () => () => void) => () => void,
+					bit: number,
 					valuesKey: string,
 					transitionKey: string,
 				) =>
 					bind(node, () => {
-						animateTarget(
-							node,
-							latest[valuesKey],
-							latest[transitionKey] ?? latest.transition,
-							latest.shouldReduceMotion,
-						);
-						return () => {
-							animateTarget(node, latest.base, latest.transition, latest.shouldReduceMotion);
-						};
+						dispatch(bit, valuesKey, transitionKey, true);
+						return () => dispatch(bit, valuesKey, transitionKey, false);
 					});
 				if (props.whileHover)
-					cleanups.push(gesture(hover as any, 'whileHover', 'whileHoverTransition'));
-				if (props.whileTap) cleanups.push(gesture(press as any, 'whileTap', 'whileTapTransition'));
+					cleanups.push(gesture(hover as any, 2, 'whileHover', 'whileHoverTransition'));
+				if (props.whileTap)
+					cleanups.push(gesture(press as any, 4, 'whileTap', 'whileTapTransition'));
 				if (props.whileFocus) {
-					const onFocus = () =>
-						animateTarget(
-							node,
-							latest.whileFocus,
-							latest.whileFocusTransition ?? latest.transition,
-							latest.shouldReduceMotion,
-						);
-					const onBlur = () =>
-						animateTarget(node, latest.base, latest.transition, latest.shouldReduceMotion);
+					const onFocus = () => dispatch(1, 'whileFocus', 'whileFocusTransition', true);
+					const onBlur = () => dispatch(1, 'whileFocus', 'whileFocusTransition', false);
 					node.addEventListener('focus', onFocus);
 					node.addEventListener('blur', onBlur);
 					cleanups.push(() => {
@@ -1318,6 +1564,7 @@ export function LazyMotion(props: LazyMotionProps, _scope?: unknown) {
 
 export { RetainedPresence, useIsPresent, type RetainedPresenceProps } from './presence';
 export { useAnimate } from './useAnimate';
+export { useAnimationControls } from './useAnimationControls';
 export { useMotionValue } from './useMotionValue';
 export { useScroll } from './useScroll';
 export { useTransform } from './useTransform';

@@ -129,6 +129,10 @@ const CATALOG = { ...DATA.reactPackages, ...PORTED_PACKAGES };
 const MOTION_BINDING = '@octanejs/motion';
 const MOTION_VERSION = DATA.bindings.find(({ name }) => name === MOTION_BINDING)!.version;
 const MOTION_EXPORTS = new Set(DATA.motionExports);
+// The catalog is generated from source before changesets publish. Version 0.1.71
+// does not ship this hook; an installed binding may still prove its own export.
+const MOTION_CATALOG_EXPORTS = new Set(MOTION_EXPORTS);
+if (MOTION_VERSION === '0.1.71') MOTION_CATALOG_EXPORTS.delete('useAnimationControls');
 const DEPENDENCY_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies'];
 /** A package that, by its name, renders through React. */
 const REACT_PACKAGE = /^(?:react-|@[^/]+\/react(?:-|\/|$)|[^/]+\/react$)|-react(?:\/|$)/;
@@ -633,7 +637,7 @@ export async function runCodemod(
 			!installed &&
 			declarations.every((spec) => catalogBindingVersion(spec, MOTION_VERSION))
 		) {
-			actual = MOTION_EXPORTS;
+			actual = MOTION_CATALOG_EXPORTS;
 		}
 		motionExportsByIssuer.set(dir, actual);
 		return actual;
