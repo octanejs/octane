@@ -44,8 +44,11 @@ imports `octane/data/manifest`. The rules and codes are in
 [Strong compiler checks](strong-compiler-checks.md#data-contracts).
 
 `view` ordering compares values as JavaScript's `<` does (dates by time,
-`null`/`undefined` first), then by the entity key. A handler must serve the
-same order.
+`null`/`undefined` first), then by the entity key's own value (so integer keys
+sort numerically). A handler must serve the same order: a window whose rows
+are out of it fails validation, in the handler and in the store, with
+`invalid` and an issue naming the view. An order only the server can run,
+such as a language collation, belongs in a read with cursor `pages`.
 
 Tags computed from an input scope invalidation to that input. A read
 computes its tags once per input, as `store.read` was given it; a view's

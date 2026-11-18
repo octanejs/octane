@@ -524,6 +524,32 @@ describe('octane/data views', () => {
 		expect(huge.getSnapshot().error).toMatchObject({ code: 'invalid' });
 	});
 
+	it.each([
+		['synchronously', Book],
+		[
+			'asynchronously',
+			entity('book', {
+				'~standard': {
+					version: 1,
+					vendor: 'test',
+					validate: async (value: unknown) => ({ value: value as BookRow }),
+				},
+			}),
+		],
+	] as const)("refuses rows out of the view's order, validated %s", async (_, of) => {
+		const sorted = view({ name: 'books.sorted', of, order: [['title', 'asc']] });
+		const reply = (rows: BookRow[]) => async () => ({ ok: true as const, value: rows });
+		const [a, b] = [...libraryServer(2).books.values()];
+		for (const [rows, status] of [
+			[[a!, b!], 'ready'],
+			[[b!, a!], 'error'],
+		] as const) {
+			const window = createDataStore({ transport: reply([...rows]) }).read(sorted, undefined);
+			window.subscribe(() => {});
+			await vi.waitFor(() => expect(window.getSnapshot().status).toBe(status));
+		}
+	});
+
 	it('hydrates the confirmed window after a record changes on the server render', async () => {
 		const server = libraryServer();
 		const rendering = createDataStore({ transport: server.transport });

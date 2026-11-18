@@ -323,6 +323,45 @@ function arrayOf<T>(item: StandardSchema<unknown, T>): StandardSchema<unknown, T
 	};
 }
 
+/**
+ * Refuse a window the server did not sort in the view's order. The store
+ * places every row by that order, so a server sorting another way, such as
+ * by a database collation, would show rows out of place and lose or repeat
+ * them at a window's edges.
+ */
+function inOrder<T>(
+	name: string,
+	rows: StandardSchema<unknown, T[]>,
+	compare: (a: T, b: T) => number,
+): StandardSchema<unknown, T[]> {
+	const check = (result: SchemaResult<T[]>): SchemaResult<T[]> => {
+		if (result.issues) return result;
+		const list = result.value;
+		for (let index = 1; index < list.length; index++) {
+			if (compare(list[index - 1]!, list[index]!) >= 0) {
+				return {
+					issues: [
+						{
+							message: `View "${name}": row ${index} is out of the view's order`,
+							path: [index],
+						},
+					],
+				};
+			}
+		}
+		return result;
+	};
+	return {
+		'~standard': {
+			...rows['~standard'],
+			validate(value) {
+				const result = rows['~standard'].validate(value);
+				return result instanceof Promise ? result.then(check) : check(result);
+			},
+		},
+	};
+}
+
 const isCount = (value: unknown, min: number, max: number) =>
 	value === undefined ||
 	(Number.isInteger(value) && (value as number) >= min && (value as number) <= max);
@@ -383,7 +422,8 @@ export function view<T, P = void, const W extends ViewRelations<T> = {}>(options
 			const result = compareValues((a as any)[field], (b as any)[field]);
 			if (result !== 0) return direction === 'asc' ? result : -result;
 		}
-		return compareValues(of.id(a), of.id(b));
+		// The key's own value, as a database orders it: integer IDs put 9 before 10.
+		return compareValues((a as any)[of.key], (b as any)[of.key]);
 	};
 	const input: StandardSchema<unknown, ViewInput<P>> = {
 		'~standard': {
@@ -407,7 +447,11 @@ export function view<T, P = void, const W extends ViewRelations<T> = {}>(options
 		...read({
 			...rest,
 			input,
-			output: joins.length > 0 ? arrayOf(joinedRow(of, joins)) : of.list,
+			output: inOrder<any>(
+				options.name,
+				joins.length > 0 ? arrayOf(joinedRow(of, joins)) : of.list,
+				compare,
+			),
 			// A related entity is selected too, so a write to it or a tag naming it reaches the view.
 			entities: (rows) => [
 				of.from(rows),

@@ -311,6 +311,10 @@ function createPages(store: DataStore, read: Read<any, any>, chain: Chain): Page
 				ready = true;
 			} else if (part !== last && part.status !== 'error') reloading = true;
 		}
+		// A created record joins every page of a chain that selects its entity; show it once,
+		// after the rows loaded so far, until the server places it.
+		if (chain.linked && current.length > 1 && new Set(rows).size < rows.length)
+			rows = rows.filter((row, index) => rows.indexOf(row, index + 1) < 0);
 		// The same rows are the same array, so a reader of the rows alone sees no change.
 		const before = snapshot?.value;
 		if (before?.length === rows.length && rows.every((row, index) => row === before[index]))
