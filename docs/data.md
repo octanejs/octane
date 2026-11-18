@@ -33,7 +33,7 @@ the same task as the event that caused it.
 | --- | --- | --- |
 | `read` | `name`, `input?`, `output`, `entities?`, `tags?`, `fresh = 0`, `keep = 300000`, `expire = Infinity`, `persist = true`, `cancel = false`, `version = ''` | Times are milliseconds; a `keep` of 2³¹ ms or more (such as `Infinity`) keeps the value for the session. `entities(output)` returns `Entity.from(...)` selections. `tags` is a list, or `tags(input)` for each input. `cancel` aborts a load once nothing observes the read or waits on it. |
 | `write` | `name`, `input`, `output?`, one of `creates`/`patches`/`removes`, `draft?`, `serverId?`, `record?`, `form?`, `invalidates?` | `draft(input, id)` defaults to the input plus the new ID. `record(output)` locates the saved record so views take it without reloading. `invalidates` is a list, or `invalidates(input)` from the validated input. |
-| `entity` | `name`, `schema`, `key = 'id'` | `id(value)` is `String(value[key])`. |
+| `entity` | `name`, `schema`, `key = 'id'` | `id(value)` is `String(value[key])`. `one` and `list` are output schemas of one record and of a list, validated by `schema`: a read whose `output` is one of them selects the entity without `entities`, and a `creates` or `patches` write to the entity whose `output` is `one` takes its reply as the saved record without `record`. An output of `schema` itself selects nothing. |
 | `view` | `name`, `of`, `order`, `where?`, `with?`, `input?`, `limit = 20`, `max = 500`, plus the read options | A read whose input is `{ ...params, offset, limit }` and whose value is that window's rows. `view.view.where` and `view.view.compare` are exposed for handlers. `with: { name: [Entity, key] }` joins each row to the record its `key` points at. |
 | `feed` | `name`, `params?`, `event`, `changes(event, params)`, `covers` | `changes` returns `{ put, value }`, `{ remove, id }`, `{ read, input?, value }` or `{ invalidates }`, or an array of them. |
 
@@ -111,6 +111,9 @@ its own entity's schema. `where` and `order` see the view's own record only.
   snapshot, including an age-based `stale` flag, until its own next change.
 - Every optimistic edit is an absolute patch, an insert by ID or a delete by
   ID, so it replays over any newer value without counting twice.
+- A record is whole: a newer copy replaces an older one entirely, never field
+  by field, and only when its load started later. A read that returns part
+  of a record's fields must not select its entity.
 - A view's records are shared: one table per entity holds the newest confirmed
   copy of each record any view loaded, and every view of the entity is
   evaluated over it with outstanding edits applied. The store loads a margin

@@ -45,20 +45,9 @@ const shelf = view({
 const patchInput = schema<Partial<BookRow> & { id: string }>(
 	(value) => typeof value?.id === 'string',
 );
-const star = write({
-	name: 'books.star',
-	input: patchInput,
-	output: schema<BookRow>(isBook),
-	patches: Book,
-	record: (book) => book,
-});
-const rename = write({
-	name: 'books.rename',
-	input: patchInput,
-	output: schema<BookRow>(isBook),
-	patches: Book,
-	record: (book) => book,
-});
+// `Book.one` as the output: the reply is the saved record, with no `record` to write.
+const star = write({ name: 'books.star', input: patchInput, output: Book.one, patches: Book });
+const rename = write({ name: 'books.rename', input: patchInput, output: Book.one, patches: Book });
 /** The same patch without `record`: views learn the result only by reloading. */
 const renameBlind = write({ name: 'books.renameBlind', input: patchInput, patches: Book });
 const add = write({
@@ -80,8 +69,15 @@ const remove = write({
 const search = read({
 	name: 'books.search',
 	input: schema<{ q: string }>((value) => typeof value?.q === 'string'),
-	output: schema<BookRow[]>((value) => Array.isArray(value) && value.every(isBook)),
-	entities: (books) => Book.from(books),
+	// `Book.list` as the output selects every book, with no `entities` to write.
+	output: Book.list,
+});
+
+/** One book, as a detail page reads it. */
+const bookById = read({
+	name: 'books.byId',
+	input: schema<{ id: string }>((value) => typeof value?.id === 'string'),
+	output: Book.one,
 });
 
 const titles = (handle: ReadHandle<BookRow[]>) =>
@@ -132,6 +128,12 @@ function libraryServer(count = 10) {
 				.filter((book) => book.title.includes(input.q))
 				.reverse()
 				.map((book) => ({ ...book }));
+		}),
+		handle(bookById, (input) => {
+			log.push(`books.byId ${input.id}`);
+			const book = books.get(input.id);
+			if (!book) throw new DataError('missing');
+			return { ...book };
 		}),
 		handle(star, patch),
 		handle(rename, patch),
@@ -1006,5 +1008,97 @@ describe('octane/data pages', () => {
 		await list.loadMore();
 		await vi.waitFor(() => expect(list.getSnapshot().value).toHaveLength(6));
 		expect(list.getSnapshot().error).toBeUndefined();
+	});
+});
+
+describe('octane/data entity output schemas', () => {
+	it('keeps a list, its detail and an edit consistent with no entities or record written', async () => {
+		const server = libraryServer();
+		const store = createDataStore({ transport: server.transport });
+		const list = store.read(search, { q: '' });
+		const detail = store.read(bookById, { id: 'b3' });
+		await ready(list);
+		await ready(detail);
+		const titleIn = () => list.getSnapshot().value!.find((book) => book.id === 'b3')?.title;
+
+		// An edit shows in the list and the detail in the task that made it.
+		const saved = store.write(rename, { id: 'b3', title: '  Atlas ' });
+		expect(titleIn()).toBe('  Atlas ');
+		expect(detail.getSnapshot().value!.title).toBe('  Atlas ');
+		server.log.length = 0;
+		await saved;
+		await quiet();
+		// The reads that show the record take the server's copy by loading it again.
+		expect(server.log).toEqual(['patch b3', 'books.search ', 'books.byId b3']);
+		expect(titleIn()).toBe('Atlas');
+		expect(detail.getSnapshot().value!.title).toBe('Atlas');
+
+		// A refused edit leaves both at once.
+		server.refuse.add('b3');
+		await expect(store.write(rename, { id: 'b3', title: 'Bold' })).rejects.toThrow();
+		expect(titleIn()).toBe('Atlas');
+		expect(detail.getSnapshot().value!.title).toBe('Atlas');
+
+		// A removal leaves the list; the detail keeps its record until it reloads.
+		await store.write(remove, { id: 'b3' });
+		expect(titleIn()).toBeUndefined();
+		expect(detail.getSnapshot().value!.id).toBe('b3');
+	});
+
+	it('takes a reply typed by `one` as the saved record, so views need no reload', async () => {
+		const server = libraryServer();
+		const store = createDataStore({ transport: server.transport });
+		const all = store.read(library, { limit: 10 });
+		await ready(all);
+		server.log.length = 0;
+		await store.write(rename, { id: 'b0', title: ' Zebra ' });
+		await quiet();
+		expect(titles(all)).toContain('Zebra');
+		expect(server.log).toEqual(['patch b0']);
+	});
+
+	it("validates `list` and `one` with the entity's schema", async () => {
+		const server = libraryServer();
+		server.books.set('bad', { id: 'bad', title: '', starred: false, shelf: 'A' });
+		const store = createDataStore({ transport: server.transport });
+		const list = store.read(search, { q: '' });
+		list.subscribe(() => {});
+		await vi.waitFor(() => expect(list.getSnapshot().status).toBe('error'));
+		const detail = store.read(bookById, { id: 'bad' });
+		detail.subscribe(() => {});
+		await vi.waitFor(() => expect(detail.getSnapshot().status).toBe('error'));
+	});
+
+	it('selects nothing through the plain schema, and an explicit option still wins', async () => {
+		const server = libraryServer();
+		const { input } = bookById;
+		const plain = read({ name: 'books.plain', input: input!, output: Book.schema });
+		const nothing = read({
+			name: 'books.nothing',
+			input: input!,
+			output: Book.one,
+			entities: () => [],
+		});
+		// The server serves both as the detail read.
+		const aliases = new Set([plain.name, nothing.name]);
+		const store = createDataStore({
+			transport: (request, signal) =>
+				server.transport(
+					aliases.has(request.name) ? { ...request, name: bookById.name } : request,
+					signal,
+				),
+		});
+		const reads = [plain, nothing].map((contract) => store.read(contract, { id: 'b1' }));
+		for (const handle of reads) await ready(handle);
+		server.hold();
+		const saved = store.write(rename, { id: 'b1', title: 'Unseen' });
+		for (const handle of reads) expect(handle.getSnapshot().value!.title).toBe('Book 01');
+		server.release();
+		await saved;
+
+		// Another entity's `one` is not this write's saved record.
+		const other = entity('author', Book.schema);
+		const writesAuthor = write({ name: 'x', input: patchInput, output: other.one, patches: Book });
+		expect(writesAuthor.record).toBeUndefined();
 	});
 });
