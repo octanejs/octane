@@ -9,6 +9,8 @@
 import { animate, hover, press, inView } from 'motion';
 import {
 	buildHTMLStyles,
+	HTMLVisualElement,
+	isAnimationControls,
 	buildSVGAttrs,
 	camelCaseAttributes,
 	camelToDash,
@@ -63,6 +65,7 @@ import {
 	type LayoutBox,
 } from './layout';
 import { LayoutAnimation } from './layout-animation';
+import { stopVisualElement } from './useAnimationControls';
 
 // A plain-TS component gets its OWN block per instance (componentSlot), so fixed
 // slot symbols don't collide across instances — and these are distinct within one.
@@ -72,6 +75,8 @@ const HOST_REF = Symbol.for('octane-motion:hostRef');
 const ENTER = Symbol.for('octane-motion:enter');
 const ANIMATE = Symbol.for('octane-motion:animate');
 const ANIMATE_COMPLETE = Symbol.for('octane-motion:animate-complete');
+const CONTROLLER_PROPS = Symbol.for('octane-motion:controller-props');
+const CONTROLLER = Symbol.for('octane-motion:controller');
 const GESTURE = Symbol.for('octane-motion:gesture');
 const EXIT = Symbol.for('octane-motion:exit');
 const LAYOUT = Symbol.for('octane-motion:layout');
@@ -438,7 +443,8 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		// label rather than its own `animate`.
 		const inheritsAnimate = props.animate === undefined && isVariantLabel(inherited.animate);
 		const initial = resolveVariant(initialLabel, props);
-		const animateTargets = resolveVariant(animateLabel, props);
+		const controller = isAnimationControls(animateLabel) ? animateLabel : undefined;
+		const animateTargets = controller ? undefined : resolveVariant(animateLabel, props);
 		const { values: resolvedInitial } = splitVariant(initial);
 		const { values: resolvedAnimate, transition: animateVariantTransition } =
 			splitVariant(animateTargets);
@@ -531,6 +537,70 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		latest.layoutEnabled = layoutEnabled;
 		latest.layoutIdKey = layoutIdKey;
 		latest.layoutMode = layoutAnimationMode(props.layout);
+
+		if (controller) {
+			// Commands must see only props from an accepted commit, even if another
+			// render is suspended or abandoned.
+			useInsertionEffect(
+				() => {
+					const committed =
+						props.transition === undefined && config.transition
+							? { ...props, transition: config.transition }
+							: props;
+					latest.committedControllerProps = committed;
+					if (latest.controller === controller && latest.controllerVisual) {
+						latest.controllerVisual.update(committed, null);
+						latest.controllerVisual.shouldReduceMotion = shouldReduceMotion;
+					}
+				},
+				null,
+				CONTROLLER_PROPS,
+			);
+			useLayoutEffect(
+				() => {
+					if (!animationEnabled) return;
+					const node = latest.host.current;
+					const Visual = svg ? SVGVisualElement : HTMLVisualElement;
+					const visual = new Visual({
+						props: latest.committedControllerProps,
+						presenceContext: null,
+						reducedMotionConfig: shouldReduceMotion ? 'always' : 'never',
+						visualState: {
+							latestValues: {},
+							renderState: { style: {}, vars: {}, transform: {}, transformOrigin: {}, attrs: {} },
+						},
+					} as any);
+					visual.mount(node);
+					latest.controller = controller;
+					latest.controllerVisual = visual;
+					const release = () => {
+						stopVisualElement(visual);
+						visual.unmount();
+						if (visualElementStore.get(node) === visual) visualElementStore.delete(node);
+						if (latest.controllerVisual === visual) {
+							latest.controllerVisual = undefined;
+							latest.controller = undefined;
+						}
+					};
+					let unsubscribe: () => void;
+					try {
+						unsubscribe = controller.subscribe(visual);
+					} catch (error) {
+						release();
+						throw error;
+					}
+					return () => {
+						try {
+							unsubscribe();
+						} finally {
+							release();
+						}
+					};
+				},
+				[animationEnabled, controller],
+				CONTROLLER,
+			);
+		}
 
 		// `initial`: apply instantly on mount (before the animate effect runs).
 		// OCTANE DIVERGENCE[motion-initial-only-no-style-materialization][conformance:initial-only-no-style-materialization]
@@ -1174,6 +1244,7 @@ export function LazyMotion(props: LazyMotionProps, _scope?: unknown) {
 }
 
 export { useAnimate } from './useAnimate';
+export { useAnimationControls } from './useAnimationControls';
 export { useMotionValue } from './useMotionValue';
 export { useScroll } from './useScroll';
 export { useTransform } from './useTransform';

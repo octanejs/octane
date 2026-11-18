@@ -9467,6 +9467,35 @@ export const views = [Motion, motion.div];`,
 		);
 	});
 
+	it('migrates animation controls only from a released catalog or a proven installed export', async () => {
+		const binding = '@octanejs/motion';
+		for (const installed of [false, true]) {
+			const root = project({
+				'package.json': JSON.stringify(
+					installed ? { dependencies: { [binding]: catalogVersion(binding) } } : { name: 'app' },
+				),
+				'view.ts': "export { useAnimationControls } from 'framer-motion';",
+				...(installed && {
+					[`node_modules/${binding}/package.json`]: JSON.stringify({
+						name: binding,
+						type: 'module',
+						version: catalogVersion(binding),
+						exports: { '.': './index.ts' },
+					}),
+					[`node_modules/${binding}/index.ts`]: 'export const useAnimationControls = () => {};',
+				}),
+			});
+			const result = await runCodemod([path.join(root, 'view.ts')], {
+				root,
+				verify: false,
+				write: false,
+			});
+			const supported = installed || catalogVersion(binding) !== '0.1.71';
+			expect(result.files[0].code).toContain(supported ? binding : 'framer-motion');
+			expect(result.files[0].notes).toHaveLength(supported ? 0 : 1);
+		}
+	});
+
 	it.each([
 		['matching installed release', '0.1.15', './index.ts'],
 		['missing install', undefined, undefined],
