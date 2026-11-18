@@ -1,7 +1,8 @@
 // Mirrors @octanejs/tanstack-router's server-side Body: a component that
 // re-parents its compiled CHILDREN BLOCK through createElement positional
 // children into a bare-children-return passthrough component.
-import { createElement, HYDRATION_RANGE_BOUNDARY } from 'octane';
+import { createElement } from 'octane';
+import { HYDRATION_RANGE_BOUNDARY } from 'octane/internal/client';
 
 const Owner = (props: any) => props.children;
 (Owner as any)[HYDRATION_RANGE_BOUNDARY] = 'owner';

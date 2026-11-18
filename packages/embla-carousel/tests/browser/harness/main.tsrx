@@ -1,5 +1,6 @@
 import useEmblaCarousel from '@octanejs/embla-carousel';
-import { createRoot, delegateEvents, useEffect, useState } from 'octane';
+import { createRoot, useEffect, useState } from 'octane';
+import { delegateEvents } from 'octane/internal/client';
 
 delegateEvents(['click']);
 

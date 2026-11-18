@@ -1,4 +1,5 @@
-import { createRoot, delegateEvents, useState } from 'octane';
+import { createRoot, useState } from 'octane';
+import { delegateEvents } from 'octane/internal/client';
 import { DayPicker } from '../../../src/index.ts';
 import '../../../src/style.css';
 

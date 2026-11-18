@@ -1,4 +1,5 @@
-import { createRoot, delegateEvents } from 'octane';
+import { createRoot } from 'octane';
+import { delegateEvents } from 'octane/internal/client';
 import { Group, Panel, Separator, useDefaultLayout } from '@octanejs/resizable-panels';
 
 delegateEvents(['blur', 'focus', 'keydown', 'pointerdown', 'pointermove', 'pointerup']);

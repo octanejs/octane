@@ -6,6 +6,7 @@
  */
 export const SERVER_RUNTIME_REQUESTS = {
 	octane: 'octane/server',
+	'octane/internal/client': 'octane/internal/server',
 	'octane/signals/client': 'octane/signals/server',
 	'octane/react': 'octane/react/server',
 	'octane/data/octane': 'octane/data/octane/server',

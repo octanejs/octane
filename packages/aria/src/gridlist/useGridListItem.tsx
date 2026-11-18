@@ -37,7 +37,7 @@ import {
 	type KeyboardEvent as ReactKeyboardEvent,
 	useRef,
 } from '../compat/react';
-import { withSlot } from 'octane';
+import { withSlot } from 'octane/internal/client';
 import { isFocusVisible } from '../interactions/useFocusVisible';
 import type { ListState } from '../upstream-exports/react-stately/useListState';
 import { mergeProps } from '../utils/mergeProps';

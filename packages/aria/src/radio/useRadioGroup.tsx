@@ -20,7 +20,7 @@ import type {
 	InputDOMProps,
 	ValidationResult,
 } from '@react-types/shared';
-import { withSlot } from 'octane';
+import { withSlot } from 'octane/internal/client';
 import { filterDOMProps } from '../utils/filterDOMProps';
 import { getEventTarget } from '../utils/shadowdom/DOMFunctions';
 import { getFocusableTreeWalker } from '../focus/FocusScope';

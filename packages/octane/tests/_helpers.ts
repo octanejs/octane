@@ -2,15 +2,8 @@
  * Test helpers — thin wrapper around createRoot + flushSync so tests can
  * mount a component, inspect the DOM, fire events, and unmount cleanly.
  */
-import {
-	createRoot,
-	flushSync,
-	delegateEvents,
-	drainPassiveEffects,
-	act,
-	type ComponentBody,
-	type Root,
-} from '../src/index.js';
+import { createRoot, flushSync, act, type ComponentBody, type Root } from '../src/index.js';
+import { delegateEvents, drainPassiveEffects } from '../src/internal/client.js';
 
 export { act };
 

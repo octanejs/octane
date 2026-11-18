@@ -1,15 +1,14 @@
 import { describe, it, expect, vi } from 'vitest';
 import { installTestClock } from 'octane/testing';
-import { __serverRpc } from 'octane';
+import { __serverRpc } from 'octane/internal/client';
 import { __serverRpcPreload } from 'octane/internal/server-rpc';
 import * as devalue from 'devalue';
 import {
 	executeServerFunction,
 	executeServerFunctionStream,
-	__registerServerFunction,
-	__setServerCallContextSource,
 	type ServerCallContext,
 } from 'octane/server';
+import { __registerServerFunction, __setServerCallContextSource } from 'octane/internal/server';
 
 // As a compiled module with server function stubs does.
 __serverRpcPreload();

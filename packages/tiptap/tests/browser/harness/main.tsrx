@@ -8,7 +8,8 @@ import {
 	useEditor,
 } from '@octanejs/tiptap';
 import { BubbleMenu, FloatingMenu } from '@octanejs/tiptap/menus';
-import { createRoot, delegateEvents, useState } from 'octane';
+import { createRoot, useState } from 'octane';
+import { delegateEvents } from 'octane/internal/client';
 
 delegateEvents(['dragstart', 'dragover', 'drop']);
 

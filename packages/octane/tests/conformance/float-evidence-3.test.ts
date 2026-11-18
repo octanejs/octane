@@ -5,15 +5,8 @@
 // gating is out of scope (documented divergence), so assertions target tag
 // placement, identity, options pass-through, and dedupe — never load timing.
 import { describe, it, expect, afterEach } from 'vitest';
-import {
-	act,
-	createRoot,
-	hydrateRoot,
-	flushSync,
-	preinit,
-	preload,
-	resetFloatResourceState,
-} from '../../src/index.js';
+import { act, createRoot, hydrateRoot, flushSync, preinit, preload } from '../../src/index.js';
+import { resetFloatResourceState } from '../../src/internal/client.js';
 import * as Server from 'octane/server';
 import { collectPipeableStream } from '../_server-stream.js';
 import { loadServerFixture } from '../_server-fixture.js';

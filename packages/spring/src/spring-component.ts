@@ -1,5 +1,5 @@
 import { Spring as SpringImpl } from './components.tsrx';
-import type { Scope } from 'octane';
+import type { Scope } from 'octane/internal/client';
 import type { SpringValues } from './types/objects';
 import type {
 	ControllerUpdate,

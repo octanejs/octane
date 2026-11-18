@@ -6,7 +6,8 @@
 // leading ownership comment, report a recoverable mismatch, and rebuild the
 // whole root, whether or not the hoisted element carried a spread.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { hydrateRoot, flushSync, resetFloatResourceState } from '../../src/index.js';
+import { hydrateRoot, flushSync } from '../../src/index.js';
+import { resetFloatResourceState } from '../../src/internal/client.js';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, type CompiledFixtureModule } from '../_server-fixture.js';
 import { activateStreamedMarkup, deferred, resetStreamRuntimeGlobals } from '../_server-stream.js';

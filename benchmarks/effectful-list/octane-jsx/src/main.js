@@ -1,4 +1,5 @@
-import { createRoot, flushSync, drainPassiveEffects } from 'octane';
+import { createRoot, flushSync } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import App from './App.tsx';
 import { toEmpty, toFresh1k, updateNodeps, updateDeps, remove100 } from './ops.js';
 import './fx.js';

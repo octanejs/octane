@@ -25,18 +25,16 @@ import {
 	isInActScope,
 	createElement,
 	createRoot,
-	drainPassiveEffects,
 	flushSync,
-	hasPendingWork,
 	hydrateRoot,
 	isValidElement,
 	useEffect,
-	withSlot,
 	type ComponentBody,
 	type ElementDescriptor,
 	type OctaneNode,
 	type Root,
 } from 'octane';
+import { drainPassiveEffects, hasPendingWork, withSlot } from 'octane/internal/client';
 import {
 	configure as configureDTL,
 	getQueriesForElement,

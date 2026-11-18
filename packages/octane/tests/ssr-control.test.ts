@@ -2,8 +2,9 @@ import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
-import { injectStyle } from '../src/index.js';
+import { injectStyle } from '../src/internal/client.js';
 import * as RT from 'octane/server';
+import * as RTInternal from 'octane/internal/server';
 import { prerender } from 'octane/static';
 import { loadCompiledFixtureSource } from './_server-fixture';
 
@@ -268,7 +269,7 @@ describe('SSR Phase 3 — scoped CSS across the boundary', () => {
 
 	it('server injectStyle applies and escapes a per-style nonce ahead of the render nonce', () => {
 		const PerStyleNonce = () => {
-			RT.injectStyle('tsrx-server-nonce', '.nonce{color:green}', 'style-"csp');
+			RTInternal.injectStyle('tsrx-server-nonce', '.nonce{color:green}', 'style-"csp');
 			return null;
 		};
 		const out = RT.renderToString(PerStyleNonce, undefined, { nonce: 'render-csp' });
@@ -282,7 +283,7 @@ describe('SSR Phase 3 — scoped CSS across the boundary', () => {
 		(mode) => {
 			const { createElement: h } = RT;
 			const Sheet = ({ id, css, nonce }: { id: string; css: string; nonce?: string }) => {
-				RT.injectStyle(id, css, nonce);
+				RTInternal.injectStyle(id, css, nonce);
 				return h('span', null, id);
 			};
 			const App = () =>
@@ -319,7 +320,8 @@ describe('SSR Phase 3 — scoped CSS across the boundary', () => {
 	it('restores repeated styles and nonces after render-phase retries and nested requests', () => {
 		const { App } = loadCompiledFixtureSource(
 			`
-			import { injectStyle, renderToString, useState } from 'octane/server';
+			import { renderToString, useState } from 'octane/server';
+			import { injectStyle } from 'octane/internal/server';
 			function Repeated(p) @{
 				injectStyle('shared', p.css, p.nonce);
 				<span>repeated</span>

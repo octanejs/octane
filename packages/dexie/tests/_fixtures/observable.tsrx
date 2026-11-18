@@ -1,5 +1,5 @@
 import { useDocument, useObservable } from '@octanejs/dexie';
-import { withSlot } from 'octane';
+import { withSlot } from 'octane/internal/client';
 
 export function ObservableReader({
 	observable,

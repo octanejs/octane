@@ -35,6 +35,10 @@ import {
 	methodDepFlags,
 } from './hook-deps.js';
 import { inlinePlainHookMemos } from './plain-hook-memo.js';
+import {
+	CLIENT_PUBLIC_RUNTIME_EXPORTS,
+	SERVER_PUBLIC_RUNTIME_EXPORTS,
+} from './public-runtime-exports.js';
 import { assertStrongMode } from './strong-mode.js';
 import { unsupportedStrongAutomaticMemo } from './strong-auto-memo.js';
 import { assertNativeReadDiagnostics, nativeReadOptions } from './native-read-diagnostics.js';
@@ -669,6 +673,19 @@ function parallelUseCallOfStatement(statement) {
 	return call;
 }
 
+// DOM output imports compiler-only helpers from the internal entries; universal
+// renderers resolve bare `octane` requests to their own runtime.
+function helperRequest(st, imported) {
+	if (st.environment === 'server') {
+		return st.domRuntime && !SERVER_PUBLIC_RUNTIME_EXPORTS.has(imported)
+			? 'octane/internal/server'
+			: 'octane/server';
+	}
+	return st.domRuntime && !CLIENT_PUBLIC_RUNTIME_EXPORTS.has(imported)
+		? 'octane/internal/client'
+		: 'octane';
+}
+
 function requireParallelHelper(st, imported) {
 	const request =
 		imported === 'nativePuMemo' ||
@@ -678,9 +695,7 @@ function requireParallelHelper(st, imported) {
 			? st.environment === 'server'
 				? 'octane/internal/server'
 				: 'octane/internal/client'
-			: st.environment === 'server'
-				? 'octane/server'
-				: 'octane';
+			: helperRequest(st, imported);
 	const key = `${request}\0${imported}`;
 	let helper = st.parallelHelpers.get(key);
 	if (helper !== undefined) return helper.local;
@@ -1406,6 +1421,7 @@ export function slotHooks(source, id, options) {
 		slotBaseName: null,
 		hookSlotsName: null,
 		voidRootNames: new Map(),
+		domRuntime: (options?.renderer?.target ?? 'dom') === 'dom' && options?.universalRuntime == null,
 	};
 	if (!st.hmr && !st.profile) st.slotBaseName = allocSlotName(st, '_hs$');
 	if (importInfo.importsHook) {
@@ -1439,37 +1455,34 @@ export function slotHooks(source, id, options) {
 	// side-effect-free and the consts are read only inside function bodies (which
 	// run after the module is fully evaluated, including cross-module imports), so
 	// trailing placement has no TDZ hazard for any valid hook usage.
-	const helperSpecifiers = [...st.getterHelpers].map(
-		([hook, local]) => `${STATE_GETTER_HELPERS[hook]} as ${local}`,
-	);
-	const otherHelpers = new Map();
-	for (const [helper, local] of st.voidRootNames) {
-		if (helper === '__createRootDefaultOptions' || helper === '__createVoidRootDefaultOptions') {
-			let specifiers = otherHelpers.get('octane/internal/client');
-			if (specifiers === undefined) otherHelpers.set('octane/internal/client', (specifiers = []));
-			specifiers.push(`${helper} as ${local}`);
-		} else helperSpecifiers.push(`${helper} as ${local}`);
-	}
-	for (const helper of st.parallelHelpers.values()) {
-		if (helper.request === 'octane') {
-			helperSpecifiers.push(`${helper.imported} as ${helper.local}`);
-		}
-	}
+	// Bare `octane` here is rewritten for server builds, so only the client
+	// request is chosen by name; server-only helpers already carry theirs.
+	const helperImports = new Map();
+	const addHelper = (request, imported, local) => {
+		let specifiers = helperImports.get(request);
+		if (specifiers === undefined) helperImports.set(request, (specifiers = []));
+		specifiers.push(`${imported} as ${local}`);
+	};
+	const bareRequest = (imported) =>
+		st.domRuntime && !CLIENT_PUBLIC_RUNTIME_EXPORTS.has(imported)
+			? st.environment === 'server'
+				? 'octane/internal/server'
+				: 'octane/internal/client'
+			: 'octane';
 	if (!st.hmr && !st.profile && st.nextId > 0) {
 		st.hookSlotsName = allocSlotName(st, '_$hookSlots');
-		helperSpecifiers.unshift(`hookSlots as ${st.hookSlotsName}`);
+		addHelper(bareRequest('hookSlots'), 'hookSlots', st.hookSlotsName);
 	}
-	const helperImport =
-		helperSpecifiers.length === 0
-			? ''
-			: `import { ${helperSpecifiers.join(', ')} } from 'octane';\n`;
+	for (const [hook, local] of st.getterHelpers) {
+		addHelper(bareRequest(STATE_GETTER_HELPERS[hook]), STATE_GETTER_HELPERS[hook], local);
+	}
+	// Root specialization runs only for the DOM client.
+	for (const [helper, local] of st.voidRootNames)
+		addHelper('octane/internal/client', helper, local);
 	for (const helper of st.parallelHelpers.values()) {
-		if (helper.request === 'octane') continue;
-		let specifiers = otherHelpers.get(helper.request);
-		if (specifiers === undefined) otherHelpers.set(helper.request, (specifiers = []));
-		specifiers.push(`${helper.imported} as ${helper.local}`);
+		addHelper(helper.request, helper.imported, helper.local);
 	}
-	const otherHelperImports = [...otherHelpers]
+	const helperImport = [...helperImports]
 		.map(([request, specifiers]) => `import { ${specifiers.join(', ')} } from '${request}';\n`)
 		.join('');
 	const signalHelperImports = new Map();
@@ -1511,7 +1524,6 @@ export function slotHooks(source, id, options) {
 			: '';
 	const block =
 		helperImport +
-		otherHelperImports +
 		signalImports +
 		profileImport +
 		slotBase +

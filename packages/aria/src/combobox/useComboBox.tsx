@@ -47,7 +47,7 @@ import {
 import { getActiveElement, getEventTarget, nodeContains } from '../utils/shadowdom/DOMFunctions';
 import { getChildNodes } from '../upstream-exports/react-stately/private/collections/getChildNodes';
 import { getItemCount } from '../upstream-exports/react-stately/private/collections/getItemCount';
-import { withSlot } from 'octane';
+import { withSlot } from 'octane/internal/client';
 import { getItemId, listData } from '../listbox/utils';
 import { getOwnerDocument } from '../utils/domHelpers';
 import intlMessages from '../intl/combobox/index';

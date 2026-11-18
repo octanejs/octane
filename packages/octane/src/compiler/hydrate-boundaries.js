@@ -2478,7 +2478,7 @@ export function prepareHydrateBoundaries(
 				body: [
 					b.import_declaration(
 						[b.import_specifier('__PermanentStaticHydrate', staticComponentName)],
-						'octane',
+						'octane/internal/client',
 					),
 					...ast.body,
 				],

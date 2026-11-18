@@ -68,7 +68,7 @@ async function bundleApp(source: string, extraEntry = '') {
 	});
 	const result = await build({
 		stdin: {
-			contents: `${code}\nexport { __createVoidRoot as createRoot } from 'octane';\n${extraEntry}`,
+			contents: `${code}\nexport { __createVoidRoot as createRoot } from 'octane/internal/client';\n${extraEntry}`,
 			loader: 'js',
 			resolveDir: resolve(TESTS, '..'),
 			sourcefile: 'form-action-bundle-entry.js',

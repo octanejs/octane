@@ -2,13 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
-import {
-	createRoot,
-	hydrateRoot,
-	flushSync,
-	createElement,
-	delegateEvents,
-} from '../../src/index.js';
+import { createRoot, hydrateRoot, flushSync, createElement } from '../../src/index.js';
+import { delegateEvents } from '../../src/internal/client.js';
 import * as ServerRT from 'octane/server';
 import { Inner, Counter, Hole, Layout, FragLayout } from './_fixtures/renderable.tsrx';
 

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createRoot, drainPassiveEffects, flushSync } from 'octane';
+import { createRoot, flushSync } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { cache } from '../../src/_internal/index';
 import { renderTrace, SWRReader } from '../upstream/root/fixtures.tsrx';
 

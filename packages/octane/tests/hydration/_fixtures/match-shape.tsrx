@@ -6,7 +6,6 @@
 // instance of this chain must survive its first post-hydration update without
 // remounting (state, effects, and DOM identity preserved).
 import {
-	HYDRATION_RANGE_BOUNDARY,
 	createContext,
 	createElement,
 	Suspense,
@@ -14,6 +13,7 @@ import {
 	useState,
 	useSyncExternalStore,
 } from 'octane';
+import { HYDRATION_RANGE_BOUNDARY } from 'octane/internal/client';
 import type { OctaneNode } from 'octane';
 
 export interface ResetStore {

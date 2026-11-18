@@ -2,9 +2,10 @@
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Middleware } from '@octanejs/app-core';
-import { __serverRpc, __serverRpcStream } from 'octane';
+import { __serverRpc, __serverRpcStream } from 'octane/internal/client';
 import { __serverRpcPreload } from 'octane/internal/server-rpc';
-import { __registerServerFunction, type ServerCallContext } from 'octane/server';
+import { type ServerCallContext } from 'octane/server';
+import { __registerServerFunction } from 'octane/internal/server';
 import { createServerFunctions } from '../src/server/server-functions.js';
 
 __serverRpcPreload();

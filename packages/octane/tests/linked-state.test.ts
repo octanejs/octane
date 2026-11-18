@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-	__useLinkedStateWithGetter,
 	createElement,
 	flushSync,
 	startTransition,
@@ -9,6 +8,7 @@ import {
 	useLinkedState,
 	useState,
 } from '../src/index.js';
+import { __useLinkedStateWithGetter } from '../src/internal/client.js';
 import { act, mount } from './_helpers';
 
 type PreviousSource<S, T> = { source: S; value: T } | undefined;

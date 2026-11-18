@@ -9,7 +9,8 @@
 import * as React from 'react';
 import { flushSync as reactFlushSync } from 'react-dom';
 import { createRoot as createReactRoot } from 'react-dom/client';
-import { createRoot as createOctaneRoot, delegateEvents, type Root } from 'octane';
+import { createRoot as createOctaneRoot, type Root } from 'octane';
+import { delegateEvents } from 'octane/internal/client';
 import { ClickIsland, EmptyIsland, IslandEnvelope } from './islands.tsrx';
 
 // A realistic app-wide delegated-event registry: compiled modules call

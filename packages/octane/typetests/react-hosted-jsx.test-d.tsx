@@ -21,7 +21,8 @@
  *     types cleanly at the child site.
  */
 import * as React from 'react';
-import type { ComponentBody, Scope } from '../src/index.js';
+import type { ComponentBody } from '../src/index.js';
+import type { Scope } from '../src/internal/client.js';
 import type { SignalOwner } from 'octane/signals';
 import { OctaneCompat, OctaneCompatInline, type OctaneReactComponent } from 'octane/react';
 import {

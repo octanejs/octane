@@ -20,11 +20,9 @@ export { createResizeObserver } from '../resize-observer.js';
  * server` functions — the vite plugin loads it via
  * `ssrLoadModule('octane/server')` so it runs inside the SSR module graph.
  *
- * Everything below the "compiler-emitted" divider is NOT for hand-written
- * code: the `octane/compiler` in `mode: 'server'` emits component modules that
- * import those string-building helpers from here. Treat them as the compiler's
- * private ABI — present because compiled output needs them, not because apps
- * should call them.
+ * Server-compiled modules import their string-building helpers from
+ * `octane/internal/server`, the compiler's private ABI; this entry exports only
+ * the names in compiler/public-runtime-exports.js.
  */
 
 export { executeServerFunction, executeServerFunctionStream } from './rpc.js';
@@ -61,9 +59,6 @@ export {
 export type { SignalOwner, SignalOwnerEnvironment } from '../signals/types.js';
 export type { CompiledComponent } from '../runtime.js';
 export {
-	__registerServerFunction,
-	__serverCall,
-	__setServerCallContextSource,
 	type ServerCallContext,
 	type ServerCallContextSource,
 	type ServerCallHost,
@@ -81,11 +76,6 @@ export {
 	type SlotlessSubSlot,
 	type SubSlotOptions,
 } from '../sub-slot.js';
-
-// Semi-public compiler target for inferred method-call dependencies — the
-// same helper the client entry ships, because inferred dependency arrays are
-// compiled identically for SSR (see applyHookDependencies' server call site).
-export { __methodDep } from '../method-dep.js';
 
 export {
 	// Buffered and streaming renderers accept renderable roots plus options,
@@ -106,17 +96,11 @@ export {
 	type StreamInjectionSource,
 	setSsrSuspenseTimeout,
 	getSsrSuspenseTimeout,
-	EXTERNAL_HYDRATION_PROMISE,
-	HYDRATION_RANGE_BOUNDARY,
 
 	// Hooks (server semantics)
 	useState,
 	useLinkedState,
 	useReducer,
-	__useCommittedState,
-	__useStateWithGetter,
-	__useLinkedStateWithGetter,
-	__useReducerWithGetter,
 	type LinkedStatePrevious,
 	type LinkedStateOptions,
 	useEffect,
@@ -141,10 +125,6 @@ export {
 	useDebugValue,
 	memo,
 	lazy,
-	hookSlots,
-	withSlot,
-	manualHook,
-	invokeManualHook,
 	startTransition,
 	flushSync,
 	RenderingPhase,
@@ -153,7 +133,6 @@ export {
 	writeLayout,
 	flushLayoutSync,
 	setLayoutSnapshotTiming,
-	__createDiscreteEventListener,
 	isChildrenBlock,
 	isValidElement,
 	cloneElement,
@@ -188,90 +167,8 @@ export {
 	CompiledOutlet,
 	use,
 	useContext,
-	ssrIsSuspense,
 	type Context,
 	type FormStatus,
-
-	// Compiler-emitted codegen helpers (private ABI — see module doc)
-	markChildrenBlock,
-	markWarm,
-	ssrHtml,
-	ssrChildTextPre,
-	ssrTextareaText,
-	ssrChildPre,
 	descriptorChildren,
 	createElement,
-	createScopedValue,
-	createScopedElement,
-	positionalChildren,
-	escapeHtml,
-	escapeAttr,
-	ssrText,
-	ssrTextPre,
-	ssrTextSlot,
-	ssrRootTextMarker,
-	ssrNestingText,
-	ssrChild,
-	ssrChildText,
-	ssrAttr,
-	normalizeClass,
-	ssrStyle,
-	ssrClass,
-	ssrAttrs,
-	ssrSignalValue,
-	ssrSignalControlValue,
-	ssrSignalControlAttrs,
-	ssrSnapshotSpread,
-	enableServerSignalBindings,
-	ssrSpread,
-	ssrInnerHtml,
-	ssrScriptInnerHtml,
-	ssrChildrenSources,
-	ssrScriptChildrenSources,
-	ssrSpreadContent,
-	ssrVoidContent,
-	// Controlled form serialization (value/checked attrs, textarea content,
-	// select option-projection scope)
-	ssrValueAttr,
-	ssrCheckedAttr,
-	ssrInputAttrs,
-	ssrFormAuthoringDiagnostics,
-	ssrTextareaValue,
-	ssrTextareaValueSources,
-	ssrSelectAttrs,
-	ssrSelectScope,
-	ssrSelectScopeSources,
-	ssrOptionValueSources,
-	ssrOption,
-	ssrElement,
-	ssrComponent,
-	ssrComponentNS,
-	ssrComponentFromConfig,
-	ssrInNamespace,
-	ssrBlock,
-	ssrFragmentMarker,
-	ssrActivity,
-	ssrForBlock,
-	mapSlot,
-	ssrControl,
-	ssrArm,
-	ssrForItem,
-	ssrTry,
-	__runOnCatch,
-	ssrPortal,
-	injectStyle,
-	ssrHeadEl,
-	styleMap,
-	touchStyleMap,
-	// React Float resources (stylesheet precedence links, style resources, async scripts)
-	ssrStylesheetResource,
-	ssrStyleResource,
-	ssrScriptResource,
-	namespaceHead,
-	namespaceHeadElement,
-	// SSR parallel-use mirror (compiler targets — see suspense-parallel-use plan).
-	puMemo,
-	puBatch,
-	warmMemo,
-	warmChild,
 } from '../runtime.server.js';

@@ -29,12 +29,12 @@ import * as React from 'react';
 import { createRoot as createReactRoot, type Root as ReactRoot } from 'react-dom/client';
 import {
 	createRoot as createOctaneRoot,
-	drainPassiveEffects,
 	flushSync as octaneFlushSync,
 	type ComponentBody,
 	type Context as OctaneContext,
 	type Root as OctaneRoot,
 } from '../../src/index.js';
+import { drainPassiveEffects } from '../../src/internal/client.js';
 import { HostedIslandEnvelope } from './_fixtures/islands.tsrx';
 import { readNearestProviderValue } from './_fiber-adapter.js';
 

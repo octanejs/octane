@@ -9,7 +9,7 @@ import { build, transform } from 'esbuild';
 import { describe, expect, it } from 'vitest';
 import { slotHooks } from '../../src/compiler/slot-hooks.js';
 import { loadPlainHookFixtureSource } from '../_server-fixture.js';
-import * as Client from '../../src/index.js';
+import * as Client from '../../src/internal/client.js';
 import * as Server from '../../src/runtime.server.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
@@ -113,7 +113,8 @@ describe('manual provider definition boundaries', () => {
 			const module = loadPlainHookFixtureSource(
 				variant.prefix +
 					`
-				import { withSlot, useMemo } from 'octane';
+				import { useMemo } from 'octane';
+				import { withSlot } from 'octane/internal/client';
 				const _$manual_useBefore = 'collision control';
 				export const early = withSlot(Symbol.for('early'), useBefore, 'before');
 				export const earlyBound = useBefore.bind(null);

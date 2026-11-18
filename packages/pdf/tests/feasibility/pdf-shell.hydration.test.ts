@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
-import { drainPassiveEffects, flushSync, hydrateRoot } from 'octane';
+import { flushSync, hydrateRoot } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { createServer } from 'vite';
 import { describe, expect, it, vi } from 'vitest';
 

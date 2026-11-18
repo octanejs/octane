@@ -6,7 +6,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { resolve } from 'node:path';
 import { act } from 'react';
-import { drainPassiveEffects, flushSync } from 'octane';
+import { flushSync } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import {
 	mountDifferential,
 	preloadDifferentialFixture,

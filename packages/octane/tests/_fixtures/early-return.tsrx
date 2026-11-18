@@ -1,4 +1,5 @@
-import { memo, useState, withSlot, type OctaneNode } from 'octane';
+import { memo, useState, type OctaneNode } from 'octane';
+import { withSlot } from 'octane/internal/client';
 
 // Simple early-return: render nothing when condition holds.
 // Old syntax: `if (props.hide) return;` before the JSX.

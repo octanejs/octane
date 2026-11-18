@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createElement, flushSync, hostComponent, type ComponentBody } from '../src/index.js';
+import { createElement, flushSync, type ComponentBody } from '../src/index.js';
+import { hostComponent } from '../src/internal/client.js';
 import { act, mount } from './_helpers';
 import {
 	CompiledSiblings,

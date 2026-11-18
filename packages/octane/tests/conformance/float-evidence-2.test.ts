@@ -14,8 +14,8 @@ import {
 	preinit,
 	preloadModule,
 	preinitModule,
-	resetFloatResourceState,
 } from '../../src/index.js';
+import { resetFloatResourceState } from '../../src/internal/client.js';
 import * as Server from 'octane/server';
 import { loadServerFixture } from '../_server-fixture.js';
 import { createPipeableCollector, deferred } from '../_server-stream.js';

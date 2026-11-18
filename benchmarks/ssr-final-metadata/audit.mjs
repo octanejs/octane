@@ -210,8 +210,13 @@ async function bundle(kind) {
 			{
 				name: 'metadata-source',
 				setup(plugin) {
-					plugin.onResolve({ filter: /^octane(?:\/(?:server|internal\/server))?$/ }, () => ({
-						path: path.join(sourceRoot, 'packages/octane/src/server/index.ts'),
+					plugin.onResolve({ filter: /^octane(?:\/(?:server|internal\/server))?$/ }, (args) => ({
+						path: path.join(
+							sourceRoot,
+							args.path === 'octane/internal/server'
+								? 'packages/octane/src/internal/server.ts'
+								: 'packages/octane/src/server/index.ts',
+						),
 					}));
 					if (kind === 'observed')
 						plugin.onLoad({ filter: /sanitize-url\.js$/ }, () => ({

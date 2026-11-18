@@ -6,7 +6,8 @@
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
-import { act as octaneAct, drainPassiveEffects, flushSync } from 'octane';
+import { act as octaneAct, flushSync } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import {
 	createDataOwner,
 	createDataStore,

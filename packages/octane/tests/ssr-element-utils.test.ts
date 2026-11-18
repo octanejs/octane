@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as Server from 'octane/server';
+import * as ServerInternal from 'octane/internal/server';
 
 // `octane/server` must export the React-compatible element utilities the
 // client entry has — bindings that inspect/re-project descriptor children
@@ -401,7 +402,7 @@ describe('octane/server element utilities', () => {
 	it('Children promises keep SSR boundary suspension bookkeeping during render', () => {
 		const promise = new Promise(() => {});
 		const App = (props: { promise: Promise<unknown> }, scope: unknown) =>
-			Server.ssrHtml(
+			ServerInternal.ssrHtml(
 				(Server as any).ssrTry(
 					scope,
 					'children-promise',

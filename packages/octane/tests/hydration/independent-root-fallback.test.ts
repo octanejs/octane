@@ -5,7 +5,8 @@ import {
 	type IndependentHydrateActivationContext,
 } from '../../src/hydration/independent-island.js';
 import { HYDRATE_INDEPENDENT_ATTR } from '../../src/hydration-protocol.js';
-import { flushSync, hasPendingWork, hydrateRoot, type Root } from '../../src/index.js';
+import { flushSync, hydrateRoot, type Root } from '../../src/index.js';
+import { hasPendingWork } from '../../src/internal/client.js';
 import { renderToString } from '../../src/runtime.server.js';
 import { evaluateCompiledFixtureCode, loadCompiledFixtureSource } from '../_server-fixture.js';
 

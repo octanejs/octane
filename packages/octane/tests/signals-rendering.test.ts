@@ -1,11 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-	createRoot,
-	flushSync,
-	getTransitionFallbackTimeout,
-	setTransitionFallbackTimeout,
-	startTransition,
-} from 'octane';
+import { createRoot, flushSync, startTransition } from 'octane';
+import { getTransitionFallbackTimeout, setTransitionFallbackTimeout } from 'octane/internal/client';
 import { bindSignalControl, createScope } from 'octane/signals';
 import { act, createLog, flushEffects, mount } from './_helpers';
 import {

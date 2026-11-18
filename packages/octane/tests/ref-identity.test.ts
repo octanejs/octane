@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { attachRef } from '../src/index.js';
+import { attachRef } from '../src/internal/client.js';
 import { mount } from './_helpers';
 import { ActivityIdentityRef, IdentityRef } from './_fixtures/ref-identity.tsrx';
 

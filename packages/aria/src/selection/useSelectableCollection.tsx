@@ -25,7 +25,8 @@ import type {
 	KeyboardDelegate,
 	RefObject,
 } from '@react-types/shared';
-import { flushSync, withSlot } from 'octane';
+import { flushSync } from 'octane';
+import { withSlot } from 'octane/internal/client';
 import { type FocusEvent, useEffect, useRef } from '../compat/react';
 import { focusSafely } from '../interactions/focusSafely';
 import { focusWithoutScrolling } from '../utils/focusWithoutScrolling';

@@ -6,14 +6,8 @@
 // Suspensey commits (suspend-until-loaded) are documented as out of scope, so
 // the load-event halves of the upstream cases are not ported here.
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import {
-	act,
-	createRoot,
-	hydrateRoot,
-	flushSync,
-	preloadModule,
-	resetFloatResourceState,
-} from '../../src/index.js';
+import { act, createRoot, hydrateRoot, flushSync, preloadModule } from '../../src/index.js';
+import { resetFloatResourceState } from '../../src/internal/client.js';
 import * as Server from 'octane/server';
 import { loadServerFixture } from '../_server-fixture.js';
 import {

@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import * as Client from '../src/index.js';
+import * as ClientInternal from '../src/internal/client.js';
 import * as Server from '../src/runtime.server.js';
 import * as Universal from '../src/universal.js';
 import * as Native from '../src/universal-native.js';
 
 describe.each([
-	['client', Client],
+	['client', ClientInternal],
 	['server', Server],
 	['universal', Universal],
 	['native', Native],
@@ -129,13 +130,17 @@ describe('custom hook state paths', () => {
 		return { state, set, ref };
 	}
 	function nested(value: string) {
-		return Client.withSlot(inner, useValue, value);
+		return ClientInternal.withSlot(inner, useValue, value);
 	}
 	function App(props: { swap?: boolean; hideFirst?: boolean; value?: string }) {
 		const left = props.hideFirst
 			? null
-			: Client.withSlot(props.swap ? second : first, nested, props.value ?? 'first');
-		const right = Client.withSlot(props.swap ? first : second, nested, props.value ?? 'second');
+			: ClientInternal.withSlot(props.swap ? second : first, nested, props.value ?? 'first');
+		const right = ClientInternal.withSlot(
+			props.swap ? first : second,
+			nested,
+			props.value ?? 'second',
+		);
 		report = { ...(left === null ? {} : { left }), right };
 		return Client.createElement('p', { children: `${left?.state ?? '-'}|${right.state}` });
 	}

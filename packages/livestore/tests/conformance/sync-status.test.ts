@@ -1,5 +1,6 @@
 import type { Store, SyncStatus } from '@livestore/livestore';
-import { drainPassiveEffects, flushSync, hydrateRoot } from 'octane';
+import { flushSync, hydrateRoot } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { describe, expect, it, vi } from 'vitest';
 import { act, flushEffects, mount } from '../_helpers';
 import { SyncReader } from '../_fixtures/document-sync.tsrx';

@@ -96,7 +96,8 @@ assert.deepEqual(catalogSites, { catalog_checks: 1, catalog_entries: 2, catalog_
 let observedCatalog = catalogSource;
 for (const [offset, text] of catalogInsertions.sort((a, b) => b[0] - a[0]))
 	observedCatalog = observedCatalog.slice(0, offset) + text + observedCatalog.slice(offset);
-const entry = 'export {createRoot,createElement,flushSync,hostComponent} from "octane";';
+const entry =
+	'export {createRoot,createElement,flushSync} from "octane";export {hostComponent} from "octane/internal/client";';
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'octane-descriptor-events-'));
 const emptyWork = () => ({
 	parse_records: 0,

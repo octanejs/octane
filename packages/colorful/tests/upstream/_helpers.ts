@@ -1,5 +1,6 @@
 import { afterEach, vi } from 'vitest';
-import { delegateEvents, flushSync } from 'octane';
+import { flushSync } from 'octane';
+import { delegateEvents } from 'octane/internal/client';
 import { flushEffects, mount } from '../../../octane/tests/_helpers';
 
 delegateEvents([

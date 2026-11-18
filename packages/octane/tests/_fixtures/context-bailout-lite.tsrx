@@ -1,14 +1,13 @@
 import {
 	Activity,
 	createContext,
-	hostComponent,
 	memo,
 	use,
 	useContext,
 	type ComponentBody,
 	type OctaneNode,
-	type Scope,
 } from 'octane';
+import { hostComponent, type Scope } from 'octane/internal/client';
 
 const Identity = createContext({ label: 'default' });
 
