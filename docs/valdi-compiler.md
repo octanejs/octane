@@ -296,10 +296,13 @@ omitted. `'host-text-site'` is invalid unless `text` is `'host'`.
 
 ### Component runtime
 
-An adapter can opt into ABI 4 with `capabilities: ['component-runtime']`. The
-generated module checks ABI 4 before registration or prototype creation. This
-capability may be combined with the host text and ref capabilities; the adapter
-must implement each selected contract.
+An adapter can opt into ABI 4 with `text: 'host'` and
+`capabilities: ['host-text-site', 'component-runtime']`. The generated module
+checks ABI 4 before registration or prototype creation. ABI 4 requires the
+host-text-site writer because `jsx.renderText` is the child sink: it must render
+child values, including values returned by `createValdiChildren`. The capability
+may be combined with `host-ref`; the adapter must implement each selected
+contract.
 
 ABI 4 accepts `createContext`, `useContext`, `useSyncExternalStore`, `useEffect`,
 `useEffectEvent`, `useLinkedState`, `useId`, `useLayoutSnapshot`, `useLazyRef`,
@@ -309,7 +312,8 @@ by the adapter. `createValdiChildren(render)` creates a child value that retains
 the authored closure and can be rendered by the adapter under its own component
 scope. Component children, JSX-valued props, and render callbacks use this
 contract; callbacks return a child value instead of writing into their caller's
-active scope. Hooks within render callbacks remain unsupported.
+active scope. Hooks within render callbacks or deferred JSX remain unsupported;
+evaluate parent hooks in component setup and pass their results into the child.
 
 Component tags may refer to a descriptor passed through props or a member
 expression, including context providers and lazy components. The compiler

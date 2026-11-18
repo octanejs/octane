@@ -209,7 +209,7 @@ function importedHookName(node, state) {
 
 function slotHookName(node, state) {
 	const imported = importedHookName(node, state);
-	if (imported !== null) return imported;
+	if (imported !== null) return HOOK_NAMES.has(imported) ? imported : null;
 	const callee = unwrap(node?.callee);
 	if (
 		callee?.type === 'Identifier' &&
@@ -227,6 +227,19 @@ function slotHookName(node, state) {
 		return callee.property.name;
 	}
 	return null;
+}
+
+function ownerHookName(node, state) {
+	const slot = slotHookName(node, state);
+	if (slot !== null) return slot;
+	const callee = unwrap(node?.callee);
+	return importedHookName(node, state) === 'useContext' ||
+		(callee?.type === 'Identifier' && callee.name === 'useContext') ||
+		(callee?.type === 'MemberExpression' &&
+			!callee.computed &&
+			callee.property?.name === 'useContext')
+		? 'useContext'
+		: null;
 }
 
 function validateRuntimeImports(ast, state) {
@@ -430,7 +443,7 @@ function lowerRenderCallback(fn, state) {
 		throw valdiError(state, fn, 'render callbacks must be synchronous.');
 	walk(fn.body, (node) => {
 		if (FUNCTION_TYPES.has(node.type)) return false;
-		if (node.type === 'CallExpression' && slotHookName(node, state) !== null) {
+		if (node.type === 'CallExpression' && ownerHookName(node, state) !== null) {
 			throw valdiError(state, node, 'hooks inside render callbacks require a child component.');
 		}
 	});
@@ -444,6 +457,15 @@ function lowerRenderCallback(fn, state) {
 }
 
 function deferredChildren(statements, state, origin) {
+	walk(statements, (node) => {
+		if (node.type === 'CallExpression' && ownerHookName(node, state) !== null) {
+			throw valdiError(
+				state,
+				node,
+				'hooks inside deferred children require a child component; evaluate parent hooks before creating children.',
+			);
+		}
+	});
 	return call(
 		state,
 		'createValdiChildren',
@@ -1438,6 +1460,9 @@ export function compileValdi(
 	};
 	if (state.textSites && renderer.text !== 'host') {
 		throw valdiError(state, ast, 'the host-text-site capability requires text: "host".');
+	}
+	if (state.componentRuntime && !state.textSites) {
+		throw valdiError(state, ast, 'the component-runtime capability requires host-text-site.');
 	}
 	if (options.hmr !== undefined && options.hmr !== false) {
 		throw valdiError(state, ast, 'HMR is not supported yet; compile with hmr: false.');

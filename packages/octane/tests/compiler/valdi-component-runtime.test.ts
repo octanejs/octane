@@ -27,6 +27,36 @@ describe('Valdi component runtime capability', () => {
 		).toThrow(/runtime import "useEffect"/);
 	});
 
+	it('requires host-text-site because ABI 4 children use renderText', () => {
+		expect(() =>
+			compile('export function Scene() @{ <view /> }', '/src/Scene.tsrx', {
+				renderer: { ...renderer, capabilities: ['component-runtime'] },
+				hmr: false,
+			}),
+		).toThrow(/component-runtime capability requires host-text-site/);
+	});
+
+	it.each(['reject', 'ignore'] as const)(
+		'requires host text for ABI 4 authored child sites when text is %s',
+		(text) => {
+			expect(() =>
+				compile('export function Scene() @{ <view /> }', '/src/Scene.tsrx', {
+					renderer: { ...renderer, text },
+					hmr: false,
+				}),
+			).toThrow(/host-text-site capability requires text: "host"/);
+		},
+	);
+
+	it('preserves legacy text-ignore behavior without component-runtime', () => {
+		expect(
+			compile('export function Scene() @{ <view>label</view> }', '/src/Scene.tsrx', {
+				renderer: { ...renderer, text: 'ignore', capabilities: [] },
+				hmr: false,
+			}).diagnostics,
+		).toEqual([]);
+	});
+
 	it('projects component values and native child types into both authoring views', () => {
 		const input = `import { createContext, useContext, useEffect } from 'octane';
 import type { Context, OctaneNode } from 'octane';

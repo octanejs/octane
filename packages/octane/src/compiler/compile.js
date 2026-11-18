@@ -22727,6 +22727,7 @@ function slotKeyedHookName(n, ctx) {
 	if (n.callee.type === 'Identifier') {
 		const local = n.callee.name;
 		const imported = n._octaneImportedHook ?? n._octaneHookRuntimeImportedHook;
+		if (imported === 'useContext' || imported === 'use') return null;
 		// A name bound by a non-octane import is that library's hook, never the
 		// builtin — it still slot-keys through the custom `use[A-Z]` branch below.
 		const shadowsImport =
