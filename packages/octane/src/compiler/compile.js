@@ -9321,6 +9321,10 @@ function mapCallbackHasEffects(node) {
  */
 function mapCallToForOf(expr, ctx) {
 	if (!isJsxReturningMapCall(expr)) return null;
+	// Receiver reflection is observable for a Proxy, and JavaScript has no
+	// trap-free way to distinguish one from the array it wraps. Fuse only a
+	// receiver whose source proves it was created as an ordinary array.
+	if (unwrapTsExpr(expr.callee.object)?.type !== 'ArrayExpression') return null;
 	if (
 		!ctx?.currentMapTemps ||
 		expr.arguments.length !== 1 ||

@@ -5120,7 +5120,7 @@ describe('compiler-owned component-region memoization', () => {
 			`function Row(props) { return <li>{props.label}</li>; }
 			export function App(props) {
 				const rows = props.rows;
-				return <ul>{rows.map((item, index) => <Row key={item.id} label={index} />)}</ul>;
+				return <ul>{[...rows].map((item, index) => <Row key={item.id} label={index} />)}</ul>;
 			}`,
 			'tsx-mapped-component-roundtrip.tsx',
 			{ hmr: false, dev: false },
@@ -6059,6 +6059,117 @@ describe('compiler-owned component-region memoization', () => {
 		}
 	});
 
+	it.each(['client', 'server'] as const)(
+		'calls a map replacement installed while spreading a proven array receiver in %s',
+		(mode) => {
+			const source = `export function App({ rows }) @{ <main>{[...rows].map((row, index) => <i key={index}>{row.label as string}</i>)}</main> }`;
+			const id = 'literal-map-override.tsrx';
+			expect(compile(source, id, { hmr: false, dev: false }).code).toContain('mapSlot');
+			const { App } = loadCompiledFixtureSource(source, {
+				id,
+				mode,
+				compileOptions: { hmr: false, dev: false },
+			});
+			const events: string[] = [];
+			const first = {
+				get label() {
+					events.push('callback:a');
+					return 'a';
+				},
+			};
+			const second = {
+				get label() {
+					events.push('callback:b');
+					return 'b';
+				},
+			};
+			const originalMap = Array.prototype.map;
+			const replacement = function <Item, Result>(
+				this: Item[],
+				callback: (item: Item, index: number, items: Item[]) => Result,
+				thisArg?: unknown,
+			): Result[] {
+				if ((this[0] as unknown) === first) events.push('method');
+				return originalMap.call(this, callback, thisArg) as Result[];
+			};
+			const rows = {
+				*[Symbol.iterator]() {
+					events.push('iterator:start');
+					Array.prototype.map = replacement;
+					yield first;
+					yield second;
+					events.push('iterator:end');
+				},
+			};
+			let root: ReturnType<typeof mount> | undefined;
+			try {
+				if (mode === 'server') ServerRuntime.renderToString(App, { rows });
+				else root = mount(App, { rows });
+			} finally {
+				Array.prototype.map = originalMap;
+				root?.unmount();
+			}
+			expect(events).toEqual([
+				'iterator:start',
+				'iterator:end',
+				'method',
+				'callback:a',
+				'callback:b',
+			]);
+		},
+	);
+
+	it.each(['client', 'server'] as const)(
+		'observes a native map receiver exactly like the authored callback in %s',
+		(mode) => {
+			const source = `
+			export function Probe({ rows }) @{ <main>{rows.map((row, index) => <i key={index}>{row as string}</i>)}</main> }
+			export function Control({ rows }) @{ <main>{rows.map((row, index) => { return <i key={index}>{row as string}</i>; })}</main> }
+		`;
+			const { Probe, Control } = loadCompiledFixtureSource(source, {
+				id: 'native-map-receiver.tsrx',
+				mode,
+				compileOptions: { hmr: false, dev: false },
+			});
+			const render = (App: any) => {
+				const observations: string[] = [];
+				const rows = new Proxy(['a', 'b'], {
+					get(target, key, receiver) {
+						observations.push('get:' + String(key));
+						return Reflect.get(target, key, receiver);
+					},
+					has(target, key) {
+						observations.push('has:' + String(key));
+						return Reflect.has(target, key);
+					},
+					getPrototypeOf(target) {
+						observations.push('prototype');
+						return Reflect.getPrototypeOf(target);
+					},
+					getOwnPropertyDescriptor(target, key) {
+						observations.push('descriptor:' + String(key));
+						return Reflect.getOwnPropertyDescriptor(target, key);
+					},
+				});
+				if (mode === 'server') {
+					const html = ServerRuntime.renderToString(App, { rows }).html;
+					const container = document.createElement('div');
+					container.innerHTML = html;
+					expect(Array.from(container.querySelectorAll('i'), (node) => node.textContent)).toEqual([
+						'a',
+						'b',
+					]);
+				} else {
+					const root = mount(App, { rows });
+					expect(root.findAll('i').map((node) => node.textContent)).toEqual(['a', 'b']);
+					root.unmount();
+				}
+				return observations;
+			};
+			expect(render(Probe)).toEqual(render(Control));
+		},
+	);
+
 	it('consults an Array[Symbol.species] replacement installed before the first mapped render', async () => {
 		const { server, client, ClientRuntime, ServerRuntime } = await loadFreshMappedRuntimes();
 		const events: string[] = [];
@@ -6441,7 +6552,7 @@ describe('compiler-owned component-region memoization', () => {
 	])('keeps $kind in arrow map parameters optimized', ({ kind, callback, rows, expected }) => {
 		const source = `
 			function SafeParameterMapApp(props) {
-				return <ul id="tsx-safe-parameter-map">{props.rows.map(${callback})}</ul>;
+				return <ul id="tsx-safe-parameter-map">{[...props.rows].map(${callback})}</ul>;
 			}
 			export const App = SafeParameterMapApp;
 		`;
@@ -8569,7 +8680,7 @@ describe('compiler-owned component-region memoization', () => {
 			`export function Rows(props) {
 				return (
 					<ul>
-						{props.rows.map((r, index) => (
+						{[...props.rows].map((r, index) => (
 							<li className={r.cls} {...r.attrs} key={index}>{r.label}</li>
 						))}
 					</ul>
@@ -9021,7 +9132,7 @@ describe('autoMemo — conversion globals in component regions', () => {
 			 function Rows(props) {
 				return (
 					<div id="rows">
-						{props.items.map((item) => <Row key={item.id} label={item.label} />)}
+						{[...props.items].map((item) => <Row key={item.id} label={item.label} />)}
 					</div>
 				);
 			 }
