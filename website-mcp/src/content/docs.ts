@@ -12,6 +12,7 @@ import ssrMd from '../../../docs/ssr.md?raw';
 import reactDifferencesMd from '../../../docs/differences-from-react.md?raw';
 import deferredHydrationMd from '../../../docs/deferred-hydration.md?raw';
 import dataMd from '../../../docs/data.md?raw';
+import signalsMd from '../../../docs/signals.md?raw';
 
 export interface McpDocSection {
 	id: string;
@@ -112,6 +113,17 @@ const repoDocs: McpDoc[] = [
 		url: 'https://github.com/octanejs/octane/blob/main/docs/data.md',
 		sections: markdownSections(dataMd),
 		markdown: dataMd,
+	},
+	{
+		slug: 'signals-reference',
+		title: 'octane/signals (full reference)',
+		description:
+			'The complete octane/signals reference: declaration ownership, async queries and streams, retained values, scopes, effects, transactions, families, transitions, and hydration.',
+		group: 'Explore',
+		source: 'repo',
+		url: 'https://github.com/octanejs/octane/blob/main/docs/signals.md',
+		sections: markdownSections(signalsMd),
+		markdown: signalsMd,
 	},
 	{
 		slug: 'ssr',
