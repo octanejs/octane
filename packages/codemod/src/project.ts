@@ -1348,15 +1348,16 @@ export async function runCodemod(
 					!selected &&
 					installedReact(source) &&
 					retainedReactContextExports(source, fs.readFileSync(source, 'utf8')).has(name);
+				const namedContext = (name === 'default' ? local : name).endsWith('Context');
 				return direct ||
 					retained ||
-					(name === 'default' ? local : name).endsWith('Context') ||
+					(!!source && namedContext) ||
 					(!!selected &&
 						selected.reexports.length > 0 &&
 						!!source &&
 						selectedContextReexport(source, name))
 					? 'review-alias'
-					: selected
+					: selected || namedContext
 						? false
 						: null;
 			}

@@ -8527,6 +8527,44 @@ export function View() { return <Shade.Provider value="night"><Shade.Consumer>{(
 	});
 
 	it.each([
+		['an unresolved module', '@missing/ui', {}],
+		[
+			'an installed third-party package',
+			'@vendor/ui',
+			{
+				'node_modules/@vendor/ui/package.json':
+					'{"name":"@vendor/ui","type":"module","types":"./index.d.ts","exports":"./index.js"}',
+				'node_modules/@vendor/ui/index.d.ts':
+					'export declare const PackageContext: { Provider: (props: unknown) => unknown };',
+				'node_modules/@vendor/ui/index.js':
+					'export const PackageContext = { Provider: () => null };',
+			},
+		],
+	])(
+		'keeps a Context-named import from %s unchanged under a wildcard path pattern',
+		async (_, module, extra) => {
+			const root = project({
+				...extra,
+				'package.json': '{"name":"app","type":"module"}',
+				'tsconfig.json':
+					'{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","jsx":"react-jsx","paths":{"@*":["./local/*"]}}}',
+				'View.tsx': `import { PackageContext } from '${module}'; export function View() { return <PackageContext.Provider value="night"><b /></PackageContext.Provider>; }`,
+			});
+			const result = await runCodemod([path.join(root, 'View.tsx')], {
+				root,
+				strong: true,
+				verify: false,
+			});
+			expect(result.files.find(({ file }) => file === 'View.tsx').notes).not.toContainEqual(
+				expect.objectContaining({ rule: 'context-path-alias' }),
+			);
+			expect(fs.readFileSync(path.join(root, 'View.tsrx'), 'utf8')).toContain(
+				'<PackageContext.Provider value="night">',
+			);
+		},
+	);
+
+	it.each([
 		['fallback alias targets', { '@shade': ['./missing.ts', './shade.ts'] }, true, {}],
 		['overlapping alias patterns', { '@shade': ['./shade.ts'], '@*': ['./*.ts'] }, true, {}],
 		[
