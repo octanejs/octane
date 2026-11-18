@@ -102,3 +102,118 @@ export interface ValdiAdapter<Prototype = unknown, Constructor = unknown, Key = 
 	/** Dependency identity may be a receiver, member value, or nullish sentinel. */
 	__methodDep(receiver: unknown, name: string, guarded?: boolean, read?: boolean): unknown;
 }
+
+/** A child accepted by an adapter that implements the component-runtime capability. */
+export type ValdiChild<Element = object> =
+	Element | string | number | boolean | null | undefined | readonly ValdiChild<Element>[];
+
+/** A registered component descriptor. Its return representation belongs to the adapter. */
+export type ValdiComponent<Props = object, Element = object> = (props: Props) => Element;
+
+export interface ValdiContext<Value, Element = object> extends ValdiComponent<
+	{ value: Value; children?: ValdiChild<Element> },
+	Element
+> {
+	readonly defaultValue: Value;
+}
+
+export type {
+	LayoutSnapshotOptions,
+	LayoutSnapshotOptionsWithInitial,
+} from '../layout-snapshot-types.js';
+import type {
+	LayoutSnapshotOptions,
+	LayoutSnapshotOptionsWithInitial,
+} from '../layout-snapshot-types.js';
+
+export interface LinkedStatePrevious<Source, Value> {
+	source: Source;
+	value: Value;
+}
+export interface LinkedStateOptions<Source, Value> {
+	sourceEqual?: (previous: Source, next: Source) => boolean;
+	valueEqual?: (previous: Value, next: Value) => boolean;
+}
+
+/**
+ * ABI 4 extension for an adapter that opts into `component-runtime`. Keeping it
+ * separate leaves adapters for ABI 1–3 valid without implementing these exports.
+ */
+export interface ValdiComponentRuntimeAdapter<
+	Prototype = unknown,
+	Constructor = unknown,
+	Key = unknown,
+	Element = object,
+> extends Omit<
+	ValdiAdapter<Prototype, Constructor, Key>,
+	'defineValdiComponent' | 'getValdiComponentConstructor'
+> {
+	defineValdiComponent<Props>(
+		render: (props: Props) => void,
+		options: { hasHooks: boolean },
+	): ValdiComponent<Props, Element>;
+	getValdiComponentConstructor(component: ValdiComponent<any, Element>): Constructor;
+	createValdiChildren(render: () => void): Element;
+	createContext<Value>(defaultValue: Value): ValdiContext<Value, Element>;
+	useContext<Value>(context: ValdiContext<Value, Element>): Value;
+	useSyncExternalStore<Value>(
+		subscribe: (notify: () => void) => () => void,
+		getSnapshot: () => Value,
+		getServerSnapshot?: (() => Value) | symbol,
+		slot?: ValdiHookSlot,
+	): Value;
+	useEffect(
+		create: (...args: any[]) => void | (() => void),
+		deps?: Dependencies | symbol,
+		slot?: ValdiHookSlot,
+	): void;
+	useEffectEvent<F extends (...args: any[]) => any>(callback: F, slot?: ValdiHookSlot): F;
+	useLinkedState<Source, Value extends Previous, Previous = Value>(
+		source: Source,
+		reconcile: (
+			source: Source,
+			previous: LinkedStatePrevious<Source, Previous> | undefined,
+		) => Value,
+		options?: LinkedStateOptions<Source, Previous> | symbol,
+		slot?: ValdiHookSlot,
+	): State<unknown extends Previous ? Value : Previous>;
+	__useLinkedStateWithGetter<Source, Value extends Previous, Previous = Value>(
+		source: Source,
+		reconcile: (
+			source: Source,
+			previous: LinkedStatePrevious<Source, Previous> | undefined,
+		) => Value,
+		options?: LinkedStateOptions<Source, Previous> | symbol,
+		slot?: ValdiHookSlot,
+	): StateWithGetter<unknown extends Previous ? Value : Previous>;
+	useId(slot?: ValdiHookSlot): string;
+	useLazyRef<Value>(create: () => Value, slot?: ValdiHookSlot): { current: Value };
+	useLayoutSnapshot<Value>(
+		measure: () => Value,
+		options: LayoutSnapshotOptionsWithInitial<Value>,
+		slot?: ValdiHookSlot,
+	): Value;
+	useLayoutSnapshot<Value>(
+		measure: () => Value,
+		options?: LayoutSnapshotOptions<Value> | symbol,
+		slot?: ValdiHookSlot,
+	): Value | undefined;
+	flushSync<Result>(callback: () => Result): Result;
+	readonly ErrorBoundary: ValdiComponent<
+		{
+			children?: ValdiChild<Element>;
+			fallback?: ValdiChild<Element> | ((error: unknown, reset: () => void) => ValdiChild<Element>);
+			resetRef?: { current: (() => void) | null };
+		},
+		Element
+	>;
+	readonly Suspense: ValdiComponent<
+		{ children?: ValdiChild<Element>; fallback?: ValdiChild<Element> },
+		Element
+	>;
+	lazy<Props>(
+		load: () => PromiseLike<
+			ValdiComponent<Props, Element> | { default: ValdiComponent<Props, Element> }
+		>,
+	): ValdiComponent<Props, Element>;
+}

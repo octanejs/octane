@@ -294,6 +294,37 @@ Adapters that only implement ABI 1 or 2 are rejected before prototypes are
 created; append-only text retains its ABI 2 contract when this capability is
 omitted. `'host-text-site'` is invalid unless `text` is `'host'`.
 
+### Component runtime
+
+An adapter can opt into ABI 4 with `capabilities: ['component-runtime']`. The
+generated module checks ABI 4 before registration or prototype creation. This
+capability may be combined with the host text and ref capabilities; the adapter
+must implement each selected contract.
+
+ABI 4 accepts `createContext`, `useContext`, `useSyncExternalStore`, `useEffect`,
+`useEffectEvent`, `useLinkedState`, `useId`, `useLayoutSnapshot`, `useLazyRef`,
+`flushSync`, `ErrorBoundary`, `Suspense`, and `lazy` from `octane`, in addition
+to the baseline hooks. These imports and compiler-selected helpers are supplied
+by the adapter. `createValdiChildren(render)` creates a child value that retains
+the authored closure and can be rendered by the adapter under its own component
+scope. Component children, JSX-valued props, and render callbacks use this
+contract; callbacks return a child value instead of writing into their caller's
+active scope. Hooks within render callbacks remain unsupported.
+
+Component tags may refer to a descriptor passed through props or a member
+expression, including context providers and lazy components. The compiler
+evaluates a dynamic descriptor once and includes its identity in the writer key,
+so replacing the descriptor cannot reuse a different component's instance.
+Locally declared functions containing JSX remain unsupported: components must be
+registered with `defineValdiComponent` before the adapter can resolve them.
+
+For TypeScript output and editor projections, component-facing types and values
+are resolved from the adapter's native declarations. For example, `OctaneNode`
+and `ReactNode` map to `ValdiChild`, component callable aliases map to
+`ValdiComponent`, and `JSX` maps to the configured intrinsics module's
+`jsx-runtime`. An ABI 4 adapter must expose those declarations. ABI 1–3 adapters
+and modules without `component-runtime` retain their existing restrictions.
+
 To restrict the authored intrinsic vocabulary, set
 `validation: { allowedTags: ['frame', 'badge', 'text-box'] }` on a renderer.
 Only lower-case intrinsic host names are checked, before prototypes are

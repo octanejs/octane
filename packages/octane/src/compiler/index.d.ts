@@ -2,7 +2,15 @@ import type { CodeInformation, Mapping } from '@volar/language-core';
 import type { TextTypeFacts } from './typescript.js';
 
 export type { TextTypeFacts } from './typescript.js';
-export type { ValdiAdapter, ValdiHookSlot, ValdiWriter } from './valdi.js';
+export type {
+	ValdiAdapter,
+	ValdiChild,
+	ValdiComponent,
+	ValdiComponentRuntimeAdapter,
+	ValdiContext,
+	ValdiHookSlot,
+	ValdiWriter,
+} from './valdi.js';
 
 export interface CompileRenderer {
 	id: string;
