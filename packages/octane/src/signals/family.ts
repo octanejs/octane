@@ -6,6 +6,7 @@ import {
 	PlainComputed,
 	assertAlive,
 	assertWritable,
+	leanRetired,
 	retireKeyless,
 	setFamilyRelease,
 	signalBatch,
@@ -72,7 +73,7 @@ class Family<K, H extends SignalHandle<unknown>> implements SignalFamily<K, H> {
 		member = untrack(() => this.create(key)) as unknown as Member;
 		if (
 			!(
-				member instanceof PlainComputed ||
+				(member instanceof PlainComputed && !leanRetired(member)) ||
 				(member instanceof PlainCell && member.owner === scope)
 			) ||
 			member.flags & REACTIVE_FAMILY_MEMBER

@@ -404,6 +404,14 @@ describe('signal families', () => {
 		expect(() => createFamily(scope, (_id: string) => other.signal$(null, 1)).get('a')).toThrow(
 			TypeError,
 		);
+		// An evicted member, cell or derived, is not admitted again.
+		for (const cached$ of [scope.signal$(null, 1), scope.derived$(null, () => 1)]) {
+			const caching = createFamily(scope, (_id: string) => cached$);
+			caching.get('a');
+			caching.delete('a');
+			expect(() => caching.get('a')).toThrow(TypeError);
+			expect(caching.size).toBe(0);
+		}
 		const dead = createScope({ scopeKey: 'family-dead' });
 		dead.dispose();
 		expect(() => createFamily(dead, () => dead.signal$(null, 1))).toThrow(ScopeDisposedError);

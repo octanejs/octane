@@ -2456,7 +2456,7 @@ export function retireKeyless(
 /** Retired derived family members, with their scope's key; a cell instead moves to a retired owner. */
 let retiredLean: WeakMap<PlainComputed, string> | undefined;
 
-function leanRetired(node: PlainComputed): boolean {
+export function leanRetired(node: PlainComputed): boolean {
 	return retiredLean !== undefined && retiredLean.has(node);
 }
 
