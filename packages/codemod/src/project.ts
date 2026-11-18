@@ -1,5 +1,6 @@
 import { createScopedStorePlanner, runtimeTargets } from './scoped-store-contract.js';
 import { parseStaticSvg } from './path-svg.js';
+import { libCachingHost } from './lib-host.js';
 import { resourceHints, retainedLiteralExports, storeSources } from './store-inputs.js';
 import type {
 	CodemodOptions,
@@ -308,13 +309,11 @@ export async function runCodemod(
 			const proofConfig =
 				physicalRoot === root ? strictConfig : (tsconfigOptions(physicalRoot) ?? strictConfig);
 			const selected = files.filter((name) => /\.[cm]?tsx?$/.test(name));
+			const proofOptions = { ...proofConfig, noEmit: true, noUncheckedIndexedAccess: true };
 			program = ts.createProgram(
 				preserve ? selected : selected.map((name) => fs.realpathSync(name)),
-				{
-					...proofConfig,
-					noEmit: true,
-					noUncheckedIndexedAccess: true,
-				},
+				proofOptions,
+				libCachingHost(proofOptions),
 			);
 		}
 		const sourceFile = program.getSourceFile(preserve ? file : fs.realpathSync(file));
@@ -3205,13 +3204,14 @@ function readMotionExports(manifest: unknown, dir: string): ReadonlySet<string> 
 		!fs.realpathSync(entry).startsWith(dir + path.sep)
 	)
 		return null;
-	const program = ts.createProgram([entry], {
+	const options = {
 		module: ts.ModuleKind.ESNext,
 		moduleResolution: ts.ModuleResolutionKind.Bundler,
 		target: ts.ScriptTarget.ESNext,
 		skipLibCheck: true,
 		types: [],
-	});
+	};
+	const program = ts.createProgram([entry], options, libCachingHost(options));
 	const source = program.getSourceFile(entry);
 	if (!source) return null;
 	const checker = program.getTypeChecker();
