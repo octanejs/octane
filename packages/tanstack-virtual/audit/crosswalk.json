@@ -208,5 +208,70 @@
     "id": "react-case-v1:3148a808c3add2f926ae",
     "classification": "implemented",
     "localEvidence": "tests/upstream/unit/index.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:bf490172e7f85b694050",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/browser/test/cached-measurements.spec.ts"
+  },
+  {
+    "id": "react-registration-v1:3ee87c613e1845aa9e24",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/browser/test/cached-measurements.spec.ts"
+  },
+  {
+    "id": "react-case-v1:d538ca46487a58eef19b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/browser/test/command-retire.spec.ts"
+  },
+  {
+    "id": "react-case-v1:f1e0f8b3b15df194367d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/browser/test/command-retire.spec.ts"
+  },
+  {
+    "id": "react-case-v1:87f1b89c9c2dc0121494",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/browser/test/ios-programmatic-landing.spec.ts"
+  },
+  {
+    "id": "react-case-v1:223d2ae403f15630ea0e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/browser/test/lanes-change.spec.ts"
+  },
+  {
+    "id": "react-registration-v1:f2ddac0335f6facaf99f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/browser/test/resize-delivery.spec.ts"
+  },
+  {
+    "id": "react-registration-v1:9a4103fa5562377ffc19",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/browser/test/resize-delivery.spec.ts"
+  },
+  {
+    "id": "react-case-v1:a610b8b2e61e5edfb9cb",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/browser/test/smooth-prepend.spec.ts"
+  },
+  {
+    "id": "react-case-v1:fd418ff15773e3438b19",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/unit/index.test.tsx"
+  },
+  {
+    "id": "react-case-v1:757e705bd22d48cd508d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/unit/index.test.tsx"
+  },
+  {
+    "id": "react-case-v1:01d5671ad90b447965e4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/unit/index.test.tsx"
+  },
+  {
+    "id": "react-case-v1:d9ef63eecc631caa462c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/unit/index.test.tsx"
   }
 ]
