@@ -77,7 +77,7 @@ class Family<K, H extends SignalHandle<unknown>> implements SignalFamily<K, H> {
 			) ||
 			member.flags & REACTIVE_FAMILY_MEMBER
 		)
-			throw new TypeError(formatClientError(368));
+			throw new TypeError(formatClientError(369));
 		member.flags |= REACTIVE_FAMILY_MEMBER;
 		const entry: MemberEntry = { family: this, id, releasedAt: Date.now(), timer: undefined };
 		entries.set(member, entry);
@@ -151,7 +151,7 @@ export function createFamily<K, H extends SignalHandle<unknown>>(
 		(keyOf !== undefined && typeof keyOf !== 'function') ||
 		(options?.idle !== undefined && !(typeof idle === 'number' && idle >= 0 && idle < Infinity))
 	)
-		throw new TypeError(formatClientError(367));
+		throw new TypeError(formatClientError(368));
 	assertAlive(scope);
 	setFamilyRelease(release);
 	return new Family(scope, create, keyOf, idle);

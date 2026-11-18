@@ -27,6 +27,7 @@ import {
 	refreshNode,
 	retireGraph,
 	setEquals,
+	setWatched,
 	setHistoricalReader,
 	signalBatch,
 	startSignalBatch,
@@ -742,13 +743,16 @@ function stopScopeEffect(this: EffectNode): void {
 	if (this.run !== undefined || this.cleanup !== undefined) stopEffect(this);
 }
 
-/** A Scope signal's `equals`, or undefined when Object.is alone compares its values. */
+/** A Scope signal's `equals`, or undefined when Object.is alone compares its values; checks `watched` too. */
 function equalsOption<T>(options: ScopeSignalOptions<T> | undefined): SignalEquals<T> | undefined {
 	if (options === undefined) return undefined;
 	if (options === null || typeof options !== 'object') throw new TypeError(formatClientError(160));
 	const equals = options.equals;
 	if (equals !== undefined && typeof equals !== 'function')
 		throw new TypeError(formatClientError(366));
+	const watched = options.watched;
+	if (watched !== undefined && typeof watched !== 'function')
+		throw new TypeError(formatClientError(367));
 	return equals;
 }
 
@@ -778,6 +782,8 @@ export function installPublicScope(): void {
 		const equals = equalsOption(options);
 		const signal$: WritableSignal<T> = plainSignal.call(this, key, initial);
 		if (equals !== undefined) setEquals(signal$ as unknown as ScopedNode<T> | PlainCell<T>, equals);
+		if (options?.watched)
+			setWatched(signal$ as unknown as ScopedNode<T> | PlainCell<T>, options.watched);
 		return signal$;
 	};
 	prototype.derived$ = function <T>(
@@ -792,6 +798,7 @@ export function installPublicScope(): void {
 			assertAlive(this);
 			const node = new PlainComputed<T>(compute);
 			if (equals) node.getter = computeEqual(node, compute, equals);
+			if (options?.watched) setWatched(node, options.watched);
 			return node as unknown as DerivedSignal<T>;
 		}
 		const node = createScopeNode<T>(this, key, 'derived');
@@ -807,6 +814,7 @@ export function installPublicScope(): void {
 		// before this node was created. Only an adoption frame reads historical
 		// computed values from a seed.
 		consumeScopeSeed(this, key);
+		if (options?.watched) setWatched(node, options.watched);
 		return node as DerivedSignal<T>;
 	};
 	prototype.get = function <T>(this: ScopeImpl, handle$: SignalHandle<T>): T {

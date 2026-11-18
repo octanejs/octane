@@ -10,6 +10,9 @@ import {
 	type Scope,
 } from 'octane/signals';
 
+// The renderer-binding retirement probe, by its registered name.
+const SIGNAL_BINDING_RETIRED = Symbol.for('octane.signal-binding-retired');
+
 const owners: Scope[] = [];
 function owner(key = `family-${owners.length}`): Scope {
 	const scope = createScope({ scopeKey: key });
@@ -155,16 +158,53 @@ describe('signal families', () => {
 		},
 	);
 
-	it("reports a cell member's retirement through a renderer binding's onRetire", () => {
+	it.each([
+		['cell', (scope: Scope) => scope.signal$(null, 1)],
+		['derived', (scope: Scope) => scope.derived$(null, () => 1)],
+	] as const)("reports a %s member's retirement as its scope's", (_kind, create) => {
 		const scope = owner();
-		const family = createFamily(scope, (_id: string) => scope.signal$(null, 1));
+		const family = createFamily(scope, (_id: string) => create(scope));
+		const member$ = family.get('a');
+		member$.get();
 		const heard: string[] = [];
-		family.get('a')[SIGNAL_BINDING_SUBSCRIBE](
+		member$[SIGNAL_BINDING_SUBSCRIBE](
 			() => heard.push('notify'),
 			() => heard.push('retire'),
 		);
+		expect((member$ as unknown as Record<symbol, () => boolean>)[SIGNAL_BINDING_RETIRED]()).toBe(
+			false,
+		);
 		family.delete('a');
 		expect(heard).toEqual(['retire']);
+		expect((member$ as unknown as Record<symbol, () => boolean>)[SIGNAL_BINDING_RETIRED]()).toBe(
+			true,
+		);
+		expect(() => member$.get()).toThrow(ScopeDisposedError);
+		expect(() => member$.latest()).toThrow(ScopeDisposedError);
+		expect(() => member$.snapshot()).toThrow(ScopeDisposedError);
+		expect(() => member$.subscribe(() => {})).toThrow(ScopeDisposedError);
+		expect(() => member$[SIGNAL_BINDING_SUBSCRIBE](() => {})).toThrow(ScopeDisposedError);
+	});
+
+	it.each([
+		['cell', (scope: Scope, watched: () => () => void) => scope.signal$(null, 1, { watched })],
+		[
+			'derived',
+			(scope: Scope, watched: () => () => void) => scope.derived$(null, () => 1, { watched }),
+		],
+	] as const)("ends an evicted %s member's watched hook", (_kind, create) => {
+		const scope = owner();
+		const log: string[] = [];
+		const family = createFamily(scope, (_id: string) =>
+			create(scope, () => {
+				log.push('watched');
+				return () => log.push('unwatched');
+			}),
+		);
+		family.get('a').subscribe(() => {});
+		expect(log).toEqual(['watched']);
+		family.delete('a');
+		expect(log).toEqual(['watched', 'unwatched']);
 	});
 
 	it('stops effects that read an evicted member, after their cleanup', () => {
