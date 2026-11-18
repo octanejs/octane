@@ -253,6 +253,36 @@ describe('retained presence', () => {
 		}
 	});
 
+	it('keeps a replacement host exiting when it mounts with an initial target', async () => {
+		const exits: Array<() => void> = [];
+		animateMock.mockImplementation((node: HTMLElement, target: { opacity: number }) => {
+			node.style.opacity = target.opacity === 0 ? '0.4' : String(target.opacity);
+			return {
+				stop: vi.fn(),
+				then(done: () => void) {
+					if (target.opacity === 0) exits.push(done);
+				},
+			};
+		});
+		const trace: string[] = [],
+			record = (event: string) => trace.push(event),
+			initial = { opacity: 0.8 };
+		const r = mount(RetainedRemovable, { show: true, record, initial });
+		try {
+			r.update(RetainedRemovable, { show: false, record, initial });
+			r.find('#replace-host').click();
+			await nextPaint();
+			expect((r.find('#exit-host') as HTMLElement).style.opacity).toBe('0.4');
+			expect(trace).toEqual([]);
+			exits.at(-1)!();
+			await nextPaint();
+			expect(r.container.querySelector('#removable')).toBeNull();
+			expect(trace.sort()).toEqual(['cleanup', 'complete']);
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('settles when the last exit host disappears but allows replacement in the same commit', async () => {
 		const finishes: Array<() => void> = [];
 		animateMock.mockImplementation(() => ({

@@ -103,7 +103,13 @@ export function InvalidPresence({ record }: { record: (event: string) => void })
 	</RetainedPresence>
 }
 
-function RemovableRow({ record }: { record: (event: string) => void }) @{
+function RemovableRow({
+	record,
+	initial = false,
+}: {
+	record: (event: string) => void;
+	initial?: false | { opacity: number };
+}) @{
 	const present = useIsPresent();
 	const [version, setVersion] = useState(0);
 	useLayoutEffect(() => () => record('cleanup'), [record]);
@@ -118,7 +124,7 @@ function RemovableRow({ record }: { record: (event: string) => void }) @{
 			<motion.div
 				key={version}
 				id="exit-host"
-				initial={false}
+				initial={initial}
 				animate={{ opacity: 1 }}
 				exit={{ opacity: 0 }}
 			/>
@@ -129,12 +135,14 @@ function RemovableRow({ record }: { record: (event: string) => void }) @{
 export function RetainedRemovable({
 	show,
 	record,
+	initial,
 }: {
 	show: boolean;
 	record: (event: string) => void;
+	initial?: false | { opacity: number };
 }) @{
 	<RetainedPresence onExitComplete={() => record('complete')}>
-		{show ? <RemovableRow key="row" record={record} /> : null}
+		{show ? <RemovableRow key="row" record={record} initial={initial} /> : null}
 	</RetainedPresence>
 }
 

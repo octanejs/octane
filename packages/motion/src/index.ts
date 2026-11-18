@@ -856,7 +856,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 			() => {
 				const node: HTMLElement = latest.host.current;
 				latest.hostMounted = true;
-				if (animationEnabled && resolvedInitial && !controller) {
+				if (animationEnabled && resolvedInitial && !controller && presence?.present !== false) {
 					animate(node, resolvedInitial, { duration: 0 });
 				}
 			},
