@@ -103,6 +103,49 @@ row.delete('a'); // evict and retire it; a later row.get('a') creates a new one
 
 `create` must return a new keyless `signal$(null, …)` or `derived$(null, …)` handle of the family's scope. Keys match as a `Map` matches them, or by the value `keyOf` returns. A member is evicted by `delete`, by `clear`, by the scope's disposal, or, with `idle`, that many milliseconds after it was last observed, as a `watched` hook counts observers (an effect, a subscription or a renderer binding, directly or through derived values); an observer that returns in time keeps it, and a derived value nothing observes does not. Eviction retires the member as a scope's disposal retires its signals: reading it throws `ScopeDisposedError`, renderer bindings and `useSignalValue` invalidate once and then find it retired, public subscriptions end silently, effects that read it stop, and a derived member lets go of its dependencies, so an evicted member can be collected. Evicting is a write, so a computation or render cannot do it. An application that never calls `createFamily` ships none of its code. Members are keyless, so a family's state is not serialized or seeded across the server boundary.
 
+
+### Opt in to family hydration
+
+A family remains transient by default. To send selected string-keyed members to the client, reserve one keyed snapshot per family namespace and keep the members keyless. Capture only the values selected for the response, after server writes and before `scope.serialize()`; recreate the same namespace in a client scope seeded with that response. Both the namespace and each member key have unambiguous identities: the namespace is a JSON tuple used as a reserved scope key, while member keys remain separate entries rather than concatenated strings.
+
+```ts
+import { createFamily, createScope, type FamilyOptions, type Scope } from 'octane/signals';
+
+function seededFamily<T>(
+	scope: Scope,
+	namespace: string,
+	initial: (id: string) => T,
+	options?: Pick<FamilyOptions<string>, 'idle'>,
+) {
+	const snapshot$ = scope.signal$<[string, T][]>(JSON.stringify(['family', namespace]), []);
+	let selected = new Map(snapshot$.get());
+	const family = createFamily(
+		scope,
+		(id: string) => scope.signal$(null, selected.has(id) ? selected.get(id)! : initial(id)),
+		options,
+	);
+	return {
+		family,
+		capture(ids: readonly string[]) {
+			const entries: [string, T][] = ids.map((id) => [id, family.get(id).get()]);
+			selected = new Map(entries);
+			snapshot$.set(entries);
+		},
+	};
+}
+
+const rows = seededFamily(server, 'rows', () => 'server default', { idle: 30_000 });
+rows.family.get('a').set('server value');
+rows.capture(['a']);
+const seed = server.serialize();
+const client = createScope({ scopeKey: server.scopeKey, seed });
+seededFamily(client, 'rows', () => 'client default').family.get('a').get(); // 'server value'
+```
+
+This recipe uses exact string member keys and accepts only the `idle` family option; it does not support custom `keyOf` aliases. Reserve the `JSON.stringify(['family', namespace])` scope keys for this recipe, and use a distinct namespace for each family in a scope. Send each request's seed only to its matching client scope. Values must be serializable by `scope.serialize()`. A selected member recreated after eviction starts from its last captured value; call `capture([])` to discard that snapshot, or capture a new selection to replace it. This uses one keyed node per family regardless of the number of members created or evicted. Captures are explicit snapshots, so later member writes are not included until captured again.
+
+### Writes and observers
+
 Writes use `Object.is` equality and become visible immediately. Pass `{ equals }` as the third argument to `scope.signal$` or `scope.derived$` to treat more values as unchanged: `account.signal$('filter', [], { equals: sameItems })`. When `equals(previous, next)` returns true, the signal keeps `previous`, by reference, and nothing downstream recomputes, re-renders or is notified. Values `Object.is` already finds equal are never passed to it, a derived value's first result and its first after an error are never compared, and it runs untracked and must not write signals. A transition's write compares against the pending value. Nested batches defer notifications until the outer synchronous batch ends. `scope.action(fn)` preserves `this`, arguments, and the return value while applying that same batching rule. It does not untrack reads, roll back earlier writes on an exception, or keep a batch open across `await`.
 
 Pass `{ watched }` to start work only while something observes a signal. `watched()` runs, untracked, when the signal gains its first observer: an effect, a subscriber or a rendered binding that reads it, directly or through derived values. The function it returns runs when the last observer leaves or the scope is disposed, and the next first observer runs `watched` again. A read with no observer, including one through a derived value nothing observes, neither starts it nor keeps it running. Return a `scope.effect` stop to connect an external source that follows other signals: the effect restarts its subscription when they change and its stop disconnects it. A synchronous write inside `watched` is what the first observer reads. An error thrown by `watched` or its cleanup is reported through `reportError` and does not fail the read, stop or disposal that ran it.

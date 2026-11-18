@@ -385,6 +385,8 @@ done.delete('task-1');
 member that nothing has observed for that many milliseconds is evicted too. A later
 `get` of the same key creates a fresh member.
 
+A family is transient by default: keyless members are not included in a scope seed. For server-rendered members, opt in by capturing selected string keys and values in one namespaced keyed signal before serializing the request scope, then initialize client family members from that snapshot. Unselected members still use their client defaults. Eviction keeps the last selected snapshot until you explicitly replace or clear it, without adding keyed nodes for individual members. See the [tested family hydration recipe](https://github.com/octanejs/octane/blob/main/docs/signals.md#opt-in-to-family-hydration) for the complete composition and namespace policy.
+
 <h3 id="react-components">Read a scope from React</h3>
 
 React components read the same handles through `octane/signals/react`, with no
