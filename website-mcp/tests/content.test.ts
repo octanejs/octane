@@ -31,6 +31,7 @@ describe('docs snapshot', () => {
 		expect(DOC_SLUGS).toContain('differences-from-react-reference');
 		expect(DOC_SLUGS).toContain('data');
 		expect(DOC_SLUGS).toContain('data-reference');
+		expect(DOC_SLUGS).toContain('signals-reference');
 	});
 
 	it('serves substantial markdown with frontmatter stripped', () => {
