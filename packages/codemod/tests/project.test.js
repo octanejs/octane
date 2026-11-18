@@ -1861,6 +1861,89 @@ export function List() { return <main>{makeRows().map(row => {
 	});
 
 	it.each([
+		{ name: 'without a target' },
+		{ name: 'without a target in a mixed module', mixed: true },
+		{ name: 'with ES2022 in a mixed module', target: 'es2022', mixed: true },
+		{ name: 'with unresolved React types', mixed: true, lib: ['es5'], block: true },
+		{
+			name: 'with missing React declarations',
+			target: 'es2022',
+			mixed: true,
+			missing: true,
+			block: true,
+		},
+		{ name: 'with an unrelated relative call', target: 'es2022', extra: 'unrelated', block: true },
+		{ name: 'with a second registration', target: 'es2022', extra: 'second', block: true },
+	])(
+		'keeps a retained React registry boundary explicit $name',
+		async ({ target, mixed, lib, missing, extra, block }) => {
+			const registration = `import { createElement } from 'react';
+import { register } from './legacy';
+${extra === 'unrelated' ? "import { helper } from './helper';" : ''}
+export const tab = register('notes', { getIcon: () => createElement('b', { className: 'icon' }, 'notes') });
+${mixed ? 'export function NativeCandidate() { return <strong>Native slot</strong>; }' : ''}
+${extra === 'unrelated' ? 'export const other = helper();' : extra === 'second' ? "export const other = register('other', { getIcon: () => createElement('i', null) });" : ''}`;
+			const root = project({
+				'package.json': '{"type":"module"}',
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: {
+						strict: true,
+						jsx: 'react-jsx',
+						module: 'esnext',
+						moduleResolution: 'bundler',
+						...(target ? { target } : {}),
+						...(lib ? { lib, types: [] } : {}),
+					},
+				}),
+				'legacy.tsx': `/** @jsxImportSource react */
+import type { ReactNode } from 'react';
+const registrations = new Map<string, { getIcon(): ReactNode }>();
+export function register(name: string, entry: { getIcon(): ReactNode }) { registrations.set(name, entry); return entry; }
+export function View() { return <nav>{registrations.get('notes')!.getIcon()}</nav>; }`,
+				'register.tsx': registration,
+				'helper.ts': 'export function helper() { return 1; }',
+			});
+			const modules = path.join(root, 'node_modules');
+			fs.mkdirSync(path.join(modules, '@types'), { recursive: true });
+			for (const name of ['react', 'react-dom']) {
+				fs.symlinkSync(
+					fs.realpathSync(path.join(import.meta.dirname, '../node_modules', name)),
+					path.join(modules, name),
+					'dir',
+				);
+				if (!missing)
+					fs.symlinkSync(
+						path.join(REPO, 'packages/octane/node_modules/@types', name),
+						path.join(modules, '@types', name),
+						'dir',
+					);
+			}
+			const input = path.join(root, 'register.tsx');
+			const options = { root, strong: true, verify: true };
+			const preview = await runCodemod([input], { ...options, write: false });
+			const converted = preview.files.find(({ file }) => file === 'register.tsx');
+			if (!block) {
+				expect(converted.code).toContain("from 'react'");
+				if (mixed) expect(converted.code).toContain('NativeCandidate() @{');
+				expect(converted.notes).toEqual([]);
+			} else {
+				expect(converted.notes).toContainEqual(
+					expect.objectContaining({ rule: 'retained-registry-boundary', severity: 'error' }),
+				);
+				const result = await runCodemod([input], options);
+				expect(result.files).toEqual([
+					expect.objectContaining({
+						file: 'register.tsx',
+						changed: false,
+						notes: [expect.objectContaining({ rule: 'retained-registry-boundary' })],
+					}),
+				]);
+				expect(fs.readFileSync(input, 'utf8')).toBe(registration);
+			}
+		},
+	);
+
+	it.each([
 		['a single TS registration', 'ts', '', ''],
 		['a single TSX registration', 'tsx', '', ''],
 		['a TS registration with a block return', 'ts', '', '', true],
@@ -1950,7 +2033,9 @@ export { Registry, getIcon } from './registry';`,
 
 			fs.writeFileSync(input, registration + "\nexport const other = createIcon('i', null);");
 			const extraFactory = await runCodemod([input], { ...options, write: false });
-			expect(extraFactory.files[0].code).toContain("from 'octane'");
+			expect(extraFactory.files[0].notes).toContainEqual(
+				expect.objectContaining({ rule: 'retained-registry-boundary', severity: 'error' }),
+			);
 
 			const mixed =
 				registration.replaceAll('createIcon', 'createElement') +
@@ -1959,8 +2044,9 @@ import * as React from 'react';
 export const other = React.createElement('i', null);`;
 			fs.writeFileSync(input, mixed);
 			const mixedPreview = await runCodemod([input], { ...options, write: false });
-			expect(mixedPreview.files[0].code).toContain("import { createElement } from 'octane';");
-			expect(mixedPreview.files[0].code).not.toContain("from 'react'");
+			expect(mixedPreview.files[0].notes).toContainEqual(
+				expect.objectContaining({ rule: 'retained-registry-boundary', severity: 'error' }),
+			);
 			fs.writeFileSync(input, registration);
 
 			fs.writeFileSync(
