@@ -5617,6 +5617,10 @@ export default defineConfig({
 					include: ['packages/codemod/tests/**/*.test.js'],
 					environment: 'node',
 					globals: false,
+					// Most cases migrate a whole fixture project and type it with TypeScript,
+					// some through the CLI in a child process; on a shared CI runner they
+					// take several times their local time.
+					testTimeout: 30_000,
 				},
 			},
 			{
