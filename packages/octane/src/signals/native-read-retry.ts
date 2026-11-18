@@ -24,7 +24,7 @@ export function createNativeReadRetry(notify: () => void) {
 		track(witness: NativeReadWitness): void {
 			let invalid = witness.mixed;
 			for (const [source, version] of witness.reads) {
-				if (!sources.has(source)) sources.set(source, source.subscribe(notify));
+				if (!sources.has(source)) sources.set(source, source.subscribe(notify, true));
 				if (source.getVersion() !== version) invalid = true;
 			}
 			if (invalid) notify();

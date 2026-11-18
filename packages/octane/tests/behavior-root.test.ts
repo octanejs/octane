@@ -9056,6 +9056,58 @@ export function Counter() @{
 			}
 		});
 
+		it(`keeps a suspended binding projection quiet until it publishes (${dev ? 'dev' : 'prod'})`, async () => {
+			const scope = createScope({ scopeKey: `watched-projection-${dev}` });
+			const log: string[] = [];
+			const selected$ = scope.signal$('selected', false);
+			const left$ = scope.signal$('left', 'left', {
+				watched: () => {
+					log.push('watch left');
+					return () => log.push('unwatch left');
+				},
+			});
+			const right$ = scope.signal$('right', 'right', {
+				watched: () => {
+					log.push('watch right');
+					right$.set('right live');
+					return () => log.push('unwatch right');
+				},
+			});
+			let resolve!: (value: string) => void;
+			const pending = new Promise<string>((done) => (resolve = done));
+			const load = query(`watched-projection-${dev}`, (selected: boolean) =>
+				selected ? pending : 'ready',
+			);
+			const gate$ = createResource(scope, 'gate', () => load(selected$.get()));
+			await act(() => {});
+			const source = `import { selected$, left$, right$, gate$ } from 'state';
+export function Projection() @{ 'use dom bindings';
+  <p title={selected$.get() ? right$.get() : left$.get()}>{gate$.get() as string}</p>
+}`;
+			const fixture = authoredPresentation('Projection', {}, dev, source, {
+				state: { selected$, left$, right$, gate$ },
+			});
+			const handle = fixture.mount({ parent: container }, fixture.state);
+			try {
+				const paragraph = container.querySelector('p')!;
+				expect(paragraph.title).toBe('left');
+				expect([...log]).toEqual(['watch left']);
+				selected$.set(true);
+				expect(paragraph.title).toBe('left');
+				expect([...log]).toEqual(['watch left']);
+				await act(() => resolve('ready'));
+				expect(container.querySelector('p')).toBe(paragraph);
+				expect(paragraph.title).toBe('right live');
+				expect([...log].sort()).toEqual(['watch left', 'unwatch left', 'watch right'].sort());
+			} finally {
+				handle.dispose();
+				scope.dispose();
+			}
+			expect([...log].sort()).toEqual(
+				['watch left', 'unwatch left', 'watch right', 'unwatch right'].sort(),
+			);
+		});
+
 		// An island reads module signals directly. Its program subscribes to every
 		// source a projection, branch test, list or block declaration reads.
 		it(`subscribes imported signal reads in projections, branches, lists and block declarations (${dev ? 'dev' : 'prod'})`, () => {

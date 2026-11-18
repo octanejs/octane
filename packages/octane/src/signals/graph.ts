@@ -31,6 +31,7 @@ import {
 	REACTIVE_KEYLESS_CELL,
 	REACTIVE_LISTED,
 	REACTIVE_CUSTOM_EQUALS,
+	REACTIVE_SPECULATIVE,
 	REACTIVE_RECURSED,
 	REACTIVE_RECURSED_CHECK,
 	REACTIVE_WATCHING,
@@ -55,6 +56,7 @@ import {
 	setNativeReadObserver,
 	type NativeReadInspection,
 	type NativeReadSource,
+	type NativeReadSubscription,
 	type NativeSerializedScope,
 } from './read-protocol.js';
 import {
@@ -1339,11 +1341,11 @@ class GraphReadSource implements NativeReadSource {
 		return pendingWorld && pendingWorld.hides(node) ? NaN : node.revision;
 	}
 
-	subscribe(notify: () => void): () => void {
+	subscribe(notify: () => void, speculative?: boolean): NativeReadSubscription {
 		const canonical = this.canonicalSource();
-		if (canonical) return canonical.subscribe(notify);
+		if (canonical) return canonical.subscribe(notify, speculative);
 		assertAlive(this.node.owner);
-		return attachObserver(this.node, notify, true);
+		return attachObserver(this.node, notify, true, speculative);
 	}
 
 	serialize(revision: number): readonly NativeSerializedScope[] | undefined {
@@ -2057,6 +2059,17 @@ export class SignalObserver implements ReactiveNode {
 		readonly native: boolean,
 		public previous: NodeState | undefined,
 	) {}
+
+	setObserved(observed: boolean): void {
+		if (!this.node || !this.flags || observed === !(this.flags & REACTIVE_SPECULATIVE)) return;
+		if (observed) {
+			this.flags &= ~REACTIVE_SPECULATIVE;
+			if (watchDriver) watchDriver.link(this.node, this);
+		} else {
+			if (watchDriver) watchDriver.unlink(this.node, this);
+			this.flags |= REACTIVE_SPECULATIVE;
+		}
+	}
 }
 
 /** Whether `state` is the plain ready state of `value`, as a value-only node's is. */
@@ -2120,8 +2133,14 @@ function observeCurrent(observer: SignalObserver, observed: ScopedNode): boolean
 	return false;
 }
 
-export function attachObserver(node: ScopedNode, notify: () => void, native: boolean): () => void {
+export function attachObserver(
+	node: ScopedNode,
+	notify: () => void,
+	native: boolean,
+	speculative = false,
+): NativeReadSubscription {
 	const observer = new SignalObserver(node, notify, native, undefined);
+	if (speculative) observer.flags |= REACTIVE_SPECULATIVE;
 	// A public subscriber hears of changes from what its node presents now.
 	if (!native) observeCurrent(observer, node);
 	// Link last: no call follows it, so an exhausted native stack cannot leave
@@ -2129,7 +2148,9 @@ export function attachObserver(node: ScopedNode, notify: () => void, native: boo
 	// A keyless derived value has no owner to stop its subscribers.
 	node.owner?.observers.add(observer);
 	linkDependency(node, observer, ++trackingCycle);
-	return () => stopObserver(observer);
+	const dispose: NativeReadSubscription = () => stopObserver(observer);
+	if (speculative) dispose.observation = observer;
+	return dispose;
 }
 
 /** Internal attempt dependency subscription; callers already hold a graph lease. */
@@ -2141,7 +2162,7 @@ export function subscribeNode(node: ScopedNode, notify: () => void): () => void 
 function runObserver(observer: SignalObserver): void {
 	const node = observer.node;
 	if (!node || !observer.flags) return;
-	observer.flags = REACTIVE_WATCHING;
+	observer.flags = REACTIVE_WATCHING | (observer.flags & REACTIVE_SPECULATIVE);
 	if (!observer.native) {
 		// The common case: a subscriber that last heard of a plain value, of a node
 		// that still holds one once brought up to date.
@@ -2454,9 +2475,9 @@ function cellChannel(cell: PlainCell): CellChannel {
 			revision: 0,
 			source: {
 				getVersion: () => channel!.revision,
-				subscribe(notify) {
+				subscribe(notify, speculative) {
 					assertAlive(cell.owner);
-					return attachObserver(cell as unknown as ScopedNode, notify, true);
+					return attachObserver(cell as unknown as ScopedNode, notify, true, speculative);
 				},
 				retired: () => cell.owner.retired,
 			},
@@ -2608,7 +2629,8 @@ function observing(sub: ReactiveNode): boolean {
 	const count = observerCounts.get(sub);
 	return count !== undefined
 		? count > 0
-		: (sub.flags & (REACTIVE_MUTABLE | REACTIVE_WATCHING)) === REACTIVE_WATCHING;
+		: (sub.flags & (REACTIVE_MUTABLE | REACTIVE_WATCHING | REACTIVE_SPECULATIVE)) ===
+				REACTIVE_WATCHING;
 }
 
 /** Starts counting a node's observers; none of its own dependencies is counted yet. */
@@ -2809,7 +2831,8 @@ function leanChannel(node: PlainComputed): CellChannel {
 				// Not told of a change, so while one may have reached it no earlier read is reusable.
 				getVersion: () =>
 					node.flags & (REACTIVE_DIRTY | REACTIVE_PENDING) ? NaN : channel!.revision,
-				subscribe: (notify) => attachObserver(node as unknown as ScopedNode, notify, true),
+				subscribe: (notify, speculative) =>
+					attachObserver(node as unknown as ScopedNode, notify, true, speculative),
 			},
 		};
 		leanChannels.set(node, channel);

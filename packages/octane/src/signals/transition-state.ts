@@ -9,7 +9,7 @@ import type {
 	SignalObserver,
 	SignalReadMode,
 } from './graph.js';
-import type { NativeReadSource } from './read-protocol.js';
+import type { NativeReadSource, NativeReadSubscription } from './read-protocol.js';
 import { READ_PENDING, setSignalMode } from './read-protocol.js';
 import type { ResourceBinding } from './requests.js';
 
@@ -40,7 +40,12 @@ interface GraphBridge {
 	releaseRetainedOwners(node: ScopedNode): void;
 	retainOwners(node: ScopedNode): void;
 	releaseRetention(node: ScopedNode): void;
-	attachObserver(node: ScopedNode, notify: () => void, native: boolean): () => void;
+	attachObserver(
+		node: ScopedNode,
+		notify: () => void,
+		native: boolean,
+		speculative?: boolean,
+	): NativeReadSubscription;
 	declarationViewFork(node: ScopedNode): DeclarationViewFork | undefined;
 	isDeclarationView(node: unknown): boolean;
 }

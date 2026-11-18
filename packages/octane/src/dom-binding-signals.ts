@@ -1,7 +1,11 @@
 import { formatClientError } from './error-codes.client.generated.js';
 import { captureSignalOwner, currentSignalOwner } from './signals/owner-context.js';
 import { __retiredBindingSource } from './dom-binding-styles.js';
-import { setNativeReadObserver, type NativeReadSource } from './signals/read-protocol.js';
+import {
+	setNativeReadObserver,
+	type NativeReadSource,
+	type NativeReadSubscription,
+} from './signals/read-protocol.js';
 import { isSignalHandle } from './signals/handle-protocol.js';
 import {
 	SIGNAL_BINDING_READ,
@@ -95,7 +99,7 @@ export interface BindingReadTracker {
 export function __createBindingReads(notify: () => void): BindingReadTracker {
 	const owner = currentSignalOwner();
 	const run = owner === null ? <T>(callback: () => T): T => callback() : captureSignalOwner(owner);
-	const subscriptions = new Map<NativeReadSource, () => void>();
+	const subscriptions = new Map<NativeReadSource, NativeReadSubscription>();
 	const waits = new WeakSet<object>();
 	let reads = new Map<NativeReadSource, number>();
 	let disposed = false;
@@ -104,21 +108,23 @@ export function __createBindingReads(notify: () => void): BindingReadTracker {
 		const stop = run(() =>
 			source.subscribe(() => {
 				if (live && !disposed) notify();
-			}),
+			}, true),
 		);
 		if (typeof stop !== 'function') throw new TypeError(formatClientError(304));
-		const cleanup = (): void => {
+		const cleanup: NativeReadSubscription = (): void => {
 			live = false;
 			stop();
 		};
+		if (stop.observation !== undefined) cleanup.observation = stop.observation;
 		if (disposed) cleanup();
 		else subscriptions.set(source, cleanup);
 	};
-	const add = (): boolean => {
+	const add = (published: boolean): boolean => {
 		let changed = false;
 		for (const [source, version] of reads) {
 			if (disposed) break;
 			if (!subscriptions.has(source)) acquire(source);
+			if (published) subscriptions.get(source)?.observation?.setObserved(true);
 			// A write between the read and its subscription has no notification.
 			if (source.getVersion() !== version) changed = true;
 		}
@@ -141,10 +147,10 @@ export function __createBindingReads(notify: () => void): BindingReadTracker {
 				subscriptions.delete(source);
 				stop();
 			}
-			if (add()) notify();
+			if (add(true)) notify();
 		},
 		fail(error, committed) {
-			if (add()) notify();
+			if (add(false)) notify();
 			if (
 				error !== null &&
 				(typeof error === 'object' || typeof error === 'function') &&

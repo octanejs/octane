@@ -109,6 +109,12 @@ export interface NativeReadInspection {
  * the channel separate from either runtime lets the engine run without DOM or
  * server dependencies, and lets compiled native readers select their renderer.
  */
+/** A native subscription can track invalidation before its render is accepted. */
+export interface NativeReadSubscription {
+	(): void;
+	observation?: { setObserved(observed: boolean): void };
+}
+
 export interface NativeReadSource {
 	/**
 	 * A conservative invalidation revision. Reading it must not evaluate user
@@ -116,8 +122,8 @@ export interface NativeReadSource {
 	 * of the live source whose value was captured.
 	 */
 	getVersion(): number;
-	/** Subscribe without evaluating a user computation. */
-	subscribe(notify: () => void): () => void;
+	/** Subscribe without evaluating a user computation; speculative reads do not observe. */
+	subscribe(notify: () => void, speculative?: boolean): NativeReadSubscription;
 	/** Ready values from the observed revision, without running computations. */
 	serialize?(observedVersion: number): readonly NativeSerializedScope[] | undefined;
 	/** Whether the data scope this source reads has retired. Never evaluates. */
