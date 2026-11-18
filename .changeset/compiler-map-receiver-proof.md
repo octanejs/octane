@@ -2,4 +2,4 @@
 'octane': patch
 ---
 
-Preserve authored map callback semantics for receivers whose native array behavior cannot be proven by the compiler.
+Preserve native map observations when a JSX list receiver is an explicit Proxy construction or a local const bound to one.
