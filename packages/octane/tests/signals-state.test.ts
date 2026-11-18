@@ -1111,6 +1111,150 @@ describe('watched', () => {
 			expect(log).toEqual(['connect a', 'disconnect a', 'connect b', 'disconnect b']);
 		});
 
+	function subscribeSafely<T>(
+		start: (publish: (value: T) => void) => (() => void) | Promise<() => void>,
+		publish: (value: T) => void,
+	) {
+		let active = true;
+		let cleanup: (() => void) | undefined;
+		let setup: (() => void) | Promise<() => void>;
+		try {
+			setup = start((value) => {
+				if (active) publish(value);
+			});
+		} catch (error) {
+			active = false;
+			throw error;
+		}
+		if (typeof setup === 'function') cleanup = setup;
+		else
+			void setup
+				.then((stop) => {
+					if (active) cleanup = stop;
+					else stop();
+				})
+				.catch((error) => {
+					active = false;
+					if (typeof reportError === 'function') reportError(error);
+					else console.error(error);
+				});
+		return () => {
+			active = false;
+			cleanup?.();
+		};
+	}
+
+	it('does not publish from an external subscription after it has been replaced or stopped', async () => {
+		const scope = owner();
+		const room$ = scope.signal$('room', 'a');
+		const listeners = new Map<string, (value: string) => void>();
+		const started: string[] = [];
+		const stopped: string[] = [];
+		const pending = deferred<() => void>();
+		const connect = (room: string, publish: (value: string) => void) => {
+			started.push(room);
+			listeners.set(room, publish);
+			publish(`${room}: initial`);
+			return room === 'a' ? pending.promise : () => stopped.push(room);
+		};
+		const feed$ = scope.signal$('feed', '', {
+			watched: () =>
+				scope.effect(() =>
+					subscribeSafely<string>(
+						(publish) => connect(room$.get(), publish),
+						(value) => feed$.set(value),
+					),
+				),
+		});
+		const first = feed$.subscribe(() => {});
+		const second = feed$.subscribe(() => {});
+		expect(started).toEqual(['a']);
+		expect(feed$.get()).toBe('a: initial');
+		room$.set('b');
+		listeners.get('a')!('a: stale');
+		expect(feed$.get()).toBe('b: initial');
+		pending.resolve(() => stopped.push('a'));
+		await pending.promise;
+		expect(stopped).toEqual(['a']);
+		first();
+		expect(stopped).toEqual(['a']);
+		second();
+		expect(stopped).toEqual(['a', 'b']);
+		listeners.get('b')!('b: stale');
+		expect(feed$.get()).toBe('b: initial');
+		scope.dispose();
+		expect(() => listeners.get('a')!('after disposal')).not.toThrow();
+	});
+
+	for (const hasReportError of [true, false]) {
+		it(`reports an asynchronous subscription setup failure ${hasReportError ? 'through reportError' : 'to the console'}`, async () => {
+			const reported: unknown[] = [];
+			vi.stubGlobal(
+				'reportError',
+				hasReportError ? (error: unknown) => reported.push(error) : undefined,
+			);
+			const log = vi.spyOn(console, 'error').mockImplementation((error) => reported.push(error));
+			try {
+				const failure = new Error('connection failed');
+				const scope = owner();
+				const feed$ = scope.signal$('feed', '', {
+					watched: () =>
+						scope.effect(() =>
+							subscribeSafely<string>(
+								() => Promise.reject(failure),
+								(value) => feed$.set(value),
+							),
+						),
+				});
+				const stop = feed$.subscribe(() => {});
+				await Promise.resolve();
+				await Promise.resolve();
+				expect(reported).toEqual([failure]);
+				expect(log).toHaveBeenCalledTimes(hasReportError ? 0 : 1);
+				stop();
+			} finally {
+				log.mockRestore();
+				vi.unstubAllGlobals();
+			}
+		});
+	}
+
+	for (const asynchronous of [false, true]) {
+		it(`invalidates a retained publish callback when setup ${asynchronous ? 'rejects' : 'throws'}`, async () => {
+			const reported: unknown[] = [];
+			vi.stubGlobal('reportError', (error: unknown) => reported.push(error));
+			try {
+				const scope = owner();
+				const failure = new Error('setup failed');
+				let retained!: (value: string) => void;
+				const feed$ = scope.signal$('feed', '', {
+					watched: () =>
+						scope.effect(() =>
+							subscribeSafely<string>(
+								(publish) => {
+									retained = publish;
+									if (asynchronous) return Promise.reject(failure);
+									throw failure;
+								},
+								(value) => feed$.set(value),
+							),
+						),
+				});
+				const stop = feed$.subscribe(() => {});
+				await Promise.resolve();
+				await Promise.resolve();
+				expect(reported).toEqual([failure]);
+				retained('stale');
+				expect(feed$.get()).toBe('');
+				stop();
+				scope.dispose();
+				expect(() => retained('disposed')).not.toThrow();
+			} finally {
+				vi.unstubAllGlobals();
+			}
+		});
+	}
+
 	it('reports a throwing watched or cleanup and still links, stops and unwatches', () => {
 		const reported: unknown[] = [];
 		vi.stubGlobal('reportError', (error: unknown) => reported.push(error));
