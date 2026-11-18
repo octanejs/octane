@@ -540,7 +540,7 @@ export const STRONG_DIAGNOSTICS = [
 		section: 'data',
 		severity: 'error',
 		detects:
-			'A contract is declared in a module whose file name does not end in `.data.ts` or `.data.js`, or a contract module has a top-level statement other than an import, a type, or a `const` declaration or export, or imports `octane/server` or `octane/data/server`. The browser and the server both import a contract module, so it must stay inert.',
+			'A contract is declared in a module whose file name does not end in `.data.ts` or `.data.js`, or a contract module has a top-level statement other than an import, a type, or a `const` declaration or export, or imports values from `octane/server` or `octane/data/server`. The browser and the server both import a contract module, so it must stay inert.',
 		replacement:
 			'Move the contracts into a `*.data.ts` module, and move statements that run for effect, and server imports, into a module that imports the contracts.',
 	},

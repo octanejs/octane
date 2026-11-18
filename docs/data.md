@@ -44,8 +44,11 @@ imports `octane/data/manifest`. The rules and codes are in
 [Strong compiler checks](strong-compiler-checks.md#data-contracts).
 
 `view` ordering compares values as JavaScript's `<` does (dates by time,
-`null`/`undefined` first), then by the entity key. A handler must serve the
-same order.
+`null`/`undefined` first), then by the entity key's own value (so integer keys
+sort numerically). A handler must serve the same order: a window whose rows
+are out of it fails validation, in the handler and in the store, with
+`invalid` and an issue naming the view. An order only the server can run,
+such as a language collation, belongs in a read with cursor `pages`.
 
 Tags computed from an input scope invalidation to that input. A read
 computes its tags once per input, as `store.read` was given it; a view's
@@ -220,7 +223,15 @@ must be unique. `defineHandler(Module, { key: run })` takes a module namespace
 view, write or feed it exports. Its type requires exactly one `run` per
 contract export, typed as `handle` types it; a missing or extra key is a type
 error, a missing one at runtime throws, and other exports are ignored.
-`Implementation<C, T>` is the type of `run` for contract `T`. `run(input, call)` receives validated input and `call`: the context
+`Implementation<C, T>` is the type of `run` for contract `T`.
+A `read`, `view`, `write` or `feed` declared with its `run` as a second argument,
+`read(options, run)`, is served by it: `defineHandler(Module)` needs no key
+for it and takes no object when every contract has one. Its `call` type names
+what `run` needs from the context (`Served<Context>`), and `defineHandler`
+accepts the module only for a context that provides it. The Vite and Rspack
+plugins drop each `run`, and the imports and module-level `const`s only those
+functions used, from the client build of a `*.data.ts` module. A contract
+module may import types from any module. `run(input, call)` receives validated input and `call`: the context
 plus `request`, `signal`, `operationId` and `read(contract, input)`. A view's
 `run` receives `{ ...params, offset, limit }`. A feed's `run` is an async
 iterable of frames and receives `call.cursor`. Throw `DataError(code, data?)`

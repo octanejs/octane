@@ -34,6 +34,7 @@ export type {
 	Listener,
 	Read,
 	SchemaIssue,
+	Served,
 	StandardSchema,
 	Tags,
 	Transport,
