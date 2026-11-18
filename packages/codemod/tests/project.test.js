@@ -1864,6 +1864,7 @@ export function List() { return <main>{makeRows().map(row => {
 		{ name: 'without a target' },
 		{ name: 'without a target in a mixed module', mixed: true },
 		{ name: 'with ES2022 in a mixed module', target: 'es2022', mixed: true },
+		{ name: 'through a parent symlink', target: 'es2022', linked: true },
 		{ name: 'with unresolved React types', mixed: true, lib: ['es5'], block: true },
 		{
 			name: 'with missing React declarations',
@@ -1876,14 +1877,14 @@ export function List() { return <main>{makeRows().map(row => {
 		{ name: 'with a second registration', target: 'es2022', extra: 'second', block: true },
 	])(
 		'keeps a retained React registry boundary explicit $name',
-		async ({ target, mixed, lib, missing, extra, block }) => {
+		async ({ target, mixed, lib, missing, extra, block, linked }) => {
 			const registration = `import { createElement } from 'react';
 import { register } from './legacy';
 ${extra === 'unrelated' ? "import { helper } from './helper';" : ''}
 export const tab = register('notes', { getIcon: () => createElement('b', { className: 'icon' }, 'notes') });
 ${mixed ? 'export function NativeCandidate() { return <strong>Native slot</strong>; }' : ''}
 ${extra === 'unrelated' ? 'export const other = helper();' : extra === 'second' ? "export const other = register('other', { getIcon: () => createElement('i', null) });" : ''}`;
-			const root = project({
+			const physicalRoot = project({
 				'package.json': '{"type":"module"}',
 				'tsconfig.json': JSON.stringify({
 					compilerOptions: {
@@ -1903,6 +1904,11 @@ export function View() { return <nav>{registrations.get('notes')!.getIcon()}</na
 				'register.tsx': registration,
 				'helper.ts': 'export function helper() { return 1; }',
 			});
+			let root = physicalRoot;
+			if (linked) {
+				root = path.join(project({}), 'app');
+				fs.symlinkSync(physicalRoot, root, 'dir');
+			}
 			const modules = path.join(root, 'node_modules');
 			fs.mkdirSync(path.join(modules, '@types'), { recursive: true });
 			for (const name of ['react', 'react-dom']) {
