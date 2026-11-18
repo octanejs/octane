@@ -63,10 +63,17 @@ function schedule(member: Member, entry: MemberEntry, delay: number): void {
 function watchIdle(member: Member, entry: MemberEntry): void {
 	const own = watchedHook(member);
 	setWatched(member, () => {
-		// Observed first: a throw from the member's own hook is reported, not thrown,
-		// and must not leave an observed member to idle out.
 		entry.observed = true;
-		const stop = own?.();
+		let stop: void | (() => void);
+		// The member's own hook fails alone, reported as the graph reports hooks, so
+		// the family's observation still ends when its last observer leaves.
+		try {
+			stop = own?.();
+		} catch (error) {
+			const report = (globalThis as { reportError?: (error: unknown) => void }).reportError;
+			if (typeof report === 'function') report(error);
+			else console.error(error);
+		}
 		return () => {
 			entry.observed = false;
 			// Retirement ends the observation too, after the member has left the family.

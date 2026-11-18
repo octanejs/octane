@@ -366,7 +366,7 @@ describe('signal families', () => {
 		expect(family.has('a')).toBe(false);
 	});
 
-	it('keeps an observed member when its own watched hook throws', () => {
+	it('idles an observed member normally when its own watched hook throws', () => {
 		vi.useFakeTimers();
 		const report = vi.fn();
 		const previous = globalThis.reportError;
@@ -383,10 +383,14 @@ describe('signal families', () => {
 					}),
 				{ idle: 10 },
 			);
-			family.get('a').subscribe(() => {});
+			const stop = family.get('a').subscribe(() => {});
 			vi.advanceTimersByTime(50);
 			expect(report).toHaveBeenCalledOnce();
 			expect(family.has('a')).toBe(true);
+			// Its observation still ends, so it idles out.
+			stop();
+			vi.advanceTimersByTime(10);
+			expect(family.has('a')).toBe(false);
 		} finally {
 			globalThis.reportError = previous;
 		}
