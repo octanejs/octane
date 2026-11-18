@@ -23,3 +23,5 @@ export const REACTIVE_KEYLESS_CELL = 1024;
 export const REACTIVE_LISTED = 2048;
 /** Octane's own: a keyless cell (PlainCell) whose writes also consult its `equals`. */
 export const REACTIVE_CUSTOM_EQUALS = 4096;
+/** Octane's own: a keyless node a signal family owns, whose family hears when its last reader leaves. */
+export const REACTIVE_FAMILY_MEMBER = 8192;

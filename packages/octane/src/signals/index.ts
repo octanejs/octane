@@ -1,5 +1,6 @@
 /** Stable scoped signals. This entry does not import a renderer. */
 export { createScope } from './engine.js';
+export { createFamily } from './family.js';
 export { bindSignalControl } from './control-binding.js';
 export type { SignalControlBinding } from './control-handoff.js';
 export { enableSignalDocument as __enableSignalDocument } from './document-owner.js';
@@ -61,6 +62,7 @@ export type {
 	DerivedOptions,
 	DerivedSignal,
 	EncodedSignalValue,
+	FamilyOptions,
 	Query,
 	QueryContext,
 	QueryLoadResult,
@@ -79,6 +81,7 @@ export type {
 	SignalHandle,
 	SignalOptions,
 	SignalBindingIdentity,
+	SignalFamily,
 	SignalAction,
 	SignalOwner,
 	SignalOwnerEnvironment,

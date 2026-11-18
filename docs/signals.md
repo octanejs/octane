@@ -85,6 +85,24 @@ const stop = account.effect(() => {
 
 A `null` key declares a keyless value: `account.signal$(null, 0)` or `account.derived$(null, () => count$.get() * 2)`. A keyless signal is not serialized, seeded, adopted, inspected or staged by a transition, and takes no entry in the scope's key table. A keyless derived value belongs to no scope and records no provenance. Use keys for anything that crosses the server boundary or should appear in `scope.inspect()`; use keyless values for local graphs that only the client computes.
 
+`createFamily(scope, create, options?)` keeps one keyless member per logical key, so the key set can grow and shrink while the program runs without growing the scope's key table:
+
+```ts
+import { createFamily } from 'octane/signals';
+
+const row = createFamily(account, (id: string) => account.signal$(null, { id, done: false }));
+const cell = createFamily(
+	account,
+	([r, c]: [number, number]) => account.derived$(null, () => `${row.get(`${r}`).get().id}:${c}`),
+	{ keyOf: ([r, c]) => `${r}:${c}`, idle: 30_000 },
+);
+
+row.get('a').set((previous) => ({ ...previous, done: true })); // created on first get, then the same member
+row.delete('a'); // evict and retire it; a later row.get('a') creates a new one
+```
+
+`create` must return a new keyless `signal$(null, …)` or `derived$(null, …)` handle of the family's scope. Keys match as a `Map` matches them, or by the value `keyOf` returns. A member is evicted by `delete`, by `clear`, by the scope's disposal, or, with `idle`, that many milliseconds after it last had a reader (a derived value, an effect, a subscription or a renderer binding); a reader that returns in time keeps it. Eviction retires the member as a scope's disposal retires its signals: reading it throws `ScopeDisposedError`, renderer bindings and `useSignalValue` invalidate once, public subscriptions end silently, effects that read it stop, and a derived member lets go of its dependencies, so an evicted member can be collected. Evicting is a write, so a computation or render cannot do it. Members are keyless, so a family's state is not serialized or seeded across the server boundary.
+
 Writes use `Object.is` equality and become visible immediately. Pass `{ equals }` as the third argument to `scope.signal$` or `scope.derived$` to treat more values as unchanged: `account.signal$('filter', [], { equals: sameItems })`. When `equals(previous, next)` returns true, the signal keeps `previous`, by reference, and nothing downstream recomputes, re-renders or is notified. Values `Object.is` already finds equal are never passed to it, a derived value's first result and its first after an error are never compared, and it runs untracked and must not write signals. A transition's write compares against the pending value. Nested batches defer notifications until the outer synchronous batch ends. `scope.action(fn)` preserves `this`, arguments, and the return value while applying that same batching rule. It does not untrack reads, roll back earlier writes on an exception, or keep a batch open across `await`.
 
 An explicit renderer `startTransition` or `useTransition` Action is different from `scope.action`: a signal written inside it keeps its committed value and gains a pending value for that transition, the way a state update joins the transition's update queue. Derived and query values computed from it are pending with it. Committed reads, public subscriptions and DOM bindings keep the committed values. The components that read them render with the transition, and those renders, like the transition's own synchronous callback, read the pending values. The transition then suspends, holds and commits as its state updates do, and `isPending` stays true until it finishes. When it does, its signals commit: DOM bindings update first, and each subscriber hears of the change once. A boundary's configured timeout may show its fallback; the transition's signals commit when that boundary reveals its content. An urgent write commits immediately, and the transition's own update applies on top of it when it commits, as React rebases state updates. Two transitions that write the same signal, or a value derived from it, commit together.

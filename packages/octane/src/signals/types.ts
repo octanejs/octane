@@ -250,6 +250,31 @@ export interface Scope {
 	dispose(): void;
 }
 
+export interface FamilyOptions<K> {
+	/**
+	 * Map a key to the identity members are found by, such as a string for a
+	 * tuple. Keys are otherwise compared as a Map compares them.
+	 */
+	readonly keyOf?: (key: K) => unknown;
+	/**
+	 * Evict a member this many milliseconds after it last had a reader: a
+	 * derived value, effect, subscription or renderer binding. Members are
+	 * otherwise evicted only by `delete`, `clear` or the scope's disposal.
+	 */
+	readonly idle?: number;
+}
+
+/** Scope-owned keyless members, one per logical key. */
+export interface SignalFamily<K, H extends SignalHandle<unknown>> {
+	readonly size: number;
+	/** The key's member, created by the family's `create` on first use. */
+	get(key: K): H;
+	has(key: K): boolean;
+	/** Evict and retire the key's member; a later `get` creates a new one. */
+	delete(key: K): boolean;
+	clear(): void;
+}
+
 /**
  * @internal A scope the runtime creates. It lacks the members only
  * createScope installs (installPublicScope), so internal code that reaches for

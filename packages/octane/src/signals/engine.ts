@@ -233,6 +233,8 @@ export class ScopeImpl implements Scope, GraphOwner {
 	frames: Set<AdoptionFrameImpl> | undefined = undefined;
 	/** Effects this scope stops when it retires. */
 	effects: EffectNode | undefined = undefined;
+	/** Signal families, whose members this scope retires with it. */
+	families: Set<{ clear(): void }> | undefined = undefined;
 	heldCells: PlainCell[] | undefined = undefined;
 	heldReleased = 0;
 	/** Holds a writable or asynchronous derived cell that new render inputs cannot re-select. */
@@ -321,6 +323,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 			if (ring !== undefined) {
 				while (ring.next !== ring) stopEffect(ring.next!);
 			}
+			if (this.families) for (const family of this.families) family.clear();
 			this.disposed = true;
 			// Reads and writes from cancellation callbacks below take the general path, which throws.
 			for (const node of this.nodes.values()) node.flags |= REACTIVE_SLOW;

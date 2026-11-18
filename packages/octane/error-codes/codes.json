@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 367,
+  "nextCode": 369,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -2197,6 +2197,18 @@
     },
     "366": {
       "message": "A signal's equals option must be a function.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "367": {
+      "message": "createFamily requires a scope from createScope, a create function, and options whose keyOf is a function and whose idle is a non-negative number of milliseconds.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "368": {
+      "message": "A signal family's create function must return a new keyless signal$(null, …) or derived$(null, …) handle of the family's scope.",
       "argumentCount": 0,
       "runtime": ["client", "server"],
       "status": "active"
