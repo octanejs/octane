@@ -152,7 +152,7 @@ class Family<K, H extends SignalHandle<unknown>> implements SignalFamily<K, H> {
 			entries.has(member) ||
 			member.subs !== undefined
 		)
-			throw new TypeError(formatClientError(369));
+			throw new TypeError(formatClientError(371));
 		const entry: MemberEntry = {
 			family: this,
 			id,
@@ -260,7 +260,7 @@ export function createFamily<K, H extends SignalHandle<unknown>>(
 		(keyOf !== undefined && typeof keyOf !== 'function') ||
 		(options?.idle !== undefined && !(typeof idle === 'number' && idle >= 0 && idle < Infinity))
 	)
-		throw new TypeError(formatClientError(368));
+		throw new TypeError(formatClientError(370));
 	assertAlive(scope);
 	return new Family(scope, create, keyOf, idle);
 }

@@ -77,6 +77,7 @@ export type {
 	ScopeOptions,
 	ScopeSeed,
 	ScopeSignalOptions,
+	SignalChange,
 	SignalEquals,
 	SignalHandle,
 	SignalOptions,
@@ -90,5 +91,6 @@ export type {
 	SignalSeedEntry,
 	SignalSnapshot,
 	SignalTraceEvent,
+	SignalTransaction,
 	WritableSignal,
 } from './types.js';

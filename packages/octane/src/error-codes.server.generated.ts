@@ -259,6 +259,8 @@ type ServerErrorArguments = {
 	367: [];
 	368: [];
 	369: [];
+	370: [];
+	371: [];
 };
 
 export function formatServerError<Code extends keyof ServerErrorArguments>(
@@ -1055,11 +1057,18 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 			case 367:
 				return formatDevErrorMessage("A signal's watched option must be a function.", args);
 			case 368:
+				return formatDevErrorMessage('A signal transaction must be a function.', args);
+			case 369:
+				return formatDevErrorMessage(
+					'A signal transaction must be synchronous: its function returned a promise.',
+					args,
+				);
+			case 370:
 				return formatDevErrorMessage(
 					'createFamily requires a scope from createScope, a create function, and options whose keyOf is a function and whose idle is a non-negative number of milliseconds.',
 					args,
 				);
-			case 369:
+			case 371:
 				return formatDevErrorMessage(
 					"A signal family's create function must return a new keyless signal$(null, …) or derived$(null, …) handle of the family's scope.",
 					args,

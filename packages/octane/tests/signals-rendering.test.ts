@@ -6,7 +6,7 @@ import {
 	setTransitionFallbackTimeout,
 	startTransition,
 } from 'octane';
-import { bindSignalControl } from 'octane/signals';
+import { bindSignalControl, createScope } from 'octane/signals';
 import { act, createLog, flushEffects, mount } from './_helpers';
 import {
 	createCounter$,
@@ -1099,6 +1099,41 @@ describe('native signal rendering', () => {
 			rendered.unmount();
 			bindings?.unmount();
 			state.scope.dispose();
+		}
+	});
+});
+
+describe('signal transactions', () => {
+	it('leave a pending transition value as it was when they roll back', async () => {
+		const scope = createScope({ scopeKey: 'transaction-transition' });
+		const count$ = scope.signal$('count', 1);
+		const settle = deferred<undefined>();
+		try {
+			await act(() => {
+				startTransition(async () => {
+					count$.set((value) => value + 10);
+					await settle.promise;
+				});
+			});
+			expect(count$.get()).toBe(1);
+			// Direct writes join an in-flight async Action; flushSync keeps them urgent.
+			expect(() =>
+				flushSync(() =>
+					scope.transaction(() => {
+						// An urgent update applies to the pending value too: 11 + 1.
+						count$.set((value) => value + 1);
+						expect(count$.get()).toBe(2);
+						throw new Error('failed');
+					}),
+				),
+			).toThrow('failed');
+			expect(count$.get()).toBe(1);
+			await act(() => settle.resolve(undefined));
+			expect(count$.get()).toBe(11);
+		} finally {
+			settle.resolve(undefined);
+			await act(() => {});
+			scope.dispose();
 		}
 	});
 });

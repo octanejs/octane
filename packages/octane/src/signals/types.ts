@@ -78,6 +78,31 @@ export interface DerivedContext {
 /** Whether `next` is equal to `previous`, the value a signal already holds. */
 export type SignalEquals<T> = (previous: T, next: T) => boolean;
 
+/** A signal a transaction changed: its value before the transaction and after it. */
+export interface SignalChange<T = unknown> {
+	readonly signal$: WritableSignal<T>;
+	readonly previous: T;
+	readonly next: T;
+}
+
+export interface SignalTransaction<T> {
+	/** What the transaction's function returned. */
+	readonly value: T;
+	/**
+	 * Each signal the transaction changed, once, in the order it first wrote
+	 * it. A signal it wrote back to its previous value is left out.
+	 */
+	readonly changes: readonly SignalChange[];
+	/**
+	 * Write each change's previous value back, in one batch. A signal whose
+	 * scope has retired is skipped. Inside another transaction it is recorded
+	 * like any write.
+	 */
+	undo(): void;
+	/** Write each change's next value again, in one batch. */
+	redo(): void;
+}
+
 export interface ScopeSignalOptions<T> {
 	/**
 	 * Treat a new value as unchanged when this returns true: the signal keeps
@@ -246,6 +271,16 @@ export interface Scope {
 	isPending(read: () => unknown): boolean;
 	batch<T>(write: () => T): T;
 	/**
+	 * Run `write` synchronously in a batch that records each signal it changes.
+	 * If `write` throws, or returns a promise, those signals take back their
+	 * values before the batch ends and the error is rethrown, so no subscriber
+	 * hears of the failed writes. Otherwise it returns `write`'s result with the
+	 * changes, one per signal, and functions that write them back or again.
+	 */
+	transaction<T>(
+		write: (() => T) & (T extends PromiseLike<unknown> ? never : unknown),
+	): SignalTransaction<T>;
+	/**
 	 * Run `run` now and again whenever a signal it read changes, after the batch
 	 * that changed it. A function it returns is called before its next run and
 	 * when the effect stops. Returns a function that stops it; the scope stops it
@@ -293,7 +328,16 @@ export interface SignalFamily<K, H extends SignalHandle<unknown>> {
  */
 export type OwnerScope = Omit<
 	Scope,
-	'derived$' | 'get' | 'set' | 'isPending' | 'batch' | 'effect' | 'action' | 'serialize' | 'inspect'
+	| 'derived$'
+	| 'get'
+	| 'set'
+	| 'isPending'
+	| 'batch'
+	| 'transaction'
+	| 'effect'
+	| 'action'
+	| 'serialize'
+	| 'inspect'
 >;
 
 export interface OwnerBoundSignal<T> extends SignalHandle<T> {

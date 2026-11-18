@@ -512,6 +512,27 @@ describe('signal families', () => {
 		expect(dropped.deref()).toBeUndefined();
 	});
 
+	it.each([
+		['cell', (scope: Scope) => scope.signal$(null, 1)],
+		['derived', (scope: Scope) => scope.derived$(null, () => 1)],
+	] as const)(
+		'lets an idle family go while an evicted %s member is still held',
+		async (_kind, create) => {
+			const scope = owner();
+			// Kept out of the async frame so no strong local outlives the call.
+			const [held, dropped] = (() => {
+				const family = createFamily(scope, (_id: string) => create(scope), { idle: 60_000 });
+				const member$ = family.get('a');
+				member$.subscribe(() => {})();
+				family.delete('a');
+				return [member$, new WeakRef(family)] as const;
+			})();
+			await collectGarbage();
+			expect(dropped.deref()).toBeUndefined();
+			expect(() => held.get()).toThrow(ScopeDisposedError);
+		},
+	);
+
 	it('rejects invalid arguments and members', () => {
 		const scope = owner();
 		const other = owner('family-other');

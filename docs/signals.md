@@ -117,6 +117,19 @@ const messages$ = account.signal$('messages', [], {
 });
 ```
 
+`scope.transaction(fn)` is a batch that can be rolled back. If `fn` throws, or returns a promise, every signal it changed takes back its previous value before the batch ends, and the error is rethrown. No subscriber, effect or render sees a failed write: an effect that read one inside the transaction may run again, reading the restored values. Otherwise it returns `{ value, changes, undo, redo }`. `value` is what `fn` returned. `changes` lists each signal it changed once, as `{ signal$, previous, next }`, in the order it first wrote them, and leaves out one it wrote back to where it started. `undo()` writes the previous values back, last change first, and `redo()` writes the next values again, each in one batch, skipping signals whose scope has retired. A transaction inside another one joins it: an inner failure rolls back only the inner writes, and an outer failure rolls back both. An `undo` or `redo` inside a transaction is recorded like any write. A restored value is the exact previous reference, even when `equals` finds it equal to the value it replaces. Writes a transition stages are not recorded, but a rollback puts back a pending transition value that an urgent write in the transaction applied to. `scope.batch` is unchanged and keeps its writes when its callback throws.
+
+```ts
+const edit = account.transaction(() => {
+	title$.set(draft.title);
+	tags$.set(draft.tags);
+	if (!validate(title$.get(), tags$.get())) throw new Error('Invalid draft');
+});
+history.push(edit);
+// later
+history.pop()?.undo();
+```
+
 An explicit renderer `startTransition` or `useTransition` Action is different from `scope.action`: a signal written inside it keeps its committed value and gains a pending value for that transition, the way a state update joins the transition's update queue. Derived and query values computed from it are pending with it. Committed reads, public subscriptions and DOM bindings keep the committed values. The components that read them render with the transition, and those renders, like the transition's own synchronous callback, read the pending values. The transition then suspends, holds and commits as its state updates do, and `isPending` stays true until it finishes. When it does, its signals commit: DOM bindings update first, and each subscriber hears of the change once. A boundary's configured timeout may show its fallback; the transition's signals commit when that boundary reveals its content. An urgent write commits immediately, and the transition's own update applies on top of it when it commits, as React rebases state updates. Two transitions that write the same signal, or a value derived from it, commit together.
 
 Direct async Action setters join the renderer's existing in-flight Action batch, including function-valued form actions. Delegated user events, `flushSync`, insertion or layout effect callbacks, and unwrapped Effect Events retain urgent behavior. To keep an Effect Event invoked after `await` in the pending Action, wrap the call in `startTransition(() => effectEvent())`. The pending read context is synchronous: it is not installed globally across `await`. Functional setters evaluate against the pending value, while ordinary reads outside the transition's synchronous callback and its renders continue to observe committed state. `scope.action` alone does not import or install a renderer scheduler.
