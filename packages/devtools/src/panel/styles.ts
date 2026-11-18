@@ -182,11 +182,6 @@ export const OCTANE_DEVTOOLS_CSS = `
 	color: var(--odt-on-accent);
 	background: var(--odt-accent);
 }
-.odt-child {
-	margin-left: 12px;
-	border-left: 1px solid var(--odt-border);
-	padding-left: 4px;
-}
 /* Inspector */
 .odt-node-name {
 	margin: 0 0 10px;

@@ -45,7 +45,6 @@ const DEVTOOLS_OWN_COMPONENTS = new Set([
 	'ProfilerTab',
 	'TransitionsTab',
 	'PerfModelTab',
-	'TreeRow',
 	'NativeReadRows',
 	'DevtoolsPortal',
 	'TanStackDevtools',
