@@ -31,6 +31,108 @@ describe('animation controls', () => {
 		}
 	});
 
+	it('starts from the committed initial variant instead of engine defaults', async () => {
+		let controls!: LegacyAnimationControls;
+		const r = mount(ControllerGroup, {
+			rows: [
+				{ id: 'one', target: 20, value: 0, initial: { opacity: 0.6, scale: 0.7, x: [100, 150] } },
+			],
+			onReady(first: LegacyAnimationControls) {
+				controls = first;
+			},
+		});
+		try {
+			expect(r.find('#one').style.transform).toContain('translateX(100px)');
+			expect(r.find('#one').style.opacity).toBe('0.6');
+			void controls.start({ opacity: 1, scale: 1, x: 200 }, { duration: 10, ease: 'linear' });
+			await new Promise((resolve) => setTimeout(resolve, 80));
+			await nextPaint();
+			const x = Number(r.find('#one').style.transform.match(/translateX\(([-\d.]+)px\)/)?.[1]);
+			expect(x).toBeGreaterThanOrEqual(100);
+			expect(x).toBeLessThan(200);
+		} finally {
+			controls.stop();
+			r.unmount();
+		}
+	});
+
+	it('retains the current controller value when rebinding a mounted host', () => {
+		let first!: LegacyAnimationControls;
+		let second!: LegacyAnimationControls;
+		const onReady = (a: LegacyAnimationControls, b: LegacyAnimationControls) => {
+			first = a;
+			second = b;
+		};
+		const value = motionValue(0);
+		const rows = [{ id: 'one', target: 20, value, initial: { x: 100 } }];
+		const r = mount(ControllerGroup, { rows, onReady });
+		try {
+			first.set({ x: 130 });
+			r.update(ControllerGroup, { rows, second: true, onReady });
+			void second.start({ x: 200 }, { duration: 1 });
+			expect(value.get()).toBe(130);
+		} finally {
+			second.stop();
+			r.unmount();
+		}
+	});
+
+	it('applies a style first supplied after the initial controller frame', async () => {
+		let controls!: LegacyAnimationControls;
+		const onReady = (first: LegacyAnimationControls) => {
+			controls = first;
+		};
+		const r = mount(ControllerGroup, {
+			rows: [{ id: 'one', target: 20, initial: { x: 100 } }],
+			onReady,
+		});
+		try {
+			r.update(ControllerGroup, {
+				rows: [{ id: 'one', target: 20, value: 200, initial: { x: 100 } }],
+				onReady,
+			});
+			expect(r.find('#one').style.transform).toContain('translateX(200px)');
+			void controls.start({ x: 300 }, { duration: 10, ease: 'linear' });
+			await new Promise((resolve) => setTimeout(resolve, 80));
+			await nextPaint();
+			const x = Number(r.find('#one').style.transform.match(/translateX\(([-\d.]+)px\)/)?.[1]);
+			expect(x).toBeGreaterThanOrEqual(200);
+			expect(x).toBeLessThan(300);
+		} finally {
+			controls.stop();
+			r.unmount();
+		}
+	});
+
+	it('honors a fresh MotionValue supplied during a controller replacement', () => {
+		let first!: LegacyAnimationControls;
+		let second!: LegacyAnimationControls;
+		const onReady = (a: LegacyAnimationControls, b: LegacyAnimationControls) => {
+			first = a;
+			second = b;
+		};
+		const oldValue = motionValue(0);
+		const fresh = motionValue(50);
+		const r = mount(ControllerGroup, {
+			rows: [{ id: 'one', target: 20, value: oldValue }],
+			onReady,
+		});
+		try {
+			first.set({ x: 130 });
+			r.update(ControllerGroup, {
+				rows: [{ id: 'one', target: 20, value: fresh }],
+				second: true,
+				onReady,
+			});
+			expect(fresh.get()).toBe(50);
+			void second.start({ x: 200 }, { duration: 1 });
+			expect(fresh.get()).toBe(50);
+		} finally {
+			second.stop();
+			r.unmount();
+		}
+	});
+
 	it('uses updated committed variants and unsubscribes removed or rebound hosts', async () => {
 		let first!: LegacyAnimationControls;
 		let second!: LegacyAnimationControls;
@@ -94,8 +196,13 @@ describe('animation controls', () => {
 		const onReady = (first: LegacyAnimationControls) => {
 			controls = first;
 		};
-		const r = mount(ControllerGroup, { rows: [], circle, onReady });
+		const r = mount(ControllerGroup, { rows: [], circle, circleInitial: { cx: [9, 12] }, onReady });
 		try {
+			expect(circle.get()).toBe(9);
+			expect(r.container.querySelector('#circle')?.getAttribute('cx')).toBe('9');
+			void controls.start({ cx: 18 }, { duration: 1 });
+			expect(circle.get()).toBe(9);
+			controls.stop();
 			controls.set('layout');
 			expect(circle.get()).toBe(18);
 			await nextPaint();

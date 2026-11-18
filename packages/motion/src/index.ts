@@ -394,7 +394,7 @@ function firstFrame(tag: string, svg: boolean, props: any, target: any, atEnd: b
 		originalAttrs[key] = resolveMotionValue(source);
 		if (isMotionValue(source)) (motionAttrs ??= new Set()).add(key);
 	}
-	return { style, attrs: state.attrs, originalAttrs, motionAttrs, originalStyle };
+	return { values, style, attrs: state.attrs, originalAttrs, motionAttrs, originalStyle };
 }
 
 export type MotionComponent = (props: any, scope: any) => OctaneElement;
@@ -456,12 +456,23 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 				({
 					host: { current: null as HTMLElement | null },
 					animationComplete: undefined,
+					committedControllerProps: undefined,
+					nextController: undefined,
+					controller: undefined,
+					controllerVisual: undefined,
+					controllerSnapshot: undefined,
+					hostMounted: false,
+					motionStyleMounted: false,
 					initialAnimationKey: initialLabel === false ? true : null,
 					frame: firstFrame(
 						tag,
 						svg,
 						props,
-						resolvedAnimate && (initialLabel === false ? animateTargets : initial),
+						controller
+							? initialLabel === false
+								? undefined
+								: initial
+							: resolvedAnimate && (initialLabel === false ? animateTargets : initial),
 						initialLabel === false,
 					),
 					layout: null,
@@ -538,7 +549,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		latest.layoutIdKey = layoutIdKey;
 		latest.layoutMode = layoutAnimationMode(props.layout);
 
-		if (controller) {
+		if (controller || latest.controllerVisual) {
 			// Commands must see only props from an accepted commit, even if another
 			// render is suspended or abandoned.
 			useInsertionEffect(
@@ -548,32 +559,80 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 							? { ...props, transition: config.transition }
 							: props;
 					latest.committedControllerProps = committed;
-					if (latest.controller === controller && latest.controllerVisual) {
-						latest.controllerVisual.update(committed, null);
-						latest.controllerVisual.shouldReduceMotion = shouldReduceMotion;
+					latest.nextController = controller;
+					if (controller && latest.controller === controller && latest.controllerVisual) {
+						const visual = latest.controllerVisual;
+						const previousStyle = visual.props.style;
+						visual.update(committed, null);
+						for (const key in committed.style) {
+							const value = committed.style[key];
+							if (
+								isTransformKey(key) &&
+								!isMotionValue(value) &&
+								!Object.is(previousStyle?.[key], value)
+							)
+								visual.getValue(key)?.set(value);
+						}
+						visual.shouldReduceMotion = shouldReduceMotion;
 					}
 				},
 				null,
 				CONTROLLER_PROPS,
 			);
+		}
+		if (controller) {
 			useLayoutEffect(
 				() => {
 					if (!animationEnabled) return;
 					const node = latest.host.current;
 					const Visual = svg ? SVGVisualElement : HTMLVisualElement;
+					const snapshot = latest.controllerSnapshot;
+					const seed = !latest.hostMounted ? { ...latest.frame?.values } : { ...snapshot?.values };
+					latest.controllerSnapshot = undefined;
+					const scraped = svg
+						? scrapeSVGMotionValuesFromProps(latest.committedControllerProps, {})
+						: scrapeHTMLMotionValuesFromProps(latest.committedControllerProps, {});
+					if (snapshot) {
+						for (const key in scraped) {
+							if (isMotionValue(scraped[key]) && scraped[key] !== snapshot.authored[key])
+								seed[key] = scraped[key].get();
+						}
+					}
 					const visual = new Visual({
 						props: latest.committedControllerProps,
 						presenceContext: null,
 						reducedMotionConfig: shouldReduceMotion ? 'always' : 'never',
 						visualState: {
-							latestValues: {},
+							latestValues: seed,
 							renderState: { style: {}, vars: {}, transform: {}, transformOrigin: {}, attrs: {} },
 						},
 					} as any);
+					if (latest.hostMounted && !Object.keys(seed).length) {
+						for (const key of new Set([
+							...Object.keys(latest.frame?.values ?? {}),
+							...Object.keys(scraped),
+						])) {
+							const authored = scraped[key];
+							const value = isMotionValue(authored)
+								? authored.get()
+								: visual.readValueFromInstance(node, key);
+							if (value != null) {
+								seed[key] = value;
+								visual.setBaseTarget(key, value);
+							}
+						}
+					}
 					visual.mount(node);
 					latest.controller = controller;
 					latest.controllerVisual = visual;
 					const release = () => {
+						if (latest.nextController && latest.nextController !== controller)
+							latest.controllerSnapshot = {
+								values: { ...visual.latestValues },
+								authored: svg
+									? scrapeSVGMotionValuesFromProps(visual.props, {})
+									: scrapeHTMLMotionValuesFromProps(visual.props, {}),
+							};
 						stopVisualElement(visual);
 						visual.unmount();
 						if (visualElementStore.get(node) === visual) visualElementStore.delete(node);
@@ -607,7 +666,8 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		useLayoutEffect(
 			() => {
 				const node: HTMLElement = latest.host.current;
-				if (animationEnabled && resolvedInitial) {
+				latest.hostMounted = true;
+				if (animationEnabled && resolvedInitial && !controller) {
 					animate(node, resolvedInitial, { duration: 0 });
 				}
 			},
@@ -747,6 +807,8 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 					motionStyleKeys.delete(node);
 				}
 
+				const initialControllerFrame = controller && !latest.motionStyleMounted;
+				latest.motionStyleMounted = true;
 				if (!style || typeof style !== 'object') return;
 				const appliedKeys: string[] = [];
 				const cleanups: Array<() => void> = [];
@@ -765,8 +827,10 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 						appliedKeys.push(key);
 						cleanups.push(v.on('change', apply));
 					} else if (isTransformKey(key)) {
-						latest.layout?.stop();
-						applyStyleValue(node, key, v, transformState);
+						if (!initialControllerFrame || !Object.hasOwn(latest.frame?.values ?? {}, key)) {
+							latest.layout?.stop();
+							applyStyleValue(node, key, v, transformState);
+						}
 						appliedKeys.push(key);
 					}
 				}
