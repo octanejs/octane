@@ -112,6 +112,22 @@ describe('octane/data store', () => {
 		await store.retire();
 	});
 
+	it('prefetches once until a reader shows the value, then reloads by age', async () => {
+		const server = createServer();
+		const store = createDataStore({ transport: server.transport });
+		// Hovering a link, then the route it opens: its reader shows the first load.
+		await store.prefetch(todos, undefined);
+		await store.prefetch(todos, undefined);
+		const list = store.read(todos, undefined);
+		const stop = list.subscribe(() => {});
+		await settled();
+		expect(server.log).toEqual(['list']);
+		stop();
+		await store.prefetch(todos, undefined);
+		expect(server.log).toEqual(['list', 'list']);
+		await store.retire();
+	});
+
 	it('rejoins the current read when an evicted handle is observed or refreshed', async () => {
 		const clock = installTestClock();
 		try {
@@ -706,6 +722,24 @@ describe('octane/data server render and hydration', () => {
 		const saved = client.write(setDone, { id: 'a', done: true });
 		expect(list.getSnapshot().value![0].done).toBe(true);
 		await saved;
+	});
+
+	it('hydrates a route that prefetches its reads without loading them again', async () => {
+		const server = createServer();
+		const seed = await serverRender(server);
+		const client = createDataStore({ transport: server.transport, seed });
+		// The route's own prefetch runs on the hydrating page too, before any component reads.
+		await client.prefetch(todos, undefined);
+		const list = client.read(todos, undefined);
+		expect(list.getSnapshot()).toMatchObject({ status: 'ready', value: [{ title: 'Tides' }] });
+		list.subscribe(() => {});
+		await settled();
+		expect(server.log).toEqual(['list']);
+
+		// Once the value has been shown, a prefetch reloads it by age, as a new reader does.
+		await client.prefetch(todos, undefined);
+		expect(server.log).toEqual(['list', 'list']);
+		await client.retire();
 	});
 
 	it('refreshes a read invalidated before the server sent its seed', async () => {
