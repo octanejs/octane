@@ -26,12 +26,14 @@ pnpm add @tsrx/oxc@0.23.0
 
 Applications that use only the Octane runtime do not need this peer.
 
-[Signals](https://octanejs.dev/docs/signals) are stable. Import `createScope` and
-`query` from `octane/signals`, or `useSignal$` from `octane/signals/client`, for
-scoped state, derived values, async resources, and native component reads.
-Each module that consumes native signal reads needs its own runtime import from
-`octane/signals`, `octane/signals/client`, or `octane/signals/server`. No extra
-compiler option is needed.
+[Signals](https://octanejs.dev/docs/signals) are stable. Import `signal$`,
+`derived$` and `query$` from `octane/signals` for writable state, derived values
+and keyed async sources, `useSignal$` from `octane/signals/client` for
+component-owned state, or `createScope` for explicitly owned scopes with effects,
+transactions and families. Each module that consumes native signal reads needs
+its own runtime import from `octane/signals`, `octane/signals/client`, or
+`octane/signals/server`. No extra compiler option is needed. React components
+read the same handles through `octane/signals/react`.
 
 [`octane/data`](https://octanejs.dev/docs/data) is the data layer for
 server-owned data. Declare reads, writes, views and feeds as contracts, serve
