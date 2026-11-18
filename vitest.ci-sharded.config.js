@@ -1,6 +1,7 @@
 import { configDefaults, defineConfig } from 'vitest/config';
 
 import baseConfig from './vitest.config.js';
+import { releaseFinishedProjectGraphs } from './scripts/release-finished-project-graphs.mjs';
 
 export const ISOLATED_COMPILER_SPEC =
 	'packages/octane/tests/compiler/compiler-vite-options.test.ts';
@@ -31,10 +32,20 @@ const ciProjects = baseConfig.test.projects.map((project) =>
 		: project,
 );
 
+const release = releaseFinishedProjectGraphs();
+
 export default defineConfig({
 	...baseConfig,
 	test: {
 		...baseConfig.test,
 		projects: configureShardedProjects(ciProjects),
+		// Vitest's default reporters, plus releasing each project's transform cache
+		// when its files finish so one shard's main process stays under the heap limit.
+		sequence: { ...baseConfig.test.sequence, sequencer: release.sequencer },
+		reporters: [
+			'default',
+			...(process.env.GITHUB_ACTIONS === 'true' ? ['github-actions'] : []),
+			release.reporter,
+		],
 	},
 });

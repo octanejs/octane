@@ -33,6 +33,27 @@ reports the heap the mounted rows hold.
 | `cells` | Each read is a signal cell, read with `.get()` while rendering. |
 | `bound` | Each read is a signal cell, and the field shown is a `derived$` bound to its text node, so a write renders no component. |
 
+### `shell`: data read near the top of the tree
+
+The scenarios above read data at the leaves. `shell` reads it where an
+application shell does: one viewer, the viewer's settings, an unread count and
+200 conversations, over a 100-message thread whose every row shows the
+`compact` setting. Its steps are **mount**, then four write steps of 200
+separately flushed changes each: **badge** (the unread count), **rename** (the
+viewer's name), **title** (one conversation's title in the list) and
+**setting** (toggle `compact`), then **unmount**.
+
+| Lane | How the shell reads |
+| --- | --- |
+| `hooks-top` | The shell reads all four with `useRead` and passes the values down to plain components, as a top-level provider does. Every write renders the whole shell. |
+| `hooks` | The header, sidebar and thread each read what they show, over `memo` rows. |
+| `cells` | The `hooks` shell, reading each signal with `.get()` while rendering. |
+| `bound` | Each shown value is a `derived$` bound to its text or attribute: the header's name and count, a title per sidebar row, and one class for every thread row. The sidebar renders again only when the conversations' ids change. |
+
+Between steps the runner waits a frame and a task, so the passive effect in
+which a read subscribes has run before the next write, as it would have in a
+page.
+
 The signal lanes read a prototype, `cells.ts`: each store read mirrored into a
 cell of one data scope. A store built on signals would hold its values in those
 cells; the mirror keeps the store's copy as well and forwards each notification
