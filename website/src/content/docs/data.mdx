@@ -474,6 +474,54 @@ The store has a few more methods for plain code:
 - `store.forget(read, input)` erases one cached value, in memory and in
   [persistent storage](#persistence).
 
+<h3 id="screen-reads">Load a screen in one round trip</h3>
+
+A component that reads its own data starts loading when it mounts. A
+component inside another's `@try` mounts only once the outer read arrives, so
+its reads start a round trip later. On a slow network each extra round trip
+is what the user waits for.
+
+When the route knows what the screen needs, start those reads together
+before rendering. The components still read exactly as before, so each part
+keeps its own cache entry, pending state and failure:
+
+```ts
+// The route, before it renders the project screen.
+store.prefetch(project, id);
+store.prefetch(members, id);
+store.prefetch(tasks, id);
+store.prefetch(activity, id);
+```
+
+A read that needs another read's reply, such as the owner named by
+`project.ownerId`, can only start once that reply arrives, so it still costs
+a second round trip. To remove it, serve the screen as one read whose handler
+gathers every part, and makes the dependent lookup on the server's own
+network:
+
+```ts
+export const dashboard = read({
+	name: 'dashboard',
+	input: ProjectId,
+	output: Dashboard,
+	// The records it carries are shared with every other read of them.
+	entities: (value) => [
+		Project.from(value.project),
+		User.from([value.owner, ...value.members]),
+		Task.from(value.tasks),
+	],
+});
+```
+
+That is one request, but the screen shows all of it at once, as fast as its
+slowest part, and one failure fails all of it. Keep separate reads for parts
+that may be slow, and for parts that other screens show on their own.
+
+On a server-rendered page, the route's prefetches find the values the server
+rendered with and load nothing. The
+[`data-fetch-waves` benchmark](https://github.com/octanejs/octane/tree/main/benchmarks/data-fetch-waves)
+measures all three ways on one screen.
+
 <h2 id="writing">Writing data</h2>
 
 A **write** contract describes a change. You call it with
