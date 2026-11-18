@@ -27,6 +27,8 @@ export interface DocumentSearchRecord {
 	blocks: SearchBlock[];
 	text: string;
 	haystack: string;
+	/** Normalized registry search terms: a query equal to one belongs in this document. */
+	searchTerms: string[];
 	/** Position of the owning doc in the curated registry — the tie-breaker. */
 	order: number;
 }
@@ -236,6 +238,7 @@ export function recordsFor(
 			blocks,
 			text,
 			haystack: (docTitle + ' ' + title + ' ' + text).toLowerCase(),
+			searchTerms: [],
 			order,
 		});
 	};
@@ -264,6 +267,7 @@ export function addSearchTerms(
 	record.blocks.push(block);
 	record.text += ' ' + block.text;
 	record.haystack += ' ' + block.text.toLowerCase();
+	record.searchTerms.push(...terms.map(normalize));
 }
 
 function normalize(value: string): string {
@@ -385,6 +389,11 @@ export function searchDocs(
 	const pattern = new RegExp('(' + terms.map(escapeRegExp).join('|') + ')', 'ig');
 	const phrasePattern = new RegExp('\\b' + escapeRegExp(q) + '\\b');
 
+	const owners = new Set(
+		index.flatMap((record) =>
+			record.kind === 'doc' && record.searchTerms.includes(q) ? [record.slug] : [],
+		),
+	);
 	const groups: SearchResult[] = [];
 	for (const record of index) {
 		if (record.kind === 'package') {
@@ -456,6 +465,10 @@ export function searchDocs(
 		// Term frequency: the section that keeps returning to a term is the one
 		// that documents it, rather than one that merely uses it in an example.
 		score += Math.min(occurrences(text, q), 6) * 2;
+		// A curated search term names the document that owns the query, above a
+		// guide that merely uses it in every example. The whole document rises,
+		// so its own sections keep their order.
+		if (owners.has(record.slug)) score += 24;
 
 		// Prefer lines carrying the whole query, then any single term. A section
 		// that only matched through its heading still shows its opening lines.
