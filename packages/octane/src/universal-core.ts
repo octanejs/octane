@@ -2688,14 +2688,10 @@ function readOwnerContext<T>(
 	return value;
 }
 
-function executeOwner(
-	owner: DraftOwner,
-	build: () => BlueprintNode[],
-	initialRenderCount = 0,
-): BlueprintNode[] {
+function executeOwner<T>(owner: DraftOwner, build: () => T, initialRenderCount = 0): T {
 	const attempt = currentAttempt();
 	const warmPlanCheckpoint = ACTIVE_UNIVERSAL_WARM_PLANS.length;
-	let output: BlueprintNode[] = [];
+	let output: T;
 	for (let renderCount = initialRenderCount; ; renderCount++) {
 		ACTIVE_UNIVERSAL_WARM_PLANS.length = warmPlanCheckpoint;
 		if (renderCount === 25) throw new Error('Too many universal render-phase updates.');
@@ -2767,14 +2763,7 @@ function renderLazyLeafItem(
 		const owner = scope.owner as DraftOwner | null;
 		if (owner?.needsRender) {
 			ACTIVE_UNIVERSAL_WARM_PLANS.length = warmPlanCheckpoint;
-			executeOwner(
-				owner,
-				() => {
-					rendered = render(item, index);
-					return [];
-				},
-				1,
-			);
+			rendered = executeOwner(owner, () => render(item, index), 1);
 		}
 		return rendered;
 	} finally {
