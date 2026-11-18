@@ -1,5 +1,5 @@
 import { formatClientError } from '../error-codes.client.generated.js';
-import { createDerivedCellWith, type DerivedBindingLifecycle, type ScopeImpl } from './engine.js';
+import { createDerivedCellWith, ScopeImpl, type DerivedBindingLifecycle } from './engine.js';
 import {
 	CandidateUnsupportedError,
 	createDeclarationView,
@@ -159,7 +159,6 @@ export function createDeclaredScalarCell<T>(
 	sequence?: number,
 	captures?: readonly unknown[],
 	declaring?: number,
-	prepare?: () => ((node: ScopedNode<T>) => void) | undefined,
 ): DerivedSignal<T> {
 	return createDerivedCellWith(
 		owner,
@@ -170,7 +169,50 @@ export function createDeclaredScalarCell<T>(
 		sequence,
 		captures,
 		declaring,
-		prepare,
+	);
+}
+
+interface ConfiguredScalarOptions<T> extends DerivedOptions {
+	readonly configure: (node: ScopedNode<T>) => void;
+}
+
+/** Only configured declarations install cell options before scalar binding setup. */
+class ConfiguredScalarBinding<T> extends ScalarBinding<T> {
+	constructor(
+		owner: ScopeImpl,
+		node: ScopedNode<T>,
+		compute: DerivedCompute<T>,
+		options?: DerivedOptions,
+	) {
+		(options as ConfiguredScalarOptions<T>).configure(node);
+		super(owner, node, compute, options);
+	}
+}
+
+export function createConfiguredDeclaredScalarCell<T>(
+	owner: OwnerScope,
+	key: string,
+	compute: DerivedCompute<T>,
+	options: (DerivedOptions & ScopeSignalOptions<T>) | undefined,
+	sequence: number,
+	captures: readonly unknown[] | undefined,
+	declaring: number,
+	prepare: (() => ((node: ScopedNode<T>) => void) | undefined) | undefined,
+): DerivedSignal<T> {
+	const configure =
+		prepare && owner instanceof ScopeImpl && !owner.nodes.has(key) ? prepare() : undefined;
+	const bindingOptions: ConfiguredScalarOptions<T> | undefined = configure
+		? { sync: true, configure }
+		: undefined;
+	return createDerivedCellWith(
+		owner,
+		key,
+		compute,
+		bindingOptions ?? options,
+		configure ? ConfiguredScalarBinding : ScalarBinding,
+		sequence,
+		captures,
+		declaring,
 	);
 }
 

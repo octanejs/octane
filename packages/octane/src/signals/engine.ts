@@ -936,14 +936,10 @@ export function createDeclaredSignalCell<T>(
 	key: string,
 	initial: T,
 	preferInitial = false,
-	prepare?: () => ((node: ScopedNode<T>) => void) | undefined,
 ): WritableSignal<T> {
 	if (!(owner instanceof ScopeImpl)) throw new TypeError(formatClientError(148));
-	// Validate before registration; failed JS options must leave this key reusable.
-	const configure = prepare !== undefined && !owner.nodes.has(key) ? prepare() : undefined;
 	const [node, created] = declaredScopeNode<T>(owner, key, 'signal');
 	if (!created) return node as WritableSignal<T>;
-	configure?.(node);
 	const seed = initialScopeSeed(owner, key) ?? retainedScopeSeed(owner, key);
 	initializeValue(node, seed && !preferInitial ? (seed.value as T) : initial);
 	consumeScopeSeed(owner, key);
@@ -961,18 +957,15 @@ export function createDerivedCellWith<T>(
 	sequence = 0,
 	captures?: readonly unknown[],
 	declaring = 0,
-	prepare?: () => ((node: ScopedNode<T>) => void) | undefined,
 ): DerivedSignal<T> {
 	if (!(owner instanceof ScopeImpl)) throw new TypeError(formatClientError(149));
 	if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
-	const configure = prepare !== undefined && !owner.nodes.has(key) ? prepare() : undefined;
 	const [node, created] = declaredScopeNode<T>(owner, key, 'derived');
 	if (!created) {
 		// A later render may declare the same cell with a new computation.
 		const binding = owner.derivedBindings?.get(node);
 		return (binding?.redeclare(compute, sequence, captures, declaring) ?? node) as DerivedSignal<T>;
 	}
-	configure?.(node);
 	const binding = new Binding(owner, node, compute, options);
 	binding.declared(sequence, captures, declaring);
 	(owner.derivedBindings ??= new Map()).set(node, binding);

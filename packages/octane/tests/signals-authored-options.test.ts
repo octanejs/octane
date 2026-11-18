@@ -60,6 +60,26 @@ it('leaves an owner key reusable after invalid JS cell options', () => {
 	}
 });
 
+it('does not replace a first cell created reentrantly by an options getter', () => {
+	const owner = { scopeKey: 'reentrant-authored-options' };
+	try {
+		Signals.runWithSignalOwner(owner, () => {
+			const options: { key: string; equals?: (a: number, b: number) => boolean } = { key: 'value' };
+			const resolveFirst$ = () => {
+				Signals.signal$(0, { key: 'value' }).get();
+				return () => true;
+			};
+			Object.defineProperty(options, 'equals', { get: resolveFirst$ });
+			const value$ = Signals.signal$(1, options);
+			expect(value$.get()).toBe(0);
+			value$.set(2);
+			expect(value$.get()).toBe(2);
+		});
+	} finally {
+		Signals.retireSignalOwnerIdentity(owner);
+	}
+});
+
 it('captures a derived comparator getter once and leaves a throwing getter’s key reusable', () => {
 	const owner = { scopeKey: 'getter-authored-options' };
 	let reads = 0;
