@@ -116,6 +116,24 @@ export function IndexedTransparentKey({ rows }: { rows: { id: string; label?: nu
 	</ul>
 }
 
+type IndexedRow = { id: string; label?: string; nested?: { score?: number }; [at: number]: number };
+
+export function IndexedExpressions({ rows }: { rows: IndexedRow[] }) @{
+	<ul>
+		@for (
+			const {
+				id,
+				label = id + index,
+				nested: { score = index * 2 } = {},
+				[index + 1]: extra = -1,
+			} of rows;
+			index index
+		) {
+			<li>{`${label}:${score}:${extra}`}</li>
+		}
+	</ul>
+}
+
 export function Scores(props: { scores: [string, ...number[]][] }) @{
 	<ul>
 		@for ([name, ...points] of props.scores; key name) {

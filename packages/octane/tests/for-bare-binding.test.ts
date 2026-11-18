@@ -273,7 +273,12 @@ describe('bare-left @for row bindings', () => {
 		expect(node?.textContent).toBe('2');
 	});
 
-	it('initializes the index before destructuring simple rows and hydrates them in place', () => {
+	const expressionRows = {
+		rows: [{ id: 'a', 1: 10 }, { id: 'b' }, { id: 'c', label: 'C', nested: { score: 7 } }],
+	};
+	const expressionText = ['a0:0:10', 'b1:2:-1', 'C:7:-1'];
+
+	it('initializes the index before destructuring rows and hydrates them in place', () => {
 		const errors: unknown[] = [];
 		const options = { onRecoverableError: (error: unknown) => errors.push(error) };
 		const defaults = { rows: [{}, {}] };
@@ -283,13 +288,10 @@ describe('bare-left @for row bindings', () => {
 			container(renderToString(server.IndexedDefault, defaults).html),
 			container(renderToString(server.IndexedProperty, properties).html),
 			container(renderToString(server.IndexedTransparentKey, keyed).html),
+			container(renderToString(server.IndexedExpressions, expressionRows).html),
 		];
 		const rows = () => hosts.map((host) => [...host.querySelectorAll('li')]);
-		const expected = [
-			['0', '1'],
-			['10', '20'],
-			['row', 'row'],
-		];
+		const expected = [['0', '1'], ['10', '20'], ['row', 'row'], expressionText];
 		const before = rows();
 		expect(before.map(text)).toEqual(expected);
 
@@ -297,6 +299,7 @@ describe('bare-left @for row bindings', () => {
 			hydrateRoot(hosts[0], client.IndexedDefault, defaults, options),
 			hydrateRoot(hosts[1], client.IndexedProperty, properties, options),
 			hydrateRoot(hosts[2], client.IndexedTransparentKey, keyed, options),
+			hydrateRoot(hosts[3], client.IndexedExpressions, expressionRows, options),
 		];
 		cleanups.push(() => roots.forEach((root) => root.unmount()));
 		flushSync(() => {});
@@ -306,25 +309,85 @@ describe('bare-left @for row bindings', () => {
 		expect(errors).toEqual([]);
 	});
 
-	it.each(['index', 'id'])(
-		'keeps the indexed row binding %s immutable on both renderers',
-		(name) => {
-			const source = `
-				export function List({ rows }) @{
-					<ul>@for (const { id, label = index } of rows; index index) {
-						eval('${name} = 7');
-						<li>{label as number}</li>
-					}</ul>
-				}
-			`;
-			const id = 'indexed-row-constant.tsrx';
-			const props = { rows: [{ id: 'a' }, { id: 'b' }] };
-			const { List: ClientList } = loadCompiledFixtureSource(source, { id, mode: 'client' });
-			const { List: ServerList } = loadCompiledFixtureSource(source, { id, mode: 'server' });
-			expect(() => mount(ClientList, props)).toThrow(TypeError);
-			expect(() => renderToString(ServerList, props)).toThrow(TypeError);
-		},
-	);
+	it('initializes the index before destructuring rows in strong compiles', () => {
+		const source = `
+			export function List({ rows }) @{
+				<ul>@for (const { id, label = id + index, nested: { score = index * 2 } = {}, [index + 1]: extra = -1 } of rows; index index) {
+					<li>{\`\${label}:\${score}:\${extra}\`}</li>
+				}</ul>
+			}
+		`;
+		const compileOptions = {
+			dev: process.env['OCTANE_TEST_COMPILE_MODE'] !== 'prod',
+			strong: true,
+		};
+		const id = 'indexed-row-strong.tsrx';
+		const { List: ClientList } = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'client',
+			compileOptions,
+		});
+		const { List: ServerList } = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'server',
+			compileOptions,
+		});
+		const host = container(renderToString(ServerList, expressionRows).html);
+		const before = [...host.querySelectorAll('li')];
+		expect(text(before)).toEqual(expressionText);
+
+		const errors: unknown[] = [];
+		const root = hydrateRoot(host, ClientList, expressionRows, {
+			onRecoverableError: (error: unknown) => errors.push(error),
+		});
+		cleanups.push(() => root.unmount());
+		flushSync(() => {});
+		const after = [...host.querySelectorAll('li')];
+		expectAdopted(after, before);
+		expect(text(after)).toEqual(expressionText);
+		expect(errors).toEqual([]);
+	});
+
+	it('keeps an indexed row pattern outside the row body scope on the server', () => {
+		// As in a for…of, a header default never sees the row body's declarations.
+		const source = `
+			const prefix = 'outer';
+			export function List({ rows }) @{
+				<ul>@for (const { read = () => prefix + index } of rows; index index) {
+					const prefix = 'row';
+					<li>{read() as string}</li>
+				}</ul>
+			}
+		`;
+		const { List } = loadCompiledFixtureSource(source, {
+			id: 'indexed-row-scope.tsrx',
+			mode: 'server',
+		});
+		const host = container(renderToString(List, { rows: [{}, {}] }).html);
+		expect(text([...host.querySelectorAll('li')])).toEqual(['outer0', 'outer1']);
+	});
+
+	it.each([
+		['index', 'index'],
+		['id', 'index'],
+		['index', 'id + index'],
+		['id', 'id + index'],
+	])('keeps the indexed row binding %s immutable on both renderers (label = %s)', (name, label) => {
+		const source = `
+			export function List({ rows }) @{
+				<ul>@for (const { id, label = ${label} } of rows; index index) {
+					eval('${name} = 7');
+					<li>{label as number}</li>
+				}</ul>
+			}
+		`;
+		const id = 'indexed-row-constant.tsrx';
+		const props = { rows: [{ id: 'a' }, { id: 'b' }] };
+		const { List: ClientList } = loadCompiledFixtureSource(source, { id, mode: 'client' });
+		const { List: ServerList } = loadCompiledFixtureSource(source, { id, mode: 'server' });
+		expect(() => mount(ClientList, props)).toThrow(TypeError);
+		expect(() => renderToString(ServerList, props)).toThrow(TypeError);
+	});
 
 	it('rejects writing a const destructured key binding on both client and server', () => {
 		// Compile directly so the runtime is exercised even without TypeScript checking.

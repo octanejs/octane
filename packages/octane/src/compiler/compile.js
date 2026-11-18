@@ -18078,19 +18078,17 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	if (snapshot !== null) {
 		itemSub.fn = { ...itemSub.fn, params: [snapshot.binding, ...itemSub.fn.params.slice(1)] };
 	} else if (mapCall === null && node.index && itemId.type !== 'Identifier') {
-		let readsIndex = false;
-		const hasOtherExpression = mapCallbackPatternSome(itemId, (expression) => {
-			const value = unwrapTsExpr(expression);
-			if (value?.type !== 'Identifier' || value.name !== node.index.name)
-				return !isInvariantLiteral(value);
-			readsIndex = true;
-			return false;
-		});
-		if (readsIndex && !hasOtherExpression) {
-			// Bind the index before preparing an authored row, like the client.
+		// Bind the index before preparing an authored row that reads it, like the
+		// client. The pattern then shares the row body's scope, where a default
+		// would see the body's own declarations, so a pattern that reads a name the
+		// body declares stays a parameter.
+		const fn = itemSub.fn;
+		const reads = collectFreeIdentifiers(node.left, []);
+		const declared = new Set();
+		for (const statement of fn.body.body) collectStatementBindings(statement, declared);
+		if (reads.has(node.index.name) && ![...reads].some((name) => declared.has(name))) {
 			const input = b.id(allocCompilerName(ctx, '__rowInput'));
 			const ordinal = b.id(allocCompilerName(ctx, '__rowIndex'));
-			const fn = itemSub.fn;
 			itemSub.fn = {
 				...fn,
 				params: [input, ordinal, ...fn.params.slice(2)],
