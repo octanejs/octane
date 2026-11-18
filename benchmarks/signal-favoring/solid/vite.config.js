@@ -6,7 +6,7 @@ import solid from '@solidjs/vite-plugin';
 // production bundle (dev:false plugin opt + non-'development' resolve
 // conditions + NODE_ENV=production define).
 export default defineConfig({
-	plugins: [solid({ dev: false, hot: false })],
+	plugins: [solid({ dev: false, refresh: false })],
 	mode: 'production',
 	define: { 'process.env.NODE_ENV': JSON.stringify('production') },
 	resolve: { conditions: ['solid', 'browser', 'module', 'import', 'default'] },

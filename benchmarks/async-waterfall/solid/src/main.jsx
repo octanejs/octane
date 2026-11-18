@@ -1,5 +1,5 @@
 import { render } from '@solidjs/web';
-import { createSignal, createMemo, createLoadingBoundary } from 'solid-js';
+import { createSignal, createMemo, Loading } from 'solid-js';
 import { fetchData, LEVELS } from './data.js';
 
 // Solid 2.0 async: a memo whose compute returns a promise auto-unwraps — reads
@@ -12,18 +12,14 @@ const [version, setVersion] = createSignal(0);
 window.__bump = () => setVersion((v) => v + 1);
 
 function Level(props) {
-	const data = createMemo(() => fetchData(props.level, version()));
+	const level = props.level; // construction-time constant: read once
+	const data = createMemo(() => fetchData(level, version()));
 	return (
-		<div class="level" data-level={props.level}>
-			{createLoadingBoundary(
-				() => (
-					<span class="val">{data()}</span>
-				),
-				() => (
-					<span class="val">…</span>
-				),
-			)}
-			{props.level < LEVELS - 1 ? <Level level={props.level + 1} /> : null}
+		<div class="level" data-level={level}>
+			<Loading fallback={<span class="val">…</span>}>
+				<span class="val" textContent={data()} />
+			</Loading>
+			{level < LEVELS - 1 ? <Level level={level + 1} /> : null}
 		</div>
 	);
 }

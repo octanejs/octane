@@ -1,16 +1,31 @@
-import { For, createStore, reconcile } from 'solid-js';
+import { For, createSignal } from 'solid-js';
 import { bindSetter } from '../../shared/bridge.js';
 import { INITIAL_SNAPSHOT } from '../../shared/workloads.js';
+
+// The Vue Vapor / Octane shape, in Solid: ONE signal holding the raw immutable
+// snapshot (no store, no reconcile — the data is never diffed or copied),
+// keyed `<For keyed={by id}>` over the plain arrays, and row bodies that read
+// through the row ACCESSOR so a surviving row whose object was replaced
+// (`{...row, active: true}`) re-runs its own bindings and writes only what
+// changed. The list diff is the only diff. This is the idiomatic Solid 2.0
+// authoring for immutable snapshots handed to the view; ../solid-reconcile
+// keeps the Solid 1-era store + reconcile shape as a second target — it pays a
+// walk over every row per commit for stable proxies and per-leaf notifications
+// this workload never uses.
+
+const byId = (item) => item.id;
 
 function TableView(props) {
 	return (
 		<table class="uibench-table" data-kind="table">
 			<tbody>
-				<For each={props.rows}>
+				<For each={props.rows} keyed={byId}>
 					{(row) => (
-						<tr data-id={row.id} class={row.active ? 'active' : 'inactive'}>
-							<th>{row.label}</th>
-							<For each={row.cells}>{(cell) => <td>{cell.text}</td>}</For>
+						<tr data-id={row().id} class={row().active ? 'active' : 'inactive'}>
+							<th textContent={row().label} />
+							<For each={row().cells} keyed={byId}>
+								{(cell) => <td textContent={cell().text} />}
+							</For>
 						</tr>
 					)}
 				</For>
@@ -22,20 +37,23 @@ function TableView(props) {
 function AnimView(props) {
 	return (
 		<div class="uibench-anim" data-kind="anim">
-			<For each={props.boxes}>
-				{(box) => <div class="box" data-id={box.id} style={{ transform: box.transform }} />}
+			<For each={props.boxes} keyed={byId}>
+				{(box) => <div class="box" data-id={box().id} style={{ transform: box().transform }} />}
 			</For>
 		</div>
 	);
 }
 
 function TreeItem(props) {
+	const node = props.node; // the row accessor from the parent <For>
 	return (
-		<li data-id={props.node.id} class={props.node.children.length === 0 ? 'leaf' : 'container'}>
-			<span>{props.node.label}</span>
-			{props.node.children.length > 0 ? (
+		<li data-id={node().id} class={node().children.length === 0 ? 'leaf' : 'container'}>
+			<span textContent={node().label} />
+			{node().children.length > 0 ? (
 				<ul>
-					<For each={props.node.children}>{(child) => <TreeItem node={child} />}</For>
+					<For each={node().children} keyed={byId}>
+						{(child) => <TreeItem node={child} />}
+					</For>
 				</ul>
 			) : null}
 		</li>
@@ -45,36 +63,25 @@ function TreeItem(props) {
 function TreeView(props) {
 	return (
 		<ul class="uibench-tree" data-kind="tree">
-			<For each={props.nodes}>{(node) => <TreeItem node={node} />}</For>
+			<For each={props.nodes} keyed={byId}>
+				{(node) => <TreeItem node={node} />}
+			</For>
 		</ul>
 	);
 }
 
 export default function App() {
-	const [snapshot, setSnapshot] = createStore({
-		kind: INITIAL_SNAPSHOT.kind,
-		rows: INITIAL_SNAPSHOT.rows,
-		boxes: [],
-		nodes: [],
-	});
-
-	bindSetter((next) =>
-		setSnapshot((current) => {
-			current.kind = next.kind;
-			if (next.kind === 'table') reconcile(next.rows, 'id')(current.rows);
-			else if (next.kind === 'anim') reconcile(next.boxes, 'id')(current.boxes);
-			else reconcile(next.nodes, 'id')(current.nodes);
-		}),
-	);
+	const [snapshot, setSnapshot] = createSignal(INITIAL_SNAPSHOT);
+	bindSetter(setSnapshot);
 
 	return (
 		<>
-			{snapshot.kind === 'table' ? (
-				<TableView rows={snapshot.rows} />
-			) : snapshot.kind === 'anim' ? (
-				<AnimView boxes={snapshot.boxes} />
+			{snapshot().kind === 'table' ? (
+				<TableView rows={snapshot().rows} />
+			) : snapshot().kind === 'anim' ? (
+				<AnimView boxes={snapshot().boxes} />
 			) : (
-				<TreeView nodes={snapshot.nodes} />
+				<TreeView nodes={snapshot().nodes} />
 			)}
 		</>
 	);

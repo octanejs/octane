@@ -25,7 +25,7 @@ export default function App() {
 
 	return (
 		<div>
-			<div class="tick">{tick()}</div>
+			<div class="tick" textContent={tick()} />
 			<table class="test-data">
 				<tbody>
 					<For each={state.items}>{(item) => <Row item={item} />}</For>

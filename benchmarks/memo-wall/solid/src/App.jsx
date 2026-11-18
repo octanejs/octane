@@ -25,7 +25,7 @@ function Wall(props) {
 		<section class="wall" id={'wall-' + props.wall.toLowerCase()}>
 			<h2>
 				{props.title}
-				<span class="tick">{tick()}</span>
+				<span class="tick" textContent={tick()} />
 			</h2>
 			<Theme value={theme}>
 				<div class="rows">
