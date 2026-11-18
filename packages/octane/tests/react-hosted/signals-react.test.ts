@@ -2,11 +2,13 @@
  * `octane/signals/react`: scoped signal handles observed from a real React 19
  * tree, through subscription, scope ownership, retirement and hydration.
  */
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot, hydrateRoot, type Root } from 'react-dom/client';
-import { renderToString } from 'react-dom/server';
+import { renderToPipeableStream, renderToString } from 'react-dom/server';
+import { PassThrough } from 'node:stream';
+import { deferred } from '../_fixtures/signals-async-controls.js';
 import {
 	createResource,
 	createScope,
@@ -209,6 +211,120 @@ describe('octane/signals/react', () => {
 		const mounted = scopes.map((scope) => mount(h(SignalScopeProvider, { scope }, h(Label))));
 		await act(() => labels.get(scopes[0]!)!.set(5));
 		expect(mounted.map(({ container }) => container.textContent)).toEqual(['5', '0']);
+	});
+
+	it('isolates overlapping streamed requests and hydrates each completed seed', async () => {
+		function request(label: string, seed?: ReturnType<Scope['serialize']>) {
+			const scope = createScope({ scopeKey: 'request', ...(seed ? { seed } : {}) });
+			labels.set(scope, scope.signal$<unknown>('label', label));
+			return scope;
+		}
+		// Server and client bundles have separate React context instances in practice.
+		vi.resetModules();
+		const server = await import('../../src/signals/react.js');
+		function DeferredLabel({ gate }: { gate: Promise<void> }) {
+			React.use(gate);
+			return h('output', null, String(server.useSignalValue(labels.get(server.useSignalScope())!)));
+		}
+		const suspense = (child: React.ReactNode) =>
+			h(React.Suspense, { fallback: h('p', null, 'loading') }, child);
+		const serverTree = (scope: Scope, gate: Promise<void>) =>
+			h(server.SignalScopeProvider, { scope }, suspense(h(DeferredLabel, { gate })));
+		const clientTree = (scope: Scope) => h(SignalScopeProvider, { scope }, suspense(h(Label)));
+		function stream(scope: Scope, gate: Promise<void>) {
+			const shell = deferred<void>();
+			const done = deferred<void>();
+			const errors: unknown[] = [];
+			const sink = new PassThrough();
+			let html = '';
+			sink.on('data', (chunk: Buffer) => (html += chunk.toString()));
+			sink.on('end', () => done.resolve());
+			sink.on('error', done.reject);
+			const render = renderToPipeableStream(serverTree(scope, gate), {
+				onShellReady: () => shell.resolve(),
+				onAllReady: () => queueMicrotask(() => render.pipe(sink)),
+				onShellError: (error) => {
+					shell.reject(error);
+					done.reject(error);
+				},
+				onError: (error) => {
+					errors.push(error);
+				},
+			});
+			return {
+				shell: shell.promise,
+				done: done.promise,
+				errors,
+				html: () => html,
+				abort: render.abort,
+			};
+		}
+
+		const first = request('first initial');
+		const second = request('second initial');
+		const cancelled = request('cancelled initial');
+		const gates = [deferred<void>(), deferred<void>(), deferred<void>()];
+		const streams = [
+			stream(first, gates[0]!.promise),
+			stream(second, gates[1]!.promise),
+			stream(cancelled, gates[2]!.promise),
+		];
+		try {
+			await Promise.all(streams.map((render) => render.shell));
+			let firstFinished = false;
+			void streams[0]!.done.then(() => (firstFinished = true));
+			const abort = new Error('request cancelled');
+			streams[2]!.abort(abort);
+			cancelled.dispose();
+			await streams[2]!.done;
+			expect(streams[2]!.errors).toEqual([abort]);
+			expect([cancelled.retired, first.retired, second.retired]).toEqual([true, false, false]);
+
+			labels.get(second)!.set('request B');
+			gates[1]!.resolve();
+			await streams[1]!.done;
+			expect(firstFinished).toBe(false);
+			labels.get(first)!.set('request A');
+			gates[0]!.resolve();
+			await streams[0]!.done;
+
+			for (const [scope, render, expected, other] of [
+				[first, streams[0]!, 'request A', 'request B'],
+				[second, streams[1]!, 'request B', 'request A'],
+			] as const) {
+				expect(render.errors).toEqual([]);
+				expect(render.html()).toContain(expected);
+				expect(render.html()).not.toContain(other);
+				const client = request('client initial', scope.serialize());
+				const container = document.createElement('div');
+				container.innerHTML = render.html();
+				const output = container.querySelector('output');
+				const errors: unknown[] = [];
+				let root!: Root;
+				try {
+					await act(() => {
+						root = hydrateRoot(container, clientTree(client), {
+							onRecoverableError: (error) => errors.push(error),
+						});
+					});
+					expect(errors).toEqual([]);
+					expect(container.querySelector('output')).toBe(output);
+					expect(output?.textContent).toBe(expected);
+					expect(subscribers(client, 'label')).toBe(1);
+					await act(() => labels.get(client)!.set(`${expected} live`));
+					expect(output?.textContent).toBe(`${expected} live`);
+				} finally {
+					await act(() => root?.unmount());
+					expect(subscribers(client, 'label')).toBe(0);
+					client.dispose();
+				}
+			}
+		} finally {
+			for (const render of streams) render.abort();
+			first.dispose();
+			second.dispose();
+			cancelled.dispose();
+		}
 	});
 
 	it('hydrates from a seeded scope and keeps server requests apart', async () => {
