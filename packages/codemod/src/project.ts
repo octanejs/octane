@@ -1041,7 +1041,9 @@ export async function runCodemod(
 			const intl = (source.includes('useIntl') || escaped) && originalIntlHook(file);
 			const store = planStoreHook && /\buse[A-Z]|\\u/.test(source);
 			if (react || intl || store) {
-				const existing = program?.getSourceFile(file);
+				const existing = program?.getSourceFile(
+					strictConfig?.preserveSymlinks === true ? file : proofPath(file),
+				);
 				const bound =
 					existing && program
 						? { sf: existing, checker: program.getTypeChecker() }
@@ -1510,7 +1512,9 @@ export async function runCodemod(
 								const request = path.resolve(path.dirname(file), specifier);
 								if (registry !== request && registry !== request + path.extname(registry)) return;
 								if (ts.findConfigFile(path.dirname(registry), ts.sys.fileExists) === rootProject)
-									return program?.getSourceFile(registry);
+									return program?.getSourceFile(
+										strictConfig?.preserveSymlinks === true ? registry : proofPath(registry),
+									);
 							}
 						: undefined,
 				get originalReact() {
