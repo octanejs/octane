@@ -7,7 +7,7 @@ client/server environments, preview, and deployment adapters.
 ## Install
 
 ```sh
-pnpm add octane @octanejs/rsbuild-plugin @tsrx/oxc@0.23.0
+pnpm add octane @octanejs/rsbuild-plugin @tsrx/oxc@0.24.0
 pnpm add -D @rsbuild/core
 ```
 

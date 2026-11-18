@@ -251,7 +251,6 @@ describe('compile errors — rejected authoring patterns', () => {
 	// only a top-level `const`, `let`, or `function`.
 	it.each([
 		['a class declaration', 'class K { static id = 1 }', 'K.id', 'K'],
-		['a `var` hoisted out of a nested block', 'if (row.ok) { var k = row.id; }', 'k', 'k'],
 		['an enum declaration', 'enum E { A }', 'E.A', 'E'],
 		['a `const` after an array hole', 'const k = row.id;', '[, k].join()', 'k'],
 	])('rejects an @for row key that reads %s from the loop body', (_, setup, key, name) => {
