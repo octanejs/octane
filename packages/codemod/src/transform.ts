@@ -181,6 +181,7 @@ export const ELEMENT_CHILD_ALIAS = 'element-child-path-alias';
 export const INTL_PROVIDER_DEFAULTS = 'intl-provider-defaults';
 export const REACT_TYPE_PROJECTION = 'react-type-projection';
 export const MOTION_PRESENCE_OWNER = 'motion-presence-owner';
+export const RETAINED_WORKSPACE_HOOK = 'retained-workspace-hook';
 export const BUFFERED_SSR_OPTIONS = 'buffered-ssr-options';
 export const BUFFERED_SSR_REACT_COMPONENT = 'buffered-ssr-react-component';
 
@@ -3731,10 +3732,15 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		);
 	}
 
-	private warnRetainedStore(module: string, name: string, site: ts.Expression) {
+	private reportRetainedStore(
+		module: string,
+		name: string,
+		site: ts.Expression,
+		severity: 'warning' | 'error',
+	) {
 		this.note(
-			RULE.bindings,
-			'warning',
+			severity === 'error' ? RETAINED_WORKSPACE_HOOK : RULE.bindings,
+			severity,
 			site,
 			`If native setup reaches the unchanged ${module} export ${name} through the original workspace entry, its store hook calls React. Provide a compiled Octane hook or keep the component under React.`,
 		);
@@ -3769,7 +3775,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				continue;
 			const local = retainedHook(module, name, false);
 			if (!local || typeof local === 'string') continue;
-			if ('retainedStore' in local) this.warnRetainedStore(module, name, member);
+			if ('retainedStore' in local) this.reportRetainedStore(module, name, member, 'warning');
 			else if (
 				'privateContext' in local &&
 				nativeSetupHook(member, this.localUses, this.checker, { ...setup, privateContext: true })
@@ -3922,7 +3928,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 							);
 							if (advisorySite) this.warnRetainedPrivateContext(module, name, advisorySite);
 						} else if (site && local && typeof local !== 'string' && 'retainedStore' in local)
-							this.warnRetainedStore(module, name, site);
+							this.reportRetainedStore(module, name, site, 'error');
 					}
 					if (!dest) {
 						kept.push(item);
