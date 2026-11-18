@@ -27,26 +27,40 @@ import { loadCompiledFixtureSource } from '../../octane/tests/_server-fixture.js
 import { flushEffects } from '../../octane/tests/_helpers.js';
 
 function migrate(source, strong = true) {
+	return migrateAll([source], strong)[0];
+}
+
+/**
+ * Migrate independent modules in one CLI run, one file each, and return their
+ * results in order. A process start costs far more than a module, so a test
+ * with many inputs batches them instead of spawning once per input.
+ */
+function migrateAll(sources, strong = true) {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'effect-receivers-'));
 	try {
 		fs.writeFileSync(path.join(root, 'package.json'), '{"type":"module"}');
-		fs.writeFileSync(path.join(root, 'Probe.tsx'), source);
+		const names = sources.map((source, index) => {
+			const name = index === 0 ? 'Probe.tsx' : `Probe${index}.tsx`;
+			fs.writeFileSync(path.join(root, name), source);
+			return name;
+		});
 		fs.symlinkSync(
 			path.resolve(import.meta.dirname, '../node_modules'),
 			path.join(root, 'node_modules'),
 			'dir',
 		);
 		const bin = path.resolve(import.meta.dirname, '../dist/bin.js');
-		const args = [bin, '--print', '--json', 'Probe.tsx'];
+		const args = [bin, '--print', '--json', ...names];
 		if (strong) args.push('--strong');
 		const result = spawnSync(process.execPath, args, { cwd: root, encoding: 'utf8' });
 		expect(result.error).toBeUndefined();
-		const file = JSON.parse(result.stdout).files[0];
-		const ownership = file.notes.some(
-			(note) => note.severity === 'error' && note.rule === 'hook-dependencies',
+		const { files } = JSON.parse(result.stdout);
+		const ordered = names.map((name) => files.find((file) => file.file === name));
+		const ownership = ordered.some((file) =>
+			file.notes.some((note) => note.severity === 'error' && note.rule === 'hook-dependencies'),
 		);
 		expect(result.status, result.stdout + result.stderr).toBe(ownership ? 1 : 0);
-		return file;
+		return ordered;
 	} finally {
 		fs.rmSync(root, { recursive: true, force: true });
 	}
@@ -678,7 +692,7 @@ it.each([false, true])(
 			severity: 'error',
 			message: expect.stringContaining('can invoke an own getter while spreading'),
 		});
-		for (const source of [
+		const reported = [
 			input('{ ...source }'),
 			input('{ ...{ get value() { return probe.value; } } }'),
 			input('{ ...{ ...source } }'),
@@ -689,9 +703,8 @@ it.each([false, true])(
 			input('{ ...source }', 'get [probe.key]() { return probe.value; }'),
 			input('{ ...source, value: 1 }'),
 			input('{ ...source }', 'get ["value"]() { return probe.value; }, other: 1'),
-		])
-			expect(migrate(source, strong).notes).toContainEqual(error);
-		for (const source of [
+		];
+		const allowed = [
 			input('{ ...source }', 'value: 1'),
 			input('{ ...source }', 'set value(next) { probe.value; }'),
 			input('{ ...source }', 'get value() { return probe.value; }, value: 1'),
@@ -708,8 +721,14 @@ it.each([false, true])(
 			input('{ ...{ deferred() { return { ...source }; } } }'),
 			input('false && { ...source }'),
 			input('{ deferred() { return { ...source }; } }'),
-		])
-			expect(migrate(source, strong).notes).not.toContainEqual(error);
+		];
+		const results = migrateAll([...reported, ...allowed], strong);
+		results.slice(0, reported.length).forEach((file, index) => {
+			expect(file.notes, `reported[${index}]`).toContainEqual(error);
+		});
+		results.slice(reported.length).forEach((file, index) => {
+			expect(file.notes, `allowed[${index}]`).not.toContainEqual(error);
+		});
 	},
 	20_000,
 );
