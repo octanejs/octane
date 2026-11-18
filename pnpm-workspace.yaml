@@ -118,7 +118,7 @@ overrides:
   # INTERIM: @tanstack/devtools (the Solid UI core reused by
   # @octanejs/tanstack-devtools) targets Solid 1.x and imports `solid-js/web`,
   # which Solid 2.0-beta removed (web renderer moved to @solidjs/web). The
-  # workspace otherwise pins Solid 2.0 RC for @tsrx/solid, so isolate the
+  # workspace otherwise pins Solid 2.0 for @tsrx/solid, so isolate the
   # devtools island — and every Solid package it shares an owner with — on a
   # single Solid 1.x copy. Remove once @tanstack/devtools ships a Solid-2 build.
   '@tanstack/devtools>solid-js': '1.9.14'
@@ -277,7 +277,7 @@ catalogs:
     '@sanity/react-loader': 2.2.1
     '@ripple-ts/adapter': ^0.4.0
     '@ripple-ts/vite-plugin': ^0.4.0
-    '@solidjs/web': '2.0.0-rc.14'
+    '@solidjs/web': '2.0.0'
     '@stylexjs/babel-plugin': '0.19.0'
     '@stylexjs/stylex': '0.19.0'
     '@tanstack/devtools': 0.14.2
@@ -483,7 +483,7 @@ catalogs:
     ripple: ^0.4.0
     rxjs: ^7.8.2
     rulesync: ^8.32.0
-    solid-js: '2.0.0-rc.14'
+    solid-js: '2.0.0'
     sonner: 2.0.7
     storybook: 10.6.1
     thinking-orbs: 0.2.0
@@ -504,9 +504,9 @@ catalogs:
     valtio: ^2.3.2
     vite: ^8.1.5
     astro: ^5.16.0
-    '@solidjs/vite-plugin': '3.0.0-next.49'
+    '@solidjs/vite-plugin': '3.0.1'
     # Vue Vapor (vapor-mode benchmark fixtures) — 3.6 is the first line with
-    # vapor; pinned to a 3.6 prerelease like solid-js's 2.0 RC. The fixtures
+    # vapor; pinned to a 3.6 prerelease. The fixtures
     # alias `vue` to a shim over @vue/runtime-dom + @vue/runtime-vapor (see
     # their vite.config.js), so those are direct deps at the same pin.
     vue: 3.6.0-rc.10
@@ -637,8 +637,18 @@ minimumReleaseAgeExclude:
   - '@tanstack/start-client-core@1.170.34'
   - '@tanstack/start-server-core@1.169.39'
   - '@tanstack/start-storage-context@1.167.36'
-  - '@solidjs/vite-plugin@3.0.0-next.49'
+  - '@solidjs/vite-plugin@3.0.1'
+  - solid-js@2.0.0
+  - '@solidjs/web@2.0.0'
+  - '@solidjs/signals@2.0.0'
+  - '@solidjs/compiler@2.0.0'
   - effect@4.1.0
+  - '@solidjs/compiler-darwin-arm64@2.0.0'
+  - '@solidjs/compiler-darwin-x64@2.0.0'
+  - '@solidjs/compiler-linux-arm64-gnu@2.0.0'
+  - '@solidjs/compiler-linux-x64-gnu@2.0.0'
+  - '@solidjs/compiler-wasm32-wasi@2.0.0'
+  - '@solidjs/compiler-win32-x64-msvc@2.0.0'
 
 # The JSX type-only, generic-arrow, and typed-default mapping fixes formerly
 # patched into @tsrx/core are published in the required @tsrx/core >= 0.1.69,

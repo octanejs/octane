@@ -4,7 +4,7 @@ import solid from '@solidjs/vite-plugin';
 // Force Solid 2.0-beta's production bundle (its dev bundle crashes) — same
 // rationale as the js-framework / dbmon Solid fixtures.
 export default defineConfig({
-	plugins: [solid({ dev: false, hot: false })],
+	plugins: [solid({ dev: false, refresh: false })],
 	mode: 'production',
 	define: { 'process.env.NODE_ENV': JSON.stringify('production') },
 	resolve: {

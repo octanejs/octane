@@ -1,4 +1,4 @@
-import { createEffect, onCleanup } from 'solid-js';
+import { onCleanup, onSettled } from 'solid-js';
 import ErrorState from './components/ErrorState.jsx';
 import LoadingState from './components/LoadingState.jsx';
 import SearchForm from './components/SearchForm.jsx';
@@ -6,14 +6,11 @@ import WeatherContent from './components/WeatherContent.jsx';
 import { weatherStore } from './stores/weatherStore.js';
 
 function App() {
-	createEffect(
-		() => {},
-		() => {
-			void weatherStore.initialize().catch((error) => {
-				console.error('Failed to auto-load weather:', error);
-			});
-		},
-	);
+	onSettled(() => {
+		void weatherStore.initialize().catch((error) => {
+			console.error('Failed to auto-load weather:', error);
+		});
+	});
 	onCleanup(() => weatherStore.cancel());
 
 	const handleSearch = async (city) => {

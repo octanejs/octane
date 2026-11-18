@@ -1,5 +1,12 @@
-import { createSignal, For, flush } from 'solid-js';
+import { createSignal, createStore, For, flush } from 'solid-js';
 import { render } from '@solidjs/web';
+
+// Canonical Solid 2.0 JFB authoring (ryansolid/js-framework-benchmark
+// solid-2.0-benchmarks branch, `solid-next`): a SIGNAL of the row array for
+// structure (keyed <For> moves by reference identity), PER-ROW LABEL SIGNALS
+// so the update op writes 100 signals with no array pass and no row rebuild,
+// and selection through an id-KEYED STORE (`selected[rowId]`) so a select is
+// two key transitions instead of an O(rows) class sweep.
 
 // Solid 2.0 js-framework-benchmark fixture (keyed). Same DOM contract as the
 // react / octane / ripple columns: the six create/update/clear/swap buttons
@@ -88,10 +95,10 @@ const random = (max) => (Math.random() * max) | 0;
 function buildData(count) {
 	const data = new Array(count);
 	for (let i = 0; i < count; i++) {
-		data[i] = {
-			id: nextId++,
-			label: `${A[random(A.length)]} ${C[random(C.length)]} ${N[random(N.length)]}`,
-		};
+		const [label, setLabel] = createSignal(
+			`${A[random(A.length)]} ${C[random(C.length)]} ${N[random(N.length)]}`,
+		);
+		data[i] = { id: nextId++, label, setLabel };
 	}
 	return data;
 }
@@ -130,7 +137,7 @@ function shuffleWithSeed(d, seed) {
 
 function Main() {
 	const [rows, setRows] = createSignal([]);
-	const [selected, setSelected] = createSignal(0);
+	const [selected, setSelected] = createStore({ selected: null });
 
 	// Force Solid to commit synchronously inside the discrete click so the
 	// harness (which reads the DOM immediately after el.click()) sees the update.
@@ -142,15 +149,11 @@ function Main() {
 	const run = () => commit(buildData(1000));
 	const runLots = () => commit(buildData(10000));
 	const add = () => commit((d) => d.concat(buildData(1000)));
-	const update = () =>
-		commit((d) => {
-			const out = d.slice();
-			for (let i = 0; i < out.length; i += 10) {
-				const r = out[i];
-				out[i] = { id: r.id, label: r.label + ' !!!' };
-			}
-			return out;
-		});
+	const update = () => {
+		const d = rows();
+		for (let i = 0; i < d.length; i += 10) d[i].setLabel((l) => l + ' !!!');
+		flush();
+	};
 	const clear = () => commit([]);
 	const swap = () =>
 		commit((d) => {
@@ -162,7 +165,12 @@ function Main() {
 			return out;
 		});
 	const select = (id) => {
-		setSelected(id);
+		setSelected((s) => {
+			const prev = s.selected;
+			if (prev != null && id !== prev) delete s[prev];
+			s[id] = true;
+			s.selected = id;
+		});
 		flush();
 	};
 	const remove = (row) =>
@@ -400,20 +408,23 @@ function Main() {
 			<table class="table table-hover table-striped test-data">
 				<tbody>
 					<For each={rows()}>
-						{(row) => (
-							<tr class={selected() === row.id ? 'danger' : ''}>
-								<td class="col-md-1">{row.id}</td>
-								<td class="col-md-4">
-									<a onClick={() => select(row.id)}>{row.label}</a>
-								</td>
-								<td class="col-md-1">
-									<a onClick={() => remove(row)}>
-										<span class="glyphicon glyphicon-remove" aria-hidden="true" />
-									</a>
-								</td>
-								<td class="col-md-6" />
-							</tr>
-						)}
+						{(row) => {
+							const { id: rowId, label } = row;
+							return (
+								<tr class={selected[rowId] ? 'danger' : ''}>
+									<td class="col-md-1" textContent={rowId} />
+									<td class="col-md-4">
+										<a onClick={[select, rowId]} textContent={label()} />
+									</td>
+									<td class="col-md-1">
+										<a onClick={() => remove(row)}>
+											<span class="glyphicon glyphicon-remove" aria-hidden="true" />
+										</a>
+									</td>
+									<td class="col-md-6" />
+								</tr>
+							); // prettier-ignore
+						}}
 					</For>
 				</tbody>
 			</table>

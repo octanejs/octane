@@ -30,7 +30,7 @@ export function Leaf(props) {
 	// expression increments the probe on every re-run of the reactive text
 	// expression (once at creation, once per theme bump).
 	const theme = useContext(props.wall === 'A' ? ThemeA : ThemeB);
-	return <span class="leaf">{(window.__renders['leaf' + props.wall]++, theme())}</span>;
+	return <span class="leaf" textContent={(window.__renders['leaf' + props.wall]++, theme())} />;
 }
 
 export function Inner(props) {
@@ -47,10 +47,8 @@ export function Row(props) {
 	window.__renders['row' + props.wall]++;
 	return (
 		<div class="item">
-			<span class="id" onClick={props.onSelect}>
-				{props.id}
-			</span>
-			<span class="label">{props.label}</span>
+			<span class="id" onClick={props.onSelect} textContent={props.id} />
+			<span class="label" textContent={props.label} />
 			<Inner value={props.value} wall={props.wall} />
 		</div>
 	);
