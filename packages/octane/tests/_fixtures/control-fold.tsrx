@@ -63,21 +63,6 @@ export function FunctionScopedBranch({ label }: { label: string }) @{
 	</main>
 }
 
-export function InlineParentBranch({ label }: { label: string }) @{
-	let branchLabel = '';
-	<main>
-		@if (label) {
-			branchLabel = label;
-			if (branchLabel) {
-				var BranchAction = CapturedAction;
-			}
-			@if (branchLabel) {
-				<BranchAction label={branchLabel} />
-			}
-		}
-	</main>
-}
-
 export function ConditionalInsideKeyedRows({ show }: { show: boolean }) @{
 	if (show) {
 		var RowAction = CapturedAction;

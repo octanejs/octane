@@ -190,11 +190,11 @@ export type Saving = {
 
 export interface Persistence {
 	/** The saved value for `key`, unless it was saved for another shape of `read`. */
-	restore(key: string, read: PersistedRead): Promise<Stored | undefined>;
+	restore(key: string, read: PersistedRead): Promise<(Stored & { revision: string }) | undefined>;
 	/** Save `key` in the next host task; `collect` reads its value then, and `null` deletes it. */
 	mark(key: string): void;
 	/** Drop a saved value that failed validation or expired. */
-	discard(key: string): void;
+	discard(key: string, revision?: string): void;
 	/** Save a durable write; resolves once it is stored, or once storage has failed. */
 	journal(write: Journaled): Promise<void>;
 	/** Remove a write from the journal once its outcome is known. */
@@ -331,6 +331,17 @@ export function createPersistence(
 	let marksChanged = false;
 	/** Saved values' metadata, by hashed name. */
 	let metas = new Map<string, StoredMeta>();
+	/** Recency changes keep content identity; a save creates a new identity. */
+	const revisions = new WeakMap<StoredMeta, string>();
+	function revisionOf(meta: StoredMeta): string {
+		let revision = revisions.get(meta);
+		if (revision === undefined) revisions.set(meta, (revision = crypto.randomUUID()));
+		return revision;
+	}
+	function currentRevision(name: string, revision: string): StoredMeta | undefined {
+		const meta = metas.get(name);
+		return meta && revisions.get(meta) === revision ? meta : undefined;
+	}
 	/** Prepared cache writes survive a failed commit even if the source read is later evicted. */
 	const prepared = new Map<string, { meta: StoredMeta; value?: string }>();
 	/** Hashed names of keys seen this session, and the reverse. */
@@ -571,8 +582,9 @@ export function createPersistence(
 			const name = await nameOf(key);
 			const meta = metas.get(name);
 			if (!meta) return undefined;
+			const revision = revisionOf(meta);
 			if (meta.version !== (await versionOf(read)) || expired(meta, hostDateNow())) {
-				forget(name);
+				if (currentRevision(name, revision)) forget(name);
 				return undefined;
 			}
 			const text =
@@ -581,15 +593,19 @@ export function createPersistence(
 			try {
 				const stored = devalue.parse(await cipher.open(text, name)) as Stored & { at: number };
 				// Purging reads this order, so it must see the use now, not after the next save.
-				metas.set(name, { ...meta, lastUsed: hostDateNow() });
+				const current = currentRevision(name, revision);
+				if (!current) return undefined;
+				const seen = { ...current, lastUsed: hostDateNow() };
+				metas.set(name, seen);
+				revisions.set(seen, revision);
 				touched.add(name);
 				schedule();
 				const marked =
 					(marks.get(null) ?? 0) > stored.at ||
 					stored.tags.some((tag) => (marks.get(tag) ?? 0) > stored.at);
-				return marked ? { ...stored, stale: true } : stored;
+				return { ...stored, stale: marked || stored.stale, revision };
 			} catch {
-				forget(name);
+				if (currentRevision(name, revision)) forget(name);
 				return undefined;
 			}
 		},
@@ -597,9 +613,10 @@ export function createPersistence(
 			dirty.add(key);
 			schedule();
 		},
-		discard(key) {
+		discard(key, revision) {
 			void ready.then(async () => {
-				if (!cleared) forget(await nameOf(key));
+				const name = await nameOf(key);
+				if (!cleared && (revision === undefined || currentRevision(name, revision))) forget(name);
 			});
 		},
 		journal(write) {
