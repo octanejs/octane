@@ -3415,6 +3415,16 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 	);
 
 	describe('retained React client roots', () => {
+		const cachedRoot = `const roots = new WeakMap<Element, Root>();
+		function rootFor(node: Element) {
+			const existing = roots.get(node);
+			if (existing) return existing;
+			const root = make(node);
+			roots.set(node, root);
+			return root;
+		}
+		export function show(node: Element) { rootFor(node).render(h(Leaf)); }
+		export function close(node: Element) { roots.get(node)?.unmount(); roots.delete(node); }`;
 		const privateRoot = `class Panel {
 			#root;
 			constructor(node) { this.#root = make(node); }
@@ -3425,6 +3435,45 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 		it.each([
 			['a direct root', 'DOM.createRoot(container).render(<Leaf />)', true],
 			['a local root', 'const root = make(container); root.render(<Leaf />);', true],
+			['a cached React root', cachedRoot, true],
+			[
+				'a cached React root beside an unrelated cache and label',
+				cachedRoot + "\nconst otherCache = new WeakMap(); const label = 'WeakMap';",
+				true,
+			],
+			['a fake cached root', cachedRoot.replace('make(node)', 'other(node)'), false],
+			['a mixed cached return', cachedRoot.replace('return root;', 'return other;'), false],
+			[
+				'an async cache helper',
+				cachedRoot.replace('function rootFor(', 'async function rootFor('),
+				false,
+			],
+			[
+				'a mixed cache write',
+				cachedRoot.replace(
+					'roots.set(node, root);',
+					'roots.set(node, root); roots.set(node, other);',
+				),
+				false,
+			],
+			['an escaping cache', cachedRoot + '\nobserve(roots);', false],
+			['an escaping helper', cachedRoot + '\nobserve(rootFor);', false],
+			['a shadowed WeakMap', 'const WeakMap = other;\n' + cachedRoot, false],
+			['a replaced global WeakMap', 'globalThis.WeakMap = other;\n' + cachedRoot, false],
+			[
+				'a computed global WeakMap replacement',
+				"Reflect.set(globalThis, 'WeakMap', other);\n" + cachedRoot,
+				false,
+			],
+			[
+				'a shadowed root factory',
+				cachedRoot.replace(
+					'function rootFor(node: Element)',
+					'function rootFor(node: Element, make = other)',
+				),
+				false,
+			],
+			['a dynamic cached root scope', cachedRoot + '\neval(code);', false],
 			['a class private root', privateRoot, true],
 			['an extensionless class private root', privateRoot, true, { specifier: './Leaf' }],
 			[
@@ -3579,7 +3628,7 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 				'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"Bundler"}}',
 				'Entry.tsx': `${name === 'a different JSX runtime' ? '/** @jsxImportSource octane */' : ''}
 					${body.includes('DOM.') ? "import * as DOM from 'react-dom/client';" : ''}
-					import { createRoot as make, hydrateRoot as hydrate } from 'react-dom/client';
+					import { createRoot as make, hydrateRoot as hydrate, type Root } from 'react-dom/client';
 					import ${reactImport} from 'react';
 					import { OctaneCompatInline } from 'octane/react';
 					import { Leaf } from '${specifier}';
