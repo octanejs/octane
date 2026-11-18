@@ -69,7 +69,18 @@ export interface Entity<T> {
 	readonly id: (value: T) => string;
 	/** Mark where this entity appears in a read's output. */
 	from(source: T | readonly T[]): EntitySelection<T>;
+	/**
+	 * One record, as an output schema. A read whose `output` it is selects the
+	 * record, and a write to this entity whose `output` it is takes its reply
+	 * as the saved record, with no `entities` or `record` to write.
+	 */
+	readonly one: StandardSchema<unknown, T>;
+	/** A list of records, as an output schema. A read whose `output` it is selects every one. */
+	readonly list: StandardSchema<unknown, T[]>;
 }
+
+/** The entity each `one` and `list` schema holds, so a contract can select it without restating it. */
+const holds = new WeakMap<object, Entity<any>>();
 
 /**
  * A record with an identity. Reads that select it share its fields: a write
@@ -86,7 +97,12 @@ export function entity<T>(
 		key,
 		id: (value) => String((value as Record<string, unknown>)[key]),
 		from: (source) => ({ entity: self, source }),
+		// Its own object, not `schema`: an output of the plain schema keeps selecting nothing.
+		one: { '~standard': schema['~standard'] },
+		list: arrayOf(schema),
 	};
+	holds.set(self.one, self);
+	holds.set(self.list, self);
 	return self;
 }
 
@@ -391,7 +407,7 @@ export function view<T, P = void, const W extends ViewRelations<T> = {}>(options
 		...read({
 			...rest,
 			input,
-			output: arrayOf(joins.length > 0 ? joinedRow(of, joins) : of.schema),
+			output: joins.length > 0 ? arrayOf(joinedRow(of, joins)) : of.list,
 			// A related entity is selected too, so a write to it or a tag naming it reaches the view.
 			entities: (rows) => [
 				of.from(rows),
@@ -427,7 +443,8 @@ export function read<Output, Input = void>(options: {
 		name: options.name,
 		input: options.input,
 		output: options.output,
-		entities: options.entities,
+		entities:
+			options.entities ?? (holds.get(options.output)?.from as Read<Input, Output>['entities']),
 		tags: options.tags ?? [],
 		fresh: options.fresh ?? 0,
 		keep: options.keep ?? 300_000,
@@ -479,7 +496,9 @@ export function write<Input, Output = unknown>(options: {
 					: undefined,
 		draft: options.draft,
 		serverId: options.serverId,
-		record: options.record,
+		record:
+			options.record ??
+			(options.output === (creates ?? patches)?.one ? (output: Output) => output : undefined),
 		form: options.form as FormFields | undefined,
 		invalidates: options.invalidates ?? [],
 	};

@@ -55,11 +55,10 @@ export const stats = read({
 export const addBook = write({
 	name: 'books.add',
 	input: bookShape.pick({ title: true }),
-	output: bookShape,
+	/** The reply is the saved book, so the lists take it without reloading. */
+	output: Book.one,
 	creates: Book,
 	draft: (input, id) => ({ id, title: input.title, read: false }),
-	/** The reply is the saved book, so the lists take it without reloading. */
-	record: (book) => book,
 	/** A native form can submit it, so adding works before hydration and without JavaScript. */
 	form: { title: 'text' },
 	invalidates: ['shelf'],
@@ -68,9 +67,8 @@ export const addBook = write({
 export const setRead = write({
 	name: 'books.setRead',
 	input: bookShape.pick({ id: true, read: true }),
-	output: bookShape,
+	output: Book.one,
 	patches: Book,
-	record: (book) => book,
 	invalidates: ['shelf'],
 });
 
