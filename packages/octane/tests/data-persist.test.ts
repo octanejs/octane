@@ -866,6 +866,35 @@ describe('octane/data persistent cache', () => {
 		await vi.waitFor(() => expect(remote.log).toEqual(['read count']));
 	});
 
+	it('restores stale only the saved inputs whose computed tag was invalidated', async () => {
+		const storage = memoryStorage();
+		const tally = read({
+			name: 'count',
+			input: schema<string>((v) => typeof v === 'string'),
+			output: count.output,
+			tags: (shelf) => [`count:${shelf}`],
+			fresh: 60_000,
+		});
+		const first = server(books());
+		const before = createDataStore({ transport: first.transport, persist: cache(storage, 'ada') });
+		(await value(before, tally, 'a')).stop();
+		(await value(before, tally, 'b')).stop();
+		await saved();
+
+		createDataStore({ transport: first.transport, persist: cache(storage, 'ada') }).invalidate([
+			'count:a',
+		]);
+		await saved();
+
+		const remote = server(books());
+		const after = createDataStore({ transport: remote.transport, persist: cache(storage, 'ada') });
+		await value(after, tally, 'b');
+		await value(after, tally, 'a');
+		await vi.waitFor(() => expect(remote.log).toEqual(['read count']));
+		await saved();
+		expect(remote.log).toEqual(['read count']);
+	});
+
 	it('keeps fresh a value saved in the same millisecond with the write already in it', async () => {
 		vi.spyOn(Date, 'now').mockReturnValue(Date.now());
 		const storage = memoryStorage();

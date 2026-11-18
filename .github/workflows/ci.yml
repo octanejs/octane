@@ -440,6 +440,11 @@ jobs:
         # did nothing. See the `website-unit` project in vitest.config.js.
         env:
           OCTANE_EXCLUDE_WEBSITE_DOCS: "1"
+          # The main Vitest process keeps each project server's transformed
+          # copy of Octane's source: about 2.5 GB across a shard's ~260
+          # projects, peaking near Node's default 4 GB heap and crashing
+          # intermittently. Raise the ceiling; workers inherit it but use far less.
+          NODE_OPTIONS: --max-old-space-size=6144
         run: >-
           pnpm test
           --config vitest.ci-sharded.config.js

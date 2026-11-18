@@ -35,6 +35,7 @@ export type {
 	Read,
 	SchemaIssue,
 	StandardSchema,
+	Tags,
 	Transport,
 	View,
 	ViewInput,

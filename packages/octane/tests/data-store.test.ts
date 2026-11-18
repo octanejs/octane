@@ -355,6 +355,32 @@ describe('octane/data store', () => {
 		expect(list.getSnapshot().value![0].done).toBe(false);
 	});
 
+	it('still sends a later edit to a record after an earlier edit to it is refused', async () => {
+		const server = createServer();
+		let writes = 0;
+		const store = createDataStore({
+			transport: async (request, signal) => {
+				if (request.kind === 'write' && writes++ === 0) {
+					await new Promise((resolve) => setTimeout(resolve, 20));
+					return { ok: false, code: 'conflict' };
+				}
+				return server.transport(request, signal);
+			},
+		});
+		const list = store.read(todos, undefined);
+		await observe(list);
+
+		const first = store.write(setDone, { id: 'a', done: true }).catch((error) => error);
+		const second = store.write(setDone, { id: 'a', done: false });
+		expect(await first).toMatchObject({ name: 'DataError', code: 'conflict' });
+		await second;
+		await settled();
+
+		// Order is kept, but the second edit does not depend on the first succeeding.
+		expect(server.log.filter((line) => line.startsWith('setDone'))).toEqual(['setDone false']);
+		expect(list.getSnapshot().value![0].done).toBe(false);
+	});
+
 	it('keeps a confirmed edit visible until a value that includes it arrives', async () => {
 		const server = createServer();
 		let release!: () => void;
@@ -998,6 +1024,88 @@ describe('octane/data server-assigned IDs and server transactions', () => {
 		server.release();
 		await settled();
 		expect(server.log).not.toContainEqual(expect.stringMatching(/^setDone/));
+	});
+
+	it('marks stale only the inputs whose computed tags an invalidation names', async () => {
+		const project = read({
+			name: 'project',
+			input: schema<string>((v) => typeof v === 'string'),
+			output: schema<string>((v) => typeof v === 'string'),
+			tags: (id) => [`project:${id}`],
+		});
+		const loads: string[] = [];
+		const store = createDataStore({
+			transport: async (request) => {
+				loads.push(request.input as string);
+				return { ok: true, value: `${request.input} v${loads.length}` };
+			},
+		});
+		const a = store.read(project, 'a');
+		const b = store.read(project, 'b');
+		await observe(a);
+		await observe(b);
+
+		store.invalidate(['project:a']);
+		await vi.waitFor(() => expect(a.getSnapshot().value).toBe('a v3'));
+		await settled();
+		expect(loads).toEqual(['a', 'b', 'a']);
+		expect(b.getSnapshot().value).toBe('b v2');
+
+		// A static tag still names every input.
+		const all = read({
+			name: 'projects',
+			input: schema<string>((v) => typeof v === 'string'),
+			output: schema<string>((v) => typeof v === 'string'),
+			tags: ['project'],
+		});
+		store.read(all, 'a').subscribe(() => {});
+		store.read(all, 'b').subscribe(() => {});
+		await vi.waitFor(() => expect(loads).toHaveLength(5));
+		store.invalidate(['project']);
+		await vi.waitFor(() => expect(loads).toHaveLength(7));
+	});
+
+	it('invalidates and refreshes only the reads a write computes tags for from its input', async () => {
+		const project = read({
+			name: 'project',
+			input: schema<string>((v) => typeof v === 'string'),
+			output: schema<string>((v) => typeof v === 'string'),
+			tags: (id) => [`project:${id}`],
+		});
+		const rename = write({
+			name: 'rename',
+			input: schema<{ id: string; title: string }>((v) => typeof v?.id === 'string'),
+			invalidates: (input) => [`project:${input.id}`],
+		});
+		const titles: Record<string, string> = { a: 'Atlas', b: 'Bramble' };
+		const requests: unknown[] = [];
+		const store = createDataStore({
+			transport: async (request) => {
+				if (request.kind === 'read') {
+					requests.push(['read', request.input]);
+					return { ok: true, value: titles[request.input as string]! };
+				}
+				const { id, title } = request.input as { id: string; title: string };
+				titles[id] = title;
+				requests.push(['write', request.refresh]);
+				return { ok: true, value: null };
+			},
+		});
+		const a = store.read(project, 'a');
+		const b = store.read(project, 'b');
+		await observe(a);
+		await observe(b);
+
+		await store.write(rename, { id: 'b', title: 'Briar' });
+		await vi.waitFor(() => expect(b.getSnapshot().value).toBe('Briar'));
+		await settled();
+		expect(requests).toEqual([
+			['read', 'a'],
+			['read', 'b'],
+			['write', [{ name: 'project', input: 'b' }]],
+			['read', 'b'],
+		]);
+		expect(a.getSnapshot().value).toBe('Atlas');
 	});
 
 	it('keeps a write to one round trip when its feed already supplied the same read', async () => {

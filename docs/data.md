@@ -31,8 +31,8 @@ the same task as the event that caused it.
 
 | Contract | Options | Notes |
 | --- | --- | --- |
-| `read` | `name`, `input?`, `output`, `entities?`, `tags?`, `fresh = 0`, `keep = 300000`, `expire = Infinity`, `persist = true`, `cancel = false`, `version = ''` | Times are milliseconds; a `keep` of 2³¹ ms or more (such as `Infinity`) keeps the value for the session. `entities(output)` returns `Entity.from(...)` selections. `cancel` aborts a load once nothing observes the read or waits on it. |
-| `write` | `name`, `input`, `output?`, one of `creates`/`patches`/`removes`, `draft?`, `serverId?`, `record?`, `form?`, `invalidates?` | `draft(input, id)` defaults to the input plus the new ID. `record(output)` locates the saved record so views take it without reloading. |
+| `read` | `name`, `input?`, `output`, `entities?`, `tags?`, `fresh = 0`, `keep = 300000`, `expire = Infinity`, `persist = true`, `cancel = false`, `version = ''` | Times are milliseconds; a `keep` of 2³¹ ms or more (such as `Infinity`) keeps the value for the session. `entities(output)` returns `Entity.from(...)` selections. `tags` is a list, or `tags(input)` for each input. `cancel` aborts a load once nothing observes the read or waits on it. |
+| `write` | `name`, `input`, `output?`, one of `creates`/`patches`/`removes`, `draft?`, `serverId?`, `record?`, `form?`, `invalidates?` | `draft(input, id)` defaults to the input plus the new ID. `record(output)` locates the saved record so views take it without reloading. `invalidates` is a list, or `invalidates(input)` from the validated input. |
 | `entity` | `name`, `schema`, `key = 'id'` | `id(value)` is `String(value[key])`. |
 | `view` | `name`, `of`, `order`, `where?`, `with?`, `input?`, `limit = 20`, `max = 500`, plus the read options | A read whose input is `{ ...params, offset, limit }` and whose value is that window's rows. `view.view.where` and `view.view.compare` are exposed for handlers. `with: { name: [Entity, key] }` joins each row to the record its `key` points at. |
 | `feed` | `name`, `params?`, `event`, `changes(event, params)`, `covers` | `changes` returns `{ put, value }`, `{ remove, id }`, `{ read, input?, value }` or `{ invalidates }`, or an array of them. |
@@ -46,6 +46,28 @@ imports `octane/data/manifest`. The rules and codes are in
 `view` ordering compares values as JavaScript's `<` does (dates by time,
 `null`/`undefined` first), then by the entity key. A handler must serve the
 same order.
+
+Tags computed from an input scope invalidation to that input. A read
+computes its tags once per input, as `store.read` was given it; a view's
+input also carries any `offset` and `limit`. A write computes its
+`invalidates` from its validated input when it is sent, to pick the reads
+refreshed in its reply, and again when it settles. Saved values keep the
+tags computed for them, so a later invalidation still reaches them after a
+restart.
+
+```ts
+const project = read({
+	name: 'project',
+	input: ProjectId,
+	output: Project,
+	tags: (id) => [`project:${id}`],
+});
+const rename = write({
+	name: 'renameProject',
+	input: Rename,
+	invalidates: ({ id }) => [`project:${id}`],
+});
+```
 
 A view `with` relations has rows of the record plus, under each relation's
 name, the record its key points at. The handler returns each row with those
@@ -226,6 +248,111 @@ the signed token and the operation.
 `'uncertain'`), `hidden(values?)` and `submit(eventOrFormData)`. The binding
 view adds `attrs`, `{ method: 'post', onSubmit }`, which submits through the
 store once hydrated. Only the newest submission's outcome is shown.
+
+### Recovering a submitted form
+
+A keyed form stays in the store while its submission is pending or its
+refusal is shown, even when nothing renders it. A dialog can close as soon as
+it submits, and a refusal can reopen it with what was submitted.
+
+- A definitive refusal (`DataError`) removes the optimistic edit and rejects
+  `submit()`. The form shows the refusal's `error` code, its `issues`, and the
+  submitted `values` as text, with `secret` fields left out. The next
+  submission of the form replaces them.
+- A transport failure after dispatch is uncertain: the edit stays, `submit()`
+  rejects with `DataUncertainError`, and the form shows `error: 'uncertain'`
+  with its `values`. Only the rejection carries the `operationId`.
+- The form keeps showing `'uncertain'` after `settle` decides the write, until
+  it is submitted again. After a confirmed `settle`, the app stops showing the
+  form's error itself.
+
+Which dialog is open, and what a retry looks like, belong to the app. In this
+example the dialog closes on submit, the book that owns it reopens it on a
+refusal, and an uncertain write is looked up before a retry is offered.
+
+```tsx
+import { useEffect, useState } from 'octane';
+import { DataError, DataUncertainError } from 'octane/data';
+import { useDataStore, useForm } from 'octane/data/octane';
+
+function RenameDialog({ id, close, uncertain }) {
+	const form = useForm(renameBook, id);
+	return (
+		<form
+			{...form.attrs}
+			onSubmit={(event) => {
+				const saving = form.submit(event);
+				close();
+				saving.catch((error) => {
+					if (error instanceof DataUncertainError) uncertain(error.operationId);
+					// A refusal shows in the form; anything else is a bug.
+					else if (!(error instanceof DataError)) throw error;
+				});
+			}}
+		>
+			{form.hidden({ id })}
+			<input name="title" defaultValue={form.values.title} />
+			{form.issues.title && <p>{form.issues.title}</p>}
+		</form>
+	);
+}
+
+function Book({ id }) {
+	const store = useDataStore();
+	const form = useForm(renameBook, id);
+	const [open, setOpen] = useState(false);
+	const [retry, setRetry] = useState(false);
+	const refused = form.error !== null && form.error !== 'uncertain';
+	useEffect(() => {
+		if (refused) setOpen(true);
+	}, [refused]);
+	const uncertain = async (operationId) => {
+		// The app's own lookup: did the server apply this operation?
+		const applied = await renameApplied(operationId);
+		store.settle(operationId, applied);
+		// Not applied: offer to submit the same values again, as a new operation.
+		setRetry(!applied);
+	};
+	return (
+		<>
+			<button onClick={() => setOpen(true)}>{retry ? 'Retry rename' : 'Rename'}</button>
+			{open && (
+				<RenameDialog id={id} close={() => setOpen(false)} uncertain={uncertain} />
+			)}
+		</>
+	);
+}
+```
+
+A store with `persist.journal` settles a journaled write's uncertain outcome
+by itself after a restart; within a session, deciding it is the app's.
+
+### Write order and dependencies
+
+- Writes with an effect on the same record are sent one at a time, in the
+  order they were submitted, so the last edit wins on the server too. Each
+  shows its optimistic edit at once.
+- That order is not a success dependency. A later edit to a record is still
+  sent after an earlier edit to it is refused or its outcome is unknown. Only
+  a record's create gates the writes after it: they wait while it is pending
+  or uncertain, and are refused unsent with code `'dependency'` if it is
+  refused.
+- Writes to different records, and writes with no effect, are sent
+  concurrently. The default HTTP transport sends one request per write.
+- The order is per store. Writes another tab or another client sends are not
+  ordered with them.
+
+When a write must only happen if another succeeded, await the first:
+
+```ts
+await store.write(moveBook, { id, shelf: 'archive' });
+await store.write(setDone, { id, done: true });
+```
+
+The second edit then shows only once the first is confirmed. To show both at
+once and still apply them together, make them one server write whose handler
+does both in one transaction; the store shows that write's own effect. A
+dependency that shows every edit at once is not built in.
 
 ## Feeds
 
