@@ -755,6 +755,24 @@ function equalsOption<T>(options: ScopeSignalOptions<T> | undefined): SignalEqua
 	return equals;
 }
 
+/** Optional authored cell setup stays out of ordinary declaration factories. */
+export function prepareDeclaredCellOptions<T>(
+	options: ScopeSignalOptions<T>,
+): ((node: ScopedNode<T>) => void) | undefined {
+	if (options === null || typeof options !== 'object') throw new TypeError(formatClientError(160));
+	const equals = options.equals;
+	if (equals !== undefined && typeof equals !== 'function')
+		throw new TypeError(formatClientError(366));
+	const watched = options.watched;
+	if (watched !== undefined && typeof watched !== 'function')
+		throw new TypeError(formatClientError(367));
+	if (equals === undefined && watched === undefined) return undefined;
+	return (node) => {
+		if (equals !== undefined) setEquals(node, equals);
+		if (watched !== undefined) setWatched(node, watched);
+	};
+}
+
 /**
  * @internal Every scope an application can hold exposes the whole Scope
  * surface. The runtime's owner scopes for `signal$` and friends reach
@@ -918,10 +936,14 @@ export function createDeclaredSignalCell<T>(
 	key: string,
 	initial: T,
 	preferInitial = false,
+	prepare?: () => ((node: ScopedNode<T>) => void) | undefined,
 ): WritableSignal<T> {
 	if (!(owner instanceof ScopeImpl)) throw new TypeError(formatClientError(148));
+	// Validate before registration; failed JS options must leave this key reusable.
+	const configure = prepare !== undefined && !owner.nodes.has(key) ? prepare() : undefined;
 	const [node, created] = declaredScopeNode<T>(owner, key, 'signal');
 	if (!created) return node as WritableSignal<T>;
+	configure?.(node);
 	const seed = initialScopeSeed(owner, key) ?? retainedScopeSeed(owner, key);
 	initializeValue(node, seed && !preferInitial ? (seed.value as T) : initial);
 	consumeScopeSeed(owner, key);
@@ -934,20 +956,23 @@ export function createDerivedCellWith<T>(
 	owner: OwnerScope,
 	key: string,
 	compute: DerivedCompute<T>,
-	options: DerivedOptions | undefined,
+	options: (DerivedOptions & ScopeSignalOptions<T>) | undefined,
 	Binding: DerivedBindingFactory<T>,
 	sequence = 0,
 	captures?: readonly unknown[],
 	declaring = 0,
+	prepare?: () => ((node: ScopedNode<T>) => void) | undefined,
 ): DerivedSignal<T> {
 	if (!(owner instanceof ScopeImpl)) throw new TypeError(formatClientError(149));
 	if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
+	const configure = prepare !== undefined && !owner.nodes.has(key) ? prepare() : undefined;
 	const [node, created] = declaredScopeNode<T>(owner, key, 'derived');
 	if (!created) {
 		// A later render may declare the same cell with a new computation.
 		const binding = owner.derivedBindings?.get(node);
 		return (binding?.redeclare(compute, sequence, captures, declaring) ?? node) as DerivedSignal<T>;
 	}
+	configure?.(node);
 	const binding = new Binding(owner, node, compute, options);
 	binding.declared(sequence, captures, declaring);
 	(owner.derivedBindings ??= new Map()).set(node, binding);

@@ -18,7 +18,9 @@ export { __methodDep } from '../method-dep.js';
 export {
 	__declared,
 	__derivedScalarAt,
+	__derivedScalarOptionsAt,
 	__signalAt,
+	__signalOptionsAt,
 	__startSignalReads,
 	readSignalBinding,
 	signal$,
@@ -53,6 +55,8 @@ export {
 	skip,
 } from './types.js';
 export type {
+	AuthoredDerivedOptions,
+	AuthoredSignalOptions,
 	AdoptionFrame,
 	ActionOperation,
 	ActionUncertain,

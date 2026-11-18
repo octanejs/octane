@@ -28,6 +28,7 @@ const SIGNAL_FACTORIES = new Map([
 const VIEW_INSTALLERS = new Map([
 	['__derivedAt', '__derivedViews'],
 	['__derivedScalarAt', '__derivedScalarViews'],
+	['__derivedScalarOptionsAt', '__derivedScalarViews'],
 	['__queryAt', '__queryViews'],
 ]);
 
@@ -102,8 +103,22 @@ function isScalarResult(expression) {
 	return false;
 }
 
+function hasCellOptions(call, index) {
+	const options = unwrapExpression(call.arguments?.[index]);
+	if (options === undefined || (options.type === 'Literal' && options.value === null)) return false;
+	return !plainOptions(options, (key) => key === 'key' || (index === 1 && key === 'sync'));
+}
+
 function declarationHelper(factory, call) {
+	if (factory === 'signal$') return hasCellOptions(call, 1) ? '__signalOptionsAt' : '__signalAt';
 	if (factory !== 'derived$') return SIGNAL_FACTORIES.get(factory);
+	const helper = derivedDeclarationHelper(call);
+	return helper === '__derivedScalarAt' && hasCellOptions(call, 1)
+		? '__derivedScalarOptionsAt'
+		: helper;
+}
+
+function derivedDeclarationHelper(call) {
 	const args = call.arguments ?? [];
 	const compute = unwrapExpression(args[0]);
 	if (
@@ -129,6 +144,7 @@ function declarationHelper(factory, call) {
 				return '__derivedAt';
 			seen.add(key);
 			if (key === 'key' && validLiteralKey(property.value)) continue;
+			if (key === 'equals' || key === 'watched') continue;
 			if (key !== 'sync' || property.value?.type !== 'Literal') return '__derivedAt';
 			sync = property.value.value;
 		}

@@ -1,6 +1,7 @@
 import { formatClientError } from '../error-codes.client.generated.js';
 import {
 	createDeclaredSignalCell,
+	prepareDeclaredCellOptions,
 	createOwnerScope,
 	createSeededOwnerScope,
 	resumeScopeReads,
@@ -13,6 +14,7 @@ import { ScopeDisposedError } from './errors.js';
 import {
 	isDeclarationView,
 	isRetiredDeclarationView,
+	type ScopedNode,
 	readSignalBinding as readBinding,
 	untrack,
 } from './graph.js';
@@ -44,13 +46,15 @@ import {
 	SIGNAL_BINDING_SUBSCRIBE,
 	SIGNAL_OWNER_RESOLVE,
 	type DerivedCompute,
-	type DerivedOptions,
+	type AuthoredDerivedOptions,
+	type AuthoredSignalOptions,
 	type DerivedSignal,
 	type OwnerBoundSignal,
 	type OwnerScope,
 	type ScopeSeed,
 	type SignalHandle,
 	type SignalOptions,
+	type ScopeSignalOptions,
 	type SignalOwner,
 	type SignalOwnerIdentity,
 	type SignalRendererOwnerIdentity,
@@ -607,6 +611,7 @@ export function __signalAt<T>(
 	site: string | undefined,
 	initial: T,
 	options?: SignalOptions,
+	prepare?: () => ((node: ScopedNode<T>) => void) | undefined,
 ): WritableSignal<T> {
 	const explicit = signalOptionsKey(options);
 	site ??= explicit;
@@ -627,22 +632,33 @@ export function __signalAt<T>(
 				key,
 				early === undefined ? initial : (early.value as T),
 				early !== undefined,
+				prepare,
 			);
 		},
 		site,
 	);
 }
 
-export function signal$<T>(initial: T, options?: SignalOptions): WritableSignal<T> {
-	return __signalAt(undefined, initial, options);
+/** Configured declarations pay for optional graph capabilities only when imported. */
+export function __signalOptionsAt<T>(
+	site: string | undefined,
+	initial: T,
+	options?: AuthoredSignalOptions<T>,
+): WritableSignal<T> {
+	return __signalAt(site, initial, options, options && (() => prepareDeclaredCellOptions(options)));
+}
+
+export function signal$<T>(initial: T, options?: AuthoredSignalOptions<T>): WritableSignal<T> {
+	return __signalOptionsAt(undefined, initial, options);
 }
 
 /** Compiler-only scalar proof; authored derived$ remains dynamically asynchronous. */
 export function __derivedScalarAt<T>(
 	site: string | undefined,
 	compute: DerivedCompute<T>,
-	options?: DerivedOptions & SignalOptions,
+	options?: AuthoredDerivedOptions<T>,
 	captures?: readonly unknown[],
+	prepare?: () => ((node: ScopedNode<T>) => void) | undefined,
 ): DerivedSignal<T> {
 	if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
 	const explicit = signalOptionsKey(options);
@@ -657,11 +673,43 @@ export function __derivedScalarAt<T>(
 				owner,
 				key,
 				() => runWithSignalOwner(owner, () => (compute as () => T)()),
+				options,
 				sequence,
 				captures,
 				declaring,
+				prepare,
 			),
 		site,
+	);
+}
+
+export function __derivedScalarOptionsAt<T>(
+	site: string | undefined,
+	compute: DerivedCompute<T>,
+	options?: AuthoredDerivedOptions<T>,
+	captures?: readonly unknown[],
+	captured?: ScopeSignalOptions<T>,
+): DerivedSignal<T> {
+	if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
+	if (options !== undefined && options.sync !== true) throw new TypeError(formatClientError(166));
+	if (compute.length !== 0) throw new TypeError(formatClientError(166));
+	const synchronous = () => {
+		const value = (compute as () => T)();
+		if (
+			isThenable(value) ||
+			(value !== null &&
+				(typeof value === 'object' || typeof value === 'function') &&
+				typeof (value as unknown as AsyncIterable<unknown>)[Symbol.asyncIterator] === 'function')
+		)
+			throw new TypeError(formatClientError(166));
+		return value;
+	};
+	return __derivedScalarAt(
+		site,
+		synchronous,
+		options,
+		captures,
+		options && (() => prepareDeclaredCellOptions(captured ?? options)),
 	);
 }
 
