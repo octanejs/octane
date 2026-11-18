@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { compile } from 'octane/compiler';
 import { compileCodeSplitReferenceRoute } from '../src/internal/router-plugin/core/code-splitter/compilers.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createRouterCodeSplitterPlugin } from '../src/internal/router-plugin/core/router-code-splitter-plugin.js';
@@ -147,3 +148,37 @@ it.each([false, true])(
 		expect(result!.code).toContain('tsr-split=component');
 	},
 );
+
+// #3020: profiling registers each component by name after its declaration. The
+// splitter removes the declaration, so the leftover registration must not throw.
+it('keeps a profiled route module loadable after its component is split out', () => {
+	const source = `import { createFileRoute } from '@octanejs/tanstack-router';
+function Home() @{ <main>home</main> }
+export const Route = createFileRoute('/')({ component: Home });
+`;
+	const filename = '/src/routes/index.tsrx';
+	const compiled = compile(source, filename, { hmr: false, profile: true }).code;
+	const result = compileCodeSplitReferenceRoute({
+		code: compiled,
+		codeSplitGroupings: [['component']],
+		targetFramework: 'octane',
+		compiled: false,
+		filename,
+		id: filename,
+		addHmr: false,
+	});
+	expect(result!.code).toContain('_$__profileComponent(Home');
+	expect(result!.code).not.toMatch(/function Home\b/);
+
+	const body = result!.code.replace(/^import .*;$/gm, '').replace(/^export /gm, '');
+	const profileComponent = vi.fn();
+	const load = new Function('_$__profileComponent', 'createFileRoute', 'lazyRouteComponent', body);
+	expect(() =>
+		load(
+			profileComponent,
+			() => (options: unknown) => options,
+			() => () => null,
+		),
+	).not.toThrow();
+	expect(profileComponent).not.toHaveBeenCalled();
+});

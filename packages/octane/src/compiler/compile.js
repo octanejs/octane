@@ -11445,11 +11445,24 @@ function profileMetadataAst(metadata) {
 	);
 }
 
-function profileRegistrationAst(bindingName, metadata, origin) {
+// Guarded like the HMR stamps: a route code-splitter may move the component
+// into another module and leave this statement naming a binding that no longer
+// exists. The moved component registers from its new module.
+function guardedProfileRegistration(bindingName, metadataNode, origin) {
 	return inheritOriginLoc(
-		b.stmt(b.call('_$__profileComponent', b.id(bindingName), profileMetadataAst(metadata))),
+		b.stmt(
+			b.logical(
+				'&&',
+				b.binary('===', b.unary('typeof', b.id(bindingName)), b.literal('function', "'function'")),
+				b.call('_$__profileComponent', b.id(bindingName), metadataNode),
+			),
+		),
 		origin,
 	);
+}
+
+function profileRegistrationAst(bindingName, metadata, origin) {
+	return guardedProfileRegistration(bindingName, profileMetadataAst(metadata), origin);
 }
 
 function profileComponentCallAst(value, metadata) {
@@ -14408,10 +14421,7 @@ function compileInternal(
 	if (ctx.profileComponents.length > 0) {
 		ctx.profileRuntimeNeeded.add('__profileComponent');
 		profileNodes = ctx.profileComponents.map((meta) =>
-			inheritOriginLoc(
-				b.stmt(b.call('_$__profileComponent', b.id(meta.name), jsonValueToNode(meta))),
-				moduleOrigin,
-			),
+			guardedProfileRegistration(meta.name, jsonValueToNode(meta), moduleOrigin),
 		);
 	}
 
