@@ -140,6 +140,8 @@ export interface Read<Input, Output> {
 	readonly expire: number;
 	/** Whether a store with `persist` saves this read's value. */
 	readonly persist: boolean;
+	/** Start a required live read alongside the first persistent restore. */
+	readonly restore?: 'concurrent' | undefined;
 	/** Whether a load is aborted once nothing observes the read or waits on it. */
 	readonly cancel: boolean;
 	/** Change it when a saved value would mean something else, such as a view's new rule. */
@@ -419,6 +421,7 @@ interface ViewOptions<T, P, W> {
 	keep?: number;
 	expire?: number;
 	persist?: boolean;
+	restore?: 'concurrent';
 	cancel?: boolean;
 	version?: string;
 }
@@ -514,6 +517,8 @@ interface ReadOptions<Input, Output> {
 	expire?: number;
 	/** Set to false to keep a value out of persistent storage, such as one holding secrets. */
 	persist?: boolean;
+	/** Restore a cached value while starting a required live read, rather than waiting for storage. */
+	restore?: 'concurrent';
 	/**
 	 * Abort a load in flight when its last observer leaves, unless a `prefetch`
 	 * or a `refresh` is waiting on it. The value already confirmed stays, and a
@@ -548,6 +553,7 @@ export function read<Output, Input>(
 		keep: options.keep ?? 300_000,
 		expire: options.expire ?? Infinity,
 		persist: options.persist ?? true,
+		restore: options.restore,
 		cancel: options.cancel ?? false,
 		version: options.version ?? '',
 	});

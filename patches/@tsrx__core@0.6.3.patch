@@ -1,0 +1,112 @@
+diff --git a/src/transform/jsx/helpers.js b/src/transform/jsx/helpers.js
+index 95b06bd21a0be85c5ff9131701ac8a8ea55a3115..bda6a8316838504b7d882a3869786c177d28a0e7 100644
+--- a/src/transform/jsx/helpers.js
++++ b/src/transform/jsx/helpers.js
+@@ -463,14 +463,23 @@ export function tsx_with_ts_locations(
+ 			context.visit(node.declarations[0]);
+ 		},
+ 		ReturnStatement: (node, context) => {
++			// esrap maps the keyword to the source text after `return` at the
++			// node's start. A compiler-made `return` takes its output's location,
++			// so it prints its keyword without one.
++			const keyword_node =
++				node.loc &&
++				source !== undefined &&
++				!source.startsWith('return', /** @type {number} */ (node.start))
++					? { ...node, loc: undefined }
++					: node;
+ 			if (!semicolon_free.has(node)) {
+ 				/** @type {NonNullable<typeof base.ReturnStatement>} */ (base.ReturnStatement)(
+-					node,
++					keyword_node,
+ 					context,
+ 				);
+ 				return;
+ 			}
+-			write_keyword('return', node, context);
++			write_keyword('return', keyword_node, context);
+ 			if (node.argument) {
+ 				context.write(' ');
+ 				context.visit(node.argument);
+diff --git a/src/transform/jsx/index.js b/src/transform/jsx/index.js
+index 8405a8cbca4e426d43ed560e12a7f5c7385da23f..7f7ace31004471eec0299576c3b5b52b3c670dde 100644
+--- a/src/transform/jsx/index.js
++++ b/src/transform/jsx/index.js
+@@ -1071,14 +1071,21 @@ function lower_dynamic_jsx_element(node, transform_context) {
+ 	transform_context.needs_dynamic_element = true;
+ 	const name_loc = has_location(dynamic_name) ? dynamic_name : undefined;
+ 	return mark_dynamic_element(
+-		rebuild_element(b.jsx_id(DYNAMIC_IMPORT_LOCAL), [
+-			b.jsx_attribute(
+-				b.jsx_id('is'),
+-				b.jsx_expression_container(generated_expression, name_loc),
+-				false,
+-				name_loc,
++		rebuild_element(
++			b.jsx_id(
++				transform_context.typeOnly
++					? (transform_context.platform.imports.dynamicTypeLocal ?? DYNAMIC_IMPORT_LOCAL)
++					: DYNAMIC_IMPORT_LOCAL,
+ 			),
+-		]),
++			[
++				b.jsx_attribute(
++					b.jsx_id('is'),
++					b.jsx_expression_container(generated_expression, name_loc),
++					false,
++					name_loc,
++				),
++			],
++		),
+ 	);
+ }
+ 
+diff --git a/src/transform/segments.js b/src/transform/segments.js
+index caff6942544ee28d14b68db1a5ac4512e43332e0..45af8cb3aca9a5278062910679e8f8a3dc57cb7a 100644
+--- a/src/transform/segments.js
++++ b/src/transform/segments.js
+@@ -2141,6 +2141,20 @@ export function convert_source_map_to_mappings(
+ 						gen_line_offsets,
+ 						mapping_data_verify_only,
+ 					);
++					// A compiler wrapper around the expression, such as a call, can
++					// open at the same source position. Start where the expression's
++					// own leftmost name is printed.
++					let object = node.object;
++					while (object?.type === 'MemberExpression') object = object.object;
++					const start =
++						object?.type === 'Identifier'
++							? generated_offset_for_text(node.loc.start, object.name)
++							: undefined;
++					const end = mapping.generatedOffsets[0] + mapping.generatedLengths[0];
++					if (start !== undefined && start > mapping.generatedOffsets[0] && start < end) {
++						mapping.generatedOffsets[0] = start;
++						mapping.generatedLengths[0] = end - start;
++					}
+ 
+ 					mappings.push(mapping);
+ 				}
+diff --git a/types/jsx-platform.d.ts b/types/jsx-platform.d.ts
+index e8aeda525c8ce70a08ce1ad874654b85643aac9d..fdec49ac6a328ef906614f56c2536a38f1d34eb3 100644
+--- a/types/jsx-platform.d.ts
++++ b/types/jsx-platform.d.ts
+@@ -405,6 +405,8 @@ export interface JsxPlatform {
+ 		 * it.
+ 		 */
+ 		dynamic?: string;
++		/** Local JSX name for dynamic tags in type-only output. */
++		dynamicTypeLocal?: string;
+ 		/**
+ 		 * Scoped-binding lowering for dynamic tags (`<{expr}>`) in production
+ 		 * output; each tag binds a scoped component const referenced like an
+@@ -420,7 +422,9 @@ export interface JsxPlatform {
+ 		 * relying on the host JSX compiler's reactive render block for
+ 		 * expression children (Vue Vapor, which never re-runs setup). In
+ 		 * type-only output, dynamic tags always lower to
+-		 * `<TsrxDynamic is={expr}>` imported from `imports.dynamic`.
++		 * `<TsrxDynamic is={expr}>` imported from `imports.dynamic`. A platform
++		 * may set `imports.dynamicTypeLocal` to use a locally declared, host-typed
++		 * alias for the generated JSX tag while retaining the dynamic helper import.
+ 		 */
+ 		dynamicFactory?: { name?: string; source?: string; renderBlock?: boolean };
+ 		/**

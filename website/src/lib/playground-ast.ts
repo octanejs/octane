@@ -36,6 +36,10 @@ const primitiveText = (value: unknown): string => {
 const childPath = (path: string, key: string, array: boolean): string =>
 	array ? `${path}[${key}]` : `${path}.${key}`;
 
+// Not structural: `metadata` holds pre-transform copies of nodes, and
+// `@tsrx/core` keeps the parser's tokens on the Program.
+const SKIPPED_KEYS = new Set(['metadata', 'loc', 'tsrx_tokens', 'tsrx_keyword_tokens']);
+
 /**
  * Convert the parser's object graph into a cycle-safe tree for display. Every
  * enumerable field remains visible; shared/cyclic values become an explicit
@@ -147,7 +151,7 @@ export function preparePlaygroundAst(value: unknown): PreparedPlaygroundAst {
 					childPath(path, childKey, array),
 					node,
 					depth + 1,
-					structural && childKey !== 'metadata',
+					structural && !SKIPPED_KEYS.has(childKey),
 				),
 			);
 		}
@@ -185,7 +189,7 @@ export function collectAuthoredRanges(value: unknown): AstRange[] {
 			ranges.push({ from, to });
 		}
 		for (const key in record) {
-			if (key === 'metadata' || key === 'loc') continue;
+			if (SKIPPED_KEYS.has(key)) continue;
 			visit(record[key]);
 		}
 	};
