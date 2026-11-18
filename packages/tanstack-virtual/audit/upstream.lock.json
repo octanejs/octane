@@ -2,17 +2,18 @@
   "schemaVersion": 1,
   "identity": {
     "packageName": "@tanstack/react-virtual",
-    "version": "3.14.12",
+    "version": "3.14.26",
     "repository": {
       "owner": "TanStack",
       "repo": "virtual",
       "subdirectory": "packages/react-virtual"
     },
-    "commit": "df47889fc87af0b5ff46a9805820f60cff6828ff",
-    "integrity": "sha512-EOJkBss/FRqzFrCpX8M96lIh+ZMc0jPt0LILhxWQ3tOHQ3XdVvuE0jceS2yZXpDtayNfpjeg2EnuYPm90CxIlA=="
+    "commit": "11b48e4ab8b08d483c8fe29a31ef11261ffbda04",
+    "integrity": "sha512-HUDlfsrYH6ko5xH56L62Mcl/uzT+AGVNMHFuDNqDJMdZWc1AQa2oeVKNUvZ/RWBZQ4TYtyQerFrNvLnp39h65A=="
   },
   "license": {
     "spdx": "MIT",
+    "declaration": "manifest",
     "evidence": [
       {
         "path": "LICENSE",
@@ -50,6 +51,10 @@
       "replace": "'octane'"
     },
     {
+      "find": "'react-dom'",
+      "replace": "'octane'"
+    },
+    {
       "find": "import ReactDOM from 'octane'",
       "replace": "import * as ReactDOM from 'octane'"
     },
@@ -65,8 +70,8 @@
   "files": [
     {
       "path": "CHANGELOG.md",
-      "gitBlob": "f633d0634dac23c7dcefce0fe88460deca18c4f6",
-      "size": 11712
+      "gitBlob": "dc15988157f0ea8a26caaa79ba731a0176806bb2",
+      "size": 17324
     },
     {
       "path": "e2e/app/cached-measurements/index.html",
@@ -75,8 +80,8 @@
     },
     {
       "path": "e2e/app/cached-measurements/main.tsx",
-      "gitBlob": "57c02899e8c459078fa5a9bbec7436c31e41dfac",
-      "size": 2038
+      "gitBlob": "9fe215bcb9ca3b9e02856d47901581e350885750",
+      "size": 2800
     },
     {
       "path": "e2e/app/chat-resize/index.html",
@@ -99,6 +104,16 @@
       "size": 3931
     },
     {
+      "path": "e2e/app/command-retire/index.html",
+      "gitBlob": "56f418f6160aa7a0cb6ef6787e809856f902964a",
+      "size": 187
+    },
+    {
+      "path": "e2e/app/command-retire/main.tsx",
+      "gitBlob": "e037bf05ffa321a26882df3fbdc0895b1ca900ae",
+      "size": 2451
+    },
+    {
       "path": "e2e/app/direct-dom-updates/index.html",
       "gitBlob": "56f418f6160aa7a0cb6ef6787e809856f902964a",
       "size": 187
@@ -107,6 +122,26 @@
       "path": "e2e/app/direct-dom-updates/main.tsx",
       "gitBlob": "79c8b84a680906ac7f094ccd1060be582314a7a3",
       "size": 2188
+    },
+    {
+      "path": "e2e/app/ios-deferral/index.html",
+      "gitBlob": "d47577ab63328692b505d2177e588ae823ac5a6c",
+      "size": 262
+    },
+    {
+      "path": "e2e/app/ios-deferral/main.tsx",
+      "gitBlob": "75068541da78376e3e585600d7f41a29cf07a79d",
+      "size": 10349
+    },
+    {
+      "path": "e2e/app/lanes-change/index.html",
+      "gitBlob": "56f418f6160aa7a0cb6ef6787e809856f902964a",
+      "size": 187
+    },
+    {
+      "path": "e2e/app/lanes-change/main.tsx",
+      "gitBlob": "37adc028c56367c57cbf8da7e92d6b99a65d650e",
+      "size": 2286
     },
     {
       "path": "e2e/app/measure-element/index.html",
@@ -134,6 +169,16 @@
       "size": 2665
     },
     {
+      "path": "e2e/app/resize-delivery/index.html",
+      "gitBlob": "935d2619b317087544ee838ce33fba45abef857e",
+      "size": 525
+    },
+    {
+      "path": "e2e/app/resize-delivery/main.tsx",
+      "gitBlob": "b1b42f6855b4686d311a76ed88f869e691512391",
+      "size": 1101
+    },
+    {
       "path": "e2e/app/scroll-anchor/index.html",
       "gitBlob": "56f418f6160aa7a0cb6ef6787e809856f902964a",
       "size": 187
@@ -150,8 +195,18 @@
     },
     {
       "path": "e2e/app/scroll/main.tsx",
-      "gitBlob": "1a2f9eacbefa5e101640029ce424e79b32a5987d",
-      "size": 2272
+      "gitBlob": "b7823891a3ea75f683f0b262119bfb65e5a4f7e0",
+      "size": 2432
+    },
+    {
+      "path": "e2e/app/smooth-prepend/index.html",
+      "gitBlob": "56f418f6160aa7a0cb6ef6787e809856f902964a",
+      "size": 187
+    },
+    {
+      "path": "e2e/app/smooth-prepend/main.tsx",
+      "gitBlob": "f4a4d7b470d316fb52f8f518c6af36f2ed4cf17f",
+      "size": 3400
     },
     {
       "path": "e2e/app/smooth-scroll/index.html",
@@ -160,8 +215,8 @@
     },
     {
       "path": "e2e/app/smooth-scroll/main.tsx",
-      "gitBlob": "565d48c36111ecd5c69cc6cfd9de49ea027173b9",
-      "size": 3216
+      "gitBlob": "a23d4980e32f6da12151f66895a2f99c95e3214e",
+      "size": 3439
     },
     {
       "path": "e2e/app/stale-index/index.html",
@@ -175,8 +230,8 @@
     },
     {
       "path": "e2e/app/test/cached-measurements.spec.ts",
-      "gitBlob": "26eb4e623c3f5a797aa56cba4d1bdc42c2d71d20",
-      "size": 1325
+      "gitBlob": "84d06a4c95a060b0f1945022d943c993f813261c",
+      "size": 2247
     },
     {
       "path": "e2e/app/test/chat.spec.ts",
@@ -184,9 +239,24 @@
       "size": 5743
     },
     {
+      "path": "e2e/app/test/command-retire.spec.ts",
+      "gitBlob": "262175100ac6b179ff547c8c705c2eb2885b2418",
+      "size": 1918
+    },
+    {
       "path": "e2e/app/test/direct-dom-updates.spec.ts",
       "gitBlob": "71b7f8dcd8117c5731b74fffa6bcc066399de11c",
       "size": 4617
+    },
+    {
+      "path": "e2e/app/test/ios-programmatic-landing.spec.ts",
+      "gitBlob": "9145ad4fc88dffdb305e73be85111fa124d2b851",
+      "size": 2356
+    },
+    {
+      "path": "e2e/app/test/lanes-change.spec.ts",
+      "gitBlob": "4e6bdd0397b9f49fd497fb4a7efa1eff2f1b59ea",
+      "size": 2170
     },
     {
       "path": "e2e/app/test/measure-element.spec.ts",
@@ -199,6 +269,11 @@
       "size": 2899
     },
     {
+      "path": "e2e/app/test/resize-delivery.spec.ts",
+      "gitBlob": "387b1789b3a1fda3c01e6c01d54da44652131d13",
+      "size": 3501
+    },
+    {
       "path": "e2e/app/test/scroll-anchor.spec.ts",
       "gitBlob": "2b87b1fadfbdf7b3246beb263f7356b8b945c6f9",
       "size": 4289
@@ -209,9 +284,14 @@
       "size": 4336
     },
     {
+      "path": "e2e/app/test/smooth-prepend.spec.ts",
+      "gitBlob": "5c12cacfbd6b85da99e92aa4631d9c3d8909118b",
+      "size": 2287
+    },
+    {
       "path": "e2e/app/test/smooth-scroll.spec.ts",
-      "gitBlob": "d8650db9124c0d9bcf74460ac46248d830bfb900",
-      "size": 4865
+      "gitBlob": "a893dc958bb1ab868621fdc423dfbaa2595b8916",
+      "size": 5120
     },
     {
       "path": "e2e/app/test/stale-index.spec.ts",
@@ -225,8 +305,8 @@
     },
     {
       "path": "e2e/app/vite.config.ts",
-      "gitBlob": "505279170bc29371c27c9bedb047de37982a9647",
-      "size": 1258
+      "gitBlob": "788359cfbc8940402773d4f5742e4b18414e15fb",
+      "size": 1683
     },
     {
       "path": "eslint.config.js",
@@ -235,7 +315,7 @@
     },
     {
       "path": "package.json",
-      "gitBlob": "e119d77d102acd84c01fa7df15053bfe242f2d46",
+      "gitBlob": "bf87b6cbc281b7e5840e69d6029552161cda7ab6",
       "size": 1890
     },
     {
@@ -245,13 +325,13 @@
     },
     {
       "path": "src/index.tsx",
-      "gitBlob": "737ad53fc0a0d8fc893430633d3ca4077159f65a",
-      "size": 10062
+      "gitBlob": "e4082c0f58ba086b717b52b8b5884f28326732b0",
+      "size": 12004
     },
     {
       "path": "tests/index.test.tsx",
-      "gitBlob": "dc6da3347d062f6b75d2bae8e72ad3cf97f3d63a",
-      "size": 4925
+      "gitBlob": "d2a3caecd72bf2c5c65efd4657af4e5a7f040523",
+      "size": 10795
     },
     {
       "path": "tests/test-setup.ts",
@@ -269,5 +349,5 @@
       "size": 526
     }
   ],
-  "fingerprint": "f5c9c87d0643fcff4860e1f27174cee1f9da437527de669ea6ae09127c3e6cbf"
+  "fingerprint": "b634c1dc157013d4bae663da022b1897c65f06e6645cd7020d7c28d845699ae7"
 }

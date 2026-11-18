@@ -5,9 +5,9 @@
   "files": ["packages/tanstack-virtual/tests/upstream-original.test.ts"],
   "tests": [
     {
-      "id": "runtime:9c23124f41d14b76",
+      "id": "runtime:da4ce2926a35592d",
       "file": "packages/tanstack-virtual/tests/upstream-original.test.ts",
-      "fullName": "runs all seven pinned Virtual unit registrations unchanged"
+      "fullName": "runs all eleven pinned Virtual unit registrations unchanged"
     }
   ],
   "snapshots": 0
