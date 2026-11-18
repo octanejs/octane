@@ -10,7 +10,7 @@
   "packageIdentity": {
     "path": "upstream/package.json",
     "name": "@tanstack/react-virtual",
-    "version": "3.14.12",
+    "version": "3.14.26",
     "license": "MIT"
   },
   "unpublishedDirs": ["audit", "tests", "typetests", "upstream", "upstream-artifact"]
