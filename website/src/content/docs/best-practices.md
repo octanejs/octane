@@ -884,7 +884,7 @@ Use `refetch()` to refresh while keeping a ready value visible, and `reset()` fo
 
 ### Declare contracts in .data.ts modules
 
-A contract (`read`, `write`, `view`, `entity`, `feed`) is an inert description of one operation. **Declare every contract as an exported `const` in a `*.data.ts` or `*.data.js` module**, whose top level holds only imports, types, and `const` exports. Both the browser and the server import it, so it must not run code or import server modules. The build then knows every contract and every use, and reports a used contract no handler serves (`OCTANE_DATA_CONTRACT_UNHANDLED`). These `OCTANE_DATA_*` diagnostics are the Data contract check, separate from Strong mode.
+A contract (`read`, `write`, `view`, `entity`, `feed`) is an inert description of one operation. **Declare every contract as an exported `const` in a `*.data.ts` or `*.data.js` module**, whose top level holds only imports, types, and `const` exports. Both the browser and the server import it, so it must not run code when it loads or import values from server modules; type imports are fine. A contract may be declared with the function that serves it, as in `read(options, run)`: the Vite and Rspack plugins drop `run` from the client build. The build then knows every contract and every use, and reports a used contract no handler serves (`OCTANE_DATA_CONTRACT_UNHANDLED`). These `OCTANE_DATA_*` diagnostics are the Data contract check, separate from Strong mode.
 
 Name a contract directly at each site, such as `store.read(books)` or `useForm(addBook)`. Passing a contract around as a value hides its uses from the build.
 
