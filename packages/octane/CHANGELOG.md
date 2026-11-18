@@ -1,5 +1,31 @@
 # octane
 
+## 0.21.0
+
+### Minor Changes
+
+- 12dbf62: Every `octane/data` entity now has `one` and `list` output schemas. A read whose `output` is `Book.list` or `Book.one` selects its books without an `entities` function, and a `creates` or `patches` write to `Book` whose `output` is `Book.one` takes its reply as the saved record without `record`. An output of the plain record schema still selects nothing.
+- 5faf206: Octane Data: a read's `tags` and a write's `invalidates` can be computed from the input, such as ``tags: (id) => [`project:${id}`]``, so an invalidation reaches only the reads for that input. Static lists work as before.
+- 1985ce9: `octane/data`: `read`, `view`, `write` and `feed` can take the function that serves them as a second argument, so a contract and its implementation live together in its `*.data.ts` module. `defineHandler(Module)` serves each such contract with its own function, and its type accepts the module only when the handler's context provides what those functions need. The Vite and Rspack plugins drop these functions from the client build of the module, together with the imports and module-level constants only they used, so server code never reaches the browser. Inputs and outputs are still validated by the contract's schemas on the server. A contract module may now import types from any module, including `octane/data/server`.
+- f94ced3: `octane/data` views now refuse a window the server did not sort in the view's order: the handler and the store fail the read with `invalid` and an issue naming the view, instead of showing rows out of place or losing them at a page's edge. A view's last tiebreak now compares the entity key's own value, so integer keys sort as a database sorts them. Cursor `pages` of a read show a pending created record once instead of on every page.
+- 1cd087c: Add an `equals` option to `scope.signal$` and `scope.derived$` from `octane/signals`. When `equals(previous, next)` finds a write or a recomputed result equal, the signal keeps the previous value by reference and nothing downstream recomputes or is notified. `Object.is` remains the default.
+- 1ffb942: Add `scope.transaction(fn)`, a batch that restores every signal it changed when `fn` throws, before any subscriber sees the failed writes, and otherwise returns the coalesced changes with `undo()` and `redo()`.
+- e2beb61: `scope.signal$` and `scope.derived$` accept a `watched` option: it runs when the signal gains its first observer, directly or through derived values, and its returned cleanup runs when the last observer leaves or the scope is disposed.
+- 799c4d4: Add `createFamily` to `octane/signals`: a scope-owned family of keyless signals, one stable member per logical key, with optional `keyOf` key identity, explicit eviction, and an `idle` policy that evicts members nothing has read for a while. Evicted members retire like a disposed scope's signals, and derived members let go of their dependencies so key churn does not leak.
+- 494e47b: Add `octane/signals/react`, so React components can read scoped signals without the Octane compiler. `useSignalValue(handle$)` subscribes through `useSyncExternalStore` and re-renders only when the value changes, and `SignalScopeProvider`/`useSignalScope` pass a borrowed scope down a React tree. A component still mounted when its scope is disposed throws `ScopeDisposedError` to the nearest error boundary instead of showing the retired value, and a client scope seeded from the server's `scope.serialize()` hydrates without a mismatch.
+- 2e1f7f1: Add an opt-in Valdi component-runtime compiler ABI for native context, effects, boundaries, child values, render props, and dynamic component descriptors.
+
+### Patch Changes
+
+- 23c13d1: Keep `CSSProperties` compatible with csstype 3.2.4. When `@types/react` resolves a newer csstype than Octane, the hyphenated style keys React already types (such as `caret`) no longer conflict, and `viewTransitionScope` follows React's type once csstype declares it, so Octane styles stay assignable to `React.CSSProperties`.
+- 03addab: Render custom JSX map results using ordinary child semantics. Array proxies returned by custom map methods now preserve their returned order through rendering and hydration without an extra numeric membership scan.
+- e44f566: `store.prefetch` no longer reloads, for its age, a value no reader has shown yet, as a first reader already did not. A route that prefetches its reads now hydrates from the server's seed without loading them again, and a prefetch after a hover prefetch no longer loads twice.
+- 40d070e: Guard compiler-emitted profile registrations with `typeof Component === 'function'`, so a route module still loads when TanStack's route code-splitter moves its component into a separate chunk.
+- 249dce4: Keep an imported custom hook's state and context reads when it is imported under an ordinary local name, such as `import { useReading as readValue }`.
+- e50b52b: Fix a crash when an exported or escaped `memo` component written with `@{ … }` switches between its template and an early `return null`.
+- 60dff19: Allow React-hosted server islands to borrow an explicit signal owner for each Fizz attempt and replay.
+- 643f476: Mount a component that renders itself through the same lite component scope as a call from another component. Since the lexical tag-shadowing fix (#2858), a recursive call was treated as a shadowed local tag and mounted through the full component path, which made nested trees about 30% slower to mount.
+
 ## 0.20.0
 
 ### Minor Changes

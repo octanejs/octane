@@ -1,5 +1,30 @@
 # @octanejs/devtools
 
+## 0.0.61
+
+### Patch Changes
+
+- 50a4dd0: Render the Components tab tree as a flat, indented list so a deep app tree no longer overflows the stack, and contain any panel render failure inside the panel instead of letting it reach the host app's error boundary.
+- Updated dependencies [23c13d1]
+- Updated dependencies [03addab]
+- Updated dependencies [12dbf62]
+- Updated dependencies [5faf206]
+- Updated dependencies [e44f566]
+- Updated dependencies [1985ce9]
+- Updated dependencies [f94ced3]
+- Updated dependencies [40d070e]
+- Updated dependencies [249dce4]
+- Updated dependencies [e50b52b]
+- Updated dependencies [60dff19]
+- Updated dependencies [643f476]
+- Updated dependencies [1cd087c]
+- Updated dependencies [1ffb942]
+- Updated dependencies [e2beb61]
+- Updated dependencies [799c4d4]
+- Updated dependencies [494e47b]
+- Updated dependencies [2e1f7f1]
+  - octane@0.21.0
+
 ## 0.0.60
 
 ### Patch Changes
