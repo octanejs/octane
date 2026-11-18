@@ -50,6 +50,7 @@ function List(props) @{
   `whileFocus`, `whileInView` (+ `viewport`), `exit`, `drag` (+ `dragConstraints`,
   `onDrag*`), `layout`, `layoutId`, `variants`, plus any DOM props (className, style,
   events, …) and `style` MotionValues spread/bound onto the element.
+- `useAnimationControls()` — share one controller across motion hosts through `animate={controls}`. `start()` animates each host’s own variant and returns a promise; `set()` applies a definition immediately, and `stop()` cancels active animations. Hosts release their subscriptions when removed or rebound.
 - `AnimatePresence` — exit animations on removal.
 - `MotionConfig` — global `transition` / `reducedMotion` defaults via context.
 - `useReducedMotion()` — a live `prefers-reduced-motion` subscription; operating-system
