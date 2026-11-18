@@ -63,8 +63,10 @@ function schedule(member: Member, entry: MemberEntry, delay: number): void {
 function watchIdle(member: Member, entry: MemberEntry): void {
 	const own = watchedHook(member);
 	setWatched(member, () => {
-		const stop = own?.();
+		// Observed first: a throw from the member's own hook is reported, not thrown,
+		// and must not leave an observed member to idle out.
 		entry.observed = true;
+		const stop = own?.();
 		return () => {
 			entry.observed = false;
 			// Retirement ends the observation too, after the member has left the family.

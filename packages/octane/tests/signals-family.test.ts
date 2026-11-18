@@ -366,6 +366,44 @@ describe('signal families', () => {
 		expect(family.has('a')).toBe(false);
 	});
 
+	it('keeps an observed member when its own watched hook throws', () => {
+		vi.useFakeTimers();
+		const report = vi.fn();
+		const previous = globalThis.reportError;
+		globalThis.reportError = report;
+		try {
+			const scope = owner();
+			const family = createFamily(
+				scope,
+				(_id: string) =>
+					scope.signal$(null, 1, {
+						watched: () => {
+							throw new Error('watched failed');
+						},
+					}),
+				{ idle: 10 },
+			);
+			family.get('a').subscribe(() => {});
+			vi.advanceTimersByTime(50);
+			expect(report).toHaveBeenCalledOnce();
+			expect(family.has('a')).toBe(true);
+		} finally {
+			globalThis.reportError = previous;
+		}
+	});
+
+	it('answers scope.get and scope.set on an evicted cell with an error', () => {
+		const scope = owner();
+		const family = createFamily(scope, (_id: string) => scope.signal$(null, 1));
+		const cell$ = family.get('a');
+		family.delete('a');
+		expect(() => cell$.get()).toThrow(ScopeDisposedError);
+		expect(() => cell$.set(2)).toThrow(ScopeDisposedError);
+		// The scope no longer owns it; checking for eviction here would cost every application.
+		expect(() => scope.get(cell$)).toThrow(TypeError);
+		expect(() => scope.set(cell$, 2)).toThrow(TypeError);
+	});
+
 	it("retires members after every effect's cleanup when the scope is disposed", () => {
 		const scope = createScope({ scopeKey: 'family-dispose-order' });
 		const cells = createFamily(scope, (_id: string) => scope.signal$(null, 1));
