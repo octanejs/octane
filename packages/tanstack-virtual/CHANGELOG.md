@@ -1,5 +1,30 @@
 # @octanejs/tanstack-virtual
 
+## 0.1.70
+
+### Patch Changes
+
+- 078dae5: Update to `@tanstack/virtual-core` 3.19.11 and port the `@tanstack/react-virtual` 3.14.26 adapter. A user scroll now retires a pending instant scroll command, so a reader who scrolls up before the initial `scrollToEnd()` reconciles is no longer pulled back to the old end after an append. Direct DOM updates also position rows that mount without re-rendering the virtualizer's owner.
+- Updated dependencies [23c13d1]
+- Updated dependencies [03addab]
+- Updated dependencies [12dbf62]
+- Updated dependencies [5faf206]
+- Updated dependencies [e44f566]
+- Updated dependencies [1985ce9]
+- Updated dependencies [f94ced3]
+- Updated dependencies [40d070e]
+- Updated dependencies [249dce4]
+- Updated dependencies [e50b52b]
+- Updated dependencies [60dff19]
+- Updated dependencies [643f476]
+- Updated dependencies [1cd087c]
+- Updated dependencies [1ffb942]
+- Updated dependencies [e2beb61]
+- Updated dependencies [799c4d4]
+- Updated dependencies [494e47b]
+- Updated dependencies [2e1f7f1]
+  - octane@0.21.0
+
 ## 0.1.69
 
 ### Patch Changes
