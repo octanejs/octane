@@ -21,6 +21,7 @@ import PublishingLibraries from './docs/publishing-libraries.mdx';
 import BrowserSupport from './docs/browser-support.mdx';
 import Bindings from './docs/bindings.mdx';
 import Profiling from './docs/profiling.mdx';
+import BestPractices from './docs/best-practices.md';
 import { docsMeta, type DocMeta, type DocSection } from './docs-meta.ts';
 
 export type { DocSection };
@@ -40,6 +41,7 @@ const components: Record<string, DocEntry['component']> = {
 	styling: Styling,
 	'tsrx-vs-tsx': TsrxVsTsx,
 	'strong-mode': StrongMode,
+	'best-practices': BestPractices,
 	'differences-from-react': DifferencesFromReact,
 	lynx: Lynx,
 	'react-compat': ReactCompat,
@@ -52,7 +54,8 @@ const components: Record<string, DocEntry['component']> = {
 
 export const docs: DocEntry[] = docsMeta.map((meta) => {
 	const component = components[meta.slug];
-	if (!component) throw new Error(`docs-meta.ts entry '${meta.slug}' has no MDX import in docs.ts`);
+	if (!component)
+		throw new Error(`docs-meta.ts entry '${meta.slug}' has no document import in docs.ts`);
 	return { ...meta, component };
 });
 

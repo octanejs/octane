@@ -9,6 +9,47 @@
 import { readFileSync } from 'node:fs';
 import rehypeShiki from '@shikijs/rehype';
 import octaneConfig from './octane.config.ts';
+import { githubSlug } from './src/lib/docs-search-core.ts';
+
+interface HastNode {
+	type: string;
+	tagName?: string;
+	value?: string;
+	properties?: Record<string, unknown>;
+	children?: HastNode[];
+}
+
+function textOf(node: HastNode): string {
+	return node.value ?? (node.children ?? []).map(textOf).join('');
+}
+
+/**
+ * Plain Markdown docs (`*.md`) cannot author the `<h2 id>` anchors and hero the
+ * MDX docs write by hand. Give their `##`/`###` headings GitHub's ids, so one
+ * link works on GitHub and on the site, and wrap a leading `# Title` and its
+ * first paragraph in the docs hero. MDX's hand-written JSX is not touched.
+ */
+function rehypeMarkdownDoc() {
+	return (tree: HastNode) => {
+		const children = tree.children ?? [];
+		for (const node of children) {
+			if ((node.tagName === 'h2' || node.tagName === 'h3') && !node.properties?.id) {
+				node.properties = { ...node.properties, id: githubSlug(textOf(node)) };
+			}
+		}
+		const at = children.findIndex((node) => node.type === 'element');
+		if (children[at]?.tagName !== 'h1') return;
+		const lede = children.findIndex((node, index) => index > at && node.type === 'element');
+		if (children[lede]?.tagName !== 'p') return;
+		children[lede].properties = { ...children[lede].properties, className: ['doc-lede'] };
+		children.splice(at, lede + 1 - at, {
+			type: 'element',
+			tagName: 'div',
+			properties: { className: ['doc-hero'] },
+			children: children.slice(at, lede + 1),
+		});
+	};
+}
 
 // The real TSRX TextMate grammar (name "TSRX", scopeName "source.tsrx" — it
 // tokenizes @{ }, @if/@for/@switch/@try directives, holes, the works). Same
@@ -60,6 +101,7 @@ export const websiteMdxOptions = {
 	// elements can use static templates on both the server and client.
 	overridableTags: ['table', 'pre'],
 	rehypePlugins: [
+		rehypeMarkdownDoc,
 		[
 			rehypeShiki,
 			{

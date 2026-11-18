@@ -7,6 +7,7 @@
 // route handlers, and it must stay on built-in Vite features (?raw, glob,
 // JSON) — never import compiled .mdx/.tsrx from here.
 import { docsMeta } from '../../../website/src/content/docs-meta.ts';
+import { docSlugOf, githubSlug } from '../../../website/src/lib/docs-search-core.ts';
 import ssrMd from '../../../docs/ssr.md?raw';
 import reactDifferencesMd from '../../../docs/differences-from-react.md?raw';
 import deferredHydrationMd from '../../../docs/deferred-hydration.md?raw';
@@ -33,29 +34,14 @@ export interface McpDoc {
 	markdown: string;
 }
 
-const rawWebsiteDocs = import.meta.glob('../../../website/src/content/docs/*.mdx', {
+const rawWebsiteDocs = import.meta.glob('../../../website/src/content/docs/*.{md,mdx}', {
 	query: '?raw',
 	import: 'default',
 	eager: true,
 }) as Record<string, string>;
 
-/** `…/docs/quick-start.mdx` → `quick-start`. */
-function slugOf(path: string): string {
-	return path.slice(path.lastIndexOf('/') + 1).replace(/\.(mdx|md)$/, '');
-}
-
 function stripFrontmatter(source: string): string {
 	return source.replace(/^---[\s\S]*?---\n*/, '');
-}
-
-/** Approximate GitHub's heading slugger so repo-doc anchors deep link. */
-function githubSlug(heading: string): string {
-	return heading
-		.toLowerCase()
-		.replace(/`/g, '')
-		.replace(/[^\w\- ]/g, '')
-		.trim()
-		.replace(/ /g, '-');
 }
 
 /** One section per `## ` markdown heading (fenced code blocks skipped). */
@@ -66,16 +52,16 @@ function markdownSections(markdown: string): McpDocSection[] {
 		if (line.trimStart().startsWith('```')) inFence = !inFence;
 		else if (!inFence && line.startsWith('## ')) {
 			const title = line.slice(3).replace(/`/g, '').trim();
-			sections.push({ id: githubSlug(line.slice(3)), title });
+			sections.push({ id: githubSlug(title), title });
 		}
 	}
 	return sections;
 }
 
 const websiteDocs: McpDoc[] = docsMeta.map((meta) => {
-	const entry = Object.entries(rawWebsiteDocs).find(([path]) => slugOf(path) === meta.slug);
+	const entry = Object.entries(rawWebsiteDocs).find(([path]) => docSlugOf(path) === meta.slug);
 	if (!entry) {
-		throw new Error(`docs-meta.ts entry '${meta.slug}' has no raw .mdx source in the snapshot`);
+		throw new Error(`docs-meta.ts entry '${meta.slug}' has no raw .md/.mdx source in the snapshot`);
 	}
 	return {
 		slug: meta.slug,
@@ -95,7 +81,7 @@ const websiteDocs: McpDoc[] = docsMeta.map((meta) => {
 // silently missing from the remote index.
 {
 	const unregistered = Object.keys(rawWebsiteDocs)
-		.map(slugOf)
+		.map(docSlugOf)
 		.filter((slug) => !docsMeta.some((meta) => meta.slug === slug));
 	if (unregistered.length > 0) {
 		throw new Error(`website docs missing from docs-meta.ts: ${unregistered.join(', ')}`);
