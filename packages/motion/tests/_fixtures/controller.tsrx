@@ -14,6 +14,10 @@ export function ControllerGroup({
 		id: string;
 		target: number;
 		value?: number | MotionValue<number>;
+		yValue?: MotionValue<number>;
+		whileFocus?: { x?: number; y?: number };
+		whileHover?: { x?: number; y?: number };
+		whileTap?: { x?: number; y?: number };
 		initial?: { opacity?: number; scale?: number; x?: number | number[] };
 	}>;
 	second?: boolean;
@@ -32,7 +36,16 @@ export function ControllerGroup({
 				initial={row.initial}
 				animate={disabled ? undefined : second ? other : first}
 				variants={{ layout: { marginTop: row.target } }}
-				style={row.value === undefined ? undefined : { x: row.value }}
+				style={
+					row.value === undefined
+						? undefined
+						: { x: row.value, ...(row.yValue ? { y: row.yValue } : {}) }
+				}
+				whileFocus={row.whileFocus}
+				whileHover={row.whileHover}
+				whileTap={row.whileTap}
+				transition={row.whileFocus || row.whileHover || row.whileTap ? { duration: 0 } : undefined}
+				tabIndex={row.whileFocus ? 0 : undefined}
 			/>
 		}
 		@if (circle) {

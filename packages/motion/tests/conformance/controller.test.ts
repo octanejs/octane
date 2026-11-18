@@ -56,6 +56,138 @@ describe('animation controls', () => {
 		}
 	});
 
+	it('restores controller gesture keys by priority and their authored base', async () => {
+		let controls!: LegacyAnimationControls;
+		const x = motionValue(10),
+			y = motionValue(20);
+		const r = mount(ControllerGroup, {
+			rows: [
+				{
+					id: 'one',
+					target: 20,
+					value: x,
+					yValue: y,
+					whileFocus: { x: 300, y: 400 },
+					whileHover: { x: 200 },
+					whileTap: { x: 500 },
+				},
+			],
+			onReady(first: LegacyAnimationControls) {
+				controls = first;
+			},
+		});
+		const host = r.find('#one') as HTMLElement;
+		const wait = () => new Promise((resolve) => setTimeout(resolve, 45));
+		const pointer = (target: EventTarget, type: string) =>
+			target.dispatchEvent(
+				Object.assign(new Event(type, { bubbles: true }), {
+					pointerType: 'mouse',
+					button: 0,
+					isPrimary: true,
+				}),
+			);
+		try {
+			controls.set({ x: 100 });
+			host.focus();
+			await wait();
+			expect([x.get(), y.get()]).toEqual([300, 400]);
+			pointer(host, 'pointerenter');
+			await wait();
+			expect(x.get()).toBe(200);
+			host.blur();
+			await wait();
+			expect([x.get(), y.get()]).toEqual([200, 20]);
+			host.focus();
+			await wait();
+			expect([x.get(), y.get()]).toEqual([200, 400]);
+			host.blur();
+			await wait();
+			expect([x.get(), y.get()]).toEqual([200, 20]);
+			pointer(host, 'pointerdown');
+			await wait();
+			expect(x.get()).toBe(500);
+			pointer(window, 'pointercancel');
+			await wait();
+			expect(x.get()).toBe(200);
+			pointer(host, 'pointerleave');
+			await wait();
+			expect(x.get()).toBe(10);
+			host.focus();
+			await wait();
+			controls.set({ x: 150 });
+			expect(x.get()).toBe(150);
+			host.blur();
+			await wait();
+			expect(x.get()).toBe(10);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it.each(['target drop', 'controller rebind'] as const)(
+		'restores activated keys after %s during focus',
+		async (change) => {
+			const x = motionValue(10),
+				y = motionValue(20);
+			const row = { id: 'one', target: 20, value: x, yValue: y, whileFocus: { x: 300 } };
+			const onReady = () => {};
+			const r = mount(ControllerGroup, { rows: [row], onReady });
+			const host = r.find('#one') as HTMLElement;
+			try {
+				host.focus();
+				await new Promise((resolve) => setTimeout(resolve, 45));
+				expect(x.get()).toBe(300);
+				r.update(ControllerGroup, {
+					rows: [change === 'target drop' ? { ...row, whileFocus: { y: 400 } } : row],
+					second: change === 'controller rebind',
+					onReady,
+				});
+				host.blur();
+				await new Promise((resolve) => setTimeout(resolve, 45));
+				expect([x.get(), y.get()]).toEqual([10, 20]);
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
+	it('leaves a gesture value in place when a controller host has no authored base', async () => {
+		const r = mount(ControllerGroup, {
+			rows: [{ id: 'one', target: 20, whileFocus: { x: 200 } }],
+			onReady() {},
+		});
+		const host = r.find('#one') as HTMLElement;
+		try {
+			host.focus();
+			await new Promise((resolve) => setTimeout(resolve, 45));
+			expect(host.style.transform).toContain('translateX(200px)');
+			host.blur();
+			await new Promise((resolve) => setTimeout(resolve, 45));
+			expect(host.style.transform).toContain('translateX(200px)');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('keeps declarative gesture restoration on its existing base target', async () => {
+		const r = mount(ControllerGroup, {
+			disabled: true,
+			rows: [{ id: 'one', target: 20, initial: { x: 10 }, whileFocus: { x: 200 } }],
+			onReady() {},
+		});
+		const host = r.find('#one') as HTMLElement;
+		try {
+			host.focus();
+			await new Promise((resolve) => setTimeout(resolve, 45));
+			expect(host.style.transform).toContain('translateX(200px)');
+			host.blur();
+			await new Promise((resolve) => setTimeout(resolve, 45));
+			expect(host.style.transform).toContain('translateX(10px)');
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('retains the current controller value when rebinding a mounted host', () => {
 		let first!: LegacyAnimationControls;
 		let second!: LegacyAnimationControls;

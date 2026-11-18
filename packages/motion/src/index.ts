@@ -607,6 +607,13 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 							renderState: { style: {}, vars: {}, transform: {}, transformOrigin: {}, attrs: {} },
 						},
 					} as any);
+					if (snapshot) {
+						for (const key in snapshot.base) {
+							const authored = scraped[key];
+							if (!isMotionValue(authored) || authored === snapshot.authored[key])
+								visual.setBaseTarget(key, snapshot.base[key]);
+						}
+					}
 					if (latest.hostMounted && !Object.keys(seed).length) {
 						for (const key of new Set([
 							...Object.keys(latest.frame?.values ?? {}),
@@ -626,13 +633,20 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 					latest.controller = controller;
 					latest.controllerVisual = visual;
 					const release = () => {
-						if (latest.nextController && latest.nextController !== controller)
+						if (latest.nextController && latest.nextController !== controller) {
+							const base: Record<string, any> = {};
+							for (const key in visual.latestValues) {
+								const value = visual.getBaseTarget(key);
+								if (value !== undefined) base[key] = value;
+							}
 							latest.controllerSnapshot = {
 								values: { ...visual.latestValues },
+								base,
 								authored: svg
 									? scrapeSVGMotionValuesFromProps(visual.props, {})
 									: scrapeHTMLMotionValuesFromProps(visual.props, {}),
 							};
+						}
 						stopVisualElement(visual);
 						visual.unmount();
 						if (visualElementStore.get(node) === visual) visualElementStore.delete(node);
@@ -851,35 +865,89 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 				const node: HTMLElement = latest.host.current;
 				if (!gesturesEnabled) return;
 				const cleanups: Array<() => void> = [];
+				// Motion priority is focus < hover < tap. Keep this local to the host's
+				// gesture subscription and only resolve per-key fallback for controller hosts.
+				let active = 0;
+				let focusTarget: any, hoverTarget: any, tapTarget: any;
+				const dispatch = (
+					bit: number,
+					valuesKey: string,
+					transitionKey: string,
+					entering: boolean,
+				) => {
+					const visual = latest.controllerVisual;
+					let activated = bit === 4 ? tapTarget : bit === 2 ? hoverTarget : focusTarget;
+					if (entering) {
+						active |= bit;
+						if (visual) activated = { ...latest[valuesKey] };
+						if (bit === 4) tapTarget = activated;
+						else if (bit === 2) hoverTarget = activated;
+						else focusTarget = activated;
+					} else {
+						active &= ~bit;
+						if (bit === 4) tapTarget = undefined;
+						else if (bit === 2) hoverTarget = undefined;
+						else focusTarget = undefined;
+					}
+					if (!visual) {
+						animateTarget(
+							node,
+							entering ? latest[valuesKey] : latest.base,
+							entering ? (latest[transitionKey] ?? latest.transition) : latest.transition,
+							latest.shouldReduceMotion,
+						);
+						return;
+					}
+					let target: Record<string, any> | undefined;
+					for (const key in activated ?? latest[valuesKey]) {
+						let value: any;
+						let protectedByHigher = false;
+						for (let priority = 4; priority; priority >>= 1) {
+							if (!(active & priority)) continue;
+							const candidate =
+								priority === 4 ? tapTarget : priority === 2 ? hoverTarget : focusTarget;
+							if (!candidate || !Object.hasOwn(candidate, key)) continue;
+							if (priority > bit) protectedByHigher = true;
+							else value = candidate[key];
+							break;
+						}
+						if (protectedByHigher) continue;
+						if (!entering && value === undefined) {
+							const frameValues = latest.frame?.values;
+							if (
+								(frameValues && Object.hasOwn(frameValues, key)) ||
+								visual.props.style?.[key] !== undefined ||
+								(svg && visual.props[key] !== undefined)
+							)
+								value = visual.getBaseTarget(key);
+						}
+						if (value !== undefined) (target ??= {})[key] = value;
+					}
+					if (target)
+						animateTarget(
+							node,
+							target,
+							entering ? (latest[transitionKey] ?? latest.transition) : latest.transition,
+							latest.shouldReduceMotion,
+						);
+				};
 				const gesture = (
 					bind: (el: Element, onStart: () => () => void) => () => void,
+					bit: number,
 					valuesKey: string,
 					transitionKey: string,
 				) =>
 					bind(node, () => {
-						animateTarget(
-							node,
-							latest[valuesKey],
-							latest[transitionKey] ?? latest.transition,
-							latest.shouldReduceMotion,
-						);
-						return () => {
-							animateTarget(node, latest.base, latest.transition, latest.shouldReduceMotion);
-						};
+						dispatch(bit, valuesKey, transitionKey, true);
+						return () => dispatch(bit, valuesKey, transitionKey, false);
 					});
 				if (props.whileHover)
-					cleanups.push(gesture(hover as any, 'whileHover', 'whileHoverTransition'));
-				if (props.whileTap) cleanups.push(gesture(press as any, 'whileTap', 'whileTapTransition'));
+					cleanups.push(gesture(hover as any, 2, 'whileHover', 'whileHoverTransition'));
+				if (props.whileTap)
+					cleanups.push(gesture(press as any, 4, 'whileTap', 'whileTapTransition'));
 				if (props.whileFocus) {
-					const onFocus = () =>
-						animateTarget(
-							node,
-							latest.whileFocus,
-							latest.whileFocusTransition ?? latest.transition,
-							latest.shouldReduceMotion,
-						);
-					const onBlur = () =>
-						animateTarget(node, latest.base, latest.transition, latest.shouldReduceMotion);
+					const onFocus = () => dispatch(1, 'whileFocus', 'whileFocusTransition', true);
+					const onBlur = () => dispatch(1, 'whileFocus', 'whileFocusTransition', false);
 					node.addEventListener('focus', onFocus);
 					node.addEventListener('blur', onBlur);
 					cleanups.push(() => {
