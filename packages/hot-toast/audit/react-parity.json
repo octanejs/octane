@@ -165,7 +165,7 @@
         {
           "path": "packages/hot-toast/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "5b6f2150a7fbf03547649d29ab62223906e166f244b3984aeac48365c1bb0fdb",
+          "sha256": "2e5525a32e778280981bc1e84d3b3df0abf3276d309206af76b5c1f5d3bf9657",
           "cases": [
             {
               "id": "differential:hot-toast-lifecycle",
@@ -192,7 +192,7 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "3b7e60f5d1d410e0d3b5ffe79b45c9ad8936a02353a9a3eff29df6b8da8c2d16"
+          "sha256": "98e3409edbbd90c64d22684a283e2848c494f323dc3d288b7bbd995bb8394f81"
         }
       ]
     }

@@ -82,7 +82,7 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "3b7e60f5d1d410e0d3b5ffe79b45c9ad8936a02353a9a3eff29df6b8da8c2d16"
+          "sha256": "98e3409edbbd90c64d22684a283e2848c494f323dc3d288b7bbd995bb8394f81"
         }
       ]
     }

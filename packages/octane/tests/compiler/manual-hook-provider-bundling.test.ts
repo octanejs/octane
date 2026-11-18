@@ -81,12 +81,15 @@ describe('manual provider definition boundaries', () => {
 											loader: 'ts',
 											resolveDir: root,
 										}));
-										plugin.onResolve({ filter: /^octane(?:\/server)?$/ }, () => ({
-											path: join(
-												root,
-												`packages/octane/src/runtime${variant.mode === 'server' ? '.server' : ''}.ts`,
-											),
-										}));
+										plugin.onResolve(
+											{ filter: /^octane(?:\/server|\/internal\/server)?$/ },
+											() => ({
+												path: join(
+													root,
+													`packages/octane/src/runtime${variant.mode === 'server' ? '.server' : ''}.ts`,
+												),
+											}),
+										);
 										plugin.onResolve({ filter: /^octane\/internal\/client$/ }, () => ({
 											path: join(root, 'packages/octane/src/internal/client.ts'),
 										}));
@@ -193,6 +196,7 @@ describe('manual provider definition boundaries', () => {
 							'.': './runtime.mjs',
 							'./server': './runtime.mjs',
 							'./internal/client': './runtime.mjs',
+							'./internal/server': './runtime.mjs',
 						},
 					}),
 				);

@@ -5,6 +5,10 @@ import { compile } from 'octane/compiler';
 import { createRoot, hydrateRoot, flushSync, createElement } from '../../src/index.js';
 import { delegateEvents } from '../../src/internal/client.js';
 import * as ServerRT from 'octane/server';
+import * as ServerInternalRuntime from 'octane/internal/server';
+
+// Server-compiled output imports private helpers from `octane/internal/server`.
+const compiledServerRuntime = { ...ServerInternalRuntime, ...ServerRT };
 import { Inner, Counter, Hole, Layout, FragLayout } from './_fixtures/renderable.tsrx';
 
 // Renderable `{expr}` holes (no `as string` cast) — Ripple/React semantics:
@@ -19,12 +23,12 @@ const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/r
 function serverModule(): Record<string, any> {
 	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'renderable.tsrx', { mode: 'server' });
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/(?:internal\/)?server['"];?/g,
 		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
 	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
-	return fn(ServerRT, {});
+	return fn(compiledServerRuntime, {});
 }
 const server = serverModule();
 

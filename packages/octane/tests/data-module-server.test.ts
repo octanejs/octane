@@ -4,8 +4,7 @@
  * `createDataHandler` handlers with the server call's request context.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { __serverRpcStream } from 'octane/internal/client';
-import { __serverRpcPreload } from 'octane/internal/server-rpc';
+import { __serverRpcPreload, __serverRpcStream } from 'octane/internal/server-rpc';
 import { executeServerFunctionStream, type ServerCallContext } from 'octane/server';
 import { __registerServerFunction, __setServerCallContextSource } from 'octane/internal/server';
 import {

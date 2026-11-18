@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { compile } from 'octane/compiler';
 import * as ServerRuntime from 'octane/server';
+import * as ServerInternalRuntime from 'octane/internal/server';
+
+// Server-compiled output imports private helpers from `octane/internal/server`.
+const compiledServerRuntime = { ...ServerInternalRuntime, ...ServerRuntime };
 import { act, mount } from './_helpers';
 import { loadCompiledFixtureSource } from './_server-fixture';
 import {
@@ -44,11 +48,11 @@ const nestedComponentGetterSource = `
 function evalServer(source: string, filename: string): Record<string, any> {
 	let code = compile(source, filename, { mode: 'server' }).code;
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server)?['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server|\/internal\/server)?['"];?/g,
 		(_match, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRuntime, {});
+	return new Function('__rt', '__exports', code + '\nreturn __exports;')(compiledServerRuntime, {});
 }
 
 describe('state getter runtime semantics', () => {
@@ -197,11 +201,14 @@ describe('state getter runtime semantics', () => {
     `;
 		let code = compile(source, 'server-getter.tsrx', { mode: 'server' }).code;
 		code = code.replace(
-			/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server)?['"];?/g,
+			/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server|\/internal\/server)?['"];?/g,
 			(_match, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 		);
 		code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-		const mod = new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRuntime, {});
+		const mod = new Function('__rt', '__exports', code + '\nreturn __exports;')(
+			compiledServerRuntime,
+			{},
+		);
 		expect(ServerRuntime.renderToString(mod.App).html).toContain('Count: 2');
 	});
 

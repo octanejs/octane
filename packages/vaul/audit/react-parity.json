@@ -276,7 +276,7 @@
         {
           "path": "packages/vaul/tests/browser/harness/main.tsrx",
           "role": "support",
-          "sha256": "5997d5285a72c9b68f256a8f6a4f847eb05bfce1006bf14915a37c493d10d68a"
+          "sha256": "9928a6e21b49fe5565d75c34aab9ddd9994d108d469ed329d9e4fecbd1df51f7"
         },
         {
           "path": "packages/vaul/tests/browser/harness/index.html",

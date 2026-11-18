@@ -59,7 +59,7 @@
         {
           "path": "packages/tanstack-devtools/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "8f3af085bee24bafb5f67b5b4f197bdef39b8071556e87fce685a86cd20c2e08",
+          "sha256": "0189db0ab01db6b462142d36564a4f832f81733f345bfc2076e00bf836e2f917",
           "cases": [
             {
               "id": "differential:tanstack-devtools-portal-lifecycle",
@@ -81,7 +81,7 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "3b7e60f5d1d410e0d3b5ffe79b45c9ad8936a02353a9a3eff29df6b8da8c2d16"
+          "sha256": "98e3409edbbd90c64d22684a283e2848c494f323dc3d288b7bbd995bb8394f81"
         },
         {
           "path": "packages/tanstack-devtools/audit/upstream-crosswalk.json",

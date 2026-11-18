@@ -86,6 +86,23 @@ describe('public runtime entries', () => {
 		expect([...violations]).toEqual([]);
 	}, 120_000);
 
+	it('leaves universal renderers to resolve bare octane themselves', () => {
+		// An inferred method dependency emits `__methodDep`, which universal
+		// runtimes re-export from bare `octane` rather than the DOM internal entry.
+		const source = `import { useMemo } from 'octane';
+			export function Panel(props) @{
+				const value = useMemo(() => props.format(props.value));
+				<view>{value as string}</view>
+			}`;
+		const renderer = { id: 'native', module: 'custom-native-runtime', target: 'universal' };
+		const { code } = compile(source, 'panel.tsrx', { dev: false, hmr: false, renderer });
+		const requests = (parseModule(code, 'panel.js').body as any[])
+			.filter((statement) => statement.type === 'ImportDeclaration')
+			.map((statement) => statement.source.value);
+		expect(code).toContain('__methodDep');
+		expect(requests).not.toContain('octane/internal/client');
+	});
+
 	it('keeps plain-module hook helpers off the public entries', () => {
 		const source = `
 			import { use, useMemo, useState } from 'octane';

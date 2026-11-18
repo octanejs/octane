@@ -1,5 +1,7 @@
 import { registerResponseReader } from '../server-rpc-client.js';
 
+export { __serverRpc, __serverRpcStream } from '../server-rpc-client.js';
+
 /**
  * Compiler target, called once by each module with server function stubs. The
  * reader's dynamic import lives here, outside the `octane` entry, so a build

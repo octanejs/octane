@@ -1778,9 +1778,15 @@ function runtimeImportModuleFor(ctx, fallback, imported, local) {
 			(imported === '__beginHydrationQueryRead' || imported === '__readHydrationQueryInput')
 		)
 			return 'octane/internal/hydration-query';
-		if (fallback === 'octane' && imported === '__serverRpcPreload')
+		if (
+			fallback === 'octane' &&
+			(imported === '__serverRpcPreload' ||
+				imported === '__serverRpc' ||
+				imported === '__serverRpcStream')
+		)
 			return 'octane/internal/server-rpc';
-		// Compiler-emitted helpers never import from a public entry.
+		// Compiler-emitted helpers never import from a public DOM entry.
+		if (!ctx.domRuntimeEntries) return fallback;
 		if (fallback === 'octane' && !CLIENT_PUBLIC_RUNTIME_EXPORTS.has(imported)) {
 			return 'octane/internal/client';
 		}
@@ -12979,6 +12985,8 @@ function compileInternal(
 		userRuntimeNames: new Set(), // specifiers USER code references — imported verbatim
 		userRuntimeNamespaces: new Set(), // `import * as ns from 'octane'`
 		userRuntimeDefaults: new Set(), // preserved verbatim; package resolution owns validity
+		// Universal renderers resolve bare `octane` to their own runtime.
+		domRuntimeEntries: domSignalTarget(options),
 		runtimeImportRoutes: [
 			...(options?.__runtimeImportRoutes ?? []),
 			...universalUnits.map((unit) => ({
@@ -14661,6 +14669,7 @@ function compileServer(
 		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
 		userRuntimeNames: new Set(), // specifiers USER code references — imported verbatim
 		userRuntimeNamespaces: new Set(), // rewritten to the server runtime module
+		domRuntimeEntries: domSignalTarget(options),
 		userRuntimeDefaults: new Set(),
 		consumedRuntimeLocals,
 		inspect: !!(options && options.inspect),

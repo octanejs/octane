@@ -17,5 +17,4 @@ export {
 } from '../hydration-inputs.js';
 export { markSingleRoot as __s } from '../runtime.js';
 export { signalOwnerUse } from '../signals/owner-context.js';
-export { __serverRpc, __serverRpcStream } from '../server-rpc-client.js';
 export { __methodDep } from '../method-dep.js';

@@ -1,8 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { batchServerCalls } from 'octane';
-import { __serverRpc } from 'octane/internal/client';
-import { __serverRpcPreload } from 'octane/internal/server-rpc';
+import { __serverRpc, __serverRpcPreload } from 'octane/internal/server-rpc';
 import {
 	executeServerFunction,
 	executeServerFunctionBatch,

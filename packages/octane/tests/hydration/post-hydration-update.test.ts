@@ -4,6 +4,10 @@ import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
+import * as ServerInternalRuntime from 'octane/internal/server';
+
+// Server-compiled output imports private helpers from `octane/internal/server`.
+const compiledServerRuntime = { ...ServerInternalRuntime, ...ServerRT };
 import { MatchShape, StartShape } from './_fixtures/match-shape.tsrx';
 import type { ResetStore } from './_fixtures/match-shape.tsrx';
 
@@ -18,11 +22,11 @@ const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/m
 function serverModule(): Record<string, any> {
 	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'match-shape.tsrx', { mode: 'server' });
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/(?:internal\/)?server['"];?/g,
 		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRT, {});
+	return new Function('__rt', '__exports', code + '\nreturn __exports;')(compiledServerRuntime, {});
 }
 const server = serverModule();
 

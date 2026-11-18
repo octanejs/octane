@@ -56,7 +56,7 @@
         {
           "path": "packages/shadcn/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "e9b18e8e5073e815549eaab5c837d737d455885dc9cf070a86aa1746da1eefc5",
+          "sha256": "2ef9573e0120d88f1b773da6909552ac231e569632e159f645c29bd4f4ef4224",
           "cases": [
             {
               "id": "differential:shadcn-badge-runtime",
@@ -163,7 +163,7 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "3b7e60f5d1d410e0d3b5ffe79b45c9ad8936a02353a9a3eff29df6b8da8c2d16"
+          "sha256": "98e3409edbbd90c64d22684a283e2848c494f323dc3d288b7bbd995bb8394f81"
         }
       ]
     },

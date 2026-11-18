@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { installTestClock } from 'octane/testing';
-import { __serverRpc } from 'octane/internal/client';
-import { __serverRpcPreload } from 'octane/internal/server-rpc';
+import { __serverRpc, __serverRpcPreload } from 'octane/internal/server-rpc';
 import * as devalue from 'devalue';
 import {
 	executeServerFunction,

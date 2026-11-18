@@ -47,7 +47,11 @@ function validateDiagnostics(code, count) {
 	const ast = parseModule(code, 'compiled.js');
 	let diagnosticBinding = null;
 	for (const statement of ast.body) {
-		if (statement.type !== 'ImportDeclaration' || statement.source?.value !== 'octane') continue;
+		if (
+			statement.type !== 'ImportDeclaration' ||
+			statement.source?.value !== 'octane/internal/client'
+		)
+			continue;
 		for (const specifier of statement.specifiers) {
 			if (specifier.type === 'ImportSpecifier' && specifier.imported?.name === 'devHtmlNesting') {
 				diagnosticBinding = specifier.local.name;

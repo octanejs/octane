@@ -259,7 +259,7 @@
     },
     {
       "path": "packages/visx/tests/conformance/spring-parity.test.ts",
-      "sha256": "35014edb40c6fd289d0680411489e0ce6f925f2c4af4f7910142f5a74ed95e32",
+      "sha256": "3231b120f53b661ba70af07a14f518e9eeaf88881afc8568fccbd981d26d1293",
       "cases": [
         {
           "id": "adapted:visx-react-spring-raf",

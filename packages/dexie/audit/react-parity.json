@@ -109,7 +109,7 @@
         {
           "path": "packages/dexie/tests/browser/harness/main.tsrx",
           "role": "support",
-          "sha256": "0b89bbe13b03f95a3423aa3669c4bd9db21613d3d00e064957639b20ba9c4f4d"
+          "sha256": "8d8559db2d009f1519ea85dc53fe840d1a6c318f08a73f29113bb829340f2681"
         },
         {
           "path": "packages/dexie/tests/_fixtures/upstream-app.tsrx",
