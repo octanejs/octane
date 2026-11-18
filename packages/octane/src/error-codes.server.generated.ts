@@ -254,6 +254,7 @@ type ServerErrorArguments = {
 	361: [];
 	363: [];
 	364: [];
+	365: [];
 };
 
 export function formatServerError<Code extends keyof ServerErrorArguments>(
@@ -1043,6 +1044,8 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 				return formatDevErrorMessage('A signal effect must be a function.', args);
 			case 364:
 				return formatDevErrorMessage('Candidate frames require live nodes.', args);
+			case 365:
+				return formatDevErrorMessage('No <SignalScopeProvider> above this component.', args);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

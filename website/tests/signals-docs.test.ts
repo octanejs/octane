@@ -2,6 +2,7 @@ import { cleanup, render } from '@octanejs/testing-library';
 import { compile } from 'octane/compiler';
 import * as signals from 'octane/signals';
 import * as clientSignals from 'octane/signals/client';
+import * as reactSignals from 'octane/signals/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import SignalsGuide from '../src/content/docs/signals.mdx';
 import guide from '../src/content/docs/signals.mdx?raw';
@@ -29,7 +30,12 @@ it('lists importable APIs in the Signals reference table', () => {
 	);
 	expect(names.length).toBeGreaterThan(0);
 	for (const name of names) {
-		const entry = name === 'useSignal$' ? clientSignals : signals;
+		const entry =
+			name === 'useSignal$'
+				? clientSignals
+				: Object.hasOwn(reactSignals, name)
+					? reactSignals
+					: signals;
 		expect(Object.hasOwn(entry, name), name).toBe(true);
 	}
 });
