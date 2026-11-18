@@ -48,7 +48,7 @@ export function EqualVariantCompletion({
 	childLabel,
 	child = false,
 }: {
-	label: string | { opacity: number } | LegacyAnimationControls;
+	label: string | string[] | { opacity: number } | LegacyAnimationControls;
 	onComplete?: (host: string, definition: unknown) => void;
 	transition?: { duration: number };
 	childLabel?: string;

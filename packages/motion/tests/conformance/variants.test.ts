@@ -302,6 +302,32 @@ describe('variants', () => {
 		expect(onComplete).not.toHaveBeenCalled();
 	});
 
+	it('does not animate or complete arrays of unresolved variant labels', () => {
+		animateMock.mockClear();
+		const onComplete = vi.fn();
+		const r = mount(EqualVariantCompletion, { label: ['missing'], onComplete });
+		try {
+			r.update(EqualVariantCompletion, { label: ['also-missing'], onComplete });
+			expect(onComplete).not.toHaveBeenCalled();
+			expect(animateMock).not.toHaveBeenCalled();
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('completes arrays that contain a resolved equal-target label', () => {
+		animateMock.mockClear();
+		const onComplete = vi.fn();
+		const r = mount(EqualVariantCompletion, { label: ['missing', 'first'], onComplete });
+		try {
+			r.update(EqualVariantCompletion, { label: ['missing', 'second'], onComplete });
+			expect(onComplete.mock.calls).toEqual([['parent', ['missing', 'second']]]);
+			expect(animateMock).not.toHaveBeenCalled();
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('does not dispatch a departing parent after the child completion unmounts it', () => {
 		const calls: unknown[] = [];
 		let r: ReturnType<typeof mount>;

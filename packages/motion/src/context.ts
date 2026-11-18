@@ -85,7 +85,7 @@ export function resolveVariant(value: any, props: any): any {
 // puts orchestration + per-variant transition options under a `transition` key on the
 // target object; the engine's `animate(el, values, options)` wants them separated).
 export function splitVariant(v: any): { values: any; transition: any } {
-	if (Array.isArray(v)) v = Object.assign({}, ...v);
+	if (Array.isArray(v)) v = v.some(Boolean) ? Object.assign({}, ...v) : undefined;
 	if (v && typeof v === 'object' && !Array.isArray(v) && 'transition' in v) {
 		const { transition, ...values } = v;
 		return { values, transition };
