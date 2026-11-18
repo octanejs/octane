@@ -38,13 +38,25 @@ const ADAPTER = readFileSync(
 	new URL('../../../../scripts/fixtures/valdi-typescript-build/writer.d.ts', import.meta.url),
 	'utf8',
 );
+const COMPONENT_ADAPTER = readFileSync(
+	new URL(
+		'../../../../scripts/fixtures/valdi-typescript-build/writer-component-runtime.d.ts',
+		import.meta.url,
+	),
+	'utf8',
+);
 
-function typecheck(code: string, consumer: string, extraFiles: Record<string, string> = {}) {
+function typecheck(
+	code: string,
+	consumer: string,
+	extraFiles: Record<string, string> = {},
+	adapter = ADAPTER,
+) {
 	const directory = mkdtempSync(join(tmpdir(), 'octane-valdi-ts-'));
 	try {
 		const adapterDirectory = join(directory, 'node_modules/@test/valdi-writer');
 		mkdirSync(adapterDirectory, { recursive: true });
-		writeFileSync(join(adapterDirectory, 'index.d.ts'), ADAPTER);
+		writeFileSync(join(adapterDirectory, 'index.d.ts'), adapter);
 		writeFileSync(
 			join(adapterDirectory, 'package.json'),
 			JSON.stringify({ name: '@test/valdi-writer', types: './index.d.ts' }),
@@ -105,6 +117,48 @@ export function Scene(props: Props) @{
 describe.each(['native', 'javascript'])(
 	'Valdi TypeScript output with the %s parser',
 	(parserName) => {
+		it('checks component-runtime hooks, children, boundaries and dynamic descriptors against the adapter', () => {
+			parser.javascript = parserName === 'javascript';
+			const source = `import { createContext, useContext, useEffect, useEffectEvent, useId, useLayoutSnapshot, useLazyRef, useLinkedState, useSyncExternalStore, flushSync, ErrorBoundary, Suspense, lazy } from 'octane';
+import type { Context, FunctionComponent, OctaneNode, LayoutSnapshotOptionsWithInitial } from 'octane';
+const Theme: Context<string> = createContext('light');
+const initial: LayoutSnapshotOptionsWithInitial<number> = { initial: 0, equal: (a, b) => a === b };
+export function Child(props: { children?: OctaneNode; render?: (value: number) => OctaneNode }) @{ <view>{props.children}{props.render?.(2)}</view> }
+const Deferred = lazy(async () => ({ default: Child }));
+export function Scene(props: { Component: FunctionComponent<{ children?: OctaneNode; render?: (value: number) => OctaneNode }>; source: number }) @{
+	const [value, setValue, read] = useLinkedState(props.source, source => source + 1);
+	const ref = useLazyRef(() => ({ value }));
+	const id = useId();
+	const theme = useContext(Theme);
+	const size = useLayoutSnapshot(() => ref.current.value, initial);
+	const snapshot = useSyncExternalStore(() => () => {}, () => props.source);
+	const event = useEffectEvent(() => flushSync(() => setValue(read() + 1)));
+	useEffect(() => { ref.current.value = value; }, [value]);
+	<ErrorBoundary fallback={(error, reset) => <label value={String(error)} onPress={reset} />}>
+		<Theme value={theme}><Suspense fallback={<label value="Loading" />}><props.Component render={number => <label value={number.toFixed()} />}><Deferred><label value={id + value + size + snapshot} onPress={event} /></Deferred></props.Component></Suspense></Theme>
+	</ErrorBoundary>
+}`;
+			const result = compile(source, '/src/Scene.tsrx', {
+				renderer: {
+					...renderer,
+					text: 'host',
+					capabilities: ['host-text-site', 'component-runtime'],
+				},
+				hmr: false,
+				output: 'ts',
+			});
+			expect(typecheck(result.code, '', {}, COMPONENT_ADAPTER)).toEqual([]);
+		});
+		it('accepts the component-runtime adapter registration signature', () => {
+			const consumer = `import type { ValdiComponent, ValdiComponentRuntimeAdapter } from 'octane/compiler/valdi';
+type Element = { readonly native: true };
+declare function actualRegistration<Props>(render: (props: Props) => void, options: { hasHooks: boolean }): ValdiComponent<Props, Element>;
+const registration: ValdiComponentRuntimeAdapter<unknown, unknown, unknown, Element>['defineValdiComponent'] = actualRegistration;
+const Scene = registration((props: { label: string }) => {}, { hasHooks: false });
+Scene({ label: 'visible' });`;
+			expect(typecheck('', consumer, {}, COMPONENT_ADAPTER)).toEqual([]);
+		});
+
 		it.each([false, true])(
 			'preserves component and hook types for a strict TypeScript consumer in dev=%s',
 			(dev) => {

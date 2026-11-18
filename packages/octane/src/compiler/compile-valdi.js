@@ -12,6 +12,11 @@ import { parseModule } from '#octane/compiler-parser';
 import { createLexicalAnalysis, validateRendererAst } from './compile-universal.js';
 import { HOOK_NAMES } from './hook-names.js';
 import {
+	VALDI_HOOKS,
+	VALDI_COMPONENT_RUNTIME,
+	projectValdiRuntimeImports,
+} from './valdi-runtime-imports.js';
+import {
 	analyzeRendererBoundaries,
 	assertRendererBoundaryAnalysis,
 } from './renderer-boundaries.js';
@@ -29,12 +34,11 @@ export const VALDI_COMPILER_ABI_VERSION = 1;
 /** @typedef {{ version: 1, expressions: readonly ValdiWriterExpressionFact[] }} ValdiWriterFacts */
 
 const VALDI_WRITER_TYPES = new Set(['boolean', 'number', 'string', 'function', 'style']);
-const VALDI_HOOKS = new Set(['useState', 'useCallback', 'useLayoutEffect', 'useMemo', 'useRef']);
-
 export const VALDI_COMPILER_RUNTIME_IMPORTS = new Set([
-	...VALDI_HOOKS,
+	...VALDI_COMPONENT_RUNTIME,
 	'__methodDep',
 	'__useStateWithGetter',
+	'__useLinkedStateWithGetter',
 	'hookSlots',
 	'withSlot',
 ]);
@@ -205,7 +209,7 @@ function importedHookName(node, state) {
 
 function slotHookName(node, state) {
 	const imported = importedHookName(node, state);
-	if (imported !== null) return imported;
+	if (imported !== null) return HOOK_NAMES.has(imported) ? imported : null;
 	const callee = unwrap(node?.callee);
 	if (
 		callee?.type === 'Identifier' &&
@@ -225,7 +229,21 @@ function slotHookName(node, state) {
 	return null;
 }
 
+function ownerHookName(node, state) {
+	const slot = slotHookName(node, state);
+	if (slot !== null) return slot;
+	const callee = unwrap(node?.callee);
+	return importedHookName(node, state) === 'useContext' ||
+		(callee?.type === 'Identifier' && callee.name === 'useContext') ||
+		(callee?.type === 'MemberExpression' &&
+			!callee.computed &&
+			callee.property?.name === 'useContext')
+		? 'useContext'
+		: null;
+}
+
 function validateRuntimeImports(ast, state) {
+	const supported = state.componentRuntime ? VALDI_COMPONENT_RUNTIME : VALDI_HOOKS;
 	for (const node of ast.body ?? []) {
 		if (node.importKind === 'type' || node.exportKind === 'type') continue;
 		if (
@@ -250,7 +268,7 @@ function validateRuntimeImports(ast, state) {
 				throw valdiError(state, specifier, 'Valdi modules require named imports from octane.');
 			}
 			const name = specifier.imported?.name ?? specifier.imported?.value;
-			if (!VALDI_HOOKS.has(name)) {
+			if (!supported.has(name)) {
 				throw valdiError(
 					state,
 					specifier,
@@ -266,10 +284,7 @@ function validateRuntimeImports(ast, state) {
 		}
 		if (node.type !== 'CallExpression') return;
 		const name = importedHookName(node, state);
-		if (
-			(HOOK_NAMES.has(name) || name === 'use' || name === 'useContext') &&
-			!VALDI_HOOKS.has(name)
-		) {
+		if ((HOOK_NAMES.has(name) || name === 'use' || name === 'useContext') && !supported.has(name)) {
 			throw valdiError(state, node, `hook ${JSON.stringify(name)} is not supported yet.`);
 		}
 	});
@@ -428,13 +443,67 @@ function lowerRenderCallback(fn, state) {
 		throw valdiError(state, fn, 'render callbacks must be synchronous.');
 	walk(fn.body, (node) => {
 		if (FUNCTION_TYPES.has(node.type)) return false;
-		if (node.type === 'CallExpression' && slotHookName(node, state) !== null) {
+		if (node.type === 'CallExpression' && ownerHookName(node, state) !== null) {
 			throw valdiError(state, node, 'hooks inside render callbacks require a child component.');
 		}
 	});
 	for (const parameter of fn.params)
 		assertNoTemplate(parameter, state, 'render callback parameters');
-	return { ...fn, body: withOrigin(b.block(writerBody(fn, state)), fn.body), expression: false };
+	const statements = writerBody(fn, state);
+	const body = state.componentRuntime
+		? [b.return(deferredChildren(statements, state, fn.body))]
+		: statements;
+	return { ...fn, body: withOrigin(b.block(body), fn.body), expression: false };
+}
+
+function deferredChildren(statements, state, origin) {
+	walk(statements, (node) => {
+		if (node.type === 'CallExpression' && ownerHookName(node, state) !== null) {
+			throw valdiError(
+				state,
+				node,
+				'hooks inside deferred children require a child component; evaluate parent hooks before creating children.',
+			);
+		}
+	});
+	return call(
+		state,
+		'createValdiChildren',
+		[withOrigin(b.arrow([], b.block(statements)), origin)],
+		origin,
+	);
+}
+
+// Child values retain their authored closures; the adapter owns where they render.
+// Local component functions cannot be descriptors until registered at module scope.
+function lowerChildValues(node, state, renderCallbacks = false) {
+	if (node === null || typeof node !== 'object') return node;
+	if (Array.isArray(node)) {
+		let result = node;
+		for (let index = 0; index < node.length; index++) {
+			const child = lowerChildValues(node[index], state, renderCallbacks);
+			if (child !== node[index]) {
+				if (result === node) result = node.slice();
+				result[index] = child;
+			}
+		}
+		return result;
+	}
+	if (isTemplate(node)) return deferredChildren(emitRenderable(node, state, []), state, node);
+	if (FUNCTION_TYPES.has(node.type) && hasOwnTemplate(node.body)) {
+		if (!renderCallbacks) return assertNoTemplate(node, state, 'nested component declarations');
+		return lowerRenderCallback(node, state);
+	}
+	let result = node;
+	for (const [key, child] of Object.entries(node)) {
+		if (AST_SKIP_KEYS.has(key)) continue;
+		const value = lowerChildValues(child, state, renderCallbacks);
+		if (value !== child) {
+			if (result === node) result = { ...node };
+			result[key] = value;
+		}
+	}
+	return result;
 }
 
 function needsCallbackContext(node) {
@@ -449,7 +518,9 @@ function needsCallbackContext(node) {
 function componentProp(value, state, element, prop) {
 	const fn = unwrap(value);
 	let lowered;
-	if (FUNCTION_TYPES.has(fn?.type) && hasOwnTemplate(fn.body)) {
+	if (state.componentRuntime) {
+		lowered = lowerChildValues(value, state, true);
+	} else if (FUNCTION_TYPES.has(fn?.type) && hasOwnTemplate(fn.body)) {
 		// Preserve authored assertions around a render callback when lowering its template.
 		const wrap = (node) =>
 			node === fn ? lowerRenderCallback(fn, state) : { ...node, expression: wrap(node.expression) };
@@ -465,7 +536,7 @@ function componentProp(value, state, element, prop) {
 		b.ts_type_parameter_instantiation(
 			[
 				b.ts_type_query(
-					b.id(elementName(element).name, fn),
+					componentTypeName(elementName(element)),
 					element.openingElement?.typeArguments,
 					fn,
 				),
@@ -817,9 +888,44 @@ function setterForAttribute(entry, state) {
 	return 'setAttribute';
 }
 
+function componentTypeName(name) {
+	if (name.type === 'JSXMemberExpression' || name.type === 'MemberExpression') {
+		return withOrigin(
+			b.ts_qualified_name(componentTypeName(name.object), b.id(name.property.name)),
+			name,
+		);
+	}
+	return withOrigin(b.id(name.name), name);
+}
+
 function componentExpression(name, state, origin) {
+	if (state.componentRuntime) {
+		if (name?.type === 'JSXMemberExpression' || name?.type === 'MemberExpression') {
+			return withOrigin(
+				b.member(componentExpression(name.object, state, origin), b.id(name.property.name)),
+				name,
+			);
+		}
+		if (name?.type === 'JSXIdentifier' || name?.type === 'Identifier') {
+			return withOrigin(b.id(name.name), name);
+		}
+	}
 	if (name?.type !== 'JSXIdentifier' && name?.type !== 'Identifier') {
 		throw valdiError(state, origin, 'dynamic component tags are not supported yet.');
+	}
+	if (!isStableComponent(name, state)) {
+		throw valdiError(
+			state,
+			origin,
+			'component tags must name a stable imported or module component.',
+		);
+	}
+	return withOrigin(b.id(name.name), name);
+}
+
+function isStableComponent(name, state) {
+	if (name?.type !== 'JSXIdentifier' && name?.type !== 'Identifier') {
+		return false;
 	}
 	const lexical = state.lexical;
 	const binding = lexical.resolveBinding(
@@ -831,20 +937,13 @@ function componentExpression(name, state, origin) {
 		? lexical.resolveBinding(lexical.nodeScopes.get(current.fn.id) ?? lexical.rootScope, name.name)
 				?.scope
 		: null;
-	if (
+	return !(
 		binding === null ||
 		binding === undefined ||
 		(binding.scope !== lexical.rootScope &&
 			!(current?.name === name.name && binding.scope === selfScope)) ||
 		(binding.importSource === null && !state.components.has(name.name))
-	) {
-		throw valdiError(
-			state,
-			origin,
-			'component tags must name a stable imported or module component.',
-		);
-	}
-	return withOrigin(b.id(name.name), name);
+	);
 }
 
 function hoistPrototype(state, method, args, origin) {
@@ -907,23 +1006,38 @@ function emitElement(node, state, keys) {
 	if (!intrinsic) {
 		const children = (node.children ?? []).filter((child) => !isEmptyChild(child, state));
 		if (children.length) {
-			const child = children[0];
-			const fn = child.type === 'JSXExpressionContainer' && unwrap(child.expression);
-			if (
-				children.length !== 1 ||
-				!(
-					FUNCTION_TYPES.has(fn?.type) ||
-					fn?.type === 'Identifier' ||
-					fn?.type === 'MemberExpression'
-				)
-			) {
-				throw valdiError(state, node, 'component children must be a single render callback.');
+			if (state.componentRuntime) {
+				const only =
+					children.length === 1 && children[0].type === 'JSXExpressionContainer'
+						? children[0].expression
+						: null;
+				entries.push({
+					name: 'children',
+					value:
+						only !== null
+							? componentProp(only, state, node, 'children')
+							: deferredChildren(emitNodes(children, state, [], false), state, node),
+					origin: node,
+				});
+			} else {
+				const child = children[0];
+				const fn = child.type === 'JSXExpressionContainer' && unwrap(child.expression);
+				if (
+					children.length !== 1 ||
+					!(
+						FUNCTION_TYPES.has(fn?.type) ||
+						fn?.type === 'Identifier' ||
+						fn?.type === 'MemberExpression'
+					)
+				) {
+					throw valdiError(state, node, 'component children must be a single render callback.');
+				}
+				entries.push({
+					name: 'children',
+					value: componentProp(child.expression, state, node, 'children'),
+					origin: child,
+				});
 			}
-			entries.push({
-				name: 'children',
-				value: componentProp(child.expression, state, node, 'children'),
-				origin: child,
-			});
 		}
 	}
 	const attrs = prepareAttributes(entries, state, node);
@@ -935,7 +1049,7 @@ function emitElement(node, state, keys) {
 		prototypeArgs,
 		node,
 	);
-	const key = keyExpression(state, prototype, keys, attrs.key, node);
+	let key = keyExpression(state, prototype, keys, attrs.key, node);
 	const statements = [...attrs.prelude];
 	if (intrinsic) {
 		if (tag === 'slot' || tag === 'slotted' || tag === 'style') {
@@ -946,7 +1060,13 @@ function emitElement(node, state, keys) {
 		statements.push(writerStatement(state, 'endRender', [], node.closingElement ?? node));
 		return statements;
 	}
-	const component = componentExpression(name, state, node);
+	let component = componentExpression(name, state, node);
+	if (state.componentRuntime && !isStableComponent(name, state)) {
+		const componentName = allocName(state, '__octaneValdiComponent');
+		statements.unshift(withOrigin(b.const(componentName, component), node));
+		component = withOrigin(b.id(componentName), node);
+		key = keyExpression(state, prototype, [...keys, component], attrs.key, node);
+	}
 	statements.push(
 		writerStatement(
 			state,
@@ -1225,7 +1345,9 @@ function rewriteComponentStatement(node, state, keys, allowReturn) {
 			'JavaScript jumps inside template regions are not supported yet.',
 		);
 	}
-	return assertNoTemplate(node, state, 'JSX in JavaScript setup');
+	return state.componentRuntime
+		? lowerChildValues(node, state)
+		: assertNoTemplate(node, state, 'JSX in JavaScript setup');
 }
 
 function emitNodes(nodes, state, keys, allowReturn) {
@@ -1334,9 +1456,13 @@ export function compileValdi(
 		attributeFacts: null,
 		writerFacts: normalizeWriterFacts(options.valdiWriterFacts, source.length, filename),
 		textSites: renderer.capabilities?.includes('host-text-site') === true,
+		componentRuntime: renderer.capabilities?.includes('component-runtime') === true,
 	};
 	if (state.textSites && renderer.text !== 'host') {
 		throw valdiError(state, ast, 'the host-text-site capability requires text: "host".');
+	}
+	if (state.componentRuntime && !state.textSites) {
+		throw valdiError(state, ast, 'the component-runtime capability requires host-text-site.');
 	}
 	if (options.hmr !== undefined && options.hmr !== false) {
 		throw valdiError(state, ast, 'HMR is not supported yet; compile with hmr: false.');
@@ -1373,7 +1499,7 @@ export function compileValdi(
 	collectComponents(ast, state);
 	validateComponentBindings(ast, state);
 	const body = [];
-	for (const node of ast.body ?? []) {
+	for (const node of projectValdiRuntimeImports(ast, renderer, false).body ?? []) {
 		const shape = state.componentNodes.get(node);
 		if (shape !== undefined) body.push(...emitComponent(shape, state));
 		else body.push(assertNoTemplate(node, state, 'JSX outside a component'));
@@ -1386,11 +1512,13 @@ export function compileValdi(
 				'assertValdiCompilerAbi',
 				[
 					b.literal(
-						state.textSites
-							? 3
-							: renderer.text === 'host' || renderer.capabilities?.includes('host-ref')
-								? 2
-								: VALDI_COMPILER_ABI_VERSION,
+						state.componentRuntime
+							? 4
+							: state.textSites
+								? 3
+								: renderer.text === 'host' || renderer.capabilities?.includes('host-ref')
+									? 2
+									: VALDI_COMPILER_ABI_VERSION,
 					),
 				],
 				origin,

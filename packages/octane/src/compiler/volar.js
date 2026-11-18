@@ -45,6 +45,7 @@ import { analyzeNativeReadDiagnostics, nativeReadOptions } from './native-read-d
 import { jsxImportSourcePragmaModule } from './pragma.js';
 import { inheritHookMemoOrigin } from './inline-hook-memo.js';
 import { lowerNativeAttributeReads } from './native-attribute-reads.js';
+import { projectValdiRuntimeImports } from './valdi-runtime-imports.js';
 import {
 	collectServerFunctionNodes,
 	serverContextTypeImports,
@@ -822,7 +823,9 @@ export function compileToVolarMappings(source, filename, options) {
 		(typePragma ?? rendererPragma ?? authoredPragma)?.value ?? '',
 	);
 	const transformed = transform(
-		typePragmaModule === 'octane/strong' ? importStrongTypes(projected) : projected,
+		typePragmaModule === 'octane/strong'
+			? importStrongTypes(projected)
+			: projectValdiRuntimeImports(projected, renderer, true),
 		source,
 		filename,
 		{
@@ -1077,7 +1080,7 @@ export function compileTypesInspection(source, filename, options) {
 		projectServerContextCalls(
 			renderer.target === 'dom'
 				? projectComponentChildren(projectNativeDomReads(transformAst), comments)
-				: transformAst,
+				: projectValdiRuntimeImports(transformAst, renderer, true),
 			filename,
 		),
 		source,
