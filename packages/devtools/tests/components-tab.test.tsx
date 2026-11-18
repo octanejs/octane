@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@octanejs/testing-library';
 import { ComponentsTab } from '../src/panel/ComponentsTab';
-import { OctaneDevtoolsEventClient } from '../src/client';
+import { OctaneDevtoolsEventClient, type WireTreeNode } from '../src/client';
 
 // globals: false in the octane-devtools vitest project — @octanejs/testing-library's
 // auto-cleanup side effect only registers when a global afterEach exists, so this
@@ -66,6 +66,23 @@ describe('ComponentsTab', () => {
 		client.emit('inspect-clear', { id: 1 });
 		expect(await screen.findByText('Select a component.')).toBeInTheDocument();
 		expect(screen.queryByText('tasks:feed')).not.toBeInTheDocument();
+	});
+
+	it('renders a deep tree without growing the stack per level', async () => {
+		// #3021: a recursive row component added runtime frames per nesting level,
+		// so a deep app tree overflowed the stack while mounting the panel.
+		const depth = 1000;
+		let root: WireTreeNode = { id: depth, name: 'Leaf', kind: 'component', children: [] };
+		for (let id = depth - 1; id >= 1; id--) {
+			root = { id, name: 'Node' + id, kind: 'component', children: [root] };
+		}
+		const client = new OctaneDevtoolsEventClient();
+		render(<ComponentsTab client={client} />);
+		client.emit('tree', { nodes: [root] });
+
+		const leaf = (await screen.findByText('Leaf')).closest('button');
+		expect(leaf).toHaveStyle({ paddingLeft: `${6 + (depth - 1) * 12}px` });
+		expect(screen.getByText('Node1').closest('button')).toHaveStyle({ paddingLeft: '6px' });
 	});
 
 	it('renders the tree pushed over the client and inspects a selected node', async () => {
