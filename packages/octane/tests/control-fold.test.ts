@@ -8,7 +8,6 @@ import {
 	RetToggle,
 	AtToggle,
 	FunctionScopedBranch,
-	InlineParentBranch,
 	ConditionalInsideKeyedRows,
 	SwitchScopedBranch,
 	TryScopedBranch,
@@ -127,7 +126,6 @@ describe('folded @if hydrates against the @{} oracle markup', () => {
 describe('function-scoped bindings across directive branches', () => {
 	it.each([
 		['FunctionScopedBranch', FunctionScopedBranch],
-		['InlineParentBranch', InlineParentBranch],
 		['SwitchScopedBranch', SwitchScopedBranch],
 		['TryScopedBranch', TryScopedBranch],
 	] as const)('renders and hydrates the local component in %s', (name, App) => {

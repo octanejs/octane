@@ -21,7 +21,7 @@ To use the compiler in Node, including through the Vite, Rspack, or Rsbuild
 integrations, install its optional parser peer in your project:
 
 ```bash
-pnpm add @tsrx/oxc@0.23.0
+pnpm add @tsrx/oxc@0.24.0
 ```
 
 Applications that use only the Octane runtime do not need this peer.

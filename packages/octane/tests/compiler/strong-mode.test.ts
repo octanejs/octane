@@ -196,7 +196,7 @@ export function App(props) @{
   for (const item of props.items) labels.push(item.label);
   <ul data-labels={labels.join(',')}>
     @for (const item of props.items; key item.id) {
-      var rowIndex = 0;
+      let rowIndex = 0;
       rowIndex++;
       const local = { count: 0 };
       local.count++;
@@ -863,8 +863,7 @@ export function App() @{
 	});
 
 	it('rejects a nested template var that redeclares hook state', () => {
-		// A `var` in a nested `@{ … }` block belongs to the component function, as
-		// in JavaScript, so it redeclares the hook state.
+		// The redeclaration fails first; the editor also reports the nested `var`.
 		const source = `"use strong";
 import { useState } from 'octane';
 export function App(props) @{
@@ -886,11 +885,12 @@ export function App(props) @{
 		const result = compileToVolarMappings(source, '/src/App.tsrx');
 		expect(result.errors).toEqual([
 			expect.objectContaining({ message: expect.stringContaining("'count'") }),
+			expect.objectContaining({ code: 'TSRX2030' }),
 		]);
 		expect(result.diagnostics).toEqual([]);
 	});
 
-	it('respects a var hoisted within a nested template block', () => {
+	it('rejects a var in a nested template block (TSRX2030)', () => {
 		const source = `"use strong";
 import { useState } from 'octane';
 export function App(props) @{
@@ -904,10 +904,12 @@ export function App(props) @{
   </div>
 }`;
 		for (const mode of ['client', 'server'] as const) {
-			expect(() => compile(source, '/src/App.tsrx', { mode })).not.toThrow();
+			expect(() => compile(source, '/src/App.tsrx', { mode })).toThrow(
+				expect.objectContaining({ code: 'TSRX2030' }),
+			);
 		}
 		const result = compileToVolarMappings(source, '/src/App.tsrx');
-		expect(result.errors).toEqual([]);
+		expect(result.errors).toEqual([expect.objectContaining({ code: 'TSRX2030' })]);
 		expect(result.diagnostics).toEqual([]);
 	});
 
@@ -1456,14 +1458,16 @@ export function App(props) @{
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 	});
 
-	it('does not hoist a nested template var into the parent hook scope', () => {
+	it('rejects a nested template var before it can shadow a hook (TSRX2030)', () => {
 		const source = `"use strong";
 import { useState } from 'octane';
 export function App(props) @{
   const [count, _setCount] = useState(0);
   <div>@{ var useState = () => 1; <span>{count as string}</span> }</div>
 }`;
-		expect(() => compile(source, '/src/App.tsrx')).toThrow(HOOK_LOCALITY);
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(
+			expect.objectContaining({ code: 'TSRX2030' }),
+		);
 	});
 
 	it.each([
@@ -4831,18 +4835,18 @@ export function App(props) @{
 		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_REF_READ);
 	});
 
-	it('keeps same-named vars in separate arms when tracing a state updater', () => {
+	it('keeps same-named bindings in separate arms when tracing a state updater', () => {
 		const source = `"use strong";
 import { useState } from 'octane';
 export function App(props) @{
   @switch (props.kind) {
     @case 'update': {
-      var [n, update] = useState(0);
+      const [n, update] = useState(0);
       update(n + 1);
       <p />
     }
     @default: {
-      var update = () => {};
+      const update = () => {};
       <p />
     }
   }

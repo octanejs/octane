@@ -156,7 +156,7 @@ export function buildFatSegments(decodedLines, source, parsedAst, code, exactOri
 		if (j < fat.length && fat[j].genLine === fat[i].genLine) fat[i].genEndCol = fat[j].genCol;
 	}
 	if (exactOrigins !== undefined && exactOrigins.size > 0 && typeof code === 'string') {
-		applyExactOrigins(fat, code, exactOrigins);
+		return applyExactOrigins(fat, code, exactOrigins);
 	}
 	return fat;
 }
@@ -175,22 +175,43 @@ function applyExactOrigins(fat, code, exactOrigins) {
 	for (let i = 0; i < code.length; i++) {
 		if (code.charCodeAt(i) === 10) lineStarts.push(i + 1);
 	}
+	// Generated positions where some segment maps to a source offset other than
+	// a claimed origin: an outer node's start mark that lands there too belongs
+	// to that position's own token.
+	const sharedAt = new Set();
 	for (const segment of fat) {
+		if (!exactOrigins.has(segment.srcStart)) sharedAt.add(`${segment.genLine}:${segment.genCol}`);
+	}
+	return fat.filter((segment) => {
 		const claim = exactOrigins.get(segment.srcStart);
-		if (claim === undefined) continue;
+		if (claim === undefined) return true;
 		const lineStart = lineStarts[segment.genLine];
-		if (lineStart === undefined) continue;
+		if (lineStart === undefined) return true;
 		const from = lineStart + segment.genCol;
 		const to =
 			segment.genEndCol === null
 				? (lineStarts[segment.genLine + 1] ?? code.length + 1) - 1
 				: lineStart + segment.genEndCol;
+		const text = code.slice(from, to).trim();
+		// The `return` that outputs a template takes its output's location, so a
+		// directive that is the output shares its start. It is not part of the
+		// directive's lowering.
+		if (OUTPUT_RETURNS.has(text)) return false;
+		// An offset-only claim names no token, so it cannot tell its anchored arm
+		// from a lowered node, such as an `@if` ternary, that starts at the same
+		// generated position as its first operand.
+		if (claim.texts === null && sharedAt.has(`${segment.genLine}:${segment.genCol}`)) {
+			return false;
+		}
 		// `texts: null` means the offset alone identifies the token — true for a
 		// CLAUSE keyword, whose span no other node starts at. A directive's own
 		// start is shared with every node of its lowering, so those must name the
 		// token they claim.
-		if (claim.texts !== null && !claim.texts.has(code.slice(from, to).trim())) continue;
+		if (claim.texts !== null && !claim.texts.has(text)) return true;
 		segment.srcEnd = claim.end;
 		segment.exact = true;
-	}
+		return true;
+	});
 }
+
+const OUTPUT_RETURNS = new Set(['return', 'return await']);
