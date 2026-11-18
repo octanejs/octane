@@ -895,6 +895,45 @@ In a real app this is a database query with the same `WHERE` and `ORDER BY`.
 The store loads a little more than the window it shows, so a row moving in
 from just below the fold appears without a request.
 
+The view's order is the one rule both sides run, so the query must sort
+exactly as `compare` does:
+
+- each key in `order`, in its direction, then the entity's key, as the last
+  tiebreak (`ORDER BY title, id`);
+- values compared as JavaScript's `<` does: numbers and dates by value,
+  strings by character code, not by language. Use a binary collation, such as
+  SQLite's default or `COLLATE "C"` in PostgreSQL, where the database's own
+  default usually sorts by language. A binary collation agrees with `<`
+  except between characters outside the Basic Multilingual Plane, such as
+  emoji, and those from U+E000 to U+FFFF;
+- `null` before every other value, so `NULLS FIRST` where the database puts
+  them last.
+
+The store checks every window it loads, and so does the handler before it
+replies: rows out of the view's order fail the read with `invalid`, naming
+the view, instead of showing rows in the wrong place or losing them at a
+page's edge.
+
+<h3 id="server-order">When only the server can order a list</h3>
+
+Some orders the browser cannot run: a database collation that sorts by
+language, a search's relevance, a ranking computed from data the browser does
+not have. Do not reproduce them in a view. Make the list a plain read that
+returns the records in the server's order, selects them with
+[`Book.list`](#entities) or `entities`, and loads a page at a time from a
+[cursor](#cursor-pages). The server stays the only authority on order and
+membership, and the store reconciles with it:
+
+- An edit to a record shows in place at once; the record keeps its position.
+- A new record shows once, after the rows loaded so far.
+- A removed record leaves at once.
+- Once a write is confirmed, the list loads again from its first page and
+  shows the server's order.
+
+A database-backed example of both, a view and a read with cursor pages over
+SQLite, is
+[`data-database.test.ts`](https://github.com/octanejs/octane/blob/main/packages/octane/tests/data-database.test.ts).
+
 A view is a read, so `useRead(store.read(unread))` shows its default window.
 To show a specific window, pass `{ offset, limit }` to `store.read`, plus any
 parameters the view declares with an `input` schema.
