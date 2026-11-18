@@ -258,6 +258,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 	],
 	'./signals/client': ['useSignal$'],
 	'./signals/server': ['useSignal$'],
+	'./signals/react': ['SignalScopeProvider', 'useSignalScope', 'useSignalValue'],
 	'./react/server': ['OctaneCompat', 'OctaneCompatInline'],
 	'./server': [
 		'Activity',

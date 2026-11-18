@@ -367,3 +367,60 @@ async function acceptReadyStaged$(whileHeld: (next$: WritableSignal<boolean>) =>
 	}
 	return { container, next$, read: () => read!(), cleanup };
 }
+
+it("stages a transition's writes through a scope signal's equals", async () => {
+	const scope = createScope({ scopeKey: 'staged-equals' });
+	const initial = { x: 1 };
+	const point$ = scope.signal$('point', initial, {
+		equals: (previous, next) => previous.x === next.x,
+	});
+	const heard: { x: number }[] = [];
+	point$.subscribe(() => heard.push(point$.get()));
+	try {
+		await act(() => startTransition(() => point$.set({ x: 1 })));
+		expect(point$.get()).toBe(initial);
+		const moved = { x: 2 };
+		await act(() =>
+			startTransition(() => {
+				point$.set(moved);
+				point$.set({ x: 2 });
+				point$.set((previous) => ({ ...previous }));
+			}),
+		);
+		expect(point$.get()).toBe(moved);
+		expect(heard).toEqual([moved]);
+	} finally {
+		scope.dispose();
+	}
+});
+
+it("compares a transition's derived results with equals against its pending result", async () => {
+	const scope = createScope({ scopeKey: 'staged-derived-equals' });
+	const items$ = scope.signal$('items', [1, 2]);
+	const evens$ = scope.derived$('evens', () => items$.get().filter((item) => item % 2 === 0), {
+		equals: (previous, next) =>
+			previous.length === next.length && previous.every((item, index) => item === next[index]),
+	});
+	const committed = evens$.get();
+	const heard: number[][] = [];
+	evens$.subscribe(() => heard.push(evens$.get()));
+	let first: number[] | undefined;
+	let second: number[] | undefined;
+	try {
+		await act(() =>
+			startTransition(() => {
+				items$.set([4, 2]);
+				first = evens$.get();
+				items$.set([4, 2, 5]);
+				second = evens$.get();
+			}),
+		);
+		expect(first).toEqual([4, 2]);
+		expect(first).not.toBe(committed);
+		expect(second).toBe(first);
+		expect(evens$.get()).toBe(first);
+		expect(heard).toEqual([[4, 2]]);
+	} finally {
+		scope.dispose();
+	}
+});

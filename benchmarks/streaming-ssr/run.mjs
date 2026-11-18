@@ -32,6 +32,15 @@
 //                 unified runner passes 3 for --quick). Warmup is 5 renders
 //                 (news-suite convention), capped at the iteration count.
 //   --no-build    reuse existing dist/ bundles (fast re-runs).
+//   --no-pin      do not keep a Worker thread busy while timing. By default a
+//                 Worker spins for the measurement phase so the OS scheduler
+//                 keeps the main thread on a performance core: a Node process
+//                 that is idle between awaited chunks (the staggered scenario)
+//                 is otherwise parked on an efficiency core on Apple Silicon,
+//                 and every framework's shell time there inflates 3–8× against
+//                 the same render under load. A fixed-work probe is timed
+//                 before and after the pass and reported, so a run can be
+//                 checked for the artifact either way.
 //   TARGETS=octane,react   env: run only targets whose name contains one of
 //                 the comma-separated substrings.
 //   BENCH_JSON=/path/out.json  env: also write machine-readable results.
@@ -47,6 +56,7 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { Worker } from 'node:worker_threads';
 import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 import { verifyStream } from '../lib/stream-verify.mjs';
 import { hashOctaneSources, octanePackageAt, packageVersion } from '../activity/harness.mjs';
@@ -56,6 +66,7 @@ const DIST = path.join(__dirname, 'dist');
 
 const args = process.argv.slice(2);
 const noBuild = args.includes('--no-build');
+const pin = !args.includes('--no-pin');
 const revisionArguments = args.filter((arg) => arg.startsWith('--octane-revision='));
 assert.ok(revisionArguments.length <= 1, 'Select one Octane revision.');
 const revision = revisionArguments[0]?.split('=')[1];
@@ -241,6 +252,19 @@ function renderScenario(mod, scenario, onChunk) {
 
 // ── run ───────────────────────────────────────────────────────────────────────
 
+// Fixed-work probe (~0.2 ms on a busy performance core). Timed around the
+// measurement pass; a probe several times slower than that means the main
+// thread was running on an efficiency core and the shell numbers with it.
+function probeMs() {
+	let x = 0;
+	const t0 = performance.now();
+	for (let i = 0; i < 2e5; i++) x = (x + i * 7) % 1000003;
+	const dt = performance.now() - t0;
+	return x < 0 ? -dt : dt;
+}
+const keepBusy = pin ? new Worker('for(;;){}', { eval: true }) : null;
+const probe = { before: probeMs(), after: null };
+
 const results = [];
 const failures = [];
 for (const t of selected) {
@@ -316,6 +340,11 @@ for (const t of selected) {
 	}
 	if (Object.keys(target.scenarios).length > 0) results.push(target);
 }
+probe.after = probeMs();
+if (keepBusy) await keepBusy.terminate();
+console.error(
+	`\nscheduling: ${pin ? 'pinned (worker busy)' : 'unpinned'}; probe ${probe.before.toFixed(2)} ms before, ${probe.after.toFixed(2)} ms after`,
+);
 
 // ── report ────────────────────────────────────────────────────────────────────
 
@@ -387,6 +416,7 @@ if (process.env.BENCH_JSON) {
 	const out = {
 		suite: 'streaming-ssr',
 		iterations: ITER,
+		scheduling: { pinned: pin, probeMsBefore: probe.before, probeMsAfter: probe.after },
 		provenance,
 		targets: results.map((r) => {
 			const st = r.scenarios['staggered'];

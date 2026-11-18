@@ -72,29 +72,23 @@ function NativeReadRows(props: { label: string; reads: readonly NativeReadWire[]
 	</div>
 }
 
-function TreeRow(props: {
-	node: WireTreeNode;
-	onSelect: (id: number) => void;
-	selected: number | null;
-}) @{
-	<div>
-		<button
-			class={['odt-tree-row', props.selected === props.node.id && 'odt-selected']}
-			onClick={() => props.onSelect(props.node.id)}
-		>
-			<span class={['odt-kind', props.node.kind === 'root' && 'odt-kind-root']}>
-				{props.node.kind}
-			</span>
-			<span>{props.node.name}</span>
-		</button>
-		@if (props.node.children.length > 0) {
-			<div class="odt-child">
-				@for (const child of props.node.children; key child.id) {
-					<TreeRow node={child} onSelect={props.onSelect} selected={props.selected} />
-				}
-			</div>
+type TreeLine = { node: WireTreeNode; depth: number };
+
+// Pre-order rows with their nesting depth. Rendering the tree as one flat,
+// indented list keeps stack depth constant however deep the app's tree is (#3021).
+function flattenTree(nodes: readonly WireTreeNode[]): TreeLine[] {
+	const lines: TreeLine[] = [];
+	const stack: TreeLine[] = [];
+	for (let i = nodes.length - 1; i >= 0; i--) stack.push({ node: nodes[i], depth: 0 });
+	while (stack.length > 0) {
+		const line = stack.pop()!;
+		lines.push(line);
+		const children = line.node.children;
+		for (let i = children.length - 1; i >= 0; i--) {
+			stack.push({ node: children[i], depth: line.depth + 1 });
 		}
-	</div>
+	}
+	return lines;
 }
 
 export function ComponentsTab(props: { client: OctaneDevtoolsEventClient }): OctaneNode {
@@ -135,8 +129,17 @@ export function ComponentsTab(props: { client: OctaneDevtoolsEventClient }): Oct
 				@if (nodes.length === 0) {
 					<div class="odt-empty">No mounted roots yet.</div>
 				} @else {
-					@for (const node of nodes; key node.id) {
-						<TreeRow node={node} onSelect={onSelect} selected={selected} />
+					@for (const line of flattenTree(nodes); key line.node.id) {
+						<button
+							class={['odt-tree-row', selected === line.node.id && 'odt-selected']}
+							style={{ paddingLeft: `${6 + line.depth * 12}px` }}
+							onClick={() => onSelect(line.node.id)}
+						>
+							<span class={['odt-kind', line.node.kind === 'root' && 'odt-kind-root']}>
+								{line.node.kind}
+							</span>
+							<span>{line.node.name}</span>
+						</button>
 					}
 				}
 			</div>

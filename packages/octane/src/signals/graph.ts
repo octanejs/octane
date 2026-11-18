@@ -30,6 +30,7 @@ import {
 	REACTIVE_QUEUED,
 	REACTIVE_KEYLESS_CELL,
 	REACTIVE_LISTED,
+	REACTIVE_CUSTOM_EQUALS,
 	REACTIVE_RECURSED,
 	REACTIVE_RECURSED_CHECK,
 	REACTIVE_WATCHING,
@@ -64,6 +65,7 @@ import {
 	type AdoptionFrame,
 	type ConnectionState,
 	type ScopeSeed,
+	type SignalEquals,
 	type SignalHandle,
 	type SignalSnapshot,
 	type SignalTraceEvent,
@@ -921,6 +923,16 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 		return node.#cold?.storedState;
 	}
 
+	/**
+	 * Whether the cell's own `equals` finds two values Object.is told apart
+	 * equal. Such a write keeps the previous value and notifies no one.
+	 */
+	isEqual(previous: T, next: T): boolean {
+		// setEquals marks every cell it gives one REACTIVE_SLOW.
+		const equals = this.flags & REACTIVE_SLOW ? cellEquals?.get(this) : undefined;
+		return equals !== undefined && untrack(() => equals(previous, next));
+	}
+
 	get [SIGNAL_HANDLE](): true {
 		return true;
 	}
@@ -1190,7 +1202,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 				typeof value === 'function'
 					? untrack(() => pure(() => (value as (previous: T) => T)(previous)))
 					: value;
-			if (!Object.is(previous, next)) {
+			if (!Object.is(previous, next) && !this.isEqual(previous, next)) {
 				writeValue(this, next);
 				this.owner.trace('write', this);
 			}
@@ -1675,6 +1687,38 @@ function thrownState(node: ScopedNode, error: unknown): NodeState {
 }
 
 const NO_FAILURE: unknown = {};
+
+/**
+ * `compute`, returning the derived node's previous value instead of a result
+ * `equals` finds equal to it, so the node keeps that reference and its plain
+ * Object.is comparison reports no change. A node with no value yet, or one
+ * that failed, compares nothing.
+ */
+export function computeEqual<T>(
+	node: ScopedNode<T> | PlainComputed<T>,
+	compute: () => T,
+	equals: SignalEquals<T>,
+): () => T {
+	// A keyless node holds its value or error in `last`; until its first result,
+	// and from a failure until its next, `last` is NO_FAILURE.
+	if (node instanceof PlainComputed) node.last = NO_FAILURE;
+	return () => {
+		const next = compute();
+		const previous = node instanceof PlainComputed ? node.last : readyValueOf(node);
+		return previous !== NO_FAILURE &&
+			!same(previous, next) &&
+			untrack(() => equals(previous as T, next))
+			? (previous as T)
+			: next;
+	};
+}
+
+/** A keyed node's ready value, or NO_FAILURE when it has none. */
+function readyValueOf(node: ScopedNode): unknown {
+	if (node.valueOnly) return node.last;
+	const snapshot = node.storedState?.snapshot;
+	return snapshot?.status === 'ready' ? snapshot.value : NO_FAILURE;
+}
 
 /**
  * evaluate() for a plain computation while reads see live nodes and no render
@@ -2163,7 +2207,7 @@ export class PlainCell<T = any> implements ReactiveNode {
 			pureDepth === 0 &&
 			activeNode === undefined &&
 			typeof value !== 'function' &&
-			!(this.flags & REACTIVE_TRACKED_CELL) &&
+			!(this.flags & (REACTIVE_TRACKED_CELL | REACTIVE_CUSTOM_EQUALS)) &&
 			!this.owner.retired
 		) {
 			if (
@@ -2250,7 +2294,10 @@ function writeCell<T>(cell: PlainCell<T>, value: T | ((previous: T) => T)): void
 		typeof value === 'function'
 			? untrack(() => pure(() => (value as (previous: T) => T)(cell.last)))
 			: value;
-	if (!same(cell.last, next)) {
+	if (
+		!same(cell.last, next) &&
+		!(cell.flags & REACTIVE_CUSTOM_EQUALS && untrack(() => cellEquals!.get(cell)!(cell.last, next)))
+	) {
 		cell.last = next;
 		if (cell.flags & REACTIVE_TRACKED_CELL) cellChannels.get(cell)!.revision++;
 		const subs = cell.subs;
@@ -2273,6 +2320,19 @@ Object.defineProperties(PlainCell.prototype, {
 	deps: { value: undefined },
 	depsTail: { value: undefined },
 });
+
+/** Each writable cell's own `equals`, made with the first one. */
+let cellEquals: WeakMap<ScopedNode | PlainCell, SignalEquals<any>> | undefined;
+
+/**
+ * Compare a writable cell's writes with `equals` too, which only a rare cell
+ * has. Its writes leave the fast path for the one that consults it, so the
+ * common write never looks for one.
+ */
+export function setEquals<T>(cell: ScopedNode<T> | PlainCell<T>, equals: SignalEquals<T>): void {
+	(cellEquals ??= new WeakMap()).set(cell, equals);
+	cell.flags |= cell instanceof PlainCell ? REACTIVE_CUSTOM_EQUALS : REACTIVE_SLOW;
+}
 
 /** A keyless cell's revision and native read channel, once a render has read it. */
 interface CellChannel {

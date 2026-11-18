@@ -350,22 +350,7 @@ let MAPPED_VALUE: object | null = null;
 /** Server twin of the compiler's guarded native-array map ABI. */
 export function mapSlot(receiver: any, method: any, callback?: (...args: any[]) => any): any {
 	if (arguments.length === 3) {
-		let mapped = NATIVE_REFLECT_APPLY(method, receiver, [callback]);
-		if (Array.isArray(mapped)) {
-			let packed: any[] | null = null;
-			for (let index = 0; index < mapped.length; index++) {
-				if (!(index in mapped)) {
-					packed = [];
-					break;
-				}
-			}
-			if (packed !== null) {
-				for (let index = 0; index < mapped.length; index++) {
-					if (index in mapped) packed.push(mapped[index]);
-				}
-				mapped = packed;
-			}
-		}
+		const mapped = NATIVE_REFLECT_APPLY(method, receiver, [callback]);
 		MAPPED_VALUE = typeof mapped === 'object' ? mapped : null;
 		return mapped;
 	}

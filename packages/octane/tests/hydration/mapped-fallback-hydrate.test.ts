@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
-import { hydrateRoot, flushSync } from '../../src/index.js';
+import { createRoot, hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { MappedFallbackList } from './_fixtures/mapped-fallback-list.tsx';
 
@@ -128,6 +128,66 @@ describe('hydrateRoot — mapped-fallback keyed list', () => {
 			root.unmount();
 		}
 	});
+
+	it.each([false, true])(
+		'renders custom map results without probing their indexes (dev=%s)',
+		(dev) => {
+			const items = {
+				map<T>(callback: (item: (typeof ITEMS)[number], index: number) => T): T[] {
+					const first = callback(ITEMS[0]!, 0);
+					const second = callback(ITEMS[1]!, 1);
+					return new Proxy([second, first], {
+						has(target, key) {
+							if (key === '0' || key === '1') throw new Error('unexpected map result index probe');
+							return Reflect.has(target, key);
+						},
+					});
+				},
+			};
+			const source = readFileSync(FIXTURE, 'utf8');
+			const options = { id: 'mapped-fallback-list.tsx', compileOptions: { dev, hmr: false } };
+			const { MappedFallbackList: serverList } = loadCompiledFixtureSource(source, {
+				...options,
+				mode: 'server',
+			});
+			const { MappedFallbackList: clientList } = loadCompiledFixtureSource(source, {
+				...options,
+				mode: 'client',
+			});
+			const rows = (host: HTMLElement) => [...host.querySelectorAll('li.fallback-row')];
+			const expected = ['b', 'a'];
+			const mounted = document.createElement('div');
+			const clientRoot = createRoot(mounted);
+			try {
+				clientRoot.render(clientList, { items });
+				expect(rows(mounted).map((row) => row.textContent)).toEqual(expected);
+			} finally {
+				clientRoot.unmount();
+			}
+
+			container.innerHTML = ServerRT.renderToString(serverList, { items }).html;
+			const served = rows(container);
+			expect(served.map((row) => row.textContent)).toEqual(expected);
+			const errors: unknown[] = [];
+			const hydrated = hydrateRoot(
+				container,
+				clientList,
+				{ items },
+				{
+					onRecoverableError: (error) => errors.push(error),
+				},
+			);
+			try {
+				flushSync(() => {});
+				const adopted = rows(container);
+				expect(adopted.map((row) => row.textContent)).toEqual(expected);
+				for (const [index, row] of adopted.entries()) expect(row).toBe(served[index]);
+				expect(errors).toEqual([]);
+			} finally {
+				hydrated.unmount();
+			}
+		},
+	);
 
 	it('stays keyed across a post-hydration reorder on the fallback path', () => {
 		const { html } = ServerRT.renderToString(server.MappedFallbackList, { items: ITEMS });

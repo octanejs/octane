@@ -2131,7 +2131,10 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		// A suspended reader waits for the account to be confirmed, then shows what is held.
 		if (fenced) return fenced.lifted;
 		const entry = entryFor(read, input);
-		return entry.hasBase && !isStale(entry) ? Promise.resolve() : (entry.wanted = load(entry));
+		// Load when a first reader would: a value no one has been shown yet, such
+		// as a seed a hydrating route prefetches, is not reloaded for its age.
+		const current = entry.hasBase && !entry.stale && !(entry.served && isStale(entry));
+		return current ? Promise.resolve() : (entry.wanted = load(entry));
 	}
 
 	function end(): void {

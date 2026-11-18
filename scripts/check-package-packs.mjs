@@ -1105,7 +1105,13 @@ export function renderProbe() {
 	const packedRuntimeSpecifiers = Object.keys(REQUIRED_PUBLIC_VALUE_EXPORTS)
 		.filter(
 			(subpath) =>
-				!['./react', './react/server', './data/react', './data/manifest'].includes(subpath),
+				![
+					'./react',
+					'./react/server',
+					'./data/react',
+					'./signals/react',
+					'./data/manifest',
+				].includes(subpath),
 		)
 		.map((subpath) => [subpath, subpath === '.' ? 'octane' : `octane/${subpath.slice(2)}`]);
 	const packedRuntimeExports = JSON.parse(

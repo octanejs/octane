@@ -474,6 +474,54 @@ The store has a few more methods for plain code:
 - `store.forget(read, input)` erases one cached value, in memory and in
   [persistent storage](#persistence).
 
+<h3 id="screen-reads">Load a screen in one round trip</h3>
+
+A component that reads its own data starts loading when it mounts. A
+component inside another's `@try` mounts only once the outer read arrives, so
+its reads start a round trip later. On a slow network each extra round trip
+is what the user waits for.
+
+When the route knows what the screen needs, start those reads together
+before rendering. The components still read exactly as before, so each part
+keeps its own cache entry, pending state and failure:
+
+```ts
+// The route, before it renders the project screen.
+store.prefetch(project, id);
+store.prefetch(members, id);
+store.prefetch(tasks, id);
+store.prefetch(activity, id);
+```
+
+A read that needs another read's reply, such as the owner named by
+`project.ownerId`, can only start once that reply arrives, so it still costs
+a second round trip. To remove it, serve the screen as one read whose handler
+gathers every part, and makes the dependent lookup on the server's own
+network:
+
+```ts
+export const dashboard = read({
+	name: 'dashboard',
+	input: ProjectId,
+	output: Dashboard,
+	// The records it carries are shared with every other read of them.
+	entities: (value) => [
+		Project.from(value.project),
+		User.from([value.owner, ...value.members]),
+		Task.from(value.tasks),
+	],
+});
+```
+
+That is one request, but the screen shows all of it at once, as fast as its
+slowest part, and one failure fails all of it. Keep separate reads for parts
+that may be slow, and for parts that other screens show on their own.
+
+On a server-rendered page, the route's prefetches find the values the server
+rendered with and load nothing. The
+[`data-fetch-waves` benchmark](https://github.com/octanejs/octane/tree/main/benchmarks/data-fetch-waves)
+measures all three ways on one screen.
+
 <h2 id="writing">Writing data</h2>
 
 A **write** contract describes a change. You call it with
@@ -515,23 +563,46 @@ export const Book = entity('book', bookShape);
 
 export const books = read({
 	name: 'books.list',
-	output: z.array(bookShape),
-	// Tell the store where the books are in this read's value.
-	entities: (list) => Book.from(list),
+	output: Book.list, // A list of books: the store knows they are books.
+});
+
+export const book = read({
+	name: 'books.get',
+	input: z.object({ id: z.string() }),
+	output: Book.one, // One book.
 });
 
 export const setRead = write({
 	name: 'books.setRead',
 	input: bookShape.pick({ id: true, read: true }),
-	output: bookShape,
+	output: Book.one, // The reply is the saved book.
 	patches: Book, // The input is a partial book, keyed by its `id`.
-	record: (book) => book, // The reply is the saved book.
 });
 ```
 
 `entity(name, schema, key?)` names a record type. Its ID lives in the `id`
-property unless you pass another `key`. A read that holds records says where
-they are with `entities`, using `Book.from(...)` on one record or an array.
+property unless you pass another `key`. `Book.list` and `Book.one` validate
+with the entity's schema, and tell the store the value is books:
+
+- a read whose `output` is `Book.list` or `Book.one` shares those books with
+  every other read that holds them;
+- a write to `Book` whose `output` is `Book.one` takes its reply as the saved
+  book.
+
+When the books sit inside a larger value, say where they are with `entities`,
+using `Book.from(...)` on one record or an array. A read can select several
+entities this way:
+
+```ts
+export const shelfPage = read({
+	name: 'shelf.page',
+	output: z.object({ owner: userShape, books: z.array(bookShape), total: z.number() }),
+	entities: (page) => [User.from(page.owner), Book.from(page.books)],
+});
+```
+
+A read whose output is the plain `bookShape` selects nothing: its value is
+just a value, and edits to books do not reach it.
 
 A write then says what it does to that entity:
 
@@ -541,8 +612,35 @@ A write then says what it does to that entity:
   plus the new ID.
 - `removes: Book` removes the record with the input's ID from every read.
 
-`record` tells the store where the saved record is in the reply, so it can
-take the server's version without reloading anything.
+When the saved record sits inside a larger reply, `record` tells the store
+where it is, `record: (reply) => reply.book`, so it can take the server's
+version without reloading anything.
+
+<h3 id="record-rules">How shared records behave</h3>
+
+- **Whole records.** Every read that selects `Book` holds whole books, each
+  validated by its schema. A newer copy replaces the older one whole, not
+  field by field. A read that returns only some fields, such as titles for a
+  menu, should not select `Book`: give it its own entity, or select nothing.
+- **Older replies.** A copy replaces another only when its load started
+  later, so a slow reply never overwrites a newer record.
+- **Your edits on top.** The server's copy is the confirmed value. Edits you
+  have not had a reply for stay applied over it, in every copy, until they
+  settle.
+- **Rollback.** When the server refuses a write, its edit leaves every copy
+  at once.
+- **Deletion.** A removed record leaves every list and view at once. A read
+  that holds just that one record keeps it until it reloads, since its value
+  has no way to say "gone".
+- **Which copies update.** Edits and feed events reach every read that
+  selects the record. When a write is confirmed, [views](#views) take its
+  saved record, and other reads that show the record load it again. Views
+  share one copy of each record, and a read gives views a newer copy of
+  records they hold. Two reads that are not views do not update each other
+  when one of them reloads.
+- **One store, one account.** Records are shared within one store. Use one
+  store per signed-in account and [retire it](#sign-out) when that account
+  signs out.
 
 <h3 id="optimistic">Optimistic edits and rollback</h3>
 

@@ -7751,6 +7751,16 @@
       "message": "Candidate frames require live nodes.",
       "runtime": ["client", "server"],
       "status": "active"
+    },
+    "365": {
+      "message": "No <SignalScopeProvider> above this component.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "366": {
+      "message": "A signal's equals option must be a function.",
+      "runtime": ["client", "server"],
+      "status": "active"
     }
   },
   "strongDiagnostics": {

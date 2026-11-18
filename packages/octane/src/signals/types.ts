@@ -75,6 +75,19 @@ export interface DerivedContext {
 	readonly read: AttemptRead;
 }
 
+/** Whether `next` is equal to `previous`, the value a signal already holds. */
+export type SignalEquals<T> = (previous: T, next: T) => boolean;
+
+export interface ScopeSignalOptions<T> {
+	/**
+	 * Treat a new value as unchanged when this returns true: the signal keeps
+	 * the previous value, by reference, and nothing downstream recomputes or is
+	 * notified. Values Object.is finds equal are never compared. Defaults to
+	 * Object.is alone. It runs untracked and must not write signals.
+	 */
+	readonly equals?: SignalEquals<T>;
+}
+
 export interface SignalOptions {
 	/** Stable authored identity; the compiler supplies a site when omitted. */
 	readonly key?: string;
@@ -208,7 +221,7 @@ export interface Scope {
 	 * serializes, inspects or reseeds it, a transition does not stage its writes,
 	 * and it takes no room in the scope's key table.
 	 */
-	signal$<T>(key: string | null, initial: T): WritableSignal<T>;
+	signal$<T>(key: string | null, initial: T, options?: ScopeSignalOptions<T>): WritableSignal<T>;
 	/**
 	 * A derived value under `key`. With a `null` key it is keyless: it belongs to
 	 * no scope, keeps no provenance, and is never serialized, inspected, reseeded
@@ -217,6 +230,7 @@ export interface Scope {
 	derived$<T>(
 		key: string | null,
 		compute: (() => T) & (T extends PromiseLike<unknown> ? never : unknown),
+		options?: ScopeSignalOptions<T>,
 	): DerivedSignal<T>;
 	get<T>(handle$: SignalHandle<T>): T;
 	set<T>(handle$: WritableSignal<T>, value: T | ((previous: T) => T)): void;
