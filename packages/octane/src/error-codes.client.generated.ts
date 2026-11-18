@@ -326,6 +326,7 @@ type ClientErrorArguments = {
 	364: [];
 	365: [];
 	366: [];
+	367: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -1442,6 +1443,8 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 				return formatDevErrorMessage('No <SignalScopeProvider> above this component.', args);
 			case 366:
 				return formatDevErrorMessage("A signal's equals option must be a function.", args);
+			case 367:
+				return formatDevErrorMessage("A signal's watched option must be a function.", args);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

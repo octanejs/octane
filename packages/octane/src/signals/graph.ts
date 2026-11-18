@@ -319,6 +319,8 @@ function addLink(
 	} else {
 		dep.subs = newLink;
 	}
+	// Last: a first observer's `watched` may write the node it starts.
+	if (watchDriver) watchDriver.link(dep, sub);
 }
 
 function unlink(link: Link, sub = link.sub): Link | undefined {
@@ -345,6 +347,7 @@ function unlink(link: Link, sub = link.sub): Link | undefined {
 		dep.subs = nextSub;
 		if (nextSub === undefined && dep.flags & REACTIVE_KEYLESS_CELL) releaseCell(dep as PlainCell);
 	}
+	if (watchDriver) watchDriver.unlink(dep, sub);
 	return nextDep;
 }
 
@@ -2392,6 +2395,127 @@ function releaseCell(cell: PlainCell): void {
 	});
 }
 
+/**
+ * Observer counts for the nodes a `watched` hook depends on: the hooked node and
+ * everything that reads it, directly or through derived values. Every reader of a
+ * counted node is counted too, from the link that makes it one. A node counts the
+ * readers that observe: effects and subscribers, and counted derived values that
+ * something observes. Derived values keep their links when unobserved, as scopes
+ * own their producers, so this count rather than a link decides `watched`.
+ * Installed by the first hook, so a graph without one checks a driver per link
+ * and unlink and ships none of this.
+ */
+let watchDriver:
+	| {
+			link(dep: ReactiveNode, sub: ReactiveNode): void;
+			unlink(dep: ReactiveNode, sub: ReactiveNode): void;
+			retire(cell: PlainCell): void;
+	  }
+	| undefined;
+let observerCounts: WeakMap<ReactiveNode, number>;
+let watchHooks: WeakMap<ReactiveNode, WatchHook>;
+
+interface WatchHook {
+	watched: () => void | (() => void);
+	cleanup: void | (() => void);
+}
+
+export function setWatched(
+	node: ScopedNode | PlainCell | PlainComputed,
+	watched: WatchHook['watched'],
+): void {
+	if (!watchDriver) {
+		observerCounts = new WeakMap();
+		watchHooks = new WeakMap();
+		watchDriver = {
+			link(dep, sub) {
+				if (observerCounts.has(dep)) countLink(dep, sub);
+			},
+			unlink(dep, sub) {
+				if (observerCounts.has(dep) && observing(sub)) unwatch(dep);
+			},
+			// Its readers keep their links until they next read it; its observation ends now.
+			retire(cell) {
+				stopWatch(cell);
+				watchHooks.delete(cell);
+			},
+		};
+	}
+	watchHooks.set(node, { watched, cleanup: undefined });
+	countObservers(node);
+}
+
+function observing(sub: ReactiveNode): boolean {
+	const count = observerCounts.get(sub);
+	return count !== undefined
+		? count > 0
+		: (sub.flags & (REACTIVE_MUTABLE | REACTIVE_WATCHING)) === REACTIVE_WATCHING;
+}
+
+/** Starts counting a node's observers; none of its own dependencies is counted yet. */
+function countObservers(node: ReactiveNode): void {
+	let count = 0;
+	for (let link = node.subs; link; link = link.nextSub) {
+		const sub = link.sub;
+		if (sub.flags & REACTIVE_MUTABLE && !observerCounts.has(sub)) countObservers(sub);
+		if (observing(sub)) count++;
+	}
+	observerCounts.set(node, count);
+	if (count) startWatch(node);
+}
+
+function countLink(dep: ReactiveNode, sub: ReactiveNode): void {
+	if (sub.flags & REACTIVE_MUTABLE && !observerCounts.has(sub)) countObservers(sub);
+	if (observing(sub)) watch(dep);
+}
+
+/** Sources start before what reads them, and stop after. */
+function watch(node: ReactiveNode): void {
+	const count = observerCounts.get(node)!;
+	observerCounts.set(node, count + 1);
+	if (count) return;
+	for (let link = node.deps; link; link = link.nextDep)
+		if (observerCounts.has(link.dep)) watch(link.dep);
+	startWatch(node);
+}
+
+function unwatch(node: ReactiveNode): void {
+	const count = observerCounts.get(node)! - 1;
+	observerCounts.set(node, count);
+	if (count) return;
+	stopWatch(node);
+	for (let link = node.deps; link; link = link.nextDep)
+		if (observerCounts.has(link.dep)) unwatch(link.dep);
+}
+
+function startWatch(node: ReactiveNode): void {
+	const hook = watchHooks.get(node);
+	if (hook !== undefined) hook.cleanup = runHook(hook.watched);
+}
+
+function stopWatch(node: ReactiveNode): void {
+	const hook = watchHooks.get(node);
+	const cleanup = hook?.cleanup;
+	if (typeof cleanup === 'function') {
+		hook!.cleanup = undefined;
+		runHook(cleanup);
+	}
+}
+
+/**
+ * A hook runs inside another node's link or unlink, so its error is reported rather
+ * than thrown: the read, stop or disposal that reached it still completes.
+ */
+function runHook(hook: () => void | (() => void)): void | (() => void) {
+	try {
+		return untrack(hook);
+	} catch (error) {
+		const report = (globalThis as { reportError?: (error: unknown) => void }).reportError;
+		if (typeof report === 'function') report(error);
+		else console.error(error);
+	}
+}
+
 function readCellOther<T>(cell: PlainCell<T>): T {
 	assertAlive(cell.owner);
 	const reader = activeNode;
@@ -3023,8 +3147,9 @@ export function retireGraph(owner: GraphOwner, nodes: Iterable<ScopedNode>): voi
 				propagate(node.subs, executionDepth !== 0);
 				shallowPropagate(node.subs);
 			}
-			while (node.deps) unlink(node.deps, node);
+			// Readers first, so a watched node stops before its sources do.
 			while (node.subs) unlink(node.subs);
+			while (node.deps) unlink(node.deps, node);
 			node.flags = REACTIVE_NONE;
 		}
 		// A keyless cell's readers learn of it as they would of a keyed node: their next
@@ -3033,6 +3158,7 @@ export function retireGraph(owner: GraphOwner, nodes: Iterable<ScopedNode>): voi
 		if (held !== undefined) {
 			owner.heldCells = undefined;
 			for (const cell of held) {
+				if (watchDriver) watchDriver.retire(cell);
 				const subs = cell.subs;
 				if (subs !== undefined) {
 					propagate(subs, executionDepth !== 0);
