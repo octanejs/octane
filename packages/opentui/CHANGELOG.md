@@ -1,5 +1,29 @@
 # @octanejs/opentui
 
+## 0.0.28
+
+### Patch Changes
+
+- Updated dependencies [23c13d1]
+- Updated dependencies [03addab]
+- Updated dependencies [12dbf62]
+- Updated dependencies [5faf206]
+- Updated dependencies [e44f566]
+- Updated dependencies [1985ce9]
+- Updated dependencies [f94ced3]
+- Updated dependencies [40d070e]
+- Updated dependencies [249dce4]
+- Updated dependencies [e50b52b]
+- Updated dependencies [60dff19]
+- Updated dependencies [643f476]
+- Updated dependencies [1cd087c]
+- Updated dependencies [1ffb942]
+- Updated dependencies [e2beb61]
+- Updated dependencies [799c4d4]
+- Updated dependencies [494e47b]
+- Updated dependencies [2e1f7f1]
+  - octane@0.21.0
+
 ## 0.0.27
 
 ### Patch Changes

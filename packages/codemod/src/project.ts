@@ -37,6 +37,7 @@ import {
 	MAP_PARAMETER_WRITE,
 	projectTypeAt,
 	REACT_TYPE_PROJECTION,
+	RETAINED_WORKSPACE_HOOK,
 	textKind,
 	transformModule,
 } from './transform.js';
@@ -127,6 +128,10 @@ const CATALOG = { ...DATA.reactPackages, ...PORTED_PACKAGES };
 const MOTION_BINDING = '@octanejs/motion';
 const MOTION_VERSION = DATA.bindings.find(({ name }) => name === MOTION_BINDING)!.version;
 const MOTION_EXPORTS = new Set(DATA.motionExports);
+// The catalog is generated from source before changesets publish. Version 0.1.71
+// does not ship this hook; an installed binding may still prove its own export.
+const MOTION_CATALOG_EXPORTS = new Set(MOTION_EXPORTS);
+if (MOTION_VERSION === '0.1.71') MOTION_CATALOG_EXPORTS.delete('useAnimationControls');
 const DEPENDENCY_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies'];
 /** A package that, by its name, renders through React. */
 const REACT_PACKAGE = /^(?:react-|@[^/]+\/react(?:-|\/|$)|[^/]+\/react$)|-react(?:\/|$)/;
@@ -298,18 +303,26 @@ export async function runCodemod(
 	for (const file of conflicts.keys()) exports.delete(file);
 	const strictConfig = (config?.strictNullChecks ?? config?.strict) ? config : null;
 	let program: ts.Program | undefined;
+	const proofPath = (name: string) => ts.sys.realpath?.(name) ?? name;
 	function typesOf(file: string): TransformOptions['types'] {
 		if (!strictConfig || options.projectTypes === false) return;
 		// Even one input can import a large graph. Bind it only for a rewrite that needs its types.
+		// With TypeScript's default symlink handling, package imports resolve to physical files;
+		// use the same identity for selected roots and path-bearing compiler options.
+		const preserve = strictConfig.preserveSymlinks === true;
 		if (!program) {
-			const options = { ...strictConfig, noEmit: true, noUncheckedIndexedAccess: true };
+			const physicalRoot = preserve ? root : proofPath(root);
+			const proofConfig =
+				physicalRoot === root ? strictConfig : (tsconfigOptions(physicalRoot) ?? strictConfig);
+			const selected = files.filter((name) => /\.[cm]?tsx?$/.test(name));
+			const proofOptions = { ...proofConfig, noEmit: true, noUncheckedIndexedAccess: true };
 			program = ts.createProgram(
-				files.filter((name) => /\.[cm]?tsx?$/.test(name)),
-				options,
-				libCachingHost(options),
+				preserve ? selected : selected.map(proofPath),
+				proofOptions,
+				libCachingHost(proofOptions),
 			);
 		}
-		const sourceFile = program.getSourceFile(file);
+		const sourceFile = program.getSourceFile(preserve ? file : proofPath(file));
 		if (sourceFile) return { sourceFile, checker: program.getTypeChecker() };
 	}
 	const contextsOf = contextIndex(exports, known);
@@ -631,7 +644,7 @@ export async function runCodemod(
 			!installed &&
 			declarations.every((spec) => catalogBindingVersion(spec, MOTION_VERSION))
 		) {
-			actual = MOTION_EXPORTS;
+			actual = MOTION_CATALOG_EXPORTS;
 		}
 		motionExportsByIssuer.set(dir, actual);
 		return actual;
@@ -1652,7 +1665,8 @@ export async function runCodemod(
 				note.rule === CONTEXT_PROVIDER_GETTER ||
 				note.rule === INTL_PROVIDER_DEFAULTS ||
 				note.rule === ELEMENT_CHILD_ALIAS ||
-				note.rule === REACT_TYPE_PROJECTION,
+				note.rule === REACT_TYPE_PROJECTION ||
+				note.rule === RETAINED_WORKSPACE_HOOK,
 		);
 		if (write && blockedTransform)
 			return blockedWrite(
