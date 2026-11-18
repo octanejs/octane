@@ -5,7 +5,7 @@ import { expect, it } from 'vitest';
 import { runPristineUpstreamSuite } from '../../../scripts/react-parity/tanstack-virtual-pristine-runtime.mjs';
 
 // @parity-case pristine:virtual-original-unit-suite
-it('runs all seven pinned Virtual unit registrations unchanged', () => {
+it('runs all eleven pinned Virtual unit registrations unchanged', () => {
 	const expected = JSON.parse(
 		readFileSync(resolve(import.meta.dirname, '../audit/pristine-runtime.json'), 'utf8'),
 	).tests;

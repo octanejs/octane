@@ -1,17 +1,17 @@
 # Upstream
 
 - Repository: https://github.com/TanStack/virtual
-- Package: `@tanstack/react-virtual@3.14.12`
-- Release commit: `df47889fc87af0b5ff46a9805820f60cff6828ff`
+- Package: `@tanstack/react-virtual@3.14.26`
+- Release commit: `11b48e4ab8b08d483c8fe29a31ef11261ffbda04`
 - Source root: `packages/react-virtual/src`
 - Test roots: `packages/react-virtual/tests` and `packages/react-virtual/e2e`
 - License: MIT; exact root license in `LICENSE.upstream`
-- npm artifact SHA-256: `61a7b5feaecaff7b44527675b24df7bb102ef09327b314e2f770e786b2a8412e`
-- Runtime dependency: `@tanstack/virtual-core@3.17.10`, imported directly
+- npm artifact SHA-256: `1c6d0c9c5ec85d51946e074eff195b4ed81f9764e748498cd6d896bd06ecde77`
+- Runtime dependency: `@tanstack/virtual-core@3.19.11`, imported directly
 
 ## Source boundary
 
-`audit/upstream.lock.json` pins all 41 files in the upstream package, including
+`audit/upstream.lock.json` pins all 56 files in the upstream package, including
 its complete source, unit tests and browser fixtures. The immutable source and
 artifact are test inputs and are excluded from publication. The binding adapts
 the React hook implementation; `src/internal.ts` supplies native slot handling.
@@ -24,18 +24,24 @@ regression with the old adapter as the failing control, the same current core,
 and assertions on scroll extent, offset and retained row identity. Public hook
 signatures also exclude the compiler's internal trailing slot argument.
 
+`tests/browser-contracts/history-append.spec.ts` holds the reconcile frame that
+the chat fixture's initial `scrollToEnd()` queues, scrolls up into history,
+appends and then releases the frame. With virtual-core 3.17.10 as the failing
+control, the release moved `scrollTop` from 350 to 1,198 px (#2860). The
+upstream fix lets an external scroll retire the pending command.
+
 ## Executable coverage
 
-The exact release contains seven unit registrations and 35 browser registrations,
+The exact release contains 11 unit registrations and 44 browser registrations,
 including expanded positioning-mode cases. `audit/registrations.json` and
-`audit/crosswalk.json` account for all 42. `materialize run` regenerates the Octane
+`audit/crosswalk.json` account for all 55. `materialize run` regenerates the Octane
 adaptation using only the mechanical rewrites in the lock. No upstream runtime
 assertions are removed or relaxed.
 
 | Suite | React | Octane |
 | --- | --- | --- |
-| Unit | Seven unchanged cases | Seven mechanically adapted cases |
-| Chromium | All 35 unchanged browser cases | All 35 adapted cases plus two direct-DOM prepend regressions |
+| Unit | All 11 unchanged cases | All 11 mechanically adapted cases |
+| Chromium | All 44 unchanged browser cases | All 44 adapted cases plus three end-anchor regressions |
 | Dedicated upstream type cases | None at this release | None to materialize |
 | Authored strict public type probes | All 26 exports with negative controls | The same contracts and negative controls |
 

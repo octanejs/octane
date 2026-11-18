@@ -30,7 +30,7 @@
     {
       "path": "packages/tanstack-virtual/tests/differential/parity.test.ts",
       "disposition": "react-octane-differential",
-      "oracle": "Runs four exact windowing, horizontal, measurement, and window-scroll scenarios against @tanstack/react-virtual@3.14.12."
+      "oracle": "Runs four exact windowing, horizontal, measurement, and window-scroll scenarios against @tanstack/react-virtual@3.14.26."
     },
     {
       "path": "packages/tanstack-virtual/tests/differential/setup.test.ts",
@@ -50,14 +50,14 @@
     {
       "path": "packages/tanstack-virtual/tests/upstream-original.test.ts",
       "disposition": "unmodified-upstream-suite-wrapper",
-      "reason": "Runs and verifies all seven unchanged upstream unit registrations.",
-      "oracle": "https://github.com/TanStack/virtual/tree/df47889fc87af0b5ff46a9805820f60cff6828ff/packages/react-virtual"
+      "reason": "Runs and verifies all eleven unchanged upstream unit registrations.",
+      "oracle": "https://github.com/TanStack/virtual/tree/11b48e4ab8b08d483c8fe29a31ef11261ffbda04/packages/react-virtual"
     },
     {
       "path": "packages/tanstack-virtual/tests/browser-parity.test.ts",
       "disposition": "adapted-upstream-suite",
-      "reason": "Runs all 35 adapted browser cases and both native prepend regressions, verifying exact identities and results.",
-      "oracle": "https://github.com/TanStack/virtual/tree/df47889fc87af0b5ff46a9805820f60cff6828ff/packages/react-virtual"
+      "reason": "Runs all 44 adapted browser cases and three native end-anchor regressions, verifying exact identities and results.",
+      "oracle": "https://github.com/TanStack/virtual/tree/11b48e4ab8b08d483c8fe29a31ef11261ffbda04/packages/react-virtual"
     },
     {
       "path": "packages/tanstack-virtual/tests/ssr-hydration.test.ts",
@@ -67,8 +67,8 @@
     {
       "path": "packages/tanstack-virtual/tests/browser-original.test.ts",
       "disposition": "unmodified-upstream-suite-wrapper",
-      "reason": "Runs all 35 pinned Chromium registrations against React, verifying exact identities and results.",
-      "oracle": "https://github.com/TanStack/virtual/tree/df47889fc87af0b5ff46a9805820f60cff6828ff/packages/react-virtual"
+      "reason": "Runs all 44 pinned Chromium registrations against React, verifying exact identities and results.",
+      "oracle": "https://github.com/TanStack/virtual/tree/11b48e4ab8b08d483c8fe29a31ef11261ffbda04/packages/react-virtual"
     },
     {
       "path": "packages/tanstack-virtual/tests/types/public-contracts.test-d.ts",
