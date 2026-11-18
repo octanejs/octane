@@ -8,6 +8,16 @@
       "status": "passed"
     },
     {
+      "file": "packages/tanstack-virtual/upstream/e2e/app/test/cached-measurements.spec.ts",
+      "fullName": "re-pins after a cached row grows (deferred observer: false)",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/upstream/e2e/app/test/cached-measurements.spec.ts",
+      "fullName": "re-pins after a cached row grows (deferred observer: true)",
+      "status": "passed"
+    },
+    {
       "file": "packages/tanstack-virtual/upstream/e2e/app/test/chat.spec.ts",
       "fullName": "chat mode does not follow appended messages while reading history",
       "status": "passed"
@@ -35,6 +45,16 @@
     {
       "file": "packages/tanstack-virtual/upstream/e2e/app/test/chat.spec.ts",
       "fullName": "direct DOM chat stays pinned when a previous message grows without a re-render",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/upstream/e2e/app/test/command-retire.spec.ts",
+      "fullName": "scrollToIndex lands on the fresh target when rows above shrink in the same handler",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/upstream/e2e/app/test/command-retire.spec.ts",
+      "fullName": "scrollToOffset retires after a row above grows, without waiting for the safety valve",
       "status": "passed"
     },
     {
@@ -78,8 +98,18 @@
       "status": "passed"
     },
     {
+      "file": "packages/tanstack-virtual/upstream/e2e/app/test/ios-programmatic-landing.spec.ts",
+      "fullName": "a programmatic landing (#scroll-to-offset) with no touch doesn't snap after it lands (#1250)",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/upstream/e2e/app/test/lanes-change.spec.ts",
+      "fullName": "rows stay aligned after changing lanes while scrolled to the end (#1036)",
+      "status": "passed"
+    },
+    {
       "file": "packages/tanstack-virtual/upstream/e2e/app/test/measure-element.spec.ts",
-      "fullName": "positions items correctly after expand → collapse → delete → expand",
+      "fullName": "positions items correctly after expand \u2192 collapse \u2192 delete \u2192 expand",
       "status": "passed"
     },
     {
@@ -113,6 +143,16 @@
       "status": "passed"
     },
     {
+      "file": "packages/tanstack-virtual/upstream/e2e/app/test/resize-delivery.spec.ts",
+      "fullName": "resizing rows can grow the rendered range without observer loop errors",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/upstream/e2e/app/test/resize-delivery.spec.ts",
+      "fullName": "resizing rows can shrink the rendered range without observer loop errors",
+      "status": "passed"
+    },
+    {
       "file": "packages/tanstack-virtual/upstream/e2e/app/test/scroll-anchor.spec.ts",
       "fullName": "anchored item stays stable when scrolling up into unmeasured items",
       "status": "passed"
@@ -135,6 +175,11 @@
     {
       "file": "packages/tanstack-virtual/upstream/e2e/app/test/scroll.spec.ts",
       "fullName": "scrolls to last item",
+      "status": "passed"
+    },
+    {
+      "file": "packages/tanstack-virtual/upstream/e2e/app/test/smooth-prepend.spec.ts",
+      "fullName": "a prepend mid-flight does not abandon a smooth scrollToIndex",
       "status": "passed"
     },
     {

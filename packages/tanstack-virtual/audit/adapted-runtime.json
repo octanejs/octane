@@ -5,6 +5,21 @@
   "files": ["packages/tanstack-virtual/tests/upstream/unit/index.test.tsx"],
   "tests": [
     {
+      "id": "runtime:539df0c941961b3f",
+      "file": "packages/tanstack-virtual/tests/upstream/unit/index.test.tsx",
+      "fullName": "directDomUpdates positions a row a child mounts without the owner"
+    },
+    {
+      "id": "runtime:80b2c82fee22e9e9",
+      "file": "packages/tanstack-virtual/tests/upstream/unit/index.test.tsx",
+      "fullName": "directDomUpdates positions rows a child mounts together with the container"
+    },
+    {
+      "id": "runtime:e428177571896777",
+      "file": "packages/tanstack-virtual/tests/upstream/unit/index.test.tsx",
+      "fullName": "getOffsetForIndex in a layout effect sees the rows measured in the same commit"
+    },
+    {
       "id": "runtime:32786d43bc81d420",
       "file": "packages/tanstack-virtual/tests/upstream/unit/index.test.tsx",
       "fullName": "should handle count change"
@@ -18,6 +33,11 @@
       "id": "runtime:f6d7f0db161e3505",
       "file": "packages/tanstack-virtual/tests/upstream/unit/index.test.tsx",
       "fullName": "should handle handle height change"
+    },
+    {
+      "id": "runtime:d5be1acfca30b6cc",
+      "file": "packages/tanstack-virtual/tests/upstream/unit/index.test.tsx",
+      "fullName": "should not flushSync while measuring an item from its ref callback"
     },
     {
       "id": "runtime:a5e978c4e800e3a5",

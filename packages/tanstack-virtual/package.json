@@ -43,13 +43,13 @@
     "test": "vitest run --root ../.. --project tanstack-virtual --project tanstack-virtual-adapted --project tanstack-virtual-differential --project tanstack-virtual-ssr"
   },
   "dependencies": {
-    "@tanstack/virtual-core": "3.17.10"
+    "@tanstack/virtual-core": "3.19.11"
   },
   "peerDependencies": {
     "octane": "workspace:^0.20.0"
   },
   "devDependencies": {
-    "@tanstack/react-virtual": "3.14.12",
+    "@tanstack/react-virtual": "3.14.26",
     "@tsrx/react": "catalog:default",
     "esbuild": "catalog:default",
     "octane": "workspace:*",
