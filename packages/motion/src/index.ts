@@ -700,13 +700,14 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		useLayoutEffect(
 			() => {
 				const node: HTMLElement = latest.host.current;
-				if (!animationEnabled || presence?.present === false) return;
+				if (!animationEnabled) return;
 				// OCTANE DIVERGENCE[motion-lazy-initial-false-first-frame][conformance:lazy-initial-false-first-frame]
 				if (latest.initialAnimationKey !== null) {
 					const skip = latest.initialAnimationKey === animationKey;
 					latest.initialAnimationKey = null;
 					if (skip) return;
 				}
+				if (presence?.present === false) return;
 				if (resolvedAnimate) {
 					let t = transition;
 					const o = latest.staggerParent;

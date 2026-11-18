@@ -193,6 +193,28 @@ describe('retained presence', () => {
 		}
 	});
 
+	it('returns a host first mounted during exit to its present target on reentry', async () => {
+		animateMock.mockImplementation((node: HTMLElement, target: { opacity: number }) => {
+			node.style.opacity = target.opacity === 0 ? '0.4' : String(target.opacity);
+			return { stop: vi.fn(), then() {} };
+		});
+		const record = vi.fn();
+		const r = mount(RetainedRemovable, { show: true, record });
+		try {
+			r.update(RetainedRemovable, { show: false, record });
+			r.find('#replace-host').click();
+			await nextPaint();
+			const replacement = r.find('#exit-host') as HTMLElement;
+			expect(replacement.style.opacity).toBe('0.4');
+			r.update(RetainedRemovable, { show: true, record });
+			expect(r.find('#exit-host')).toBe(replacement);
+			expect(replacement.style.opacity).toBe('1');
+			expect(record).not.toHaveBeenCalledWith('complete');
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('settles when the last exit host disappears but allows replacement in the same commit', async () => {
 		const finishes: Array<() => void> = [];
 		animateMock.mockImplementation(() => ({

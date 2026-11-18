@@ -114,7 +114,13 @@ function RemovableRow({ record }: { record: (event: string) => void }) @{
 			Remove
 		</button>
 		@if (version >= 0) {
-			<motion.div key={version} id="exit-host" exit={{ opacity: 0 }} />
+			<motion.div
+				key={version}
+				id="exit-host"
+				initial={false}
+				animate={{ opacity: 1 }}
+				exit={{ opacity: 0 }}
+			/>
 		}
 	</div>
 }
