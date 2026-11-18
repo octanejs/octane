@@ -191,6 +191,24 @@ describe('useMotionValue', function useMotionValueSuite() {
 		}
 	});
 
+	it('applies the resting transitionEnd after an authored-value focus gesture', async () => {
+		const x = motionValue(3),
+			cx = motionValue(5),
+			onReady = () => {};
+		const r = mount(AuthoredValueAnimation, { x, cx, run: true, focus: true, onReady });
+		try {
+			const host = r.find('#animated-x') as HTMLElement;
+			host.focus();
+			await new Promise((resolve) => setTimeout(resolve, 200));
+			expect(x.get()).toBe(60);
+			host.blur();
+			await new Promise((resolve) => setTimeout(resolve, 200));
+			expect(x.get()).toBe(42);
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('cancels a queued instant transitionEnd when a newer target commits', async () => {
 		const x = motionValue(3),
 			cx = motionValue(5),
