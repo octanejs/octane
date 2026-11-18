@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/better-auth",
-  "version": "0.0.24",
+  "version": "0.0.25",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -44,7 +44,7 @@
     "nanostores": "1.5.3"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.20.0"
+    "octane": "workspace:^0.21.0"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",
