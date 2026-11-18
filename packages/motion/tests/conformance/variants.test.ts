@@ -13,6 +13,9 @@ vi.mock('motion', () => ({
 import { mount, nextPaint } from '../_helpers';
 import {
 	InheritedVariantCompletion,
+	EqualVariantCompletion,
+	DisabledVariantCompletion,
+	ReducedEqualVariantCompletion,
 	VariantCompletion,
 	VariantTree,
 } from '../_fixtures/variants.tsrx';
@@ -151,6 +154,143 @@ describe('variants', () => {
 			expect(stop).toHaveBeenCalledOnce();
 		},
 	);
+
+	it('completes changed equal-target named labels in descendant order without physical work', async () => {
+		animateMock.mockClear();
+		const onComplete = vi.fn();
+		const r = mount(EqualVariantCompletion, { label: 'first', onComplete, child: true });
+		try {
+			expect(onComplete).not.toHaveBeenCalled();
+			r.update(EqualVariantCompletion, { label: 'second', onComplete, child: true });
+			await nextPaint();
+			expect(onComplete.mock.calls).toEqual([
+				['child', 'second'],
+				['parent', 'second'],
+			]);
+			expect(animateMock).not.toHaveBeenCalled();
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('completes an equal-target label immediately while the original animation finishes later', async () => {
+		let finish!: () => void;
+		const stop = vi.fn();
+		animateMock.mockClear();
+		animateMock.mockReturnValueOnce({
+			stop,
+			finished: {
+				then(done: () => void) {
+					finish = done;
+				},
+			},
+		});
+		const onComplete = vi.fn();
+		const r = mount(EqualVariantCompletion, { label: 'first', onComplete });
+		try {
+			r.update(EqualVariantCompletion, { label: 'third', onComplete });
+			r.update(EqualVariantCompletion, { label: 'fourth', onComplete });
+			expect(onComplete.mock.calls).toEqual([['parent', 'fourth']]);
+			expect(stop).not.toHaveBeenCalled();
+			expect(animateMock).toHaveBeenCalledOnce();
+			finish();
+			expect(onComplete.mock.calls).toEqual([
+				['parent', 'fourth'],
+				['parent', 'third'],
+			]);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('uses the effective child label and ignores listener-only changes', () => {
+		const first = vi.fn();
+		const next = vi.fn();
+		const r = mount(EqualVariantCompletion, { label: 'first', child: true, onComplete: first });
+		try {
+			r.update(EqualVariantCompletion, {
+				label: 'second',
+				child: true,
+				childLabel: 'second',
+				onComplete: first,
+			});
+			expect(first.mock.calls).toEqual([
+				['child', 'second'],
+				['parent', 'second'],
+			]);
+			r.update(EqualVariantCompletion, { label: 'second', child: true, onComplete: next });
+			expect(next).not.toHaveBeenCalled();
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('lets a changed physical transition complete once instead of also completing the label', () => {
+		animateMock.mockClear();
+		const onComplete = vi.fn();
+		const r = mount(EqualVariantCompletion, {
+			label: 'first',
+			transition: { duration: 1 },
+			onComplete,
+		});
+		try {
+			r.update(EqualVariantCompletion, {
+				label: 'second',
+				transition: { duration: 2 },
+				onComplete,
+			});
+			expect(animateMock).toHaveBeenCalledOnce();
+			expect(onComplete.mock.calls).toEqual([['parent', 'second']]);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('does not duplicate a named completion when reduced-motion policy restarts physical work', () => {
+		animateMock.mockClear();
+		const onComplete = vi.fn();
+		const r = mount(ReducedEqualVariantCompletion, {
+			label: 'first',
+			reduced: 'never',
+			onComplete,
+		});
+		try {
+			r.update(ReducedEqualVariantCompletion, { label: 'second', reduced: 'always', onComplete });
+			expect(animateMock).toHaveBeenCalledOnce();
+			expect(onComplete.mock.calls).toEqual([['parent', 'second']]);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('does not complete unresolved or disabled named variants', () => {
+		const onComplete = vi.fn();
+		const unresolved = mount(EqualVariantCompletion, { label: 'missing', onComplete });
+		try {
+			unresolved.update(EqualVariantCompletion, { label: 'also-missing', onComplete });
+		} finally {
+			unresolved.unmount();
+		}
+		const disabled = mount(DisabledVariantCompletion, { label: 'first', onComplete });
+		try {
+			disabled.update(DisabledVariantCompletion, { label: 'second', onComplete });
+		} finally {
+			disabled.unmount();
+		}
+		expect(onComplete).not.toHaveBeenCalled();
+	});
+
+	it('does not dispatch a departing parent after the child completion unmounts it', () => {
+		const calls: unknown[] = [];
+		let r: ReturnType<typeof mount>;
+		const onComplete = (host: string, definition: unknown) => {
+			calls.push([host, definition]);
+			if (host === 'child') r.unmount();
+		};
+		r = mount(EqualVariantCompletion, { label: 'first', child: true, onComplete });
+		r.update(EqualVariantCompletion, { label: 'second', child: true, onComplete });
+		expect(calls).toEqual([['child', 'second']]);
+	});
 
 	it('passes the inherited label from a completed child animation', async () => {
 		const onComplete = vi.fn();
