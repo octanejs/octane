@@ -1519,6 +1519,9 @@ export async function runCodemod(
 				localReactClass: renames.has(file)
 					? (module, name) => localReactClass(file, module, name)
 					: undefined,
+				forwardedClassChild: renames.has(file)
+					? (module, name) => forwardedProp(file, module, name, 'children', 'render', true)
+					: undefined,
 				localReactContext: renames.has(file)
 					? (module, name, member) => localReactContext(file, module, name, member)
 					: undefined,
