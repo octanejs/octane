@@ -7,7 +7,7 @@
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { STEPS } from './contract.mjs';
+import { settle, stepsOf } from './contract.mjs';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const ROOT = path.resolve(HERE, '../..');
@@ -63,13 +63,14 @@ try {
 	const cdp = await page.context().newCDPSession(page);
 	await cdp.send('Profiler.enable');
 	await cdp.send('Profiler.setSamplingInterval', { interval: 50 });
-	const steps = STEPS.filter((step) => step !== 'write' || scenario !== 'none');
+	const steps = stepsOf(scenario);
 	const cycle = async (profile) => {
 		for (const step of steps) {
 			await page.evaluate(() => globalThis.gc?.());
 			if (profile && step === target) await cdp.send('Profiler.start');
 			await page.evaluate((name) => window.__bench.run(name), step);
 			if (profile && step === target) parts.push((await cdp.send('Profiler.stop')).profile);
+			await page.evaluate(settle);
 		}
 		await page.evaluate(() => window.__bench.reset());
 	};

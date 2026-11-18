@@ -851,6 +851,48 @@ describe('CI workflow aggregation', () => {
 		assert.equal(projects[1].testExecution, undefined);
 	});
 
+	test("releases each sharded project's transform cache after its last file", async () => {
+		const Sequencer = shardedVitestConfig.test.sequence.sequencer;
+		const reporter = shardedVitestConfig.test.reporters.at(-1);
+
+		const released = [];
+		const server = (name) => ({
+			environments: {
+				client: { moduleGraph: { invalidateAll: () => released.push(`${name}:client`) } },
+				ssr: { moduleGraph: { invalidateAll: () => released.push(`${name}:ssr`) } },
+			},
+		});
+		const project = (name, vite = server(name)) => ({
+			name,
+			vite,
+			config: { sequence: { groupOrder: 0 }, isolate: true },
+		});
+		const a = project('a');
+		const b = project('b');
+		// A browser instance shares its parent's server, so the two count together.
+		const aClone = project('a-clone', a.vite);
+		const spec = (testProject, file) => ({ project: testProject, moduleId: path.join(REPO, file) });
+		const sequencer = (watch) =>
+			new Sequencer({
+				config: { root: REPO, watch },
+				cache: { getFileTestResults() {}, getFileStats() {} },
+			});
+
+		// The sequencer sorts the files the shard selected, so only they count.
+		await sequencer(false).sort([spec(a, 'a1'), spec(b, 'b1'), spec(aClone, 'a2')]);
+		reporter.onTestModuleEnd({ project: a });
+		assert.deepEqual(released, []);
+		reporter.onTestModuleEnd({ project: b });
+		assert.deepEqual(released, ['b:client', 'b:ssr']);
+		reporter.onTestModuleEnd({ project: aClone });
+		assert.deepEqual(released, ['b:client', 'b:ssr', 'a:client', 'a:ssr']);
+
+		released.length = 0;
+		await sequencer(true).sort([spec(a, 'a1')]);
+		reporter.onTestModuleEnd({ project: a });
+		assert.deepEqual(released, []);
+	});
+
 	test('guards ordinary client framework work in Chromium CI and retains failed results', () => {
 		const steps = jobSource('heavy_integration').split(/\n      - name: /);
 		const guard = steps.find((step) =>

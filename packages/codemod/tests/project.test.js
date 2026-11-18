@@ -4417,7 +4417,8 @@ export function useLabel() { const later = () => useState('ready'); return 'read
 			);
 			expect(fs.readFileSync(path.join(root, 'use-label.ts'), 'utf8')).toBe(helper);
 		}
-	});
+		// Each pass spawns a cold CLI process that analyzes the project.
+	}, 30_000);
 
 	it.each([false, true])(
 		'reports direct retained React arrow hooks (projectTypes=%s)',
