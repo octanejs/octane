@@ -374,6 +374,8 @@ export interface Entry {
 	span: Span | null;
 	/** Whether persistent storage has been asked for this entry's value. */
 	checkedStorage: boolean;
+	/** The first concurrent restore has a required live request that refresh can join. */
+	startup: boolean;
 	/** The last projection of a read's value, so an unchanged one keeps its identity. */
 	projected: { base: unknown; parts: Map<unknown, unknown>; value: unknown } | null;
 	/** For a view with relations, the keys of `joining` it is listed under. */
@@ -1486,54 +1488,57 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	 * Start an entry from persistent storage, as from a seed. A fresh value
 	 * needs no load; a stale one shows while its load runs.
 	 */
+	function restoreValue(entry: Entry, attempt: number): Promise<void> {
+		const current = () =>
+			!retired && entries.get(entry.key) === entry && entry.attempt === attempt && !entry.hasBase;
+		return persisted!.restore(entry.key, persistedRead(entry.read)).then(async (stored) => {
+			if (!stored || !current()) return;
+			const age = Math.max(0, hostDateNow() - stored.savedAt);
+			let value: unknown;
+			try {
+				if (age >= entry.read.expire) throw new Error('expired');
+				value = await parse(entry.read.output, stored.value);
+			} catch {
+				if (current()) persisted!.discard(entry.key, stored.revision);
+				return;
+			}
+			if (!current()) return;
+			const reload = new Set<Entry>();
+			const error = entry.error;
+			adopt(entry, value, 0, age, reload);
+			entry.error = error;
+			if (entry.span) {
+				entry.span = {
+					...(stored.span as Span),
+					reloaded: false,
+					more: false,
+					rows: new Map(),
+					asked: entry.span.asked,
+				};
+				index(entry);
+			}
+			entry.stale = stored.stale;
+			reloadAll(reload);
+		});
+	}
+
 	function restore(entry: Entry): Promise<void> {
 		entry.checkedStorage = true;
-		const attempt = entry.attempt;
-		const current = () => !retired && entry.attempt === attempt && !entry.hasBase;
-		const done = persisted!
-			.restore(entry.key, persistedRead(entry.read))
-			.then(async (stored) => {
-				if (!stored || !current()) return;
-				const age = Math.max(0, hostDateNow() - stored.savedAt);
-				let value: unknown;
-				try {
-					if (age >= entry.read.expire) throw new Error('expired');
-					value = await parse(entry.read.output, stored.value);
-				} catch {
-					persisted!.discard(entry.key);
-					return;
-				}
-				if (!current()) return;
-				const reload = new Set<Entry>();
-				adopt(entry, value, 0, age, reload);
-				if (entry.span) {
-					entry.span = {
-						...(stored.span as Span),
-						reloaded: false,
-						more: false,
-						rows: new Map(),
-						asked: entry.span.asked,
-					};
-					index(entry);
-				}
-				entry.stale = stored.stale;
-				reloadAll(reload);
-			})
-			.then(() => {
-				if (retired || entry.inflight !== done) return;
-				const pinned = entry.wanted === done;
-				const dropped = unwanted(entry);
-				fly(entry, null);
-				commitReached([entry]);
-				if (!entry.hasBase && !dropped) {
-					const loading = load(entry);
-					// A caller that waited on the restore waits on the load it led to.
-					if (pinned) entry.wanted = loading;
-					return loading;
-				}
-				if (entry.subscribers.size > 0 && isStale(entry)) void load(entry);
-				else idle(entry);
-			});
+		const done = restoreValue(entry, entry.attempt).then(() => {
+			if (retired || entry.inflight !== done) return;
+			const pinned = entry.wanted === done;
+			const dropped = unwanted(entry);
+			fly(entry, null);
+			commitReached([entry]);
+			if (!entry.hasBase && !dropped) {
+				const loading = load(entry);
+				// A caller that waited on the restore waits on the load it led to.
+				if (pinned) entry.wanted = loading;
+				return loading;
+			}
+			if (entry.subscribers.size > 0 && isStale(entry)) void load(entry);
+			else idle(entry);
+		});
 		fly(entry, done);
 		touch(entry);
 		return done;
@@ -1541,8 +1546,11 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 
 	function load(entry: Entry): Promise<void> {
 		if (entry.inflight) return entry.inflight;
-		if (persisted && !entry.hasBase && !entry.checkedStorage && entry.read.persist) {
-			return restore(entry);
+		const fromStorage = persisted && !entry.hasBase && !entry.checkedStorage && entry.read.persist;
+		if (fromStorage) {
+			if (entry.read.restore !== 'concurrent') return restore(entry);
+			entry.checkedStorage = true;
+			entry.startup = true;
 		}
 		const startedSeq = ++sequence;
 		// A value is as old as the request that read it, so tabs compare loads by when they started.
@@ -1606,6 +1614,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			)
 			.then(() => {
 				if (!current()) return;
+				entry.startup = false;
 				fly(entry, null);
 				entry.abort = null;
 				commitReached([entry]);
@@ -1613,11 +1622,16 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			});
 		fly(entry, done);
 		touch(entry);
+		if (fromStorage)
+			void restoreValue(entry, attempt).then(() => {
+				if (current() && entries.get(entry.key) === entry && entry.hasBase) commitReached([entry]);
+			});
 		return done;
 	}
 
 	/** Discard any load or restore in flight; returns the attempt that supersedes it. */
 	function supersede(entry: Entry): number {
+		entry.startup = false;
 		entry.abort?.abort();
 		entry.abort = null;
 		entry.preview = null;
@@ -1722,6 +1736,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				refresh() {
 					if (retired) return NEVER;
 					const current = entryFor(read, input);
+					if (current.startup && current.inflight) return (current.wanted = current.inflight);
 					invalidateEntry(current);
 					return (current.wanted = load(current));
 				},
@@ -1746,6 +1761,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			snapshot: null,
 			span: null,
 			checkedStorage: false,
+			startup: false,
 			projected: null,
 			related: EMPTY as string[],
 		};

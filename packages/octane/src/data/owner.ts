@@ -1037,7 +1037,7 @@ export function createReplica(
 				if (marked.size === 0) void served.then(() => postHostTask(flush));
 				marked.add(key);
 			},
-			discard: (key) => persistTell('discard', [key]),
+			discard: (key, revision) => persistTell('discard', [key, revision]),
 			journal: (write) => persistAsk('journal', [write]),
 			unjournal: (id) => persistTell('unjournal', [id]),
 			recover: () => persistAsk('recover', []),

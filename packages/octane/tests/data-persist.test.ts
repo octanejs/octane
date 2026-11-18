@@ -214,6 +214,161 @@ afterEach(() => {
 });
 
 describe('octane/data persistent cache', () => {
+	it('can restore a cached value while a required live read is already running', async () => {
+		const storage = memoryStorage();
+		const before = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada'),
+		});
+		await before.prefetch(shelf, undefined);
+		await before.publish(shelf, undefined, books());
+		await before.dispose();
+		const disk = Promise.withResolvers<void>();
+		const live = Promise.withResolvers<DataReply>();
+		const transport = vi.fn(() => live.promise);
+		const delayed = {
+			...storage,
+			index: async (partition: string) => {
+				await disk.promise;
+				return storage.index(partition);
+			},
+		};
+		const contract = read({
+			name: shelf.name,
+			output: shelf.output,
+			fresh: shelf.fresh,
+			restore: 'concurrent',
+		});
+		const store = createDataStore({ transport, persist: cache(delayed, 'ada') });
+		const handle = store.read(contract);
+		const stop = handle.subscribe(() => {});
+		await vi.waitFor(() => expect(transport).toHaveBeenCalledTimes(1));
+		const refresh = handle.refresh();
+		disk.resolve();
+		await vi.waitFor(() => expect(handle.getSnapshot().value).toEqual(books()));
+		expect(handle.getSnapshot().refreshing).toBe(true);
+		live.resolve({ ok: true, value: [] });
+		await refresh;
+		await vi.waitFor(() => expect(handle.getSnapshot().value).toEqual([]));
+		expect(transport).toHaveBeenCalledTimes(1);
+		stop();
+		await store.dispose();
+	});
+
+	it('finishes a live refresh without waiting for storage and never restores over it', async () => {
+		const storage = memoryStorage();
+		const before = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada'),
+		});
+		await before.prefetch(shelf, undefined);
+		await before.dispose();
+		const disk = Promise.withResolvers<void>();
+		const live = Promise.withResolvers<DataReply>();
+		const transport = vi.fn(() => live.promise);
+		const delayed = {
+			...storage,
+			index: async (partition: string) => {
+				await disk.promise;
+				return storage.index(partition);
+			},
+		};
+		const contract = read({ name: shelf.name, output: shelf.output, restore: 'concurrent' });
+		const store = createDataStore({ transport, persist: cache(delayed, 'ada') });
+		const handle = store.read(contract);
+		const stop = handle.subscribe(() => {});
+		const refresh = handle.refresh();
+		live.resolve({ ok: true, value: [] });
+		await refresh;
+		expect(handle.getSnapshot().value).toEqual([]);
+		expect(transport).toHaveBeenCalledTimes(1);
+		disk.resolve();
+		await saved();
+		expect(handle.getSnapshot().value).toEqual([]);
+		await store.dispose();
+		const reopened = createDataStore({
+			transport: () => Promise.reject(new Error('offline')),
+			persist: cache(storage, 'ada'),
+		});
+		expect((await value<Book[]>(reopened, shelf)).value).toEqual([]);
+		stop();
+		await reopened.dispose();
+	});
+
+	it('can show a late cache value alongside an earlier live failure', async () => {
+		const storage = memoryStorage();
+		const before = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada'),
+		});
+		await before.prefetch(shelf, undefined);
+		await before.dispose();
+		const key = Promise.withResolvers<string>();
+		const offline = new Error('offline');
+		const contract = read({ name: shelf.name, output: shelf.output, restore: 'concurrent' });
+		const store = createDataStore({
+			transport: () => Promise.reject(offline),
+			persist: cache(storage, 'ada', { key: () => key.promise }),
+		});
+		const handle = store.read(contract);
+		const stop = handle.subscribe(() => {});
+		await vi.waitFor(() => expect(handle.getSnapshot().error).toBe(offline));
+		key.resolve(KEY);
+		await vi.waitFor(() => expect(handle.getSnapshot().value).toEqual(books()));
+		expect(handle.getSnapshot()).toMatchObject({
+			status: 'ready',
+			error: offline,
+			refreshing: false,
+		});
+		stop();
+		await store.dispose();
+	});
+
+	it('does not let a corrupt restore delete a newer persisted live value', async () => {
+		const storage = memoryStorage();
+		const before = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada'),
+		});
+		await before.prefetch(shelf, undefined);
+		await before.dispose();
+		const reading = Promise.withResolvers<void>();
+		const release = Promise.withResolvers<void>();
+		const live = Promise.withResolvers<DataReply>();
+		const delayed = {
+			...storage,
+			async get(partition: string, key: string) {
+				if (partition !== key) {
+					reading.resolve();
+					await release.promise;
+					return 'corrupt';
+				}
+				return storage.get(partition, key);
+			},
+		};
+		const contract = read({ name: shelf.name, output: shelf.output, restore: 'concurrent' });
+		const store = createDataStore({
+			transport: () => live.promise,
+			persist: cache(delayed, 'ada'),
+		});
+		const handle = store.read(contract);
+		const stop = handle.subscribe(() => {});
+		await reading.promise;
+		live.resolve({ ok: true, value: [] });
+		await vi.waitFor(() => expect(handle.getSnapshot().value).toEqual([]));
+		await saved();
+		release.resolve();
+		await saved();
+		stop();
+		await store.dispose();
+		const reopened = createDataStore({
+			transport: () => Promise.reject(new Error('offline')),
+			persist: cache(storage, 'ada'),
+		});
+		expect((await value<Book[]>(reopened, shelf)).value).toEqual([]);
+		await reopened.dispose();
+	});
+
 	it('keeps a confirmed read on an immediate dispose and reopen', async () => {
 		const storage = memoryStorage();
 		const before = createDataStore({
@@ -2003,6 +2158,43 @@ describe('octane/data persistence through a shared owner', () => {
 		closing.push(() => (channel.port1.close(), channel.port2.close()));
 		return store;
 	}
+
+	it('restores the same cached read for concurrent offline replicas without fetching', async () => {
+		const storage = memoryStorage();
+		const before = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada'),
+		});
+		await before.prefetch(shelf, undefined);
+		await before.dispose();
+		const release = Promise.withResolvers<void>();
+		let readers = 0;
+		const delayed = {
+			...storage,
+			async get(partition: string, key: string) {
+				if (partition !== key) {
+					readers++;
+					await release.promise;
+				}
+				return storage.get(partition, key);
+			},
+		};
+		const remote = server(books());
+		remote.faults.lose = 'request';
+		const owner = ownerOver(delayed, remote);
+		const one = tab(owner, memoryStorage());
+		const two = tab(owner, memoryStorage());
+		const handles = [one.read(shelf), two.read(shelf)];
+		const unsubscribes = handles.map((handle) => handle.subscribe(() => {}));
+		await vi.waitFor(() => expect(readers).toBe(2));
+		release.resolve();
+		await vi.waitFor(() =>
+			expect(handles.map((handle) => handle.getSnapshot().value)).toEqual([books(), books()]),
+		);
+		expect(remote.log).toEqual([]);
+		for (const unsubscribe of unsubscribes) unsubscribe();
+		await Promise.all([one.dispose(), two.dispose()]);
+	});
 
 	it('saves one cache for every tab through the owner, which a tab after a restart starts from', async () => {
 		const storage = memoryStorage();
