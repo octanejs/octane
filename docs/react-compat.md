@@ -92,11 +92,21 @@ const root = createRoot(container, { signalOwner: documentScope });
 
 The host captures the owner for its React key. Change the host's outer key
 to use a different owner. The caller owns disposal, so removing one island
-leaves the other borrowers active. For React SSR, configure the original
-request owner through `installSignalOwnerEnvironment` and supply
-`clientSignalOwner` only from the browser entry. Use the same scope key for
-the browser owner and its server counterpart. Existing hydration sidecars
-carry historical reads before the borrowed owner supplies live values.
+leaves the other borrowers active.
+
+On the server, import either host from `octane/react/server` and pass the
+request scope explicitly:
+
+```tsx
+<OctaneCompat serverSignalOwner={requestScope} component={Panel} props={panelProps} />
+```
+
+The host borrows that owner for session creation and every Fizz attempt or
+replay, including overlapping streams. It never disposes the scope. Supply
+`clientSignalOwner` from the browser entry with the same scope key as the
+server owner. Existing hydration sidecars carry historical reads before the
+browser owner supplies live values. A request-wide async carrier is also
+available when code outside the hosted island needs the owner.
 
 ## Storybook with Octane components
 
@@ -229,7 +239,7 @@ inside the island keep their usual precedence.
 
 ## Request-scoped signals in Node.js
 
-A Node.js server using React's `renderToPipeableStream` can give compiled module-level signals a request-local owner. Install a carrier once in the server entry. Enter the caller's scope when starting each render so React's asynchronous work can read that request's signals.
+For request-wide ownership beyond an individual hosted island, a Node.js server using React's `renderToPipeableStream` can install an async carrier once in the server entry. Enter the caller's scope when starting each render so React's asynchronous work can read that request's signals.
 
 ```ts
 import { AsyncLocalStorage } from 'node:async_hooks';

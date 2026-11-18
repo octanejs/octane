@@ -136,12 +136,39 @@ export const invalidOwner = (
 	// @ts-expect-error — the browser option takes a signal owner
 	<OctaneCompat component={RawGreeting} props={{ name: 'x' }} clientSignalOwner="browser" />
 );
+declare const requestOwner: SignalOwner;
+declare const requestOwnerOrUndefined: SignalOwner | undefined;
 export const serverOwner: ServerComponentProps<GreetingProps> = {
 	component: RawGreeting,
 	props: { name: 'x' },
-	// @ts-expect-error — the server receives its request owner from the environment
+	serverSignalOwner: requestOwner,
+};
+export const explicitServerChild = (
+	<OctaneCompatServer serverSignalOwner={requestOwner}>
+		<Greeting name="x" />
+	</OctaneCompatServer>
+);
+export const explicitServerInline = (
+	<OctaneCompatInlineServer
+		component={RawGreeting}
+		props={{ name: 'x' }}
+		serverSignalOwner={requestOwnerOrUndefined}
+	/>
+);
+export const invalidServerOwner = (
+	// @ts-expect-error — the server option takes a signal owner
+	<OctaneCompatServer component={RawGreeting} props={{ name: 'x' }} serverSignalOwner="request" />
+);
+export const clientOwnerOnServer: ServerComponentProps<GreetingProps> = {
+	component: RawGreeting,
+	props: { name: 'x' },
+	// @ts-expect-error — clientSignalOwner is browser-only
 	clientSignalOwner: browserOwner,
 };
+export const serverOwnerOnClient = (
+	// @ts-expect-error — serverSignalOwner is server-only
+	<OctaneCompat component={RawGreeting} props={{ name: 'x' }} serverSignalOwner={requestOwner} />
+);
 // @ts-expect-error — wrong island prop type in the inline component form
 export const inlineWrong = <OctaneCompatInline component={RawGreeting} props={{ name: 42 }} />;
 export const invalidHostStyle = (

@@ -38,6 +38,8 @@ export type {
 import * as React from 'react';
 import { reactResourceHints } from './resource-hints.js';
 import { Activity, createElement as createOctaneServerElement } from '../server/index.js';
+import { runWithSignalOwner } from '../signals/owner-context.js';
+import type { SignalOwner } from '../signals/types.js';
 import {
 	createHostedServerSession,
 	renderHostedAttempt,
@@ -46,17 +48,19 @@ import {
 import {
 	OCTANE_COMPAT_HOST_STYLE,
 	resolveHostedIsland,
-	type OctaneCompatComponentProps,
-	type OctaneCompatProps,
+	type OctaneCompatComponentProps as HostedComponentProps,
+	type OctaneCompatProps as HostedElementProps,
 } from './shared.js';
 
-export type {
-	OctaneCompatComponentProps,
-	OctaneCompatProps,
-	OctaneHostedComponent,
-	OctaneReactComponent,
-	OctaneRenderedNode,
-} from './shared.js';
+export type { OctaneHostedComponent, OctaneReactComponent, OctaneRenderedNode } from './shared.js';
+
+interface ServerSignalOwnerOption {
+	/** Borrow this caller-owned scope for every server attempt and Fizz replay. */
+	serverSignalOwner?: SignalOwner | undefined;
+}
+
+export interface OctaneCompatProps extends HostedElementProps, ServerSignalOwnerOption {}
+export type OctaneCompatComponentProps<P> = HostedComponentProps<P> & ServerSignalOwnerOption;
 
 /**
  * Server envelope: marker-parity twin of the client root envelope — the
@@ -109,30 +113,35 @@ function createOctaneCompat(host: 'div' | 'span') {
 	): React.ReactNode {
 		if ('clientSignalOwner' in props && props.clientSignalOwner !== undefined)
 			throw new TypeError(
-				'clientSignalOwner is only supported by octane/react in the browser. Use installSignalOwnerEnvironment to provide a request owner on the server.',
+				'clientSignalOwner is only supported by octane/react in the browser. Pass serverSignalOwner to the server host or install a request owner environment.',
 			);
 		const child = resolveHostedIsland(props);
 		// The island-stable identifier prefix; the client wrapper derives the same
 		// value at the same tree position, so Octane ids hydrate byte-identically.
 		const identifierPrefix = React.useId();
-		const session = sessionFor(props);
+		const owner = props.serverSignalOwner;
+		// Session creation can capture the ambient owner before the first attempt.
+		const session =
+			owner === undefined ? sessionFor(props) : runWithSignalOwner(owner, () => sessionFor(props));
 
 		// Replay committed strata IN ORDER: identity-stable and status-stamped, so
 		// settled ones unwrap synchronously and use()-call positions stay aligned
 		// across Fizz replays (§9.1 — order determinism is hard correctness).
 		for (const stratum of session.strata) React.use(stratum as PromiseLike<void>);
 
-		const attempt = renderHostedAttempt(
-			session,
-			hostedServerEnvelope as never,
-			{ body: child.type, bodyProps: child.props, bodyKey: child.key },
-			{
-				identifierPrefix,
-				// §6.4: the hosted context reader IS React's — nearest provider,
-				// defaults, and Fizz semantics come along for free.
-				readForeignContext: (context) => React.use(context as React.Context<unknown>),
-			},
-		);
+		const body = { body: child.type, bodyProps: child.props, bodyKey: child.key };
+		const options = {
+			identifierPrefix,
+			// §6.4: the hosted context reader IS React's — nearest provider,
+			// defaults, and Fizz semantics come along for free.
+			readForeignContext: (context: object) => React.use(context as React.Context<unknown>),
+		};
+		const attempt =
+			owner === undefined
+				? renderHostedAttempt(session, hostedServerEnvelope as never, body, options)
+				: runWithSignalOwner(owner, () =>
+						renderHostedAttempt(session, hostedServerEnvelope as never, body, options),
+					);
 		if (attempt.status === 'suspended') {
 			// Delegate the wait to Fizz; the replay re-enters with the session.
 			React.use(attempt.stratum as Promise<void>);
