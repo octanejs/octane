@@ -198,7 +198,7 @@ const CASES: Record<string, string> = {
 		}
 		class Square extends Shape {
 			sides = 4;
-			constructor(private size: number);
+			constructor(size: number);
 			constructor(private size: number) { super(); }
 			area() { return this.size * this.size; }
 		}

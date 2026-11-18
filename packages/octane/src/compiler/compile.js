@@ -92,6 +92,7 @@ import {
 } from './arm-exits.js';
 import { assertNoBareHoles } from './bare-holes.js';
 import { assertForOfHeaders } from './for-headers.js';
+import { assertNoDirectiveBodyVars } from './directive-body-vars.js';
 import {
 	isComponentTag,
 	isKnownStringChildExpression,
@@ -120,7 +121,7 @@ import {
 	prepareHydrateBoundaries,
 	prepareServerHydrateBoundaries,
 } from './hydrate-boundaries.js';
-import { assertNoLiveClientOnlyImports } from './client-only-server.js';
+import { assertNoLiveClientOnlyImports, withoutProgramLoc } from './client-only-server.js';
 import { nsForChildren, nsForSelf } from './jsx-namespace.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { analyzeStrongMode, assertStrongMode } from './strong-mode.js';
@@ -12275,6 +12276,7 @@ function prepareAuthoredAst(source, cleanFilename, options) {
 	);
 	analyzeTsrx(ast, cleanFilename);
 	assertForOfHeaders(ast, source, cleanFilename);
+	assertNoDirectiveBodyVars(ast, source, cleanFilename);
 	assertTemplateJumps(ast, source, cleanFilename);
 	assertNoBareHoles(ast, source, cleanFilename);
 	adoptParserAst(ast);
@@ -41208,7 +41210,7 @@ function printNodeWithMap(node, ctx) {
 		baseVisitors.TSImportType = printImportType;
 	}
 	const visitors = withDeferredImports(baseVisitors);
-	const { code, map } = esrapPrint(printable, visitors, {
+	const { code, map } = esrapPrint(withoutProgramLoc(printable), visitors, {
 		// esrap indents every continuation of a block comment. TS consumers need
 		// authored annotation bytes, including indentation inside nested comments.
 		indent: ctx.output === 'ts' ? '' : undefined,
