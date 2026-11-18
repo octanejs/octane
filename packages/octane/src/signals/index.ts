@@ -74,6 +74,8 @@ export type {
 	ScopeInspection,
 	ScopeOptions,
 	ScopeSeed,
+	ScopeSignalOptions,
+	SignalEquals,
 	SignalHandle,
 	SignalOptions,
 	SignalBindingIdentity,

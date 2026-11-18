@@ -12,6 +12,7 @@ import {
 	assertAlive,
 	assertWritable,
 	addEffect,
+	computeEqual,
 	derivedState,
 	effectRing,
 	endSignalBatch,
@@ -25,6 +26,7 @@ import {
 	readyState,
 	refreshNode,
 	retireGraph,
+	setEquals,
 	setHistoricalReader,
 	signalBatch,
 	startSignalBatch,
@@ -68,7 +70,9 @@ import type {
 	ScopeInspection,
 	ScopeOptions,
 	ScopeSeed,
+	ScopeSignalOptions,
 	skip,
+	SignalEquals,
 	SignalHandle,
 	SignalSeedEntry,
 	SignalTraceEvent,
@@ -275,6 +279,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 		return this.disposed;
 	}
 
+	// installPublicScope adds the `equals` option, which only createScope's scopes take.
 	signal$<T>(key: string | null, initial: T): WritableSignal<T> {
 		if (key !== null) return this.keyedSignal(key, initial);
 		if (this.disposed) throw new ScopeDisposedError(this.key);
@@ -734,6 +739,16 @@ function stopScopeEffect(this: EffectNode): void {
 	if (this.run !== undefined || this.cleanup !== undefined) stopEffect(this);
 }
 
+/** A Scope signal's `equals`, or undefined when Object.is alone compares its values. */
+function equalsOption<T>(options: ScopeSignalOptions<T> | undefined): SignalEquals<T> | undefined {
+	if (options === undefined) return undefined;
+	if (options === null || typeof options !== 'object') throw new TypeError(formatClientError(160));
+	const equals = options.equals;
+	if (equals !== undefined && typeof equals !== 'function')
+		throw new TypeError(formatClientError(366));
+	return equals;
+}
+
 /**
  * @internal Every scope an application can hold exposes the whole Scope
  * surface. The runtime's owner scopes for `signal$` and friends reach
@@ -746,19 +761,44 @@ export function installPublicScope(): void {
 	if (publicScope) return;
 	publicScope = true;
 	const prototype = ScopeImpl.prototype;
+	const plainSignal: (
+		this: ScopeImpl,
+		key: string | null,
+		initial: unknown,
+	) => WritableSignal<any> = prototype.signal$;
+	prototype.signal$ = function <T>(
+		this: ScopeImpl,
+		key: string | null,
+		initial: T,
+		options?: ScopeSignalOptions<T>,
+	): WritableSignal<T> {
+		const equals = equalsOption(options);
+		const signal$: WritableSignal<T> = plainSignal.call(this, key, initial);
+		if (equals !== undefined) setEquals(signal$ as unknown as ScopedNode<T> | PlainCell<T>, equals);
+		return signal$;
+	};
 	prototype.derived$ = function <T>(
 		this: ScopeImpl,
 		key: string | null,
 		compute: (() => T) & (T extends PromiseLike<unknown> ? never : unknown),
+		options?: ScopeSignalOptions<T>,
 	): DerivedSignal<T> {
 		if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
+		const equals = equalsOption(options);
 		if (key === null) {
 			assertAlive(this);
-			return new PlainComputed(compute) as unknown as DerivedSignal<T>;
+			const node = new PlainComputed<T>(compute);
+			if (equals) node.getter = computeEqual(node, compute, equals);
+			return node as unknown as DerivedSignal<T>;
 		}
 		const node = createScopeNode<T>(this, key, 'derived');
-		node.compute = (target) => derivedState(target, compute);
-		node.plain = compute;
+		const read: () => T = equals ? computeEqual(node, compute, equals) : compute;
+		// A transition's shadow takes `compute` alone: its results compare with its own.
+		node.compute = equals
+			? (target) =>
+					derivedState(target, target === node ? read : computeEqual(target, compute, equals))
+			: (target) => derivedState(target, read);
+		node.plain = read;
 		initializeScopeRetention(this, node);
 		// Live derived values always reflect live inputs, including edits made
 		// before this node was created. Only an adoption frame reads historical
