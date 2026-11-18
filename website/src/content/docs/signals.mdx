@@ -277,7 +277,7 @@ no observer does not start it. Here `chat.subscribe` is an application function
 that returns an unsubscribe function.
 
 ```ts
-import { createScope } from 'octane/signals';
+import { createScope, ScopeDisposedError } from 'octane/signals';
 import { chat, type Message } from './chat';
 
 function subscribeSafely<T>(
@@ -297,6 +297,8 @@ function subscribeSafely<T>(
 			if (active) publish(value);
 		});
 	} catch (error) {
+		active = false;
+		if (error instanceof ScopeDisposedError) throw error;
 		fail(error);
 		return () => {};
 	}

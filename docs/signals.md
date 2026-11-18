@@ -108,6 +108,8 @@ Writes use `Object.is` equality and become visible immediately. Pass `{ equals }
 Pass `{ watched }` to start work only while something observes a signal. `watched()` runs, untracked, when the signal gains its first observer: an effect, a subscriber or a rendered binding that reads it, directly or through derived values. The function it returns runs when the last observer leaves or the scope is disposed, and the next first observer runs `watched` again. A read with no observer, including one through a derived value nothing observes, neither starts it nor keeps it running. Return a `scope.effect` stop to connect an external source that follows other signals: the effect restarts its subscription when they change and its stop disconnects it. A synchronous write inside `watched` is what the first observer reads. An error thrown by `watched` or its cleanup is reported through `reportError` and does not fail the read, stop or disposal that ran it.
 
 ```ts
+import { ScopeDisposedError } from 'octane/signals';
+
 function subscribeSafely<T>(
 	start: (publish: (value: T) => void) => (() => void) | Promise<() => void>,
 	publish: (value: T) => void,
@@ -125,6 +127,8 @@ function subscribeSafely<T>(
 			if (active) publish(value);
 		});
 	} catch (error) {
+		active = false;
+		if (error instanceof ScopeDisposedError) throw error;
 		fail(error);
 		return () => {};
 	}

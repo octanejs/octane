@@ -1128,6 +1128,8 @@ describe('watched', () => {
 				if (active) publish(value);
 			});
 		} catch (error) {
+			active = false;
+			if (error instanceof ScopeDisposedError) throw error;
 			fail(error);
 			return () => {};
 		}
@@ -1255,6 +1257,59 @@ describe('watched', () => {
 			}
 		});
 	}
+
+	it('silently retires a subscription effect that reads a disposed source after a live input', () => {
+		const reported: unknown[] = [];
+		vi.stubGlobal('reportError', (error: unknown) => reported.push(error));
+		try {
+			const scope = owner();
+			const sourceScope = owner('disposed-subscription-source');
+			const disposed$ = sourceScope.signal$('source', 'retired');
+			sourceScope.dispose();
+			const log: string[] = [];
+			const input$ = scope.signal$('input', 'a', {
+				watched: () => {
+					log.push('watch input');
+					return () => log.push('unwatch input');
+				},
+			});
+			let attempts = 0;
+			let retained!: (value: string) => void;
+			const feed$ = scope.signal$('feed', '', {
+				watched: () => {
+					log.push('watch feed');
+					const stop = scope.effect(() =>
+						subscribeSafely<string>(
+							(publish) => {
+								retained = publish;
+								input$.get();
+								attempts++;
+								disposed$.get();
+								return () => {};
+							},
+							(value) => feed$.set(value),
+						),
+					);
+					return () => {
+						log.push('unwatch feed');
+						stop();
+					};
+				},
+			});
+			const stop = feed$.subscribe(() => {});
+			expect([...log]).toEqual(['watch feed', 'watch input', 'unwatch input']);
+			expect(reported).toEqual([]);
+			input$.set('b');
+			retained('stale');
+			expect(attempts).toBe(1);
+			expect(feed$.get()).toBe('');
+			expect(reported).toEqual([]);
+			stop();
+			expect(log).toEqual(['watch feed', 'watch input', 'unwatch input', 'unwatch feed']);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
 
 	it('stops an effect whose initial subscription setup throws', () => {
 		const reported: unknown[] = [];
