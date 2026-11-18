@@ -101,7 +101,8 @@ it('reports an ordinary bare SVG component whose issuer changes to .tsrx', () =>
 	const conflict = preview();
 	expect(conflict.result.output).toBe('src/pane.tsx');
 	expect(conflict.result.notes.map((n) => n.rule)).toEqual(['rename-conflict']);
-});
+	// Four cold CLI processes analyze the project in turn.
+}, 30_000);
 
 it.each(['renderToString', 'renderToStaticMarkup'])(
 	'adapts SVG in a local component owned by the native %s renderer',
