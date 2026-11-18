@@ -646,5 +646,12 @@ export function storeSources(
 		}
 		return exported.has(name);
 	}
-	return { inputFactory, changedJsxExport, helperFunction, localFile, exportsConstObject };
+	return {
+		inputFactory,
+		changedJsxExport,
+		helperFunction,
+		localFile,
+		typedFile,
+		exportsConstObject,
+	};
 }

@@ -1861,6 +1861,89 @@ export function List() { return <main>{makeRows().map(row => {
 	});
 
 	it.each([
+		{ name: 'without a target' },
+		{ name: 'without a target in a mixed module', mixed: true },
+		{ name: 'with ES2022 in a mixed module', target: 'es2022', mixed: true },
+		{ name: 'with unresolved React types', mixed: true, lib: ['es5'], block: true },
+		{
+			name: 'with missing React declarations',
+			target: 'es2022',
+			mixed: true,
+			missing: true,
+			block: true,
+		},
+		{ name: 'with an unrelated relative call', target: 'es2022', extra: 'unrelated', block: true },
+		{ name: 'with a second registration', target: 'es2022', extra: 'second', block: true },
+	])(
+		'keeps a retained React registry boundary explicit $name',
+		async ({ target, mixed, lib, missing, extra, block }) => {
+			const registration = `import { createElement } from 'react';
+import { register } from './legacy';
+${extra === 'unrelated' ? "import { helper } from './helper';" : ''}
+export const tab = register('notes', { getIcon: () => createElement('b', { className: 'icon' }, 'notes') });
+${mixed ? 'export function NativeCandidate() { return <strong>Native slot</strong>; }' : ''}
+${extra === 'unrelated' ? 'export const other = helper();' : extra === 'second' ? "export const other = register('other', { getIcon: () => createElement('i', null) });" : ''}`;
+			const root = project({
+				'package.json': '{"type":"module"}',
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: {
+						strict: true,
+						jsx: 'react-jsx',
+						module: 'esnext',
+						moduleResolution: 'bundler',
+						...(target ? { target } : {}),
+						...(lib ? { lib, types: [] } : {}),
+					},
+				}),
+				'legacy.tsx': `/** @jsxImportSource react */
+import type { ReactNode } from 'react';
+const registrations = new Map<string, { getIcon(): ReactNode }>();
+export function register(name: string, entry: { getIcon(): ReactNode }) { registrations.set(name, entry); return entry; }
+export function View() { return <nav>{registrations.get('notes')!.getIcon()}</nav>; }`,
+				'register.tsx': registration,
+				'helper.ts': 'export function helper() { return 1; }',
+			});
+			const modules = path.join(root, 'node_modules');
+			fs.mkdirSync(path.join(modules, '@types'), { recursive: true });
+			for (const name of ['react', 'react-dom']) {
+				fs.symlinkSync(
+					fs.realpathSync(path.join(import.meta.dirname, '../node_modules', name)),
+					path.join(modules, name),
+					'dir',
+				);
+				if (!missing)
+					fs.symlinkSync(
+						path.join(REPO, 'packages/octane/node_modules/@types', name),
+						path.join(modules, '@types', name),
+						'dir',
+					);
+			}
+			const input = path.join(root, 'register.tsx');
+			const options = { root, strong: true, verify: true };
+			const preview = await runCodemod([input], { ...options, write: false });
+			const converted = preview.files.find(({ file }) => file === 'register.tsx');
+			if (!block) {
+				expect(converted.code).toContain("from 'react'");
+				if (mixed) expect(converted.code).toContain('NativeCandidate() @{');
+				expect(converted.notes).toEqual([]);
+			} else {
+				expect(converted.notes).toContainEqual(
+					expect.objectContaining({ rule: 'retained-registry-boundary', severity: 'error' }),
+				);
+				const result = await runCodemod([input], options);
+				expect(result.files).toEqual([
+					expect.objectContaining({
+						file: 'register.tsx',
+						changed: false,
+						notes: [expect.objectContaining({ rule: 'retained-registry-boundary' })],
+					}),
+				]);
+				expect(fs.readFileSync(input, 'utf8')).toBe(registration);
+			}
+		},
+	);
+
+	it.each([
 		['a single TS registration', 'ts', '', ''],
 		['a single TSX registration', 'tsx', '', ''],
 		['a TS registration with a block return', 'ts', '', '', true],
@@ -1950,7 +2033,9 @@ export { Registry, getIcon } from './registry';`,
 
 			fs.writeFileSync(input, registration + "\nexport const other = createIcon('i', null);");
 			const extraFactory = await runCodemod([input], { ...options, write: false });
-			expect(extraFactory.files[0].code).toContain("from 'octane'");
+			expect(extraFactory.files[0].notes).toContainEqual(
+				expect.objectContaining({ rule: 'retained-registry-boundary', severity: 'error' }),
+			);
 
 			const mixed =
 				registration.replaceAll('createIcon', 'createElement') +
@@ -1959,8 +2044,9 @@ import * as React from 'react';
 export const other = React.createElement('i', null);`;
 			fs.writeFileSync(input, mixed);
 			const mixedPreview = await runCodemod([input], { ...options, write: false });
-			expect(mixedPreview.files[0].code).toContain("import { createElement } from 'octane';");
-			expect(mixedPreview.files[0].code).not.toContain("from 'react'");
+			expect(mixedPreview.files[0].notes).toContainEqual(
+				expect.objectContaining({ rule: 'retained-registry-boundary', severity: 'error' }),
+			);
 			fs.writeFileSync(input, registration);
 
 			fs.writeFileSync(
@@ -8522,6 +8608,152 @@ export function View() { return <Selected.Provider value="a"><Retained.Provider 
 		);
 	});
 
+	it('migrates a selected direct context through one verified TypeScript path alias', async () => {
+		const root = project({
+			'package.json': '{"name":"app","type":"module"}',
+			'tsconfig.json':
+				'{"compilerOptions":{"strict":true,"target":"es2022","module":"esnext","moduleResolution":"bundler","jsx":"react-jsx","paths":{"@shade":["./shade.ts"],"@ordinary":["./ordinary.ts"]}}}',
+			'shade.ts':
+				"import { createContext } from 'react'; export const Shade = createContext('default');",
+			'ordinary.ts': "export const BadgeContext = { Provider() { return 'original'; } };",
+			'View.tsx': `import { Shade } from '@shade';
+import { BadgeContext as Badge } from '@ordinary';
+const provide = Badge.Provider;
+export function View() { return <Shade.Provider value="night"><Shade.Consumer>{(value) => <b title={provide()}>{value}</b>}</Shade.Consumer></Shade.Provider>; }`,
+		});
+		fs.mkdirSync(path.join(root, 'node_modules/@types'), { recursive: true });
+		for (const name of ['octane', 'react', 'react-dom'])
+			fs.symlinkSync(
+				fs.realpathSync(path.join(import.meta.dirname, '../node_modules', name)),
+				path.join(root, 'node_modules', name),
+				'dir',
+			);
+		for (const name of ['react', 'react-dom'])
+			fs.symlinkSync(
+				path.join(REPO, 'packages/octane/node_modules/@types', name),
+				path.join(root, 'node_modules/@types', name),
+				'dir',
+			);
+		const selected = ['shade.ts', 'ordinary.ts', 'View.tsx'].map((name) => path.join(root, name));
+		const preview = await runCodemod(selected, { root, strong: true, verify: true, write: false });
+		const view = preview.files.find(({ file }) => file === 'View.tsx');
+		expect(view.notes.filter(({ rule }) => rule === 'context-path-alias')).toEqual([]);
+		expect(view.code).toContain('<Shade value="night">');
+		expect(view.code).not.toContain('Shade.Consumer');
+		expect(view.code).toContain('const provide = Badge.Provider;');
+		const written = await runCodemod(selected, { root, strong: true, verify: true });
+		expect(written.files.find(({ file }) => file === 'View.tsx').changed).toBe(true);
+		const dom = installDOM();
+		try {
+			const { createRoot, View } = await bundleRuntime(
+				root,
+				'client',
+				"export { createRoot } from 'octane'; export { View } from './View.tsrx';",
+			);
+			const host = dom.window.document.createElement('div');
+			const mounted = createRoot(host);
+			mounted.render(View, {});
+			expect(host.querySelector('b')?.outerHTML).toBe('<b title="original">night</b>');
+			mounted.unmount();
+		} finally {
+			vi.unstubAllGlobals();
+			dom.window.close();
+		}
+	});
+
+	it.each([
+		['an unresolved module', '@missing/ui', {}],
+		[
+			'an installed third-party package',
+			'@vendor/ui',
+			{
+				'node_modules/@vendor/ui/package.json':
+					'{"name":"@vendor/ui","type":"module","types":"./index.d.ts","exports":"./index.js"}',
+				'node_modules/@vendor/ui/index.d.ts':
+					'export declare const PackageContext: { Provider: (props: unknown) => unknown };',
+				'node_modules/@vendor/ui/index.js':
+					'export const PackageContext = { Provider: () => null };',
+			},
+		],
+	])(
+		'keeps a Context-named import from %s unchanged under a wildcard path pattern',
+		async (_, module, extra) => {
+			const root = project({
+				...extra,
+				'package.json': '{"name":"app","type":"module"}',
+				'tsconfig.json':
+					'{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","jsx":"react-jsx","paths":{"@*":["./local/*"]}}}',
+				'View.tsx': `import { PackageContext } from '${module}'; export function View() { return <PackageContext.Provider value="night"><b /></PackageContext.Provider>; }`,
+			});
+			const result = await runCodemod([path.join(root, 'View.tsx')], {
+				root,
+				strong: true,
+				verify: false,
+			});
+			expect(result.files.find(({ file }) => file === 'View.tsx').notes).not.toContainEqual(
+				expect.objectContaining({ rule: 'context-path-alias' }),
+			);
+			expect(fs.readFileSync(path.join(root, 'View.tsrx'), 'utf8')).toContain(
+				'<PackageContext.Provider value="night">',
+			);
+		},
+	);
+
+	it.each([
+		['fallback alias targets', { '@shade': ['./missing.ts', './shade.ts'] }, true, {}],
+		['overlapping alias patterns', { '@shade': ['./shade.ts'], '@*': ['./*.ts'] }, true, {}],
+		[
+			'a competing runtime sibling',
+			{ '@shade': ['./shade.ts'] },
+			true,
+			{ 'shade.js': 'export const Shade = { Provider: () => null };' },
+		],
+		['an unselected React context', { '@shade': ['./shade.ts'] }, false, {}],
+	])('blocks context alias migration with %s', async (_case, paths, selectContext, extra) => {
+		const root = project({
+			...extra,
+			'package.json': '{"name":"app","type":"module"}',
+			'tsconfig.json': JSON.stringify({
+				compilerOptions: {
+					strict: true,
+					target: 'es2022',
+					module: 'esnext',
+					moduleResolution: 'bundler',
+					jsx: 'react-jsx',
+					paths,
+				},
+			}),
+			'shade.ts':
+				"import { createContext } from 'react'; export const Shade = createContext('default');",
+			'View.tsx':
+				'import { Shade } from \'@shade\'; export function View() { return <Shade.Provider value="night"><b /></Shade.Provider>; }',
+		});
+		fs.mkdirSync(path.join(root, 'node_modules/@types'), { recursive: true });
+		for (const name of ['octane', 'react'])
+			fs.symlinkSync(
+				fs.realpathSync(path.join(import.meta.dirname, '../node_modules', name)),
+				path.join(root, 'node_modules', name),
+				'dir',
+			);
+		fs.symlinkSync(
+			path.join(REPO, 'packages/octane/node_modules/@types/react'),
+			path.join(root, 'node_modules/@types/react'),
+			'dir',
+		);
+		const selected = [...(selectContext ? ['shade.ts'] : []), 'View.tsx'].map((name) =>
+			path.join(root, name),
+		);
+		const before = selected.map((file) => fs.readFileSync(file, 'utf8'));
+		const preview = await runCodemod(selected, { root, strong: true, verify: true, write: false });
+		expect(preview.files.find(({ file }) => file === 'View.tsx').notes).toContainEqual(
+			expect.objectContaining({ rule: 'context-path-alias', severity: 'error' }),
+		);
+		const written = await runCodemod(selected, { root, strong: true, verify: true });
+		expect(written.files).toEqual([expect.objectContaining({ file: 'View.tsx', changed: false })]);
+		expect(selected.map((file) => fs.readFileSync(file, 'utf8'))).toEqual(before);
+		expect(fs.existsSync(path.join(root, 'View.tsrx'))).toBe(false);
+	});
+
 	it.each(['esnext', 'es2022'])(
 		'reports selected context member reads through TypeScript path aliases before writing (%s)',
 		async (module) => {
@@ -8626,7 +8858,7 @@ export function View() {
 		[
 			'an attributed consumer import',
 			"export { Base as Shade } from './shade';",
-			false,
+			true,
 			{},
 			" with { mode: 'runtime' }",
 		],

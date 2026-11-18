@@ -603,10 +603,21 @@ process.stdout.write(JSON.stringify({
 			expect(result.code.slice(generatedOffset, generatedOffset + generatedLength)).toBe(text);
 		};
 
-		// @tsrx/core's typeOnly print enables esrap `boundaryTokens`: the closing
-		// object brace and computed-member bracket resolve at their own mapped
-		// positions instead of inheriting the preceding token's location.
-		expectExactSpan('{ list: [run(input)] }');
+		// @tsrx/core maps a literal by its two ends, a points mapping, and its
+		// closing brace at its own position, not as one span over the whole.
+		const literal = '{ list: [run(input)] }';
+		const literalStart = src.indexOf(literal);
+		const points = result.mappings.find(
+			(candidate) =>
+				candidate.sourceOffsets[0] === literalStart &&
+				candidate.sourceOffsets[1] === literalStart + literal.length,
+		);
+		expect(points).toBeDefined();
+		expect(result.code.slice(points!.generatedOffsets[0], points!.generatedOffsets[1])).toBe(
+			literal,
+		);
+		expectExactSpan('}');
+		// The member keeps its own span inside the native-read call around it.
 		expectExactSpan('value.list[0]');
 	});
 
@@ -1057,8 +1068,8 @@ export function PendingOrFailed() @{
 				'/src/Boundary.tsrx',
 			);
 			expect(compiled.errors).toEqual([]);
-			expect(compiled.code).toContain('<TsrxErrorBoundary');
-			expect(compiled.code).toContain('<Suspense');
+			expect(compiled.code).toContain('<__TsrxErrorBoundary');
+			expect(compiled.code).toContain('<__Suspense');
 			const file = join(root, 'Boundary.tsx');
 			writeFileSync(file, compiled.code);
 			const program = ts.createProgram({

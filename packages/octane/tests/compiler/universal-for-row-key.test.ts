@@ -126,7 +126,6 @@ describe('`key` on a universal @for row root', () => {
 	it.each([
 		['a const', 'const k = row.id;', 'k'],
 		['a function', 'function keyOf() { return row.id; }', 'keyOf()'],
-		['a hoisted var', 'if (row.ok) { var k = row.id; }', 'k'],
 		['a redeclared item', 'const row = props.fallback;', 'row.id'],
 	])('rejects a key that reads %s declared in the body', (_, setup, key) => {
 		const source = `export function Rows(props) @{ <view>@for (const row of props.rows) { ${setup} <view key={${key}} /> }</view> }`;

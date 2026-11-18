@@ -397,6 +397,12 @@ dependency that shows every edit at once is not built in.
 - Only confirmed values are saved. Values saved under another output schema
   shape or `version` are discarded unread; values that fail validation on
   restore are discarded.
+- Reads and views normally restore first and fetch only if needed. Set
+  `restore: 'concurrent'` on a read or view when it must start one live
+  request immediately, even if storage is slow. A valid cached value can show
+  while that request runs, but a late restore cannot replace its accepted live
+  value. Refresh joins that initial request. If it fails, a valid cached value
+  can still show alongside the error. `persist: false` disables restoration.
 - Stale marks survive restarts: each tag and entity keeps when it was last
   marked.
 - Saves coalesce into one storage transaction per host task.

@@ -184,6 +184,7 @@ export const MOTION_PRESENCE_OWNER = 'motion-presence-owner';
 export const RETAINED_WORKSPACE_HOOK = 'retained-workspace-hook';
 export const BUFFERED_SSR_OPTIONS = 'buffered-ssr-options';
 export const BUFFERED_SSR_REACT_COMPONENT = 'buffered-ssr-react-component';
+export const RETAINED_REGISTRY_BOUNDARY = 'retained-registry-boundary';
 
 /** Rule names, as reported. */
 const RULE = {
@@ -3576,8 +3577,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 	private retainedRegistryFactoryImport(react: ts.ImportDeclaration) {
 		const resolveRegistry = this.options.retainedRegistry;
 		if (!resolveRegistry) return false;
-		// Check the registration shape without the inert exported constants.
-		const statements = this.sf.statements.filter((statement) => {
+		const inertExport = (statement: ts.Statement) => {
 			if (
 				!ts.isVariableStatement(statement) ||
 				statement.modifiers?.length !== 1 ||
@@ -3585,14 +3585,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				(statement.declarationList.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
 				statement.declarationList.declarations.length !== 1
 			)
-				return true;
+				return false;
 			const { name, initializer, type } = statement.declarationList.declarations[0];
-			return !ts.isIdentifier(name) || !!type || !initializer || !isPrimitiveLiteral(initializer);
-		});
+			return ts.isIdentifier(name) && !type && !!initializer && isPrimitiveLiteral(initializer);
+		};
 		const bindings = react.importClause?.namedBindings;
 		if (
-			statements.length !== 3 ||
-			!statements.slice(0, 2).every(ts.isImportDeclaration) ||
 			react.attributes ||
 			react.importClause?.name ||
 			!bindings ||
@@ -3604,15 +3602,51 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 
 		const binding = this.importOf(bindings.elements[0].name);
 		if (!binding || binding.typeOnly || binding.imported !== 'createElement') return false;
+		const block = (site: ts.Node) =>
+			this.note(
+				RETAINED_REGISTRY_BOUNDARY,
+				'error',
+				site,
+				'Cannot prove this React factory is isolated to a typed callback consumed by the retained React registry. Keep the registration under React or make the boundary explicit before writing.',
+			);
 
-		// Only a registration module can keep the descriptor without also moving
-		// a consumer of it in the same file.
-		const declaration = statements[2];
-		if (
-			!ts.isVariableStatement(declaration) ||
-			!(declaration.declarationList.flags & ts.NodeFlags.Const)
-		)
-			return false;
+		const declarations = this.sf.statements.filter(
+			(statement): statement is ts.VariableStatement => {
+				if (
+					!ts.isVariableStatement(statement) ||
+					!(statement.declarationList.flags & ts.NodeFlags.Const)
+				)
+					return false;
+				const [entry, extra] = statement.declarationList.declarations;
+				const use = entry?.initializer;
+				if (extra || !use || !ts.isCallExpression(use) || !ts.isIdentifier(use.expression))
+					return false;
+				const owner = this.importOf(use.expression);
+				const object = use.arguments[1];
+				if (
+					!owner ||
+					owner.namespace ||
+					owner.typeOnly ||
+					!owner.module.startsWith('.') ||
+					!object ||
+					!ts.isObjectLiteralExpression(object)
+				)
+					return false;
+				return object.properties.some((property) => {
+					if (!ts.isPropertyAssignment(property) || !ts.isArrowFunction(property.initializer))
+						return false;
+					const output = singleCallbackExpression(property.initializer.body);
+					const call = output && skipParens(output);
+					return !!call && ts.isCallExpression(call) && this.importOf(call.expression) === binding;
+				});
+			},
+		);
+		if (!declarations.length) return false;
+		if (declarations.length !== 1) {
+			block(bindings.elements[0].name);
+			return true;
+		}
+		const declaration = declarations[0];
 		const [entry, extra] = declaration.declarationList.declarations;
 		const use = entry?.initializer;
 		if (
@@ -3706,7 +3740,59 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		const module = checker.getSymbolAtLocation(specifier);
 		const reactNode =
 			module && checker.getExportsOfModule(module).find((symbol) => symbol.name === 'ReactNode');
-		return !!reactNode && checker.getContextualType(peer)?.aliasSymbol === reactNode;
+		const contextual = checker.getContextualType(peer);
+		const proven = !!reactNode && contextual?.aliasSymbol === reactNode;
+		const callback =
+			decl.parameters[1] &&
+			checker.getTypeAtLocation(decl.parameters[1]).getProperty(property.name.text);
+		const callbackDecl = callback?.valueDeclaration;
+		const annotation = callbackDecl && ts.isMethodSignature(callbackDecl) && callbackDecl.type;
+		const annotated =
+			annotation && ts.isTypeReferenceNode(annotation) && ts.isIdentifier(annotation.typeName)
+				? checker.getSymbolAtLocation(annotation.typeName)
+				: undefined;
+		const sourceImport = file.statements
+			.flatMap((statement) => {
+				if (
+					!ts.isImportDeclaration(statement) ||
+					!ts.isStringLiteral(statement.moduleSpecifier) ||
+					statement.moduleSpecifier.text !== 'react'
+				)
+					return [];
+				const names = statement.importClause?.namedBindings;
+				return names && ts.isNamedImports(names)
+					? names.elements.filter((item) => (item.propertyName ?? item.name).text === 'ReactNode')
+					: [];
+			})
+			.find((item) => checker.getSymbolAtLocation(item.name) === annotated);
+		const unresolved =
+			(!reactNode || !contextual || !!(contextual.flags & ts.TypeFlags.Any)) &&
+			/@jsxImportSource\s+react\b/.test(file.text) &&
+			!!annotated &&
+			!!sourceImport &&
+			(!reactNode ||
+				(!!(annotated.flags & ts.SymbolFlags.Alias) &&
+					checker.getAliasedSymbol(annotated) === reactNode));
+		if (!proven && !unresolved) return false;
+		const uses = renderUses(this.localUses(bindings.elements[0].name));
+		const imports = this.sf.statements.filter(ts.isImportDeclaration);
+		const unsupported = this.sf.statements.some(
+			(statement) =>
+				statement !== declaration &&
+				!ts.isImportDeclaration(statement) &&
+				!inertExport(statement) &&
+				!(ts.isFunctionDeclaration(statement) && !!statement.name && this.isComponent(statement)),
+		);
+		if (
+			unresolved ||
+			unsupported ||
+			imports.length !== 2 ||
+			uses.length !== 1 ||
+			uses[0] !== call.expression
+		) {
+			block(call);
+		}
+		return true;
 	}
 
 	// ---------------------------------------------------------------- imports

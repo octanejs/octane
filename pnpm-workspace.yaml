@@ -114,7 +114,8 @@ overrides:
   playwright: ^1.61.1
   # esrap <2.3.2 printed `declare` on every bodyless function, corrupting the
   # virtual TSX for plain overload signatures (TS2384). See issue #736.
-  esrap: ^2.3.2
+  # @tsrx/core >= 0.6 requires esrap ^2.4.0.
+  esrap: ^2.4.2
   # INTERIM: @tanstack/devtools (the Solid UI core reused by
   # @octanejs/tanstack-devtools) targets Solid 1.x and imports `solid-js/web`,
   # which Solid 2.0-beta removed (web renderer moved to @solidjs/web). The
@@ -303,15 +304,15 @@ catalogs:
     '@vitest/coverage-v8': 4.1.10
     '@volar/language-core': 2.4.28
     '@volar/typescript': 2.4.28
-    '@tsrx/content-mapper': 0.1.2
-    '@tsrx/core': ^0.5.5
-    '@tsrx/prettier-plugin': ^0.6.3
-    '@tsrx/typescript-plugin': ^0.6.3
-    '@tsrx/ripple': ^0.2.0
-    '@tsrx/react': ^0.4.5
-    '@tsrx/solid': ^0.3.5
-    '@tsrx/vite-plugin-react': ^0.0.120
-    '@tsrx/vite-plugin-solid': ^0.0.117
+    '@tsrx/content-mapper': 0.1.4
+    '@tsrx/core': ^0.6.3
+    '@tsrx/prettier-plugin': ^0.7.3
+    '@tsrx/typescript-plugin': ^0.7.3
+    '@tsrx/ripple': ^0.2.11
+    '@tsrx/react': ^0.5.3
+    '@tsrx/solid': ^0.4.3
+    '@tsrx/vite-plugin-react': ^0.0.124
+    '@tsrx/vite-plugin-solid': ^0.0.121
     '@types/babel__core': 7.20.5
     '@types/d3-array': 3.0.3
     '@types/d3-chord': ^1.0.14
@@ -359,8 +360,8 @@ catalogs:
     devalue: ^6.0.3
     es-module-lexer: ^1.7.0
     esbuild: ^0.28.1
-    esrap: ^2.3.2
-    '@tsrx/oxc': 0.23.0
+    esrap: ^2.4.2
+    '@tsrx/oxc': 0.24.0
     sucrase: ^3.35.1
     graphql: ^16.14.2
     gsap: 3.15.0
@@ -602,33 +603,34 @@ minimumReleaseAgeExclude:
   - '@blocknote/core@0.53.0'
   - '@blocknote/react@0.53.0'
   - '@tanstack/db@0.7.0'
-  - '@tsrx/oxc-darwin-arm64@0.23.0'
-  - '@tsrx/oxc-darwin-x64@0.23.0'
-  - '@tsrx/oxc-linux-arm64-gnu@0.23.0'
-  - '@tsrx/oxc-linux-arm64-musl@0.23.0'
-  - '@tsrx/oxc-linux-x64-gnu@0.23.0'
-  - '@tsrx/oxc-linux-x64-musl@0.23.0'
-  - '@tsrx/oxc-win32-arm64-msvc@0.23.0'
-  - '@tsrx/oxc-win32-x64-msvc@0.23.0'
-  - '@tsrx/oxc@0.23.0'
+  - '@tsrx/oxc-darwin-arm64@0.24.0'
+  - '@tsrx/oxc-darwin-x64@0.24.0'
+  - '@tsrx/oxc-linux-arm64-gnu@0.24.0'
+  - '@tsrx/oxc-linux-arm64-musl@0.24.0'
+  - '@tsrx/oxc-linux-x64-gnu@0.24.0'
+  - '@tsrx/oxc-linux-x64-musl@0.24.0'
+  - '@tsrx/oxc-win32-arm64-msvc@0.24.0'
+  - '@tsrx/oxc-win32-x64-msvc@0.24.0'
+  - '@tsrx/oxc@0.24.0'
   - '@tanstack/octane-hotkeys@0.3.0'
   - '@tanstack/octane-pacer@0.3.0'
   - '@tanstack/octane-store@0.13.0'
   - '@tanstack/octane-table@9.3.0'
   - '@ripple-ts/adapter@0.4.0'
   - '@ripple-ts/vite-plugin@0.4.0'
-  - '@tsrx/core@0.5.5'
-  - '@tsrx/prettier-plugin@0.6.3'
-  - '@tsrx/react@0.4.5'
-  - '@tsrx/ripple@0.2.0'
-  - '@tsrx/solid@0.3.5'
-  - '@tsrx/typescript-plugin@0.6.3'
-  - '@tsrx/vite-plugin-react@0.0.120'
-  - '@tsrx/vite-plugin-solid@0.0.117'
+  - '@tsrx/core@0.6.3'
+  - '@tsrx/prettier-plugin@0.7.3'
+  - '@tsrx/react@0.5.3'
+  - '@tsrx/ripple@0.2.11'
+  - '@tsrx/solid@0.4.3'
+  - '@tsrx/typescript-plugin@0.7.3'
+  - '@tsrx/vite-plugin-react@0.0.124'
+  - '@tsrx/vite-plugin-solid@0.0.121'
   - ripple@0.4.0
-  - '@tsrx/runtime@0.2.4'
-  - '@tsrx/react-runtime@0.1.12'
-  - '@tsrx/solid-runtime@0.1.12'
+  - '@tsrx/runtime@0.2.5'
+  - '@tsrx/react-runtime@0.2.0'
+  - '@tsrx/solid-runtime@0.1.13'
+  - '@tsrx/content-mapper@0.1.4'
   - cn@0.2.6
   - '@tanstack/react-virtual@3.14.26'
   - '@tanstack/virtual-core@3.19.11'
@@ -671,38 +673,22 @@ patchedDependencies:
   # packages/octane/tests/compiler/parser.test.ts. Drop when the adopted release
   # contains #110.
   '@sveltejs/acorn-typescript@1.0.13': patches/@sveltejs__acorn-typescript@1.0.13.patch
-  # Test a comment's blank-line condition only once the text before it is
-  # whitespace, the only case that reads it. In 0.5.x, comment attachment
-  # copied all the code from every node to the next comment, so parsing a
-  # large module with few comments was quadratic. Octane's Vite plugin parses
-  # every module it compiles with @tsrx/core. Before #1852 it also parsed the
-  # SSR chunks Nitro re-bundles, and the website's 5 MB docs chunk ran its
-  # production build past the 420 s limit.
-  # Not yet fixed upstream in tsrx-org/tsrx (checked through @tsrx/core 0.5.5).
-  # SCOPE: this does not ship in the published octane tarball; consumers resolve
-  # unpatched @tsrx/core until an upstream release is adopted. Guarded by
-  # packages/octane/tests/compiler/compiler-vite-options.test.ts. Drop when the
-  # adopted @tsrx/core no longer scans past non-whitespace text for blank lines.
-  # Also keep template text lexing off while an opening tag reads its type
-  # arguments. acorn-typescript reads them with the tag's token context removed,
-  # so every token after the first read as text: `<Select<string | null>>`,
-  # `<Select<string, boolean>>` and `<Select<{ a: string }>>` threw "Unexpected
-  # token" in the editor parser on source the native parser compiles. Not yet
-  # fixed upstream (checked through @tsrx/core 0.5.5). Unlike the Vite plugin's
-  # parse above, the editor and octane-tsc get this fix: bundle-volar.mjs
+  # Let type-only output name dynamic tags with a platform-chosen local
+  # (`imports.dynamicTypeLocal`), so the Volar print can type `<{Tag}>` against
+  # a host-typed alias while keeping the dynamic helper import. Not yet in
+  # tsrx-org/tsrx (checked through @tsrx/core 0.6.3). SCOPE: bundle-volar.mjs
   # freezes this install's @tsrx/core into the published `octane/compiler/volar`.
-  # Guarded by "checks props against explicit JSX element type arguments" in
-  # packages/octane/tests/compiler/volar.test.ts. Drop this hunk when the
-  # adopted @tsrx/core reads a tag's type arguments as code.
-  '@tsrx/core@0.5.5': patches/@tsrx__core@0.5.5.patch
+  # Guarded by "type-checks dynamic tags against the element or component named
+  # by the tag" in packages/octane/tests/compiler/volar.test.ts.
+  '@tsrx/core@0.6.3': patches/@tsrx__core@0.6.3.patch
   # The same type-only import rule for the native parser: the compat facade's
   # scope check mirrors acorn-typescript's lexical import bindings, and the
   # compiler parses .tsrx with it first in Node. Not yet fixed upstream in
-  # tsrx-org/oxc (checked through @tsrx/oxc 0.23.0). Drop the scope hunks when
+  # tsrx-org/oxc (checked through @tsrx/oxc 0.24.0). Drop the scope hunks when
   # the adopted release reads importKind and the parser-option hunks when it
   # preserves import/export kinds for .ts/.mts/.cts. The published Node
   # compiler bundles the patched JS facade and loads the native parser separately.
-  '@tsrx/oxc@0.23.0': patches/@tsrx__oxc@0.23.0.patch
+  '@tsrx/oxc@0.24.0': patches/@tsrx__oxc@0.24.0.patch
   # Verify Chromium request interception is live before a browser mock route is
   # added, and keep it on across files. The provider mocks through
   # context.route(); clearing mocks between files removes every route, and
@@ -718,18 +704,6 @@ patchedDependencies:
   # Browser ships its own prebundled copy of the mocker implementation.
   '@vitest/browser@4.1.10': patches/@vitest__browser@4.1.10.patch
   '@vitest/mocker@4.1.10': patches/@vitest__mocker@4.1.10.patch
-  # Print a one-parameter type parameter list as `<T,>` in TSX. 2.3.2 prints
-  # `<T>`, so a generic arrow in a .tsrx file became a JSX element in the virtual
-  # TSX the editor and octane-tsc check (TS17008 and a cascade of syntax errors).
-  # Backports sveltejs/esrap#188 (4a0bb7f, released in 2.3.8). Upgrading instead
-  # would also take 2.3.11, which removed the `boundaryTokens` option @tsrx/core
-  # 0.5.5 maps structural tokens with. SCOPE: packages/octane/scripts/
-  # bundle-volar.mjs freezes this install's esrap into the published
-  # `octane/compiler/volar`, so this patch ships in the octane tarball. Guarded
-  # by the generic arrow case in
-  # packages/octane/tests/compiler/volar.test.ts. Drop when the adopted esrap is
-  # 2.3.8 or later.
-  esrap@2.3.2: patches/esrap@2.3.2.patch
   # Replay a bodiless request once when the upstream closes its pooled keep-alive
   # socket before answering it, as Node documents for `request.reusedSocket`.
   # Nitro's dev server proxies every document to its SSR worker through

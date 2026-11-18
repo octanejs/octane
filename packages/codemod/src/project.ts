@@ -38,6 +38,7 @@ import {
 	MOTION_PRESENCE_OWNER,
 	projectTypeAt,
 	REACT_TYPE_PROJECTION,
+	RETAINED_REGISTRY_BOUNDARY,
 	RETAINED_WORKSPACE_HOOK,
 	textKind,
 	transformModule,
@@ -304,22 +305,33 @@ export async function runCodemod(
 	for (const file of conflicts.keys()) exports.delete(file);
 	const strictConfig = (config?.strictNullChecks ?? config?.strict) ? config : null;
 	let program: ts.Program | undefined;
+	const proofPath = (name: string) => ts.sys.realpath?.(name) ?? name;
 	function typesOf(file: string): TransformOptions['types'] {
 		if (!strictConfig || options.projectTypes === false) return;
 		// Even one input can import a large graph. Bind it only for a rewrite that needs its types.
+		// With TypeScript's default symlink handling, package imports resolve to physical files;
+		// use the same identity for selected roots and path-bearing compiler options.
+		const preserve = strictConfig.preserveSymlinks === true;
 		if (!program) {
-			const options = { ...strictConfig, noEmit: true, noUncheckedIndexedAccess: true };
+			const physicalRoot = preserve ? root : proofPath(root);
+			const proofConfig =
+				physicalRoot === root ? strictConfig : (tsconfigOptions(physicalRoot) ?? strictConfig);
+			const selected = files.filter((name) => /\.[cm]?tsx?$/.test(name));
+			const proofOptions = { ...proofConfig, noEmit: true, noUncheckedIndexedAccess: true };
 			program = ts.createProgram(
-				files.filter((name) => /\.[cm]?tsx?$/.test(name)),
-				options,
-				libCachingHost(options),
+				preserve ? selected : selected.map(proofPath),
+				proofOptions,
+				libCachingHost(proofOptions),
 			);
 		}
-		const sourceFile = program.getSourceFile(file);
+		const sourceFile = program.getSourceFile(preserve ? file : proofPath(file));
 		if (sourceFile) return { sourceFile, checker: program.getTypeChecker() };
 	}
 	const contextsOf = contextIndex(exports, known);
-	const contextPaths = Object.keys(config?.paths ?? {}).map((pattern) => pattern.split('*'));
+	const contextPaths = Object.entries(config?.paths ?? {}).map(([pattern, targets]) => ({
+		parts: pattern.split('*'),
+		targets,
+	}));
 	const moduleKind = config?.module;
 	const esmContextProject =
 		(moduleKind === ts.ModuleKind.ES2015 ||
@@ -772,8 +784,14 @@ export async function runCodemod(
 			bindingExports: (from, to) => bindingExports(file, from, to),
 		}).changed;
 	}
-	const { inputFactory, changedJsxExport, helperFunction, localFile, exportsConstObject } =
-		storeSources(root, config, unchangedStoreInput, (file) => renames.has(file));
+	const {
+		inputFactory,
+		changedJsxExport,
+		helperFunction,
+		localFile,
+		typedFile,
+		exportsConstObject,
+	} = storeSources(root, config, unchangedStoreInput, (file) => renames.has(file));
 	function localReactTemplateComponent(from: string, module: string, name: string) {
 		if (
 			!/^\.{1,2}\//.test(module) ||
@@ -1314,24 +1332,49 @@ export async function runCodemod(
 				if (
 					!contextPaths.length ||
 					!esmContextProject ||
-					ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject ||
-					!contextPaths.some(([start, end]) =>
-						end === undefined
-							? specifier === start
-							: specifier.startsWith(start) && specifier.endsWith(end),
-					)
+					ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject
 				)
 					return null;
+				const matches = contextPaths.filter(({ parts: [start, end] }) =>
+					end === undefined
+						? specifier === start
+						: specifier.startsWith(start) && specifier.endsWith(end),
+				);
+				if (!matches.length) return null;
+				const typed = typedFile(file, specifier);
 				const source = localFile(file, specifier, true);
-				const selected = source && exports.get(source);
-				return source &&
-					selected &&
-					ts.findConfigFile(path.dirname(source), ts.sys.fileExists) === rootProject &&
-					(selected.contexts.includes(name) ||
-						(name === 'default' ? local : name).endsWith('Context') ||
-						(!attributed && selected.reexports.length > 0 && selectedContextReexport(source, name)))
+				const selected = typed ? exports.get(typed) : undefined;
+				const sameProject =
+					source && ts.findConfigFile(path.dirname(source), ts.sys.fileExists) === rootProject;
+				if (!attributed && sameProject && exportsConstObject(source, name)) return false;
+				const direct = !!selected?.contexts.includes(name);
+				if (
+					direct &&
+					!attributed &&
+					sameProject &&
+					source === typed &&
+					matches.length === 1 &&
+					matches[0].targets.length === 1 &&
+					selectedContextReexport(source, name)
+				)
+					return true;
+				const retained =
+					sameProject &&
+					!selected &&
+					installedReact(source) &&
+					retainedReactContextExports(source, fs.readFileSync(source, 'utf8')).has(name);
+				const namedContext = (name === 'default' ? local : name).endsWith('Context');
+				return direct ||
+					retained ||
+					(!!source && namedContext) ||
+					(!!selected &&
+						selected.reexports.length > 0 &&
+						!!source &&
+						selectedContextReexport(source, name))
 					? 'review-alias'
-					: null;
+					: selected || namedContext
+						? false
+						: null;
 			}
 			const target = resolveModule(file, specifier, known);
 			if (target) return contextsOf(target.file).has(name);
@@ -1660,6 +1703,7 @@ export async function runCodemod(
 				note.rule === ELEMENT_CHILD_ALIAS ||
 				note.rule === REACT_TYPE_PROJECTION ||
 				note.rule === MOTION_PRESENCE_OWNER ||
+				note.rule === RETAINED_REGISTRY_BOUNDARY ||
 				note.rule === RETAINED_WORKSPACE_HOOK,
 		);
 		if (write && blockedTransform)

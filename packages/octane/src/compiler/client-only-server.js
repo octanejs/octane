@@ -295,8 +295,19 @@ function clientOnlyStubVisitors() {
 	};
 }
 
+/**
+ * esrap maps every located node's start and end, and a Program starts at
+ * offset 0 whatever comes first, so its mark would shadow the first statement's
+ * own at generated column 0 and map an empty module.
+ */
+export function withoutProgramLoc(node) {
+	if (node.type !== 'Program' || !node.loc) return node;
+	const { loc, ...program } = node;
+	return program;
+}
+
 function printClientOnlyServerStub(program, source, filename, exports) {
-	const printed = esrapPrint(program, clientOnlyStubVisitors(), {
+	const printed = esrapPrint(withoutProgramLoc(program), clientOnlyStubVisitors(), {
 		sourceMapSource: filename,
 		sourceMapContent: source,
 	});

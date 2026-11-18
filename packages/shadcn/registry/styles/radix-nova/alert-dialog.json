@@ -12,7 +12,7 @@
     }
   ],
   "dependencies": [
-    "@octanejs/radix@0.1.73",
+    "@octanejs/radix@0.1.74",
     "cn"
   ],
   "registryDependencies": [
