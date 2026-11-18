@@ -37,8 +37,6 @@ const DATA_CONTRACT_ESCAPE = 'OCTANE_DATA_CONTRACT_ESCAPE';
 
 const FACTORIES = new Set(['entity', 'feed', 'read', 'view', 'write']);
 const DATA_MODULE = /\.data\.[cm]?[jt]s$/;
-/** The factories that take the function serving their contract as a second argument. */
-const WITH_RUN = new Set(['read', 'view', 'write']);
 const DATA_SPECIFIER = /\.data(?:\.[cm]?[jt]s)?$/;
 const SERVER_MODULES = ['octane/server', 'octane/data/server', 'octane/data/octane/server'];
 
@@ -446,7 +444,7 @@ export function stripDataImplementations(source, filename) {
 			continue;
 		for (const specifier of statement.specifiers) {
 			const imported = specifier.imported?.name ?? specifier.imported?.value;
-			if (specifier.importKind !== 'type' && WITH_RUN.has(imported))
+			if (specifier.importKind !== 'type' && SERVED.has(imported))
 				factories.add(specifier.local.name);
 		}
 	}
@@ -631,7 +629,7 @@ const SOURCE_FILE = /\.(?:tsrx|[cm]?[jt]sx?)$/;
 const IGNORED_DIRECTORIES = new Set(['node_modules', 'dist', 'build', 'out', 'coverage']);
 /** A source that names `octane/data` or imports a contract module. */
 const MENTIONS_DATA = /octane\/data|\.data(?:\.[cm]?[jt]s)?['"]/;
-/** Contracts a `createDataHandler` serves. */
+/** Contracts a `createDataHandler` serves, whose factories also take the function serving them. */
 const SERVED = new Set(['read', 'view', 'write', 'feed']);
 const HANDLER_SITES = new Set(['handle', 'defineHandler']);
 const RESOLVE_EXTENSIONS = ['.ts', '.js', '.mts', '.mjs', '.cts', '.cjs'];

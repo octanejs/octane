@@ -1244,8 +1244,8 @@ T>` type names the function that serves contract `T` under context `C`.
 
 <h3 id="served-contracts">Declare a contract with its function</h3>
 
-A read, view or write can also take the function that serves it as a second
-argument, so the contract and its implementation sit together in the
+A read, view, write or feed can also take the function that serves it as a
+second argument, so the contract and its implementation sit together in the
 `*.data.ts` module:
 
 ```ts
@@ -1290,8 +1290,7 @@ before it leaves, and your function still decides who may do what. The Octane
 Vite and Rspack plugins build the browser's copy of the module without these
 functions, and without the imports and module-level constants only they used,
 so `db.server.ts` never reaches the client. Without one of those plugins, keep
-your functions in `defineHandler`'s object instead. Feeds take their
-function in `defineHandler`'s object only.
+your functions in `defineHandler`'s object instead.
 
 <h3 id="module-server">Serve through a server function</h3>
 

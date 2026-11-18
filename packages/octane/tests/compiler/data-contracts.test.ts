@@ -479,7 +479,7 @@ store.read(extra);
 });
 
 describe('the browser copy of a contract module', () => {
-	const served = `import { entity, read, view, write } from 'octane/data';
+	const served = `import { entity, feed, read, view, write } from 'octane/data';
 import { z } from 'zod';
 import { db, sql } from './db.server.ts';
 import { audit } from './audit.ts';
@@ -498,6 +498,12 @@ export const shelf = view(
 );
 export const add = write({ name: 'books.add', input: z.string() }, (title) => audit(books.insert(title))) as never;
 export const plain = read({ name: 'books.count', output: z.number() });
+export const changes = feed(
+	{ name: 'books.changes', event: Book.one, changes: (book) => ({ put: Book, value: book }), covers: ['book'] },
+	async function* () {
+		yield* books.watch();
+	},
+);
 `;
 
 	it('drops each function, and what only the functions used, from a client build', () => {
@@ -509,6 +515,8 @@ export const plain = read({ name: 'books.count', output: z.number() });
 		expect(client).toContain("import { z } from 'zod'");
 		expect(client).toContain('(db) => db.title');
 		expect(client).toContain("read({ name: 'books.count', output: z.number() })");
+		expect(client).not.toContain('watch');
+		expect(client).toContain("name: 'books.changes'");
 		expect(analyzeDataContracts(client, '/app/books.data.ts').diagnostics).toEqual([]);
 	});
 

@@ -5,7 +5,7 @@
  */
 import * as devalue from 'devalue';
 import { describe, expect, it } from 'vitest';
-import { DataError, entity, read, write, type DataRequest } from '../src/data/index.js';
+import { DataError, entity, feed, read, write, type DataRequest } from '../src/data/index.js';
 import {
 	createDataHandler,
 	type DataCall,
@@ -197,6 +197,21 @@ describe('contracts declared with the function that serves them', () => {
 				return note;
 			},
 		),
+		saved: feed(
+			{
+				name: 'notes.saved',
+				event: Note.one,
+				changes: (note) => ({ put: Note, value: note }),
+				covers: ['note'],
+			},
+			async function* (_, { viewer, cursor }: Call & { readonly cursor: string | null }) {
+				yield { cursor: cursor ?? '0' };
+				for (const note of notes.values())
+					if (note.owner === viewer) yield { event: note, cursor: note.id };
+				// Fails its contract, so it never leaves the server.
+				yield { event: { id: 'x', text: 1 } as never, cursor: 'x' };
+			},
+		),
 		count: read({
 			name: 'notes.count',
 			output: schema<number>((value) => typeof value === 'number'),
@@ -245,6 +260,25 @@ describe('contracts declared with the function that serves them', () => {
 				new AbortController().signal,
 			),
 		).toMatchObject({ ok: false, code: 'forbidden' });
+	});
+
+	it('serves a feed by its own function, dropping events its contract refuses', async () => {
+		const server = createDataHandler({ context }, (_, defineHandler) =>
+			defineHandler(Notes, { count: () => notes.size }),
+		);
+		const request = new Request('https://app.test/data');
+		const frames = [];
+		for await (const frame of server.listen(
+			devalue.stringify({ name: 'notes.saved', params: undefined, cursor: 'c0' }),
+			{ request, signal: request.signal, viewer: 'ada' },
+		))
+			frames.push(devalue.parse(frame));
+		expect(frames).toEqual([
+			{},
+			{ cursor: 'c0' },
+			{ event: { id: 'n1', text: 'Kelp', owner: 'ada' }, cursor: 'n1' },
+			{ gap: true, cursor: 'x' },
+		]);
 	});
 
 	it('still refuses a contract with neither its own function nor one in the object', () => {

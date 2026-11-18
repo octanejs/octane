@@ -221,7 +221,7 @@ view, write or feed it exports. Its type requires exactly one `run` per
 contract export, typed as `handle` types it; a missing or extra key is a type
 error, a missing one at runtime throws, and other exports are ignored.
 `Implementation<C, T>` is the type of `run` for contract `T`.
-A `read`, `view` or `write` declared with its `run` as a second argument,
+A `read`, `view`, `write` or `feed` declared with its `run` as a second argument,
 `read(options, run)`, is served by it: `defineHandler(Module)` needs no key
 for it and takes no object when every contract has one. Its `call` type names
 what `run` needs from the context (`Served<Context>`), and `defineHandler`

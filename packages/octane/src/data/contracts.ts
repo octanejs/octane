@@ -601,21 +601,34 @@ export interface Feed<Params, Event> {
  * a connection without a cursor drops and comes back, it marks every read in
  * `covers` stale, and observed ones reload.
  */
-export function feed<Event, Params = void>(options: {
+interface FeedOptions<Event, Params> {
 	name: string;
 	params?: StandardSchema<unknown, Params>;
 	event: StandardSchema<unknown, Event>;
 	changes: (event: Event, params: Params) => FeedChange | readonly FeedChange[];
 	covers: readonly string[];
-}): Feed<Params, Event> {
-	return {
+}
+
+export function feed<Event, Params = void>(
+	options: FeedOptions<Event, Params>,
+): Feed<Params, Event>;
+/** A feed with the function that serves it: see `Served`. */
+export function feed<Event, Params = void, Context = {}>(
+	options: FeedOptions<Event, Params>,
+	run: Implementation<Context, Feed<Params, Event>>,
+): Feed<Params, Event> & Served<Context>;
+export function feed<Event, Params>(
+	options: FeedOptions<Event, Params>,
+	run?: (input: any, call: any) => unknown,
+): Feed<Params, Event> {
+	return serve(run, {
 		kind: 'feed',
 		name: options.name,
 		params: options.params,
 		event: options.event,
 		changes: options.changes,
 		covers: options.covers,
-	};
+	});
 }
 
 /**
