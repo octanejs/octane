@@ -9,10 +9,7 @@ import {
 	suspendScopeReads,
 	ScopeImpl,
 } from './engine.js';
-import {
-	createConfiguredDeclaredScalarCell,
-	createDeclaredScalarCell,
-} from './scalar-computations.js';
+import { createDeclaredScalarCell } from './scalar-computations.js';
 import { ScopeDisposedError } from './errors.js';
 import {
 	isDeclarationView,
@@ -382,7 +379,7 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 		readonly key: string,
 		readonly kind: H['kind'],
 		/** `declaring` is the invocation that evaluated the declaration of `owner`'s cell, or 0. */
-		public create: (owner: OwnerScope, declaring: number) => H,
+		readonly create: (owner: OwnerScope, declaring: number) => H,
 		readonly site: string | undefined,
 		declared?: Descriptor<T, H>,
 	) {
@@ -614,6 +611,7 @@ export function __signalAt<T>(
 	site: string | undefined,
 	initial: T,
 	options?: SignalOptions,
+	prepare?: () => ((node: ScopedNode<T>) => void) | undefined,
 ): WritableSignal<T> {
 	const explicit = signalOptionsKey(options);
 	site ??= explicit;
@@ -634,6 +632,7 @@ export function __signalAt<T>(
 				key,
 				early === undefined ? initial : (early.value as T),
 				early !== undefined,
+				prepare,
 			);
 		},
 		site,
@@ -646,24 +645,7 @@ export function __signalOptionsAt<T>(
 	initial: T,
 	options?: AuthoredSignalOptions<T>,
 ): WritableSignal<T> {
-	const descriptor = __signalAt(site, initial, options) as SignalDescriptor<T>;
-	if (options) {
-		const create = descriptor.create;
-		descriptor.create = (owner, declaring) => {
-			// Validate before the base factory registers a new key. The resolved
-			// writable cell is still unobserved when its first options are installed.
-			const configure =
-				owner instanceof ScopeImpl && !owner.nodes.has(descriptor.key)
-					? prepareDeclaredCellOptions(options)
-					: undefined;
-			// A getter may resolve the same key while its options are captured.
-			const created = configure !== undefined && !(owner as ScopeImpl).nodes.has(descriptor.key);
-			const node = create(owner, declaring);
-			if (created) configure!(node as ScopedNode<T>);
-			return node;
-		};
-	}
-	return descriptor;
+	return __signalAt(site, initial, options, options && (() => prepareDeclaredCellOptions(options)));
 }
 
 export function signal$<T>(initial: T, options?: AuthoredSignalOptions<T>): WritableSignal<T> {
@@ -676,6 +658,7 @@ export function __derivedScalarAt<T>(
 	compute: DerivedCompute<T>,
 	options?: AuthoredDerivedOptions<T>,
 	captures?: readonly unknown[],
+	prepare?: () => ((node: ScopedNode<T>) => void) | undefined,
 ): DerivedSignal<T> {
 	if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
 	const explicit = signalOptionsKey(options);
@@ -694,6 +677,7 @@ export function __derivedScalarAt<T>(
 				sequence,
 				captures,
 				declaring,
+				prepare,
 			),
 		site,
 	);
@@ -720,25 +704,12 @@ export function __derivedScalarOptionsAt<T>(
 			throw new TypeError(formatClientError(166));
 		return value;
 	};
-	const explicit = signalOptionsKey(options);
-	site ??= explicit;
-	const key = declarationKey(site, descriptorKey(site, explicit));
-	const sequence = signalDeclarationSequence(site);
-	return new DerivedDescriptor(
-		key,
-		'derived',
-		(owner, declaring) =>
-			createConfiguredDeclaredScalarCell(
-				owner,
-				key,
-				() => runWithSignalOwner(owner, synchronous),
-				options,
-				sequence,
-				captures,
-				declaring,
-				options && (() => prepareDeclaredCellOptions(captured ?? options)),
-			),
+	return __derivedScalarAt(
 		site,
+		synchronous,
+		options,
+		captures,
+		options && (() => prepareDeclaredCellOptions(captured ?? options)),
 	);
 }
 

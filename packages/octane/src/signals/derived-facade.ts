@@ -25,18 +25,10 @@ import type {
 export function __derivedAt<T>(
 	site: string | undefined,
 	compute: DerivedCompute<T>,
-	options?: AuthoredDerivedOptions<T>,
+	options?: SignalOptions & DerivedOptions,
 	captures?: readonly unknown[],
 ): DerivedSignal<T> {
 	if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
-	const equals = options?.equals;
-	const watched = options?.watched;
-	if (equals !== undefined || watched !== undefined) {
-		return __derivedScalarOptionsAt(site, compute, options, captures, {
-			equals,
-			watched,
-		} as ScopeSignalOptions<T>);
-	}
 	const explicit = signalOptionsKey(options);
 	site ??= explicit;
 	const key = declarationKey(site, descriptorKey(site, explicit));
@@ -56,6 +48,24 @@ export function __derivedAt<T>(
 	);
 }
 
+/** General declarations whose options may configure the resolved cell. */
+export function __derivedOptionsAt<T>(
+	site: string | undefined,
+	compute: DerivedCompute<T>,
+	options?: AuthoredDerivedOptions<T>,
+	captures?: readonly unknown[],
+): DerivedSignal<T> {
+	if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
+	const equals = options?.equals;
+	const watched = options?.watched;
+	return equals !== undefined || watched !== undefined
+		? __derivedScalarOptionsAt(site, compute, options, captures, {
+				equals,
+				watched,
+			} as ScopeSignalOptions<T>)
+		: __derivedAt(site, compute, options, captures);
+}
+
 export function derived$<T>(
 	compute: (() => T) & (T extends PromiseLike<unknown> | AsyncIterable<unknown> ? never : unknown),
 	options: SignalOptions & ScopeSignalOptions<T> & { readonly sync: true },
@@ -68,5 +78,5 @@ export function derived$<T>(
 	compute: DerivedCompute<T>,
 	options?: AuthoredDerivedOptions<T>,
 ): DerivedSignal<T> {
-	return __derivedAt(undefined, compute, options);
+	return __derivedOptionsAt(undefined, compute, options);
 }

@@ -26,19 +26,19 @@ const SIGNAL_FACTORIES = new Map([
 // module with such a declaration installs the views that stage it until the
 // renderer accepts that render (signals/redeclaration.ts).
 const VIEW_INSTALLERS = new Map([
-	['__derivedAt', '__derivedViews'],
-	['__derivedScalarAt', '__derivedScalarViews'],
-	['__derivedScalarOptionsAt', '__derivedScalarViews'],
-	['__queryAt', '__queryViews'],
+	['__derivedAt', ['__derivedViews']],
+	['__derivedOptionsAt', ['__derivedViews', '__derivedScalarViews']],
+	['__derivedScalarAt', ['__derivedScalarViews']],
+	['__derivedScalarOptionsAt', ['__derivedScalarViews']],
+	['__queryAt', ['__queryViews']],
 ]);
 
 function viewInstallers(declarations, trustedFactory) {
 	const installers = new Map();
 	for (const { node } of declarations) {
 		const trusted = trustedFactory(node);
-		const installer = VIEW_INSTALLERS.get(declarationHelper(trusted.factory, node));
-		if (installer !== undefined && !installers.has(installer))
-			installers.set(installer, trusted.helper(installer));
+		for (const installer of VIEW_INSTALLERS.get(declarationHelper(trusted.factory, node)) ?? [])
+			if (!installers.has(installer)) installers.set(installer, trusted.helper(installer));
 	}
 	return [...installers.values()];
 }
@@ -113,6 +113,12 @@ function declarationHelper(factory, call) {
 	if (factory === 'signal$') return hasCellOptions(call, 1) ? '__signalOptionsAt' : '__signalAt';
 	if (factory !== 'derived$') return SIGNAL_FACTORIES.get(factory);
 	const helper = derivedDeclarationHelper(call);
+	if (helper === '__derivedAt') {
+		const options = unwrapExpression(call.arguments?.[1]);
+		return options === undefined || (options.type === 'Literal' && options.value === null)
+			? helper
+			: '__derivedOptionsAt';
+	}
 	return helper === '__derivedScalarAt' && hasCellOptions(call, 1)
 		? '__derivedScalarOptionsAt'
 		: helper;

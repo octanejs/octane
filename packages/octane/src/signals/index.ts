@@ -6,7 +6,7 @@ export type { SignalControlBinding } from './control-handoff.js';
 export { enableSignalDocument as __enableSignalDocument } from './document-owner.js';
 export { createResource, query } from './requests.js';
 export { ActionUncertainError, action$, isActionUncertain, optimistic$ } from './actions.js';
-export { __derivedAt, derived$ } from './derived-facade.js';
+export { __derivedAt, __derivedOptionsAt, derived$ } from './derived-facade.js';
 export { __queryAt, query$ } from './query-facade.js';
 // Compiled instance declarations install the views that stage a redeclaration.
 export { installDerivedViews as __derivedViews } from './computations.js';

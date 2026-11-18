@@ -87,7 +87,7 @@ function compiledCalls(source: string, mode: 'client' | 'server' = 'client') {
 					: node.callee?.type === 'MemberExpression' && node.callee.property?.name;
 			if (
 				typeof callee === 'string' &&
-				/^_?\$?__(?:signal(?:Options)?|derived(?:Scalar(?:Options)?)?|query)At/.test(callee)
+				/^_?\$?__(?:signal(?:Options)?|derived(?:Options|Scalar(?:Options)?)?|query)At/.test(callee)
 			) {
 				calls.push({ callee, site: node.arguments?.[0]?.value });
 			}
@@ -233,6 +233,31 @@ export function exercise() { return 1; }
 }
 
 describe('compiler-owned signal declaration sites', () => {
+	it('keeps proven optionless general declarations separate from dynamic options', () => {
+		const source = `import { derived$ } from 'octane/signals';
+const options = {sync: true, watched: () => {}};
+const optionless$ = derived$(async () => 1);
+const nullOptions$ = derived$(async () => 2, null);
+const dynamic$ = derived$(() => ({}), options);
+const keyed$ = derived$(async () => 3, {key: 'keyed'});`;
+		for (const mode of ['client', 'server'] as const) {
+			expect(compiledCalls(source, mode).map((call) => call.callee)).toEqual([
+				expect.stringContaining('__derivedAt'),
+				expect.stringContaining('__derivedAt'),
+				expect.stringContaining('__derivedOptionsAt'),
+				expect.stringContaining('__derivedOptionsAt'),
+			]);
+		}
+		const instance = compile(
+			`import { derived$ } from 'octane/signals';
+export function App(props) @{ const value$ = derived$(() => ({value: props.value}), props.options); <output>{value$.get().value}</output> }`,
+			FILENAME,
+			{ mode: 'client' },
+		).code;
+		expect(instance).toContain('__derivedViews');
+		expect(instance).toContain('__derivedScalarViews');
+	});
+
 	it('honors authored equality and observation options on client and server sites', async () => {
 		const authored = `import {signal$, derived$} from 'octane/signals';
 const point$ = signal$({x: 0}, {equals: (a, b) => a.x === b.x});
