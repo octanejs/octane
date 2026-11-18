@@ -289,6 +289,8 @@ function compareValues(a: unknown, b: unknown): number {
 	if (b == null) return 1;
 	const left = a instanceof Date ? a.getTime() : a;
 	const right = b instanceof Date ? b.getTime() : b;
+	// Values of different types never coerce: a pending create's string ID sorts after numbers.
+	if (typeof left !== typeof right) return typeof left < typeof right ? -1 : 1;
 	return (left as any) < (right as any) ? -1 : (left as any) > (right as any) ? 1 : 0;
 }
 

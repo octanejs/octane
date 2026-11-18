@@ -129,6 +129,26 @@ describe('octane/data over a database', () => {
 		expect(list.getSnapshot().value!.map((book) => book.id)).toEqual([
 			13, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14,
 		]);
+
+		// A new tied title, whose draft key is a string, waits after the integer keys: never in
+		// the first page, which ends at a tie.
+		const first = db.store.read(byTitle, undefined);
+		first.subscribe(() => {});
+		await vi.waitFor(() => expect(first.getSnapshot().status).toBe('ready'));
+		const ids = () => first.getSnapshot().value!.map((book) => book.id);
+		expect(ids()).toEqual([13, 1, 2, 3, 4]);
+		const added = db.store.write(add, { title: 'Same' });
+		expect(ids()).toEqual([13, 1, 2, 3, 4]);
+		expect(shown().slice(-2)).toEqual(['Same', 'Zephyr']);
+		await added;
+		await quiet();
+		expect(ids()).toEqual([13, 1, 2, 3, 4]);
+		expect(
+			list
+				.getSnapshot()
+				.value!.map((book) => book.id)
+				.slice(-3),
+		).toEqual([12, 15, 14]);
 	});
 
 	it('moves an edited row across a page edge before the reply, where the database then puts it', async () => {
