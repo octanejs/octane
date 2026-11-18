@@ -2,7 +2,7 @@
 
 How to write modern Octane applications in TSRX: where state should live, when an effect is the right tool, how Strong mode, Signals, and Data fit together, and what to check before you ship.
 
-This guide is for people and coding agents writing Octane applications. Each rule says what to do, why, when it applies, and what to use instead. Major pitfalls show an **Avoid** example followed by a **Prefer** example. Every example is a TSRX module that the repository compiles in a test, and each Avoid example in a Strong module reports the diagnostic its comment names. The rendered page at [octanejs.dev/docs/best-practices](https://octanejs.dev/docs/best-practices) and this Markdown file are the same document.
+This guide is for people and coding agents writing Octane applications. Each rule says what to do, why, when it applies, and what to use instead. Major pitfalls show an **Avoid** example followed by a **Prefer** example. Every example is a TSRX module that the repository compiles in a test, and each Avoid example in a Strong module reports the diagnostic its comment names.
 
 Octane looks like React, and most React instincts transfer. The ones that don't are deliberate: see [Differences from React](https://octanejs.dev/docs/differences-from-react). When this guide and the source disagree, the source wins.
 
