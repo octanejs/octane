@@ -128,6 +128,10 @@ its own entity's schema. `where` and `order` see the view's own record only.
   it.
 - A seed is adopted when its read is first asked for, and keeps its age
   (`seedAge` adds time spent in a cache).
+- A value no reader has shown yet, from a seed or a `prefetch`, is not
+  reloaded for its age by its first reader or by another `prefetch`, so a
+  route that prefetches hydrates without loading, and a link prefetched on
+  hover loads once. Once shown, a value older than `fresh` reloads.
 - `dispose()` ends one store locally, clears its memory immediately, flushes confirmed saves already queued after persistence has initialized, and preserves durable storage for another window or restart. A store disposed before initialization cancels its pending saves. A later `retire()` can still erase the account cache.
 - `retire()` clears memory at once, ignores late replies, and resolves once
   persistent storage is cleared. Later writes, invalidations and settlements
