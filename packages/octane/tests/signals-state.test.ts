@@ -1304,3 +1304,245 @@ describe('equals', () => {
 		expect(() => scope.signal$(null, 1, 'no' as never)).toThrow(TypeError);
 	});
 });
+
+describe('transaction', () => {
+	for (const key of ['count', null]) {
+		const kind = key === null ? 'keyless' : 'keyed';
+
+		it(`commits ${kind} writes and coalesces them into one change per signal`, () => {
+			const scope = owner();
+			const count$ = scope.signal$(key, 1);
+			const name$ = scope.signal$(key && 'name', 'a');
+			const same$ = scope.signal$(key && 'same', 0);
+			const seen: string[] = [];
+			count$.subscribe(() => seen.push(`count ${count$.get()}`));
+			scope.effect(() => {
+				seen.push(`effect ${count$.get()} ${name$.get()}`);
+			});
+			seen.length = 0;
+
+			const transaction = scope.transaction(() => {
+				count$.set(2);
+				name$.set('b');
+				count$.set((value) => value + 1);
+				same$.set(5);
+				same$.set(0);
+				expect(seen).toEqual([]);
+				return 'done';
+			});
+
+			expect(transaction.value).toBe('done');
+			expect(transaction.changes).toEqual([
+				{ signal$: count$, previous: 1, next: 3 },
+				{ signal$: name$, previous: 'a', next: 'b' },
+			]);
+			expect(seen).toEqual(['count 3', 'effect 3 b']);
+		});
+
+		it(`restores ${kind} writes when the callback throws, before anyone hears of them`, () => {
+			const scope = owner();
+			const count$ = scope.signal$(key, 1);
+			const doubled$ = scope.derived$(key && 'doubled', () => count$.get() * 2);
+			const seen: string[] = [];
+			// Disposal notifies them too, when their reads throw.
+			count$.subscribe(() => scope.retired || seen.push(`count ${count$.get()}`));
+			doubled$.subscribe(() => scope.retired || seen.push(`doubled ${doubled$.get()}`));
+			scope.effect(() => {
+				seen.push(`effect ${doubled$.get()}`);
+			});
+			seen.length = 0;
+			const failure = new Error('failed');
+
+			expect(() =>
+				scope.transaction(() => {
+					count$.set(2);
+					// A read inside the transaction sees its own writes.
+					expect(doubled$.get()).toBe(4);
+					count$.set(3);
+					throw failure;
+				}),
+			).toThrow(failure);
+
+			expect([count$.get(), doubled$.get()]).toEqual([1, 2]);
+			// The effect read 4 inside the transaction, so it can run again, but
+			// it and everyone else see only restored values.
+			expect(seen.filter((entry) => entry !== 'effect 2')).toEqual([]);
+			seen.length = 0;
+			count$.set(5);
+			expect(seen).toEqual(['count 5', 'doubled 10', 'effect 10']);
+		});
+	}
+
+	it('keeps the writes of an enclosing batch when a transaction inside it fails', () => {
+		const scope = owner();
+		const a$ = scope.signal$('a', 0);
+		const b$ = scope.signal$(null, 0);
+		const seen: string[] = [];
+		scope.effect(() => {
+			seen.push(`${a$.get()} ${b$.get()}`);
+		});
+		seen.length = 0;
+
+		scope.batch(() => {
+			a$.set(1);
+			expect(() =>
+				scope.transaction(() => {
+					a$.set(2);
+					b$.set(2);
+					throw new Error('failed');
+				}),
+			).toThrow('failed');
+			expect([a$.get(), b$.get()]).toEqual([1, 0]);
+		});
+
+		expect(seen).toEqual(['1 0']);
+	});
+
+	it('rolls back only an inner transaction that fails, and all of one whose outer fails', () => {
+		const scope = owner();
+		const a$ = scope.signal$('a', 0);
+		const b$ = scope.signal$(null, 0);
+
+		const outer = scope.transaction(() => {
+			a$.set(1);
+			expect(() =>
+				scope.transaction(() => {
+					a$.set(2);
+					b$.set(2);
+					throw new Error('inner');
+				}),
+			).toThrow('inner');
+			expect([a$.get(), b$.get()]).toEqual([1, 0]);
+			const inner = scope.transaction(() => b$.set(3));
+			expect(inner.changes).toEqual([{ signal$: b$, previous: 0, next: 3 }]);
+		});
+		expect(outer.changes).toEqual([
+			{ signal$: a$, previous: 0, next: 1 },
+			{ signal$: b$, previous: 0, next: 3 },
+		]);
+
+		expect(() =>
+			scope.transaction(() => {
+				scope.transaction(() => {
+					a$.set(10);
+					b$.set(10);
+				});
+				throw new Error('outer');
+			}),
+		).toThrow('outer');
+		expect([a$.get(), b$.get()]).toEqual([1, 3]);
+	});
+
+	it('undoes and redoes its changes in one batch, across scopes', () => {
+		const first = owner();
+		const second = owner();
+		const a$ = first.signal$('a', 'a0');
+		const b$ = second.signal$(null, 'b0');
+		const seen: string[] = [];
+		first.effect(() => {
+			seen.push(`${a$.get()} ${b$.get()}`);
+		});
+		seen.length = 0;
+
+		const transaction = first.transaction(() => {
+			a$.set('a1');
+			b$.set('b1');
+		});
+		transaction.undo();
+		expect([a$.get(), b$.get()]).toEqual(['a0', 'b0']);
+		transaction.redo();
+		expect([a$.get(), b$.get()]).toEqual(['a1', 'b1']);
+		expect(seen).toEqual(['a1 b1', 'a0 b0', 'a1 b1']);
+
+		// An undo inside another transaction is part of it.
+		expect(() =>
+			first.transaction(() => {
+				transaction.undo();
+				throw new Error('failed');
+			}),
+		).toThrow('failed');
+		expect([a$.get(), b$.get()]).toEqual(['a1', 'b1']);
+		const undo = first.transaction(() => transaction.undo());
+		expect(undo.changes).toEqual([
+			{ signal$: b$, previous: 'b1', next: 'b0' },
+			{ signal$: a$, previous: 'a1', next: 'a0' },
+		]);
+	});
+
+	it('restores exact values: a function, and a reference equals kept', () => {
+		const scope = owner();
+		const initial = { x: 1 };
+		const point$ = scope.signal$(null, initial, { equals: (a, b) => a.x === b.x });
+		const callback = () => 'first';
+		const callback$ = scope.signal$('callback', callback);
+
+		expect(() =>
+			scope.transaction(() => {
+				point$.set({ x: 2 });
+				point$.set({ x: 1 });
+				callback$.set(() => () => 'second');
+				throw new Error('failed');
+			}),
+		).toThrow('failed');
+
+		expect(point$.get()).toBe(initial);
+		expect(callback$.get()).toBe(callback);
+		const transaction = scope.transaction(() => callback$.set(() => () => 'second'));
+		transaction.undo();
+		expect(callback$.get()).toBe(callback);
+	});
+
+	it('skips the signals of a scope that retired', () => {
+		const scope = owner();
+		const other = createScope({ scopeKey: 'transaction-retired' });
+		const kept$ = scope.signal$('kept', 0);
+		const gone$ = other.signal$(null, 0);
+
+		expect(() =>
+			scope.transaction(() => {
+				kept$.set(1);
+				gone$.set(1);
+				other.dispose();
+				throw new Error('failed');
+			}),
+		).toThrow('failed');
+		expect(kept$.get()).toBe(0);
+
+		const later = createScope({ scopeKey: 'transaction-retired-later' });
+		const late$ = later.signal$('late', 0);
+		const transaction = scope.transaction(() => {
+			kept$.set(2);
+			late$.set(2);
+		});
+		later.dispose();
+		transaction.undo();
+		expect(kept$.get()).toBe(0);
+		transaction.redo();
+		expect(kept$.get()).toBe(2);
+	});
+
+	it('rolls back and rejects a callback that returns a promise, or none at all', () => {
+		const scope = owner();
+		const count$ = scope.signal$('count', 0);
+		expect(() =>
+			scope.transaction(() => {
+				count$.set(1);
+				return Promise.resolve();
+			}),
+		).toThrow(TypeError);
+		expect(count$.get()).toBe(0);
+		expect(() => scope.transaction('no' as never)).toThrow(TypeError);
+	});
+
+	it('leaves batch keeping its writes when its callback throws', () => {
+		const scope = owner();
+		const count$ = scope.signal$('count', 0);
+		expect(() =>
+			scope.batch(() => {
+				count$.set(1);
+				throw new Error('failed');
+			}),
+		).toThrow('failed');
+		expect(count$.get()).toBe(1);
+	});
+});

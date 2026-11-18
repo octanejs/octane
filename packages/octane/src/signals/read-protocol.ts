@@ -144,6 +144,8 @@ export const READ_ADOPTING = 2;
 export const READ_HISTORICAL = 4;
 export const READ_PENDING = 8;
 export const WRITE_GUARDED = 16;
+/** A transaction is open: each write records what it replaced (graph.ts signalTransaction). */
+export const WRITE_JOURNALED = 32;
 /** Any state in which a read is not a plain read of a live node. */
 export const READS_SPECIAL = READ_OBSERVED | READ_ADOPTING | READ_HISTORICAL | READ_PENDING;
 export let signalMode = 0;

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 368,
+  "nextCode": 370,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -2203,6 +2203,18 @@
     },
     "367": {
       "message": "A signal's watched option must be a function.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "368": {
+      "message": "A signal transaction must be a function.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "369": {
+      "message": "A signal transaction must be synchronous: its function returned a promise.",
       "argumentCount": 0,
       "runtime": ["client", "server"],
       "status": "active"

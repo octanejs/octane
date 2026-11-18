@@ -45,6 +45,7 @@ import {
 	setSignalMode,
 	signalMode,
 	WRITE_GUARDED,
+	WRITE_JOURNALED,
 	getNativeAdoptionResolver,
 	isNativeAdoptionMiss,
 	isNativeWriteGuarded,
@@ -65,10 +66,13 @@ import {
 	type AdoptionFrame,
 	type ConnectionState,
 	type ScopeSeed,
+	type SignalChange,
 	type SignalEquals,
 	type SignalHandle,
 	type SignalSnapshot,
 	type SignalTraceEvent,
+	type SignalTransaction,
+	type WritableSignal,
 } from './types.js';
 import { isThenable } from './handle-protocol.js';
 
@@ -933,7 +937,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 	isEqual(previous: T, next: T): boolean {
 		// setEquals marks every cell it gives one REACTIVE_SLOW.
 		const equals = this.flags & REACTIVE_SLOW ? cellEquals?.get(this) : undefined;
-		return equals !== undefined && untrack(() => equals(previous, next));
+		return equals !== undefined && !restoring && untrack(() => equals(previous, next));
 	}
 
 	get [SIGNAL_HANDLE](): true {
@@ -1156,7 +1160,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 		// for a current cell of a live, untraced owner, outside any computation, guard
 		// or transition. It changes nothing but the value and what depends on it.
 		if (
-			(signalMode & WRITE_GUARDED) === 0 &&
+			(signalMode & (WRITE_GUARDED | WRITE_JOURNALED)) === 0 &&
 			pureDepth === 0 &&
 			!(activeNode instanceof PlainComputed) &&
 			this.valueOnly &&
@@ -1206,12 +1210,20 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 					? untrack(() => pure(() => (value as (previous: T) => T)(previous)))
 					: value;
 			if (!Object.is(previous, next) && !this.isEqual(previous, next)) {
+				if (journal !== undefined && !journal.has(this)) journal.set(this, previous);
 				writeValue(this, next);
 				this.owner.trace('write', this);
 			}
 			// A pending transition value re-applies the update on top, even an
-			// update that leaves committed state equal.
-			if (this.pending !== undefined) pending!.rebase(this, value);
+			// update that leaves committed state equal. A transaction records the
+			// pending value first, and its rollback puts that back rather than
+			// rebasing again.
+			const slot = this.pending;
+			if (slot !== undefined && restoring !== ROLLING_BACK) {
+				if (journal !== undefined && !journal.has(slot))
+					journal.set(slot, strictValue(refreshNode(slot.shadow!), this.key));
+				pending!.rebase(this, value);
+			}
 		} finally {
 			endSignalBatch();
 		}
@@ -2299,8 +2311,13 @@ function writeCell<T>(cell: PlainCell<T>, value: T | ((previous: T) => T)): void
 			: value;
 	if (
 		!same(cell.last, next) &&
-		!(cell.flags & REACTIVE_CUSTOM_EQUALS && untrack(() => cellEquals!.get(cell)!(cell.last, next)))
+		!(
+			cell.flags & REACTIVE_CUSTOM_EQUALS &&
+			!restoring &&
+			untrack(() => cellEquals!.get(cell)!(cell.last, next))
+		)
 	) {
+		if (journal !== undefined && !journal.has(cell)) journal.set(cell, cell.last);
 		cell.last = next;
 		if (cell.flags & REACTIVE_TRACKED_CELL) cellChannels.get(cell)!.revision++;
 		const subs = cell.subs;
@@ -2323,6 +2340,92 @@ Object.defineProperties(PlainCell.prototype, {
 	deps: { value: undefined },
 	depsTail: { value: undefined },
 });
+
+/**
+ * The open transaction's journal: each writable signal it changed, in the order
+ * of its first change, and the value it had before. Writes leave their fast
+ * paths while WRITE_JOURNALED is set, so only a transaction's writes record.
+ */
+let journal: Map<ScopedNode | PlainCell | PendingSlotLike, unknown> | undefined;
+/**
+ * While a transaction restores values a write compares by identity alone. An
+ * undo or redo is an urgent write; a rollback also leaves pending values alone.
+ */
+let restoring: 0 | typeof RESTORING | typeof ROLLING_BACK = 0;
+const RESTORING = 1;
+const ROLLING_BACK = 2;
+
+/**
+ * Run `write` in a batch that records each signal it changes. If `write`
+ * throws, or returns a promise, the signals it changed take back their values
+ * before the batch ends, so no subscriber hears of them. A nested transaction's
+ * changes join its parent's journal when it commits.
+ */
+export function signalTransaction<T>(write: () => T): SignalTransaction<T> {
+	const parent = journal;
+	const own: Map<ScopedNode | PlainCell | PendingSlotLike, unknown> = (journal = new Map());
+	setSignalMode(WRITE_JOURNALED, true);
+	startSignalBatch();
+	try {
+		let value: T;
+		try {
+			value = write();
+			if (isThenable(value)) throw new TypeError(formatClientError(369));
+		} catch (error) {
+			// Restoring records nothing: what the parent had before is still current.
+			journal = undefined;
+			setSignalMode(WRITE_JOURNALED, false);
+			restore([...own].reverse(), ROLLING_BACK);
+			throw error;
+		} finally {
+			journal = parent;
+			setSignalMode(WRITE_JOURNALED, parent !== undefined);
+		}
+		const changes: SignalChange[] = [];
+		for (const [node, previous] of own) {
+			if (parent !== undefined && !parent.has(node)) parent.set(node, previous);
+			if (!(node instanceof ScopedNode || node instanceof PlainCell)) continue;
+			const next = node.last;
+			if (!Object.is(previous, next))
+				changes.push({ signal$: node as unknown as WritableSignal<unknown>, previous, next });
+		}
+		const undo = changes.map((change) => [change.signal$, change.previous] as const).reverse();
+		const redo = changes.map((change) => [change.signal$, change.next] as const);
+		return {
+			value,
+			changes,
+			undo: () => signalBatch(() => restore(undo, RESTORING)),
+			redo: () => signalBatch(() => restore(redo, RESTORING)),
+		};
+	} finally {
+		endSignalBatch();
+	}
+}
+
+/**
+ * Write each live signal's value exactly, even one its `equals` finds equal,
+ * and put back each pending transition value a rollback recorded, if its
+ * transition is still pending.
+ */
+function restore(
+	entries: readonly (readonly [unknown, unknown])[],
+	mode: typeof RESTORING | typeof ROLLING_BACK,
+): void {
+	restoring = mode;
+	try {
+		for (const [key, value] of entries) {
+			if (key instanceof ScopedNode || key instanceof PlainCell) {
+				if (!key.owner.retired) key.set(() => value);
+			} else {
+				const slot = key as PendingSlotLike;
+				if (slot.node.pending === slot && !slot.node.owner.retired)
+					publishNode(slot.shadow!, readyState(value));
+			}
+		}
+	} finally {
+		restoring = 0;
+	}
+}
 
 /** Each writable cell's own `equals`, made with the first one. */
 let cellEquals: WeakMap<ScopedNode | PlainCell, SignalEquals<any>> | undefined;
