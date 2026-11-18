@@ -1215,8 +1215,15 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 				this.owner.trace('write', this);
 			}
 			// A pending transition value re-applies the update on top, even an
-			// update that leaves committed state equal.
-			if (this.pending !== undefined) pending!.rebase(this, value);
+			// update that leaves committed state equal. A transaction records the
+			// pending value first, and its rollback puts that back rather than
+			// rebasing again.
+			const slot = this.pending;
+			if (slot !== undefined && restoring !== ROLLING_BACK) {
+				if (journal !== undefined && !journal.has(slot))
+					journal.set(slot, strictValue(refreshNode(slot.shadow!), this.key));
+				pending!.rebase(this, value);
+			}
 		} finally {
 			endSignalBatch();
 		}
@@ -2339,9 +2346,14 @@ Object.defineProperties(PlainCell.prototype, {
  * of its first change, and the value it had before. Writes leave their fast
  * paths while WRITE_JOURNALED is set, so only a transaction's writes record.
  */
-let journal: Map<ScopedNode | PlainCell, unknown> | undefined;
-/** While a transaction restores values: a write compares by identity alone. */
-let restoring = false;
+let journal: Map<ScopedNode | PlainCell | PendingSlotLike, unknown> | undefined;
+/**
+ * While a transaction restores values a write compares by identity alone. An
+ * undo or redo is an urgent write; a rollback also leaves pending values alone.
+ */
+let restoring: 0 | typeof RESTORING | typeof ROLLING_BACK = 0;
+const RESTORING = 1;
+const ROLLING_BACK = 2;
 
 /**
  * Run `write` in a batch that records each signal it changes. If `write`
@@ -2351,7 +2363,7 @@ let restoring = false;
  */
 export function signalTransaction<T>(write: () => T): SignalTransaction<T> {
 	const parent = journal;
-	const own: Map<ScopedNode | PlainCell, unknown> = (journal = new Map());
+	const own: Map<ScopedNode | PlainCell | PendingSlotLike, unknown> = (journal = new Map());
 	setSignalMode(WRITE_JOURNALED, true);
 	startSignalBatch();
 	try {
@@ -2363,7 +2375,7 @@ export function signalTransaction<T>(write: () => T): SignalTransaction<T> {
 			// Restoring records nothing: what the parent had before is still current.
 			journal = undefined;
 			setSignalMode(WRITE_JOURNALED, false);
-			restore([...own].reverse());
+			restore([...own].reverse(), ROLLING_BACK);
 			throw error;
 		} finally {
 			journal = parent;
@@ -2372,6 +2384,7 @@ export function signalTransaction<T>(write: () => T): SignalTransaction<T> {
 		const changes: SignalChange[] = [];
 		for (const [node, previous] of own) {
 			if (parent !== undefined && !parent.has(node)) parent.set(node, previous);
+			if (!(node instanceof ScopedNode || node instanceof PlainCell)) continue;
 			const next = node.last;
 			if (!Object.is(previous, next))
 				changes.push({ signal$: node as unknown as WritableSignal<unknown>, previous, next });
@@ -2381,24 +2394,36 @@ export function signalTransaction<T>(write: () => T): SignalTransaction<T> {
 		return {
 			value,
 			changes,
-			undo: () => signalBatch(() => restore(undo)),
-			redo: () => signalBatch(() => restore(redo)),
+			undo: () => signalBatch(() => restore(undo, RESTORING)),
+			redo: () => signalBatch(() => restore(redo, RESTORING)),
 		};
 	} finally {
 		endSignalBatch();
 	}
 }
 
-/** Write each live signal's value exactly, even one its `equals` finds equal. */
-function restore(entries: readonly (readonly [unknown, unknown])[]): void {
-	restoring = true;
+/**
+ * Write each live signal's value exactly, even one its `equals` finds equal,
+ * and put back each pending transition value a rollback recorded, if its
+ * transition is still pending.
+ */
+function restore(
+	entries: readonly (readonly [unknown, unknown])[],
+	mode: typeof RESTORING | typeof ROLLING_BACK,
+): void {
+	restoring = mode;
 	try {
-		for (const [handle, value] of entries) {
-			const node = handle as ScopedNode | PlainCell;
-			if (!node.owner.retired) node.set(() => value);
+		for (const [key, value] of entries) {
+			if (key instanceof ScopedNode || key instanceof PlainCell) {
+				if (!key.owner.retired) key.set(() => value);
+			} else {
+				const slot = key as PendingSlotLike;
+				if (slot.node.pending === slot && !slot.node.owner.retired)
+					publishNode(slot.shadow!, readyState(value));
+			}
 		}
 	} finally {
-		restoring = false;
+		restoring = 0;
 	}
 }
 
