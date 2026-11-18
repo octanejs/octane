@@ -114,14 +114,19 @@ function subscribeSafely<T>(
 ) {
 	let active = true;
 	let cleanup: (() => void) | undefined;
+	const fail = (error: unknown) => {
+		active = false;
+		if (typeof reportError === 'function') reportError(error);
+		else console.error(error);
+	};
 	let setup: (() => void) | Promise<() => void>;
 	try {
 		setup = start((value) => {
 			if (active) publish(value);
 		});
 	} catch (error) {
-		active = false;
-		throw error;
+		fail(error);
+		return () => {};
 	}
 	if (typeof setup === 'function') cleanup = setup;
 	else
@@ -130,11 +135,7 @@ function subscribeSafely<T>(
 				if (active) cleanup = stop;
 				else stop();
 			})
-			.catch((error) => {
-				active = false;
-				if (typeof reportError === 'function') reportError(error);
-				else console.error(error);
-			});
+			.catch(fail);
 	return () => {
 		active = false;
 		cleanup?.();

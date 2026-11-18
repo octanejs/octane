@@ -1117,14 +1117,19 @@ describe('watched', () => {
 	) {
 		let active = true;
 		let cleanup: (() => void) | undefined;
+		const fail = (error: unknown) => {
+			active = false;
+			if (typeof reportError === 'function') reportError(error);
+			else console.error(error);
+		};
 		let setup: (() => void) | Promise<() => void>;
 		try {
 			setup = start((value) => {
 				if (active) publish(value);
 			});
 		} catch (error) {
-			active = false;
-			throw error;
+			fail(error);
+			return () => {};
 		}
 		if (typeof setup === 'function') cleanup = setup;
 		else
@@ -1133,11 +1138,7 @@ describe('watched', () => {
 					if (active) cleanup = stop;
 					else stop();
 				})
-				.catch((error) => {
-					active = false;
-					if (typeof reportError === 'function') reportError(error);
-					else console.error(error);
-				});
+				.catch(fail);
 		return () => {
 			active = false;
 			cleanup?.();
@@ -1254,6 +1255,36 @@ describe('watched', () => {
 			}
 		});
 	}
+
+	it('stops an effect whose initial subscription setup throws', () => {
+		const reported: unknown[] = [];
+		vi.stubGlobal('reportError', (error: unknown) => reported.push(error));
+		try {
+			const scope = owner();
+			const room$ = scope.signal$('room', 'a');
+			let attempts = 0;
+			const feed$ = scope.signal$('feed', '', {
+				watched: () =>
+					scope.effect(() =>
+						subscribeSafely<string>(
+							() => {
+								room$.get();
+								attempts++;
+								throw new Error('setup failed');
+							},
+							(value) => feed$.set(value),
+						),
+					),
+			});
+			const stop = feed$.subscribe(() => {});
+			stop();
+			expect(() => room$.set('b')).not.toThrow();
+			expect(attempts).toBe(1);
+			expect(reported).toHaveLength(1);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
 
 	it('reports a throwing watched or cleanup and still links, stops and unwatches', () => {
 		const reported: unknown[] = [];
