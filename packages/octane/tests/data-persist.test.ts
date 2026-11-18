@@ -298,6 +298,30 @@ describe('octane/data persistent cache', () => {
 		await reopened.dispose();
 	});
 
+	it('starts a concurrent view live read before its storage key resolves', async () => {
+		const key = Promise.withResolvers<string>();
+		const api = server(books());
+		const contract = view({
+			name: 'unread',
+			of: Book,
+			order: [['title', 'asc']],
+			limit: 2,
+			restore: 'concurrent',
+		});
+		const store = createDataStore({
+			transport: api.transport,
+			persist: cache(memoryStorage(), 'ada', { key: () => key.promise }),
+		});
+		const handle = store.read(contract);
+		const stop = handle.subscribe(() => {});
+		await vi.waitFor(() => expect(handle.getSnapshot().value).toEqual(books().slice(0, 2)));
+		expect(api.log).toEqual(['read unread']);
+		key.resolve(KEY);
+		await saved();
+		stop();
+		await store.dispose();
+	});
+
 	it('can show a late cache value alongside an earlier live failure', async () => {
 		const storage = memoryStorage();
 		const before = createDataStore({
