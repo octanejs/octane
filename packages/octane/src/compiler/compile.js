@@ -9393,6 +9393,20 @@ function mapCallToForOf(expr, ctx) {
 		// their authored order when the key itself can observe them.
 		const key = unwrapTsExpr(keyExpr);
 		const componentTag = isComponentTag(body);
+		// A component row can run (or throw) before the next map callback. A
+		// property read in that next callback can also throw, so preserve the
+		// authored callback phase before rendering ordinal component rows.
+		if (
+			componentTag &&
+			key?.type === 'Identifier' &&
+			key.name === params[1]?.name &&
+			containsRenderCall(
+				attributes.filter((attribute) => attribute !== keyAttr),
+				null,
+				(node) => node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression',
+			)
+		)
+			return null;
 		const ordinalKey =
 			!componentTag &&
 			params[0].type === 'Identifier' &&

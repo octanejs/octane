@@ -6592,6 +6592,90 @@ describe('compiler-owned component-region memoization', () => {
 		}
 	});
 
+	it.each(['client', 'server'] as const)(
+		'evaluates ordinal component map callbacks before rendering children in %s',
+		(mode) => {
+			const source = `
+				function Child({ value }) { if (value === 0) throw Error('first child'); return <li />; }
+				export function App({ rows }) @{ <ul>{rows.map((row, index) => <Child key={index} value={row.label} />)}</ul> }
+			`;
+			const { App } = loadCompiledFixtureSource(source, {
+				id: 'ordinal-component-map.tsrx',
+				mode,
+				compileOptions: { hmr: false, dev: false },
+			});
+			const rows = [
+				{
+					get label() {
+						return 0;
+					},
+				},
+				{
+					get label() {
+						throw Error('second callback');
+					},
+				},
+			];
+			if (mode === 'server') {
+				expect(() => ServerRuntime.renderToString(App, { rows })).toThrow('second callback');
+				return;
+			}
+			const errors: unknown[] = [];
+			const container = document.body.appendChild(document.createElement('div'));
+			const root = createRoot(container, { onUncaughtError: (error) => errors.push(error) });
+			try {
+				flushSync(() => root.render(App, { rows }));
+				expect(errors).toEqual([expect.objectContaining({ message: 'second callback' })]);
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+		},
+	);
+
+	it('hydrates ordinal component map rows without replacing their DOM or input state', () => {
+		const source = `function Child({value}) { return <li><input defaultValue={value}/><span>{value}</span></li>; } export function App({rows}) @{ <ul>{rows.map((row,index) => <Child key={index} value={row.label}/>)}</ul> }`;
+		const id = 'ordinal-component-map-hydration.tsrx';
+		const compileOptions = { hmr: false, dev: false };
+		const { App: clientApp } = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'client',
+			compileOptions,
+		});
+		const { App: serverApp } = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'server',
+			compileOptions,
+		});
+		const rows = [{ label: 'a' }, { label: 'b' }];
+		const container = document.body.appendChild(document.createElement('div'));
+		container.innerHTML = ServerRuntime.renderToString(serverApp, { rows }).html;
+		const original = Array.from(container.querySelectorAll('li'));
+		const input = original[0]!.querySelector('input')!;
+		input.value = 'edited';
+		const errors: unknown[] = [];
+		const root = hydrateRoot(
+			container,
+			clientApp,
+			{ rows },
+			{ onRecoverableError: (e) => errors.push(e) },
+		);
+		try {
+			flushSync(() => {});
+			expect(Array.from(container.querySelectorAll('li'))).toEqual(original);
+			expect(original.map((row) => row.textContent)).toEqual(['a', 'b']);
+			flushSync(() => root.render(clientApp, { rows: rows.toReversed() }));
+			expect(Array.from(container.querySelectorAll('li'))).toEqual(original);
+			expect(original.map((row) => row.textContent)).toEqual(['b', 'a']);
+			expect(original[0]!.querySelector('input')).toBe(input);
+			expect(input.value).toBe('edited');
+			expect(errors).toEqual([]);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
+
 	it('reads native-array indexed getters exactly once in callback order on every render', () => {
 		const events: string[] = [];
 		const items = [
