@@ -300,11 +300,24 @@ export async function runCodemod(
 	function typesOf(file: string): TransformOptions['types'] {
 		if (!strictConfig || options.projectTypes === false) return;
 		// Even one input can import a large graph. Bind it only for a rewrite that needs its types.
-		program ??= ts.createProgram(
-			files.filter((name) => /\.[cm]?tsx?$/.test(name)),
-			{ ...strictConfig, noEmit: true, noUncheckedIndexedAccess: true },
-		);
-		const sourceFile = program.getSourceFile(file);
+		// With TypeScript's default symlink handling, package imports resolve to physical files;
+		// use the same identity for selected roots and path-bearing compiler options.
+		const preserve = strictConfig.preserveSymlinks === true;
+		if (!program) {
+			const physicalRoot = preserve ? root : fs.realpathSync(root);
+			const proofConfig =
+				physicalRoot === root ? strictConfig : (tsconfigOptions(physicalRoot) ?? strictConfig);
+			const selected = files.filter((name) => /\.[cm]?tsx?$/.test(name));
+			program = ts.createProgram(
+				preserve ? selected : selected.map((name) => fs.realpathSync(name)),
+				{
+					...proofConfig,
+					noEmit: true,
+					noUncheckedIndexedAccess: true,
+				},
+			);
+		}
+		const sourceFile = program.getSourceFile(preserve ? file : fs.realpathSync(file));
 		if (sourceFile) return { sourceFile, checker: program.getTypeChecker() };
 	}
 	const contextsOf = contextIndex(exports, known);

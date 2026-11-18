@@ -294,6 +294,67 @@ function project(overrides) {
 	return f;
 }
 
+it('uses the same project type proofs through a parent symlink unless symlinks are preserved', async () => {
+	const { root } = project({
+		'app/tsconfig.json': JSON.stringify({
+			compilerOptions: {
+				strict: true,
+				module: 'ESNext',
+				moduleResolution: 'bundler',
+				target: 'ES2022',
+				jsx: 'react-jsx',
+				paths: { '@/*': ['./src/*'] },
+			},
+		}),
+		'app/src/pane.tsx': `import { useSnapshot } from 'observer';
+import { handle } from '@/handle';
+function Label({ value }: { value: string }) { return <b>{value}</b>; }
+export function Pane() { const value = useSnapshot(handle); return <Label value={value} />; }`,
+		'app/src/handle.ts': `import { createHandle } from 'observer/core';
+import type { Token } from '../../observer/state';
+export const handle: Token = createHandle(1);`,
+		'observer/public-store.ts': "export { valueOf, createHandle, Token } from './state';",
+		'observer/state.ts': `export class Token { private brand = 0; }
+export function createHandle(_value: number): Token { return new Token(); }
+export function valueOf(input: number) { return input; }`,
+		'observer/react-hooks.ts': `import { use } from 'react';
+import { current } from './renderer';
+import { valueOf, Token } from './state';
+export function useChannel<T>(input: T): T extends Token ? string : { text: string } {
+ const text = String(valueOf(use(current)));
+ return (input instanceof Token ? text : { text }) as never;
+}`,
+	});
+	const physical = fs.realpathSync(root);
+	const linked = path.join(path.dirname(physical), path.basename(physical) + '-linked');
+	fs.symlinkSync(physical, linked, 'dir');
+	temporary.unshift(linked);
+	const configPath = path.join(physical, 'app/tsconfig.json');
+	const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+	for (const preserveSymlinks of [false, true]) {
+		if (preserveSymlinks) config.compilerOptions.preserveSymlinks = true;
+		fs.writeFileSync(configPath, JSON.stringify(config));
+		for (const parent of [physical, linked]) {
+			const app = path.join(parent, 'app');
+			const result = await runCodemod([path.join(app, 'src/pane.tsx')], {
+				root: app,
+				strong: true,
+				verify: true,
+				write: false,
+			});
+			const pane = result.files.find(({ file }) => file === 'src/pane.tsx');
+			expect(
+				Boolean(pane.rules['store-hook']),
+				`${parent} preserveSymlinks=${preserveSymlinks}`,
+			).toBe(!preserveSymlinks);
+			if (preserveSymlinks)
+				expect(pane.notes).toContainEqual(
+					expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+				);
+		}
+	}
+});
+
 it.each([
 	['0.17.0', true],
 	['0.18.0', true],
