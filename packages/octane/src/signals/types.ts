@@ -266,9 +266,10 @@ export interface FamilyOptions<K> {
 	 */
 	readonly keyOf?: (key: K) => unknown;
 	/**
-	 * Evict a member this many milliseconds after it last had a reader: a
-	 * derived value, effect, subscription or renderer binding. Members are
-	 * otherwise evicted only by `delete`, `clear` or the scope's disposal.
+	 * Evict a member this many milliseconds after it was last observed, as a
+	 * `watched` hook counts observers: an effect, subscription or renderer
+	 * binding, directly or through derived values. Members are otherwise
+	 * evicted only by `delete`, `clear` or the scope's disposal.
 	 */
 	readonly idle?: number;
 }

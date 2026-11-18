@@ -9,6 +9,7 @@ import {
 	SignalWriteError,
 	type Scope,
 } from 'octane/signals';
+import { setNativeReadObserver, type NativeReadSource } from '../src/signals/read-protocol.js';
 
 // The renderer-binding retirement probe, by its registered name.
 const SIGNAL_BINDING_RETIRED = Symbol.for('octane.signal-binding-retired');
@@ -158,10 +159,12 @@ describe('signal families', () => {
 		},
 	);
 
+	// A cell's binding hears onRetire, as for its scope's retirement. A derived value
+	// has no scope, so its binding is notified and then finds it retired.
 	it.each([
-		['cell', (scope: Scope) => scope.signal$(null, 1)],
-		['derived', (scope: Scope) => scope.derived$(null, () => 1)],
-	] as const)("reports a %s member's retirement as its scope's", (_kind, create) => {
+		['cell', (scope: Scope) => scope.signal$(null, 1), 'retire'],
+		['derived', (scope: Scope) => scope.derived$(null, () => 1), 'notify'],
+	] as const)("reports a %s member's retirement to renderer bindings", (_kind, create, hears) => {
 		const scope = owner();
 		const family = createFamily(scope, (_id: string) => create(scope));
 		const member$ = family.get('a');
@@ -171,14 +174,14 @@ describe('signal families', () => {
 			() => heard.push('notify'),
 			() => heard.push('retire'),
 		);
-		expect((member$ as unknown as Record<symbol, () => boolean>)[SIGNAL_BINDING_RETIRED]()).toBe(
-			false,
-		);
+		const retired = () =>
+			(member$ as unknown as Record<symbol, (() => boolean) | undefined>)[
+				SIGNAL_BINDING_RETIRED
+			]?.() === true;
+		expect(retired()).toBe(false);
 		family.delete('a');
-		expect(heard).toEqual(['retire']);
-		expect((member$ as unknown as Record<symbol, () => boolean>)[SIGNAL_BINDING_RETIRED]()).toBe(
-			true,
-		);
+		expect(heard).toEqual([hears]);
+		expect(retired()).toBe(true);
 		expect(() => member$.get()).toThrow(ScopeDisposedError);
 		expect(() => member$.latest()).toThrow(ScopeDisposedError);
 		expect(() => member$.snapshot()).toThrow(ScopeDisposedError);
@@ -205,6 +208,31 @@ describe('signal families', () => {
 		expect(log).toEqual(['watched']);
 		family.delete('a');
 		expect(log).toEqual(['watched', 'unwatched']);
+	});
+
+	it.each([
+		['cell', (scope: Scope) => scope.signal$(null, 1)],
+		['derived', (scope: Scope) => scope.derived$(null, () => 1)],
+	] as const)('tells a render that read a %s member it retired', (_kind, create) => {
+		const scope = owner();
+		const family = createFamily(scope, (_id: string) => create(scope));
+		const member$ = family.get('a');
+		let source: NativeReadSource | undefined;
+		const previous = setNativeReadObserver((current) => {
+			source = current;
+		});
+		try {
+			member$.get();
+		} finally {
+			setNativeReadObserver(previous);
+		}
+		let notices = 0;
+		source!.subscribe(() => notices++);
+		expect(source!.retired?.() === true).toBe(false);
+		family.delete('a');
+		expect(notices).toBe(1);
+		expect(source!.retired?.()).toBe(true);
+		expect(() => source!.subscribe(() => {})).toThrow(ScopeDisposedError);
 	});
 
 	it('stops effects that read an evicted member, after their cleanup', () => {
@@ -288,28 +316,90 @@ describe('signal families', () => {
 		expect(family.has('read')).toBe(false);
 	});
 
-	it('keeps an idle member while a derived member reads it, then evicts both in turn', () => {
+	it('keeps an idle member while an observed derived value reads it', () => {
 		vi.useFakeTimers();
 		const scope = owner();
 		const base = createFamily(scope, (_id: string) => scope.signal$(null, 1), { idle: 10 });
 		const view = createFamily(
 			scope,
 			(id: string) => scope.derived$(null, () => base.get(id).get() + 1),
-			{
-				idle: 50,
-			},
+			{ idle: 50 },
 		);
 		const view$ = view.get('a');
+		const stop = view$.subscribe(() => {});
 		expect(view$.get()).toBe(2);
 		const base$ = base.get('a');
-		vi.advanceTimersByTime(40);
+		vi.advanceTimersByTime(100);
+		// Observed through the view, the base member stays.
 		expect(base.get('a')).toBe(base$);
-		vi.advanceTimersByTime(10);
-		expect(view.has('a')).toBe(false);
-		// Evicting the view let go of the base member, which now idles out.
-		expect(base.has('a')).toBe(true);
+		expect(view.get('a')).toBe(view$);
+		stop();
+		// Both lose their observer together, and each idles out on its own time.
 		vi.advanceTimersByTime(10);
 		expect(base.has('a')).toBe(false);
+		expect(view.has('a')).toBe(true);
+		vi.advanceTimersByTime(40);
+		expect(view.has('a')).toBe(false);
+	});
+
+	it("keeps a member's own watched hook alongside idle eviction", () => {
+		vi.useFakeTimers();
+		const scope = owner();
+		const log: string[] = [];
+		const family = createFamily(
+			scope,
+			(_id: string) =>
+				scope.signal$(null, 1, {
+					watched: () => {
+						log.push('watched');
+						return () => log.push('unwatched');
+					},
+				}),
+			{ idle: 10 },
+		);
+		const stop = family.get('a').subscribe(() => {});
+		vi.advanceTimersByTime(20);
+		expect(family.has('a')).toBe(true);
+		stop();
+		expect(log).toEqual(['watched', 'unwatched']);
+		vi.advanceTimersByTime(10);
+		expect(family.has('a')).toBe(false);
+	});
+
+	it("retires members after every effect's cleanup when the scope is disposed", () => {
+		const scope = createScope({ scopeKey: 'family-dispose-order' });
+		const cells = createFamily(scope, (_id: string) => scope.signal$(null, 1));
+		const views = createFamily(scope, (id: string) =>
+			scope.derived$(null, () => cells.get(id).get() * 10),
+		);
+		const cell$ = cells.get('a');
+		const view$ = views.get('a');
+		const log: unknown[] = [];
+		// Created after both families' first members, so later in the effect ring.
+		scope.effect(() => {
+			view$.get();
+			return () => log.push(cell$.get(), view$.get());
+		});
+		scope.dispose();
+		expect(log).toEqual([1, 10]);
+		expect(cells.size).toBe(0);
+		expect(views.size).toBe(0);
+		expect(() => view$.get()).toThrow(ScopeDisposedError);
+	});
+
+	it('does not keep an idle member for a derived value nothing observes', () => {
+		vi.useFakeTimers();
+		const scope = owner();
+		const base = createFamily(scope, (_id: string) => scope.signal$(null, 1), { idle: 10 });
+		const label$ = scope.derived$(null, () => base.get('a').get() + 1);
+		expect(label$.get()).toBe(2);
+		const base$ = base.get('a');
+		base$.set(5);
+		vi.advanceTimersByTime(10);
+		expect(base.has('a')).toBe(false);
+		// The polled reader recomputes against a new member.
+		expect(label$.get()).toBe(2);
+		expect(base.get('a')).not.toBe(base$);
 	});
 
 	it('evicts an idle derived member once its last reader leaves, after recomputing', () => {
@@ -412,6 +502,10 @@ describe('signal families', () => {
 			expect(() => caching.get('a')).toThrow(TypeError);
 			expect(caching.size).toBe(0);
 		}
+		// A handle something already observes is not new.
+		const observed$ = scope.derived$(null, () => 1);
+		observed$.subscribe(() => {});
+		expect(() => createFamily(scope, (_id: string) => observed$).get('a')).toThrow(TypeError);
 		const dead = createScope({ scopeKey: 'family-dead' });
 		dead.dispose();
 		expect(() => createFamily(dead, () => dead.signal$(null, 1))).toThrow(ScopeDisposedError);

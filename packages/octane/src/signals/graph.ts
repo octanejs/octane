@@ -29,7 +29,6 @@ import {
 	REACTIVE_FAILED,
 	REACTIVE_QUEUED,
 	REACTIVE_KEYLESS_CELL,
-	REACTIVE_FAMILY_MEMBER,
 	REACTIVE_LISTED,
 	REACTIVE_CUSTOM_EQUALS,
 	REACTIVE_RECURSED,
@@ -346,8 +345,7 @@ function unlink(link: Link, sub = link.sub): Link | undefined {
 	} else {
 		// Scopes retain their producers independently of subscriber count.
 		dep.subs = nextSub;
-		if (nextSub === undefined && dep.flags & (REACTIVE_KEYLESS_CELL | REACTIVE_FAMILY_MEMBER))
-			releaseKeyless(dep as PlainCell | PlainComputed);
+		if (nextSub === undefined && dep.flags & REACTIVE_KEYLESS_CELL) releaseCell(dep as PlainCell);
 	}
 	if (watchDriver) watchDriver.unlink(dep, sub);
 	return nextDep;
@@ -2397,25 +2395,13 @@ function releaseCell(cell: PlainCell): void {
 	});
 }
 
-/** Installed by the family module, so applications without families ship none of it. */
-let familyRelease: ((member: PlainCell | PlainComputed) => void) | undefined;
-
-export function setFamilyRelease(release: (member: PlainCell | PlainComputed) => void): void {
-	familyRelease = release;
-}
-
-/** A keyless node lost its last reader. */
-function releaseKeyless(node: PlainCell | PlainComputed): void {
-	if (node.flags & REACTIVE_KEYLESS_CELL) releaseCell(node as PlainCell);
-	if (node.flags & REACTIVE_FAMILY_MEMBER) familyRelease!(node);
-}
-
 /**
  * Retire one keyless node, as its scope's retirement would: native views
  * invalidate once, public subscriptions end silently, and every other reader
  * recomputes, where reading it throws ScopeDisposedError. A cell moves to
  * `retired`, a retired owner of the same shape as its own, so its fast paths
- * keep their single check. A derived value lets go of its dependencies.
+ * keep their single check. A derived value lets go of its dependencies. Only
+ * signal families call this, so applications without them ship none of it.
  * Callers batch, so the invalidations run once this returns.
  */
 export function retireKeyless(
@@ -2423,7 +2409,6 @@ export function retireKeyless(
 	retired: GraphOwner,
 	scopeKey: string,
 ): void {
-	node.flags &= ~REACTIVE_FAMILY_MEMBER;
 	for (let link = node.subs; link !== undefined;) {
 		const sub = link.sub;
 		link = link.nextSub;
@@ -2446,22 +2431,22 @@ export function retireKeyless(
 		node.last = undefined;
 		return;
 	}
-	(retiredLean ??= new WeakMap()).set(node, scopeKey);
 	while (node.deps) unlink(node.deps, node);
-	node.getter = () => assertLeanAlive(node) as never;
+	node.getter = () => {
+		throw new ScopeDisposedError(scopeKey);
+	};
 	node.last = undefined;
 	node.flags = (node.flags & REACTIVE_TRACKED_CELL) | REACTIVE_MUTABLE | REACTIVE_DIRTY;
 }
 
-/** Retired derived family members, with their scope's key; a cell instead moves to a retired owner. */
-let retiredLean: WeakMap<PlainComputed, string> | undefined;
-
-export function leanRetired(node: PlainComputed): boolean {
-	return retiredLean !== undefined && retiredLean.has(node);
+/** The native read source a render took from a keyless derived value, if one did. */
+export function leanSource(node: PlainComputed): NativeReadSource | undefined {
+	return leanChannels.get(node)?.source;
 }
 
-function assertLeanAlive(node: PlainComputed): void {
-	if (leanRetired(node)) throw new ScopeDisposedError(retiredLean!.get(node)!);
+/** A node's own `watched` hook, which a family keeps when it adds its own. */
+export function watchedHook(node: ReactiveNode): WatchHook['watched'] | undefined {
+	return watchDriver ? watchHooks.get(node)?.watched : undefined;
 }
 
 /**
@@ -2653,7 +2638,6 @@ export class PlainComputed<T = any> implements ReactiveNode {
 	latest(): T | undefined;
 	latest<F>(fallback: F): T | F;
 	latest<F>(fallback?: F): T | F | undefined {
-		assertLeanAlive(this);
 		try {
 			refreshLean(this);
 		} catch {
@@ -2663,7 +2647,6 @@ export class PlainComputed<T = any> implements ReactiveNode {
 	}
 
 	snapshot(): SignalSnapshot<T> {
-		assertLeanAlive(this);
 		try {
 			refreshLean(this);
 		} catch (error) {
@@ -2676,7 +2659,6 @@ export class PlainComputed<T = any> implements ReactiveNode {
 
 	/** Subscriptions do not deliver an initial notification. */
 	subscribe(notify: () => void): () => void {
-		assertLeanAlive(this);
 		assertWritable();
 		if (typeof notify !== 'function') throw new TypeError(formatClientError(165));
 		return attachObserver(this as unknown as ScopedNode, notify, false);
@@ -2691,18 +2673,8 @@ export class PlainComputed<T = any> implements ReactiveNode {
 		}
 	}
 
-	// Only a family evicts a keyless derived value, and reports it as its scope's retirement.
-	[SIGNAL_BINDING_SUBSCRIBE](notify: () => void, onRetire?: () => void): () => void {
-		assertLeanAlive(this);
-		return attachObserver(
-			this as unknown as ScopedNode,
-			onRetire === undefined ? notify : () => (leanRetired(this) ? onRetire() : notify()),
-			true,
-		);
-	}
-
-	[SIGNAL_BINDING_RETIRED](): boolean {
-		return leanRetired(this);
+	[SIGNAL_BINDING_SUBSCRIBE](notify: () => void): () => void {
+		return attachObserver(this as unknown as ScopedNode, notify, true);
 	}
 
 	[SIGNAL_BINDING_IDENTITY]() {
@@ -2732,11 +2704,7 @@ function leanChannel(node: PlainComputed): CellChannel {
 				// Not told of a change, so while one may have reached it no earlier read is reusable.
 				getVersion: () =>
 					node.flags & (REACTIVE_DIRTY | REACTIVE_PENDING) ? NaN : channel!.revision,
-				subscribe(notify) {
-					assertLeanAlive(node);
-					return attachObserver(node as unknown as ScopedNode, notify, true);
-				},
-				retired: () => leanRetired(node),
+				subscribe: (notify) => attachObserver(node as unknown as ScopedNode, notify, true),
 			},
 		};
 		leanChannels.set(node, channel);
@@ -2769,10 +2737,7 @@ function refreshLean(node: PlainComputed): void {
 function updateLean(node: PlainComputed): boolean {
 	// A tracked channel, an earlier failure or a render collecting reads takes the
 	// wrapper, which keeps this common recomputation small enough to inline.
-	if (
-		node.flags & (REACTIVE_FAILED | REACTIVE_TRACKED_CELL | REACTIVE_FAMILY_MEMBER) ||
-		signalMode & READ_OBSERVED
-	)
+	if (node.flags & (REACTIVE_FAILED | REACTIVE_TRACKED_CELL) || signalMode & READ_OBSERVED)
 		return updateLeanTracked(node);
 	return recomputeLean(node);
 }
@@ -2811,7 +2776,7 @@ function recomputeLean(node: PlainComputed): boolean {
 }
 
 function updateLeanTracked(node: PlainComputed): boolean {
-	const kept = node.flags & (REACTIVE_FAILED | REACTIVE_TRACKED_CELL | REACTIVE_FAMILY_MEMBER);
+	const kept = node.flags & (REACTIVE_FAILED | REACTIVE_TRACKED_CELL);
 	// After a failure any result is a change: the held error equals no value.
 	if (kept & REACTIVE_FAILED) node.last = NO_FAILURE;
 	// A render collecting reads must not see this computation's own reads.
@@ -2821,7 +2786,7 @@ function updateLeanTracked(node: PlainComputed): boolean {
 		changed = recomputeLean(node);
 	} finally {
 		if (observer !== null) setNativeReadObserver(observer);
-		node.flags |= kept & (REACTIVE_TRACKED_CELL | REACTIVE_FAMILY_MEMBER);
+		node.flags |= kept & REACTIVE_TRACKED_CELL;
 	}
 	if (changed && kept & REACTIVE_TRACKED_CELL) leanChannels.get(node)!.revision++;
 	return changed;

@@ -295,7 +295,7 @@ done.delete('task-1');
 ```
 
 `delete` evicts a member, and reading an evicted member throws. With `idle`, a
-member that nothing has read for that many milliseconds is evicted too. A later
+member that nothing has observed for that many milliseconds is evicted too. A later
 `get` of the same key creates a fresh member.
 
 <h3 id="react-components">Read a scope from React</h3>
