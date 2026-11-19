@@ -9845,6 +9845,94 @@ export function WatchedTry(props) @{ 'use dom bindings';
 			}
 		});
 
+		for (const [shape, markup, initial, accepted, read] of [
+			[
+				'@if branch',
+				`@if (props.selected ? right$.get() : left$.get()) { <b>{'shown' + props.suffix}</b> } @else { <b>{'hidden' + props.suffix}</b> }`,
+				[true, true, false],
+				'hidden:old',
+				(section: HTMLElement) => section.querySelector('b')!.textContent,
+			],
+			[
+				'@for collection',
+				`@for (const row of (props.selected ? right$.get() : left$.get()); key row.id) { <b>{row.label + props.suffix as string}</b> }`,
+				[[{ id: 'a', label: 'a' }], [{ id: 'z', label: 'z' }], [{ id: 'b', label: 'b' }]],
+				'b:old',
+				(section: HTMLElement) =>
+					[...section.querySelectorAll('b')].map((node) => node.textContent).join(),
+			],
+			[
+				'imported-read attribute',
+				`<p title={(props.selected ? right$.get() : left$.get()) + props.suffix}>text</p>`,
+				['red', 'blue', 'orange'],
+				'orange:old',
+				(section: HTMLElement) => section.querySelector('p')!.title,
+			],
+			[
+				'imported-read style',
+				`<p style={{ color: props.selected ? right$.get() : left$.get(), outlineColor: props.suffix === ':old' ? 'black' : 'white' }}>text</p>`,
+				['red', 'blue', 'orange'],
+				'orange',
+				(section: HTMLElement) => section.querySelector('p')!.style.color,
+			],
+		] as const)
+			for (const outcome of ['commit', 'cancel'] as const)
+				it(`refreshes an accepted ${shape} while its replacement suspends, then can ${outcome} (${dev ? 'dev' : 'prod'})`, async () => {
+					const scope = createScope({ scopeKey: `held-accepted-${shape}-${outcome}-${dev}` });
+					const left$ = scope.signal$('left', initial[0] as unknown);
+					const right$ = scope.signal$('right', initial[1] as unknown);
+					const selectedGate$ = scope.signal$('selected-gate', false);
+					let resolve!: (value: string) => void;
+					const pending = new Promise<string>((done) => (resolve = done));
+					const load = query(`held-accepted-${shape}-${outcome}-${dev}`, (selected: boolean) =>
+						selected ? pending : 'ready',
+					);
+					const gate$ = createResource(scope, 'gate', () => load(selectedGate$.get()));
+					await act(() => {});
+					const source = `import { left$, right$, gate$ } from 'state';
+export function Held(props) @{ 'use dom bindings';
+  <section>${markup}<i>{gate$.get() as string}</i></section>
+}`;
+					const fixture = authoredPresentation(
+						'Held',
+						{ selected: false, suffix: ':old' },
+						dev,
+						source,
+						{ state: { left$, right$, gate$ } },
+					);
+					const handle = fixture.mount({ parent: container }, fixture.state);
+					try {
+						const section = container.querySelector('section')!;
+						const before = read(section);
+						selectedGate$.set(true);
+						fixture.publish({ selected: true, suffix: ':new' });
+						expect(read(section)).toBe(before);
+						left$.set(initial[2] as unknown);
+						expect(read(section)).toBe(accepted);
+						expect(section.querySelector('i')!.textContent).toBe('ready');
+						if (outcome === 'cancel') {
+							fixture.publish({ selected: false, suffix: ':old' });
+							selectedGate$.set(false);
+						}
+						await act(() => resolve('ready'));
+						const replacement = authoredPresentation(
+							'Held',
+							outcome === 'commit'
+								? { selected: true, suffix: ':new' }
+								: { selected: false, suffix: ':old' },
+							dev,
+							source,
+							{ state: { left$, right$, gate$ } },
+						);
+						const expected = document.createElement('div');
+						expected.innerHTML = replacement.html;
+						expect(read(section)).toBe(read(expected.querySelector('section')!));
+					} finally {
+						handle.dispose();
+						scope.dispose();
+					}
+				});
+
 		it(`keeps a suspended binding projection quiet until it publishes (${dev ? 'dev' : 'prod'})`, async () => {
 			const scope = createScope({ scopeKey: `watched-projection-${dev}` });
 			const log: string[] = [];
