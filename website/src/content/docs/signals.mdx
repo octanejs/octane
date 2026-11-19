@@ -7,30 +7,39 @@ title: Signals
 	<h1>Signals</h1>
 	<p className="doc-lede">
 		{
-			'A signal holds a value. Read it while rendering and Octane updates that part of the UI when the value changes.'
+			'A signal holds a value that can change. When you read it during rendering, Octane knows which part of the page to update the next time the value changes.'
 		}
 	</p>
 </div>
 
-Use `signal$` for a value you change, `derived$` for a value you calculate
-from other signals, and `query$` for data you load by a key such as a user ID.
-All three return a handle you can read with `.get()`. For data with a lifetime
-your application manages, use [an explicit scope and resource](#explicit-resources). The
-[application API reference](#reference) lists the exports used in app code.
-For data your server owns and many components read and change, such as lists
-with optimistic edits, see [Data](/docs/data). [Best practices](/docs/best-practices#choose-where-state-lives)
-compares Signals with component state and Data.
+When someone changes the quantity in a shopping cart, the total should
+change too. You can use `signal$` for the quantity, which you set directly,
+and `derived$` for the total, which you calculate from the quantity. If a
+value comes from a request, like a profile you look up by user ID,
+`query$` lets you work with the result in much the same way. All three give
+you a handle you can read by calling `.get()`.
 
-**Every module that reads a signal during rendering needs a runtime import**
-from `octane/signals`, `octane/signals/client`, or `octane/signals/server`.
-This includes components that receive a handle through props or call a helper
-that reads it. If the module needs no named import, add `import 'octane/signals';`.
-A type-only import or a name ending in `$` alone does not enable these reads.
+If your app needs to decide how long to keep the data, you can use
+[an explicit scope and resource](#explicit-resources). For records that
+belong to the server, such as a list that several components read and edit
+optimistically, see [Data](/docs/data).
+[Best practices](/docs/best-practices#choose-where-state-lives) walks through
+when to use component state, Signals, or Data. If you're looking for a
+particular export, jump to the [application API reference](#reference).
+
+**Each module that reads a signal during rendering needs its own runtime
+import** from `octane/signals`, `octane/signals/client`, or
+`octane/signals/server`. This includes a component that gets the handle
+through props or calls a helper that reads it. The compiler needs that
+runtime import even if the handle's name ends in `$` or you've imported its
+type. If your module uses none of the named exports, add `import 'octane/signals';`.
 
 <h2 id="declarations">Write state and derive a value</h2>
 
-In this compiled browser module, the quantity is writable. The total is read-only and follows the quantity,
-so changing the quantity is enough to update both.
+Here's the cart calculation in a browser module compiled by Octane. The
+quantity is writable and the total is read-only. Each item costs 12, so
+when you set the quantity to 3, you can read 36 from the total on the very
+next line.
 
 ```ts
 import { derived$, signal$ } from 'octane/signals';
@@ -42,16 +51,18 @@ quantity$.set(3);
 console.log(total$.get()); // 36, immediately.
 ```
 
-In a module compiled by Octane, module-level declarations share state within
-one browser document or one server request. Declare `signal$`, `derived$`, or
-`query$` **inside a component** when each mounted instance should have its own
-value. Use `derived$` directly there for a calculation such as `total$`.
+Where you put these declarations determines who shares the cart. At module
+level, components in the same browser document share the values. On the
+server, each request gets its own copy. If you want a separate cart for each
+mounted instance of a component, declare `signal$`, `derived$`, or `query$`
+inside the component. You can use `derived$` there to calculate `total$`
+just as you did at module level.
 
 <h3 id="local-state">Keep state in a component</h3>
 
-`useSignal$` is a hook for component-owned writable state. The counter calls
-`.get()` during rendering to subscribe and `.set()` in the click handler to
-update the value.
+The `useSignal$` hook gives a component a writable signal of its own. This
+counter subscribes to the count by calling `.get()` as it renders the button.
+When the click handler calls `.set()`, the button shows the new count.
 
 ```tsrx
 import { useSignal$ } from 'octane/signals/client';
@@ -62,14 +73,18 @@ export function Counter() @{
 }
 ```
 
-A lazy initializer such as `useSignal$(() => 0)` runs once when the hook slot
-initializes. Keep the `$` suffix on variables and props that carry a signal.
-A value you have already read, such as `const count = count$.get()`, uses an
-ordinary name.
+You can also pass a lazy initializer such as `useSignal$(() => 0)`. Octane
+calls the function once, when it initializes that hook slot.
+
+The `$` suffix tells you which names carry a handle. Keep it on the variable
+and on any prop you pass the handle through. Once you've read the value, give
+it an ordinary name, as in `const count = count$.get()`.
 
 <h3 id="hooks-and-memos">Use signals with existing hooks</h3>
 
-When you omit a dependency array, `useMemo` tracks signal reads in its callback.
+You can read the count inside a `useMemo` callback, too. When you leave out
+the dependency array, the memo tracks the signals its callback reads. That's
+enough to keep the label on this button up to date.
 
 ```tsrx
 import { useMemo } from 'octane';
@@ -82,9 +97,10 @@ export function Counter() @{
 }
 ```
 
-With an explicit array, read the signal during rendering and put its current
-value in the array. This component reports the count to its caller after each
-change.
+If you write the dependency array yourself, read the count during rendering
+and put its current value in the array. That same value can go in an effect's
+dependencies, too. Here the effect reports the count to the caller each time
+it changes.
 
 ```tsrx
 import { useEffect, useMemo } from 'octane';
@@ -102,11 +118,15 @@ export function CountLog(props: { recordCount: (count: number) => void }) @{
 
 <h2 id="async-resources">Load data with query$</h2>
 
-Use `query$(select, load)` when a component or module owns the request.
-The first function selects what to load. The second receives the selection
-and a context with an `AbortSignal`. Here the selection is the user ID.
-The browser examples use the application's same-origin `/api` endpoints.
-For server rendering, use a request-aware URL or a server function as in the
+For a request that belongs to a component or module, `query$(select, load)`
+lets you describe how to choose a key and how to load its data. In the
+profile lookup below, the first function reads the selected user ID. The
+second receives that ID and a context with an `AbortSignal` to pass to
+`fetch`.
+
+These examples run in the browser, where `/api` points to the app's own
+origin. When rendering on the server, use a URL based on the incoming
+request, or call a server function as in the
 [streaming example](#streaming-example).
 
 ```ts
@@ -125,10 +145,12 @@ export const user$ = query$<number, User>(
 );
 ```
 
-Setting `selectedId$.set(2)` selects user 2. Setting it to `null` returns
-`skip` and leaves the query idle. Check for that state before calling
-`.get()`. For a selected user, read inside `@try` so the component can show
-the loading, ready, and error states.
+Calling `selectedId$.set(2)` selects user 2. If you set the ID to `null`,
+the selector returns `skip` and the query stays idle. The card checks for
+that state before calling `.get()` so it can ask you to choose a user.
+Once there's a selection, reading inside `@try` lets the card show a
+loading message while it waits, the name when it arrives, or an error
+if the request fails.
 
 ```tsrx
 import 'octane/signals';
@@ -151,10 +173,14 @@ export function UserCard() @{
 }
 ```
 
-Call `user$.refetch()` to refresh the current user while keeping a ready value
-visible. Call `user$.reset()` for a fresh attempt that can show pending UI.
-A component can also select a prop. Here `loadUser` loads a display name, and
-the retry button resets both the query and its error boundary.
+If the card already has a name to show, `user$.refetch()` keeps that name
+visible while it refreshes the current user. With `user$.reset()`, the card
+can show its loading message again during the new attempt.
+
+The ID can also come from a prop. This profile asks `loadUser` for the
+display name that goes with the current ID. If the request fails, the retry
+button resets the query to try the load again and resets the error boundary
+so the profile can render the result.
 
 ```tsrx
 import { query$ } from 'octane/signals';
@@ -185,9 +211,10 @@ export function Profile(props: {
 
 <h3 id="streams">Consume streams</h3>
 
-For a loader that returns an async iterable, pass `{ kind: 'stream' }` to
-`query$`. Here `watchNotifications(id, signal)` is an application function
-that returns an `AsyncIterable<Notification>`.
+Your loader can also return an async iterable. Here the app's
+`watchNotifications(id, signal)` returns an `AsyncIterable<Notification>`.
+Pass `{ kind: 'stream' }` to `query$` so it reads the notifications as they
+arrive.
 
 ```ts
 import { query$, skip } from 'octane/signals';
@@ -202,16 +229,18 @@ export const notification$ = query$<number, Notification>(
 );
 ```
 
-The query waits for the first yield. Each yield is its whole next value.
-A stream that completes after yielding keeps its last value. Completing before the first
-yield is an error.
+The query stays pending until the stream yields its first notification. Each
+yield replaces the entire value, so reading the query gives you the most
+recent notification. When the stream finishes, you can still read that last
+value. If it finishes before yielding anything, the query reports an error.
 
 <h2 id="shared-state">Own shared state with a scope</h2>
 
-Create a scope when **your code decides how long the data lives**, for example
-when a cart outlives the components showing it. Create the scope once when the
-cart opens. Pass its handles through props or context and dispose it when the
-cart closes.
+The cart from the first example might stay open as someone moves from one
+screen to another. Its components come and go, and **your app decides how
+long to keep the cart**. Create a scope once, when the cart opens, and pass
+its handles to those components through props or context. When the cart
+closes, dispose of the scope.
 
 ```ts
 import { createScope } from 'octane/signals';
@@ -232,16 +261,17 @@ stop();
 cart.dispose();
 ```
 
-Each key identifies one signal within that scope. An explicit `scope.derived$`
-calculation is synchronous. `subscribe` observes changes and returns a
-function that stops the subscription.
+Each key names a signal within this cart. A calculation made with
+`scope.derived$` is synchronous, so you can read the new total as soon as
+you set the quantity. To hear about later changes, call `subscribe`. It
+returns a function you can call when you want to stop listening.
 
 <h3 id="effects">Run an effect when values change</h3>
 
-`scope.effect(run)` runs `run` at once and again after each batch that changes
-a signal it read. A function it returns runs before the next run and when the
-effect stops. The effect lives until you call the stop function it returns or
-dispose its scope.
+Suppose you want the browser tab's title to show how many items are in the
+cart. With `scope.effect(run)`, Octane calls `run` right away and tracks
+which signals it reads. After a batch that changes any of them, Octane runs
+the effect again. Here the effect reads the label and copies it to the title.
 
 ```ts
 import { createScope } from 'octane/signals';
@@ -258,23 +288,36 @@ const stop = cart.effect(() => {
 });
 ```
 
-A `null` key, as in `label$`, declares a keyless signal or calculation. It is
-not serialized, seeded, inspected, or staged by a transition, so use it only
-for values the client computes for itself.
+The effect returns a cleanup function that clears the title. Octane calls
+it before running the effect again and when the effect stops. The effect
+keeps running until you call the `stop` function returned by `cart.effect`
+or dispose of the cart.
+
+The label is something the client can work out for itself, so `label$` has
+a `null` key. You can leave a signal or calculation keyless this way if it's
+only for use on the client. Give it a key if you need to serialize, seed,
+or inspect it, or stage its value in a transition.
 
 <h3 id="equality-and-watched">Control when a signal changes or starts</h3>
 
-Writes use `Object.is`. Pass `equals` as the third argument to `scope.signal$`
-or `scope.derived$` to treat more values as unchanged: the signal keeps its
-previous value, and nothing downstream recomputes or is notified. `equals`
-must not write signals.
+A write uses `Object.is` to check whether the value changed. For a chat
+room, you might consider two lists of messages equivalent if they have the
+same IDs in the same order. You can supply that check as `equals` in the
+third argument to `scope.signal$` or `scope.derived$`. When it returns
+true, the signal keeps the previous value, so Octane skips the calculations
+and notifications that would follow a change. Keep `equals` free of writes
+to signals.
 
-Pass `watched` to start work only while something observes the signal: an
-effect, a subscription, or a rendered binding, directly or through derived
-values. It runs when the first observer arrives, and the function it returns
-runs when the last one leaves or the scope is disposed. A plain `.get()` with
-no observer does not start it. Here `chat.subscribe` is an application function
-that returns an unsubscribe function.
+The chat room also needs a connection while someone is reading its messages.
+With `watched`, the first observer starts the connection. An effect, a
+subscription, or a binding in the rendered UI can all observe the messages,
+even through a derived value. Calling `.get()` on its own leaves the
+connection closed if there are no observers. When the last observer leaves
+or the scope is disposed, Octane calls the cleanup that `watched` returned.
+
+Here the app's `chat.subscribe` gives you a function to unsubscribe. The
+helper takes care of the case where you leave the room while the
+connection is still opening.
 
 ```ts
 import { createScope, ScopeDisposedError } from 'octane/signals';
@@ -331,19 +374,29 @@ const messages$ = room.signal$<Message[]>('messages', [], {
 });
 ```
 
-Returning the effect's stop function connects the source while the messages
-are observed and reconnects it when `roomId$` changes. The active flag rejects
-callbacks from an old connection; cleanup returned later by an asynchronous
-setup still runs after the connection is stopped. Setup failures and errors in
-late cleanup are reported through `reportError`.
+Returning the effect's stop function from `watched` keeps the subscription
+open for as long as the messages have observers. The effect reads
+`roomId$`, so switching rooms closes the old subscription and opens one
+for the new room.
+
+The `active` flag lets the helper ignore messages that arrive after you've
+left. If the old connection finishes opening later, the helper immediately
+calls the cleanup function it gets back. It reports errors from setup and
+from this late cleanup through `reportError`, falling back to
+`console.error` when needed.
 
 <h3 id="transactions">Group writes you can undo</h3>
 
-`scope.batch(fn)` delays notifications until `fn` returns and keeps its writes
-even if `fn` throws. `scope.transaction(fn)` is a batch that rolls back: if `fn`
-throws or returns a promise, every signal it changed gets its previous value
-back before anything is notified, and the error is rethrown. Otherwise it
-returns `{ value, changes, undo, redo }`.
+An editor might change a title and its tags in the same edit. With
+`scope.batch(fn)`, observers hear about the changes together when `fn`
+finishes. If `fn` throws partway through, the writes it made still stand.
+
+For an edit that should succeed or fail as a whole, `scope.transaction(fn)`
+groups the writes in a batch. If `fn` throws, Octane restores the previous
+values before notifying any observers and rethrows the error. Returning a
+promise also causes the transaction to roll back and throw. On success you
+get `{ value, changes, undo, redo }`, so the editor can undo the title and
+tags together.
 
 ```ts
 import { createScope } from 'octane/signals';
@@ -362,19 +415,22 @@ edit.undo(); // Restores both signals in one batch.
 edit.redo();
 ```
 
-`changes` lists each changed signal once as `{ signal$, previous, next }`.
-A transaction inside another one joins it: an inner failure rolls back only
-its own writes.
+You can inspect the edit with `changes`. It lists each changed signal once
+as `{ signal$, previous, next }`, even if you wrote to it several times.
+A nested transaction joins the outer edit. If the inner transaction fails,
+its rollback covers just the writes it made.
 
 <h3 id="explicit-resources">Load data in an explicit scope</h3>
 
-For the same user lookup, `query$` combines selection and loading in one
-declaration. When you already own a scope, use two functions together:
+In the earlier user lookup, `query$` handled selection and loading in one
+declaration. If you already have a scope for the account, you can define
+a reusable request and let each account choose which user to load.
 
-- `query('user', load)` defines a reusable request. Calling the returned
-  function with an ID describes what to fetch.
-- `createResource(account, 'selected-user', describe)` runs the selection callback,
-  starts the load in the account scope, and returns the readable handle.
+- `query('user', load)` defines the request and returns a function. Call
+  that function with an ID to describe which user to fetch.
+- `createResource(account, 'selected-user', describe)` runs your selection
+  callback and starts the load in the account scope. It gives you a handle
+  you can read to get the result.
 
 ```ts
 import { createResource, createScope, query } from 'octane/signals';
@@ -400,17 +456,19 @@ export function openAccount$(initialId: number) {
 }
 ```
 
-Call `selectUser(2)` to load another user. Once a value is ready, `refresh()`
-keeps showing it during a retry. Use `reload()` to show pending UI instead.
-Resources selecting the same request in the same scope share the load. Call
-`close()` when the account session ends.
+With the account open, `selectUser(2)` loads another user. Once that user
+is on screen, `refresh()` keeps their details visible while the request runs
+again. Call `reload()` if you'd like to show the pending UI during the retry.
+If two resources in the account scope select the same request, they share
+the load. Call `close()` when the account session ends.
 
 <h3 id="families">Keep one signal per key</h3>
 
-When the keys come and go as the program runs, such as one row per item in a
-list, use a family instead of a key per item. `createFamily` creates a keyless
-member the first time you ask for a key, and returns that member for the same
-key after that.
+On a task board, you might want a signal for each row, and the rows can
+change as people add and finish tasks. A family lets you look up the
+signal by task ID without reserving a scope key for every task. With
+`createFamily`, the first lookup creates a keyless member in the scope.
+Ask for the same ID again and you get that member back.
 
 ```ts
 import { createFamily, createScope } from 'octane/signals';
@@ -425,18 +483,32 @@ console.log(done.get('task-1').get()); // true
 done.delete('task-1');
 ```
 
-`delete` evicts a member, and reading an evicted member throws. With `idle`, a
-member that nothing has observed for that many milliseconds is evicted too. A later
-`get` of the same key creates a fresh member.
+When a task leaves the board, `delete` evicts its member. The `idle`
+option also evicts a member after it goes that many milliseconds without
+an observer, which here means 30 seconds. Reading the old handle after
+eviction throws. A later `get` for the same ID creates a fresh member.
 
-A family is transient by default: keyless members are not included in a scope seed. For server-rendered members, opt in by capturing selected string keys and values in one namespaced keyed signal before serializing the request scope, then initialize client family members from that snapshot. Unselected members still use their client defaults. Eviction keeps the last selected snapshot until you explicitly replace or clear it, without adding keyed nodes for individual members. See the [tested family hydration recipe](https://github.com/octanejs/octane/blob/main/docs/signals.md#opt-in-to-family-hydration) for the complete composition and namespace policy.
+By default, a family lasts only in memory. Its members are keyless, so
+serializing the scope leaves them out of the seed. If you render the board
+on the server and want to carry particular rows over to the client, save
+their string keys and values together in one keyed signal reserved for the
+family's namespace. Do this before serializing the request scope. On the
+client, use that snapshot to initialize the selected members and let the
+others start with their usual client defaults.
+
+Even if a member is evicted, its last captured value stays in the snapshot
+until you replace or clear it. The whole family still uses just one keyed
+signal. The [tested family hydration recipe](https://github.com/octanejs/octane/blob/main/docs/signals.md#opt-in-to-family-hydration)
+shows the full setup, including how to reserve a namespace for each family.
 
 <h3 id="react-components">Read a scope from React</h3>
 
-React components read the same handles through `octane/signals/react`, with no
-Octane compiler. `useSignalValue(handle$)` re-renders when the value changes,
-and writes still go through the handle. `SignalScopeProvider` passes a scope to
-`useSignalScope()` below it.
+You can show the cart total in React using the same handles, without the
+Octane compiler. The `useSignalValue(handle$)` hook from `octane/signals/react`
+reads the total and re-renders the component when it changes. The button
+can write through the quantity handle as usual. To give components further
+down the tree access to the scope itself, wrap them in
+`SignalScopeProvider`. They can then call `useSignalScope()` to get the cart.
 
 ```tsx
 import { createRoot } from 'react-dom/client';
@@ -459,19 +531,24 @@ createRoot(document.getElementById('root')!).render(
 );
 ```
 
-The provider borrows the scope and never disposes it. Create one scope per root
-or server request, and dispose it after unmounting the tree that reads it. A
-component still mounted when its scope retires throws `ScopeDisposedError` to
-the nearest error boundary rather than showing the retired value. A pending
-async handle suspends, and a failed one throws. To hydrate, create the client
-scope with `seed: serverScope.serialize()`.
+The provider borrows the scope, so your app is responsible for its lifetime.
+Create one per root or server request, and unmount the tree that reads it
+before disposing of the scope. If you retire the scope while a component is
+still reading it, the read throws `ScopeDisposedError` and React passes it
+to the nearest error boundary.
+
+Reading a pending async handle suspends the component, and reading a failed
+one throws its error. If you're hydrating a server-rendered tree, create
+the client scope with `seed: serverScope.serialize()`.
 
 <h2 id="async-derived">Derive values across await</h2>
 
-Use `derived$` for a calculation that depends on other signals, including one
-that returns a promise. Inside an async calculation, `await read(handle$)`
-tracks a dependency even after an earlier `await`. If the user or locale
-changes, Octane cancels the old attempt and starts a new one.
+A `derived$` calculation can return a promise. Say you want to greet the
+selected user in their language. The greeting depends on both the user and
+the locale, and you might still be waiting for the user when the calculation
+starts. Inside the async function, `await read(handle$)` tells Octane about
+each dependency as you reach it, even after an earlier `await`. If the user
+or locale changes, Octane cancels the old attempt and starts a new one.
 
 ```ts
 import { derived$, signal$ } from 'octane/signals';
@@ -491,10 +568,13 @@ export const greeting$ = derived$(async ({ read, signal }) => {
 
 <h3 id="availability">Choose what to show while waiting</h3>
 
-Use `.get()` to read a ready value and let a boundary handle pending work or
-errors. Use `.latest(fallback)` to keep showing the last successful result
-while the next is pending or has failed. Use `.snapshot()` to distinguish
-idle, pending, ready, and error states or to check whether a refresh is running.
+So far the profile has read the user with `.get()` and relied on a boundary
+to handle loading and errors. You might prefer to keep the previous profile
+on screen while the next one loads. With `.latest(fallback)`, you get the
+last successful result, even if the next attempt is pending or has failed.
+You'll get the fallback until the first result is ready. When you need to
+tell idle, pending, ready, and error states apart, read `.snapshot()`. It
+also tells you whether a refresh is underway.
 
 ```tsrx
 import { derived$ } from 'octane/signals';
@@ -516,15 +596,18 @@ export function UserSummary() @{
 }
 ```
 
-Reading `card$.latest(null)` during rendering keeps the ID and name from the
-same user together while a new selection loads.
+The card derives the ID and name together. Reading `card$.latest(null)`
+during rendering keeps both fields from the same user on screen until the
+next user's card is ready.
 
 <h2 id="optimistic-actions">Save with optimistic feedback</h2>
 
-`optimistic$` lets the UI show a proposed edit while `action$` saves it.
-Here `updateUser` is the application's mutation and returns a user with a
-server-assigned revision. `mayHaveReachedServer` identifies a lost response
-whose outcome needs checking.
+When someone edits their name, you can show the new name right away with
+`optimistic$` while an `action$` saves it. Here the app's `updateUser`
+function sends the edit to the server and returns the saved user with a
+server-assigned revision. The response might get lost after the server saves
+the name. The app uses `mayHaveReachedServer` to recognize errors where
+it needs to check whether the edit went through.
 
 ```ts
 import { action$, optimistic$ } from 'octane/signals';
@@ -548,18 +631,24 @@ export const saveUser = action$('user.save', async (operation, name: string) => 
 });
 ```
 
-Call `saveUser(name)` from an event when the user data is ready. Read
-`visibleUser$.get().name` in the UI to show the tentative name. A confirmed receipt
-replaces the overlay and a definite failure removes it. If the outcome is
-uncertain, reconcile it with the server and call `operation.adopt(value)` or
-`operation.reject()`. The revision comparison keeps an older receipt from
-overwriting a newer one.
+Once the user data is ready, call `saveUser(name)` from the event handler.
+A component that reads `visibleUser$.get().name` shows the name the person
+entered while the save is in progress. When the server confirms the edit,
+the saved value takes its place. If two saves finish out of order, comparing
+their revisions keeps the newer result.
+
+A definite failure removes the tentative edit. If the outcome is uncertain,
+check with the server. Once you know what happened, call
+`operation.adopt(value)` with the confirmed value or `operation.reject()`
+to drop the edit.
 
 <h2 id="transitions">Keep committed UI during a transition</h2>
 
-In a client event handler, use `startTransition` to keep the current card
-visible while the next user's data loads. Urgent edits can still update the UI.
-This also works when the current result came from the server during hydration.
+When someone switches profiles, you can leave the current card on screen
+until the next one is ready. In the client event handler, wrap the change
+of ID in `startTransition`. Urgent edits can still update the page while
+the new profile loads. This works during hydration, too, when the current
+card came from the server.
 
 ```ts
 import { startTransition } from 'octane';
@@ -572,15 +661,17 @@ export function showNextUser() {
 
 <h2 id="server-rendering">Server rendering and hydration</h2>
 
-The standard Octane fullstack host streams the initial HTML and delivers query
-results to the browser. A component can use the result when it hydrates,
-even if its code loads later.
+In a standard Octane fullstack app, the host streams the initial HTML to
+the browser and sends query results as they arrive. A result can reach the
+page before the code for its component does. When the component is ready
+to hydrate, that result is there for it to use.
 
 <h3 id="streaming-example">Show the page first, then its data</h3>
 
-In a [fullstack app](/docs/quick-start), put this in `src/Page.tsrx`. The
-short delays stand in for database calls. Each query has its own pending
-boundary, so the title can appear while the messages are still loading.
+To try this in a [fullstack app](/docs/quick-start), put the following chat
+page in `src/Page.tsrx`. The short delays stand in for database calls. The
+title and the messages each have their own pending boundary, so you can
+see the room's name while you're waiting for the messages.
 
 ```tsrx
 // src/Page.tsrx
@@ -648,7 +739,7 @@ export default function Page() @{
 }
 ```
 
-Register the page in `octane.config.ts`.
+Register the page in `octane.config.ts` so you can open it at `/`.
 
 ```ts
 import { defineConfig, RenderRoute } from '@octanejs/vite-plugin';
@@ -662,25 +753,31 @@ export default defineConfig({
 
 <h3 id="early-input">Keep input typed before hydration</h3>
 
-`value={draft$}` binds the textarea to writable state. Octane's early capture
-script records edits, including clearing the field, before the component
-loads. The character count updates once the signal engine and view are active.
+The textarea is already on the page, so someone can start typing before
+the component loads. The `value={draft$}` binding connects it to a writable
+signal. Octane's early capture script records those first edits, even if
+someone types a message and then clears the field. Once the signal engine
+and the view are active, the character count catches up with the draft.
 
 <h3 id="streaming-performance">What reaches the browser</h3>
 
-The initial HTML contains both placeholders and the textarea. When a query
-first becomes ready, the server sends HTML for that boundary. Later message
-lists travel as data. An active view displays them, and a deferred view keeps
-its server HTML until it activates. The browser reuses a matching server
-result, saving a second initial request. Each yield replaces the whole list,
-so the second yield includes the first message.
+The first HTML to arrive has the two placeholders and the textarea. As
+each query gets its first result, the server sends HTML for that boundary.
+If the result matches the browser's query, the browser can reuse it and
+save a second request for the same initial data.
+
+Later lists of messages arrive as data. A view that's already active shows
+them as they arrive. A deferred view keeps showing the server's HTML until
+it becomes active. Each yield replaces the whole list, which is why the
+second yield includes the first message again.
 
 <h3 id="server-state-ownership">Keep server state separate for each request</h3>
 
-A custom host using `createScope` on the server must create a fresh scope per
-request. To hydrate HTML from a known starting value, pass the same initial
-seed to the renderer and the browser. Here `route$` is a compiled module
-declaration such as `signal$('home')`.
+If you're writing your own host with `createScope`, create a fresh scope
+for every server request. The renderer and the browser need the same seed
+so they agree on the values that produced the HTML. Here a compiled module
+declares `route$` with `signal$('home')`. The request sets the route to
+`thread` and takes a snapshot before rendering.
 
 ```ts
 import { earlySignalBootstrapScript, renderToString } from 'octane/server';
@@ -708,11 +805,14 @@ export function renderPage() {
 }
 ```
 
-Emit `earlyScript` before the rendered HTML and include `initialDocumentSignals`
-once in the response, escaping the JSON for its HTML or script context.
-On the client, pass the container holding that HTML, the build and document
-IDs, and the original seed to `hydratePage`. Initialize the document before
-importing components that read its signals.
+In the response, place `earlyScript` before the rendered HTML. Include
+`initialDocumentSignals` once, escaping the JSON for the HTML or script
+context where you put it.
+
+On the client, pass `hydratePage` the container with the rendered HTML,
+the build and document IDs, and the original seed. Inside `hydratePage`,
+initialize the document before importing any component that reads its
+signals.
 
 ```ts
 import { hydrateRoot } from 'octane';
@@ -749,17 +849,20 @@ export async function hydratePage(
 }
 ```
 
-The seed describes the HTML the browser is adopting. A newer live value,
-including an edit captured before hydration, survives adoption. When the
-root ends, call `root.unmount()`. Call `page.dispose()` when the document ends.
+The seed gives the browser the values that go with the HTML it's adopting.
+A live value may already be newer by then, especially if someone edited
+a field before hydration. That newer value survives. Call `root.unmount()`
+when you're finished with the root and `page.dispose()` when you're
+finished with the document.
 
 <h2 id="streamed-adoption">Adopt streamed results before hydration</h2>
 
-A custom host can connect a writable signal to an existing textarea without
-hydrating a component. Render `<textarea id="draft" value={draft$} />` on the
-server using the same compiled `draft$` that `./draft-state` exports.
-Install the early capture script before the textarea. In this host the editor
-starts the document's single bootstrap using the original full signal manifest.
+In a custom host, you can connect a writable signal directly to a textarea
+that's already on the page, without hydrating a component. On the server,
+render `<textarea id="draft" value={draft$} />` using the same compiled
+`draft$` exported by `./draft-state`. Include the early capture script
+before the textarea. In this example the editor initializes signals once
+for the whole document, using the original signal manifest in full.
 
 ```ts
 import { bindSignalControl } from 'octane/signals';
@@ -795,30 +898,32 @@ export async function attachEditor(bootstrap: {
 }
 ```
 
-Call `releaseControl()` before handing the node to a component and `dispose()`
-when the document ends. For a host that also places streamed HTML, see
+If a component takes over the textarea later, call `releaseControl()`
+before handing it the node. Call `dispose()` when the document ends. If
+your host also needs to place streamed HTML on the page, see the
 [custom SSR host setup](https://github.com/octanejs/octane/blob/main/docs/ssr.md#connect-signals-in-a-custom-ssr-host).
 
 <h2 id="reference">Application API reference</h2>
 
-Import these APIs from `octane/signals`, except for the component hook
-`useSignal$`, which comes from `octane/signals/client`, and the React bindings
-from `octane/signals/react`. Octane selects the `useSignal$` server
-implementation when it compiles a component for SSR.
+Most of these APIs come from `octane/signals`. For the component hook
+`useSignal$`, import from `octane/signals/client`. When Octane compiles
+your component for server rendering, it picks the server implementation
+of `useSignal$` for you. The React bindings live in `octane/signals/react`.
 
-| Export                                                    | When to use it                                                                                                                                                                                                                                                                                   |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `signal$`, `useSignal$`                                   | Create writable state and update it with `.set(valueOrUpdater)`. A `signal$` can belong to a module or component and stores a function initial value as data. The component hook `useSignal$` calls a function initializer once for its hook slot.                                               |
-| `derived$`                                                | Calculate a read-only value from other signals. Use it directly inside a component or at module level. For async work, `await read(handle$)` tracks a dependency across an earlier `await`.                                                                                                      |
-| `query$`, `skip`                                          | Load data for a selected key. Return `skip` from the selector to leave the query idle. Use `.refetch()` to refresh while showing a ready value, or `.reset()` to show pending UI.                                                                                                                |
-| `createScope`                                             | Own state for a lifetime you manage, such as a cart or an account session. Create keyed signals with `scope.signal$` and synchronous calculations with `scope.derived$`, and use `scope.effect`, `scope.batch`, and `scope.transaction` with them. Call `scope.dispose()` when the owner closes. |
-| `query`, `createResource`                                 | In an explicit scope, `query` defines a reusable request. Calling that function with an argument describes a load. `createResource` selects the request, starts the load in the scope, and returns the handle you read.                                                                          |
-| `optimistic$`, `action$`, `isActionUncertain`             | Show an edit while saving it. `optimistic$` overlays the edit on a ready source. `action$` gives each save its own operation. Use `isActionUncertain` to recognize a receipt or error that needs reconciliation with the server.                                                                 |
-| `createFamily`                                            | Keep one keyless signal per key, such as one per row, in a scope. Evict members with `.delete(key)` or the `idle` option so keys that come and go don't grow the scope.                                                                                                                          |
-| `isSignalHandle`, `isWritableSignal`                      | Check an unknown value before treating it as a readable handle or writing to it with `.set()`.                                                                                                                                                                                                   |
-| `SignalScopeProvider`, `useSignalScope`, `useSignalValue` | From `octane/signals/react`: pass a scope to React components and read a handle's value in them.                                                                                                                                                                                                 |
+| Export                                                    | When to use it                                                                                                                                                                                                                                                                   |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `signal$`, `useSignal$`                                   | Create writable state and update it with `.set(valueOrUpdater)`. A `signal$` can belong to a module or a component. If you pass it a function as the initial value, it stores the function itself. The `useSignal$` hook calls a function initializer once for its hook slot.    |
+| `derived$`                                                | Calculate a read-only value from other signals, either inside a component or at module level. In an async calculation, `await read(handle$)` tracks a dependency even after an earlier `await`.                                                                                  |
+| `query$`, `skip`                                          | Load data for a key you select, or return `skip` from the selector to leave the query idle. Call `.refetch()` to keep a ready value on screen during a refresh, or `.reset()` to show pending UI.                                                                                |
+| `createScope`                                             | Keep state for as long as a cart or account session is open. Use `scope.signal$` for keyed signals and `scope.derived$` for synchronous calculations. Work with them using `scope.effect`, `scope.batch`, and `scope.transaction`. Call `scope.dispose()` when the session ends. |
+| `query`, `createResource`                                 | Use `query` to define a reusable request. Calling the returned function with an argument describes what to load. In a scope you manage, `createResource` selects the request, starts the load, and gives you a handle to read the result.                                        |
+| `optimistic$`, `action$`, `isActionUncertain`             | Show an edit to a ready value with `optimistic$` while you save it. Each save through `action$` gets its own operation. Check a receipt or error with `isActionUncertain` to find out whether you need to confirm the outcome with the server.                                   |
+| `createFamily`                                            | Look up a keyless signal by a key such as a row ID. As rows come and go, `.delete(key)` or the `idle` option lets you evict members so the scope can release them.                                                                                                               |
+| `isSignalHandle`, `isWritableSignal`                      | Check whether an unknown value is a handle you can read, or one you can also write to with `.set()`.                                                                                                                                                                             |
+| `SignalScopeProvider`, `useSignalScope`, `useSignalValue` | Use these bindings from `octane/signals/react` to share a scope with React components and read a handle's value as they render.                                                                                                                                                  |
 
-Read a handle with `.get()` for its current value. Use `.latest(fallback)`
-to show the last successful value and `.snapshot()` to inspect pending or error
-states. For ownership, retries, and hydration details, see the
-[signals reference](https://github.com/octanejs/octane/blob/main/docs/signals.md).
+On any handle, `.get()` reads the current value. To keep showing the last
+successful result, use `.latest(fallback)`. If you need to know whether a
+request is pending or has failed, check `.snapshot()`. The
+[signals reference](https://github.com/octanejs/octane/blob/main/docs/signals.md)
+goes into more detail about ownership, retries, and hydration.
