@@ -56,12 +56,19 @@ const createBindingStyles = function __createBindingStyles(observations?: Bindin
 	return {
 		connect(
 			node: Element,
-			notify: () => void,
+			notify: (committed?: boolean) => void,
 			restoreStyles = false,
 			sharedObservation?: BindingObservationOwner,
 		): BindingSignalConnection {
-			const observation = sharedObservation ?? observations?.owner();
 			let raw: unknown;
+			let acceptedRaw: unknown;
+			let currentSources: Map<NativeReadSource, number> | undefined;
+			let acceptedSources: Map<NativeReadSource, number> | undefined;
+			const publishAccepted = (): void => {
+				acceptedRaw = raw;
+				acceptedSources = currentSources;
+			};
+			const observation = sharedObservation ?? observations?.owner(publishAccepted);
 			let disposed = false;
 			const subscriptions = new Map<NativeReadSource, (inspect?: boolean) => boolean | void>();
 			let previous: BindingValue = null;
@@ -81,8 +88,31 @@ const createBindingStyles = function __createBindingStyles(observations?: Bindin
 				return result;
 			};
 			previous = snapshotDOM();
-			const get = (): BindingValue => {
+			const sampleAccepted = (value: unknown, sources?: Set<NativeReadSource>): BindingValue => {
+				const previousObserver = setNativeReadObserver(
+					sources ? (source) => sources.add(source) : null,
+				);
+				const guard = beginNativeWriteGuard();
+				try {
+					return run(() => __normalizeBindingStyle(readNativeDomStyle(value)));
+				} finally {
+					endNativeWriteGuard(guard);
+					setNativeReadObserver(previousObserver);
+				}
+			};
+			const readAccepted = (value: unknown): { valid: boolean; value: BindingValue } => {
+				const sources = new Set<NativeReadSource>();
+				const sampled = sampleAccepted(value, sources);
+				return {
+					valid:
+						sources.size === (acceptedSources?.size ?? 0) &&
+						[...sources].every((source) => acceptedSources?.has(source)),
+					value: sampled,
+				};
+			};
+			const get = (committed = false): BindingValue => {
 				if (disposed) return null;
+				if (committed) return sampleAccepted(acceptedRaw);
 				const reads = new Map<NativeReadSource, number>();
 				const previousObserver = setNativeReadObserver((source, version) =>
 					reads.set(source, version),
@@ -111,9 +141,13 @@ const createBindingStyles = function __createBindingStyles(observations?: Bindin
 							source.subscribe(() => {
 								if (!disposed) {
 									if (active)
-										observations ? observations.notify(observation!, stop, notify) : notify();
-									else if (observations && source.retired?.())
-										observations.retire(observation!, stop);
+										observations
+											? observations.notify(observation!, stop, notify, raw !== acceptedRaw)
+											: notify();
+									else if (observations) {
+										if (source.retired?.()) observations.retire(observation!, stop);
+										else observations.notify(observation!, stop, notify);
+									}
 								}
 							}, !!observations),
 						);
@@ -130,6 +164,7 @@ const createBindingStyles = function __createBindingStyles(observations?: Bindin
 					if (!disposed && source.getVersion() !== version)
 						observations ? observations.notify(observation!, undefined, notify) : notify();
 				}
+				currentSources = reads;
 				return value;
 			};
 			const writeProperty = (name: string, value: string | null): void => {
@@ -177,7 +212,18 @@ const createBindingStyles = function __createBindingStyles(observations?: Bindin
 			};
 			return {
 				get,
-				accept: () => observation && observations!.accept(observation),
+				readAccepted,
+				publishAccepted,
+				publishAcceptedValue(value) {
+					acceptedRaw = value;
+				},
+				accept: () => {
+					if (
+						observation &&
+						(raw !== acceptedRaw || observation.pending?.size || observation.retired?.size)
+					)
+						observations!.accept(observation);
+				},
 				retired: () =>
 					__retiredBindingSource(
 						subscriptions,

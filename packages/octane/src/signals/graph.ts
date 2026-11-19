@@ -1323,6 +1323,16 @@ class GraphReadSource implements NativeReadSource {
 		readonly view: DeclarationView | undefined,
 	) {}
 
+	/** Private proof used only by an opted native projection observer. */
+	__matchesNativeDomHandle(handle: unknown): boolean {
+		return (
+			this.read === 'value' &&
+			this.view === undefined &&
+			handle === this.node &&
+			this.node[NATIVE_DOM_VALUE] === ScopedNode.prototype[NATIVE_DOM_VALUE]
+		);
+	}
+
 	/** The promoted view's canonical channel, or undefined while this one is live. */
 	canonicalSource(): NativeReadSource | undefined {
 		const view = this.view;
@@ -2476,6 +2486,16 @@ interface CellChannel {
 	revision: number;
 	readonly source: NativeReadSource;
 }
+function matchesKeylessNativeDomHandle(this: NativeReadSource, handle: unknown): boolean {
+	return (
+		(handle instanceof PlainCell &&
+			handle[NATIVE_DOM_VALUE] === PlainCell.prototype[NATIVE_DOM_VALUE] &&
+			cellChannels.get(handle)?.source === this) ||
+		(handle instanceof PlainComputed &&
+			handle[NATIVE_DOM_VALUE] === PlainComputed.prototype[NATIVE_DOM_VALUE] &&
+			leanChannels.get(handle)?.source === this)
+	);
+}
 const cellChannels = new WeakMap<PlainCell, CellChannel>();
 
 function cellChannel(cell: PlainCell): CellChannel {
@@ -2484,13 +2504,14 @@ function cellChannel(cell: PlainCell): CellChannel {
 		channel = {
 			revision: 0,
 			source: {
+				__matchesNativeDomHandle: matchesKeylessNativeDomHandle,
 				getVersion: () => channel!.revision,
 				subscribe(notify, speculative) {
 					assertAlive(cell.owner);
 					return attachObserver(cell as unknown as ScopedNode, notify, true, speculative);
 				},
 				retired: () => cell.owner.retired,
-			},
+			} as NativeReadSource & { __matchesNativeDomHandle: typeof matchesKeylessNativeDomHandle },
 		};
 		cellChannels.set(cell, channel);
 		cell.flags |= REACTIVE_TRACKED_CELL;
@@ -2847,12 +2868,13 @@ function leanChannel(node: PlainComputed): CellChannel {
 		channel = {
 			revision: 0,
 			source: {
+				__matchesNativeDomHandle: matchesKeylessNativeDomHandle,
 				// Not told of a change, so while one may have reached it no earlier read is reusable.
 				getVersion: () =>
 					node.flags & (REACTIVE_DIRTY | REACTIVE_PENDING) ? NaN : channel!.revision,
 				subscribe: (notify, speculative) =>
 					attachObserver(node as unknown as ScopedNode, notify, true, speculative),
-			},
+			} as NativeReadSource & { __matchesNativeDomHandle: typeof matchesKeylessNativeDomHandle },
 		};
 		leanChannels.set(node, channel);
 		node.flags |= REACTIVE_TRACKED_CELL;

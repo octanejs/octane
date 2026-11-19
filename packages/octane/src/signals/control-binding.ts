@@ -71,6 +71,7 @@ export interface BindingControlPrepared {
 export interface BindingControlLease {
 	prepare(value: unknown): BindingControlPrepared;
 	prepareCurrent(): BindingControlPrepared;
+	prepareCommitted(): BindingControlPrepared;
 	active(): boolean;
 	composing(): boolean;
 	/** Whether the bound handle's own owner retired, which ended this lease. */
@@ -85,7 +86,11 @@ const createBindingControls = function __createBindingControls(
 ) {
 	const run = owner === null ? <T>(callback: () => T): T => callback() : captureSignalOwner(owner);
 	return {
-		claim(element: Element, channel: ControlChannel, notify: () => void): BindingControlLease {
+		claim(
+			element: Element,
+			channel: ControlChannel,
+			notify: (committed?: boolean) => void,
+		): BindingControlLease {
 			const observation = observations?.owner();
 			const control = element as SignalControl;
 			if (
@@ -196,7 +201,7 @@ const createBindingControls = function __createBindingControls(
 				if (channels.size === 0) CONTROL_BINDINGS.delete(control);
 				if (failed) throw failure;
 			};
-			const prepare = (next: unknown): BindingControlPrepared => {
+			const prepare = (next: unknown, committed = false): BindingControlPrepared => {
 				if (disposed) return { publish() {}, commit() {} };
 				if (
 					isSignalHandle(next) &&
@@ -204,7 +209,7 @@ const createBindingControls = function __createBindingControls(
 						typeof next[SIGNAL_BINDING_SUBSCRIBE] !== 'function')
 				)
 					throw new TypeError(formatClientError(116));
-				if (raw !== next) {
+				if (!committed && raw !== next) {
 					const ticket = ++generation;
 					const stop = unsubscribe;
 					unsubscribe = undefined;
@@ -221,7 +226,10 @@ const createBindingControls = function __createBindingControls(
 						stopNext = run(() =>
 							candidate[SIGNAL_BINDING_SUBSCRIBE](
 								() => {
-									if (!disposed && generation === ticket) {
+									if (
+										!disposed &&
+										(generation === ticket || observation?.retired?.has(stopNext!))
+									) {
 										revision++;
 										observations ? observations.notify(observation!, stopNext, notify) : notify();
 									}
@@ -249,7 +257,7 @@ const createBindingControls = function __createBindingControls(
 					}
 				}
 				if (disposed) return { publish() {}, commit() {} };
-				const candidate = handle;
+				const candidate = committed ? active : handle;
 				const value = candidate ? read(candidate) : next;
 				if (disposed) return { publish() {}, commit() {} };
 				const multiple = control.localName === 'select' && (control as HTMLSelectElement).multiple;
@@ -285,6 +293,7 @@ const createBindingControls = function __createBindingControls(
 				const version = revision;
 				return {
 					publish(): void {
+						if (committed) return;
 						if (disposed || ticket !== generation) return;
 						active = candidate;
 						if (isWritableSignal(active)) {
@@ -326,7 +335,7 @@ const createBindingControls = function __createBindingControls(
 					commit(): void {
 						if (disposed || ticket !== generation || version !== revision || active !== candidate)
 							return;
-						if (observation) observations!.accept(observation);
+						if (observation && !committed) observations!.accept(observation);
 						if (
 							value == null ||
 							(multiple && selected === undefined) ||
@@ -356,6 +365,7 @@ const createBindingControls = function __createBindingControls(
 			return {
 				prepare,
 				prepareCurrent: () => prepare(raw),
+				prepareCommitted: () => prepare(active, true),
 				active: () => !disposed,
 				composing: () => composing,
 				retired: () => ownerRetired,

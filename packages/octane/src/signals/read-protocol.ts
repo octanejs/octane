@@ -138,6 +138,7 @@ export interface NativeReadSource {
 export type NativeReadObserver = (source: NativeReadSource, version: number) => void;
 
 let nativeReadObserver: NativeReadObserver | null = null;
+let nativeDomBoundary = 0;
 let nativeWriteGuarded = false;
 
 /**
@@ -166,8 +167,35 @@ export const NATIVE_DOM_VALUE: unique symbol = Symbol('octane.nativeDomValue');
 export function readNativeDomValue<T>(value: T): T extends SignalHandle<infer V> ? V : T;
 export function readNativeDomValue(value: any): any {
 	return value !== null && typeof value === 'object' && NATIVE_DOM_VALUE in value
-		? value[NATIVE_DOM_VALUE]()
+		? nativeReadObserver === null
+			? value[NATIVE_DOM_VALUE]()
+			: readObservedNativeDomValue(value)
 		: value;
+}
+
+function readObservedNativeDomValue(value: any): any {
+	const observer = nativeReadObserver as NativeReadObserver & {
+		__domBoundary?: number;
+		__domHandle?: unknown;
+		__domResolved?: unknown;
+		__domSource?: NativeReadSource | undefined;
+	};
+	if (observer.__domBoundary === undefined) return value[NATIVE_DOM_VALUE]();
+	const boundary = observer.__domBoundary;
+	const handle = observer.__domHandle;
+	const resolved = observer.__domResolved;
+	const source = observer.__domSource;
+	observer.__domBoundary = ++nativeDomBoundary;
+	observer.__domHandle = observer.__domResolved = value;
+	observer.__domSource = undefined;
+	try {
+		return value[NATIVE_DOM_VALUE]();
+	} finally {
+		observer.__domBoundary = boundary;
+		observer.__domHandle = handle;
+		observer.__domResolved = resolved;
+		observer.__domSource = source;
+	}
 }
 
 /** Snapshot values so later writes can diff against the last applied style. */
