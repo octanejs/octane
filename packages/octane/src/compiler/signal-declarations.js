@@ -26,18 +26,19 @@ const SIGNAL_FACTORIES = new Map([
 // module with such a declaration installs the views that stage it until the
 // renderer accepts that render (signals/redeclaration.ts).
 const VIEW_INSTALLERS = new Map([
-	['__derivedAt', '__derivedViews'],
-	['__derivedScalarAt', '__derivedScalarViews'],
-	['__queryAt', '__queryViews'],
+	['__derivedAt', ['__derivedViews']],
+	['__derivedOptionsAt', ['__derivedViews', '__derivedScalarViews']],
+	['__derivedScalarAt', ['__derivedScalarViews']],
+	['__derivedScalarOptionsAt', ['__derivedScalarViews']],
+	['__queryAt', ['__queryViews']],
 ]);
 
 function viewInstallers(declarations, trustedFactory) {
 	const installers = new Map();
 	for (const { node } of declarations) {
 		const trusted = trustedFactory(node);
-		const installer = VIEW_INSTALLERS.get(declarationHelper(trusted.factory, node));
-		if (installer !== undefined && !installers.has(installer))
-			installers.set(installer, trusted.helper(installer));
+		for (const installer of VIEW_INSTALLERS.get(declarationHelper(trusted.factory, node)) ?? [])
+			if (!installers.has(installer)) installers.set(installer, trusted.helper(installer));
 	}
 	return [...installers.values()];
 }
@@ -102,8 +103,28 @@ function isScalarResult(expression) {
 	return false;
 }
 
+function hasCellOptions(call, index) {
+	const options = unwrapExpression(call.arguments?.[index]);
+	if (options === undefined || (options.type === 'Literal' && options.value === null)) return false;
+	return !plainOptions(options, (key) => key === 'key' || (index === 1 && key === 'sync'));
+}
+
 function declarationHelper(factory, call) {
+	if (factory === 'signal$') return hasCellOptions(call, 1) ? '__signalOptionsAt' : '__signalAt';
 	if (factory !== 'derived$') return SIGNAL_FACTORIES.get(factory);
+	const helper = derivedDeclarationHelper(call);
+	if (helper === '__derivedAt') {
+		const options = unwrapExpression(call.arguments?.[1]);
+		return options === undefined || (options.type === 'Literal' && options.value === null)
+			? helper
+			: '__derivedOptionsAt';
+	}
+	return helper === '__derivedScalarAt' && hasCellOptions(call, 1)
+		? '__derivedScalarOptionsAt'
+		: helper;
+}
+
+function derivedDeclarationHelper(call) {
 	const args = call.arguments ?? [];
 	const compute = unwrapExpression(args[0]);
 	if (
@@ -129,6 +150,7 @@ function declarationHelper(factory, call) {
 				return '__derivedAt';
 			seen.add(key);
 			if (key === 'key' && validLiteralKey(property.value)) continue;
+			if (key === 'equals' || key === 'watched') continue;
 			if (key !== 'sync' || property.value?.type !== 'Literal') return '__derivedAt';
 			sync = property.value.value;
 		}
@@ -950,16 +972,21 @@ export function lowerSignalDeclarations(ast, filename, options) {
 			trusted.factory === 'derived$' && revision === null
 				? hydrationDerivedCapture(node, listed)
 				: null;
+		const helper = declarationHelper(trusted.factory, node);
+		const configured = helper.endsWith('OptionsAt');
 		return {
 			...node,
-			...(hydration === null
+			...(hydration === null && !configured
 				? null
-				: { metadata: { ...node.metadata, hydrationDerived: hydration } }),
+				: {
+						metadata: {
+							...node.metadata,
+							...(hydration === null ? null : { hydrationDerived: hydration }),
+							...(configured ? { octaneConfiguredSignalDeclaration: true } : null),
+						},
+					}),
 			...(pureSignalDeclaration(trusted.factory, node) ? { __octanePure: true } : null),
-			callee: inheritHookMemoOrigin(
-				trusted.helper(declarationHelper(trusted.factory, node)),
-				node.callee,
-			),
+			callee: inheritHookMemoOrigin(trusted.helper(helper), node.callee),
 			arguments: args,
 		};
 	});

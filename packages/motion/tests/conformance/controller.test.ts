@@ -4,12 +4,44 @@ import type { LegacyAnimationControls } from 'motion-dom';
 import { act, hydrateRoot } from 'octane';
 import { octane } from 'octane/compiler/vite';
 import { createServer } from 'vite';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { mount, nextPaint } from '../_helpers';
-import { ControllerGroup } from '../_fixtures/controller.tsrx';
+import { ControllerGroup, ExternalController } from '../_fixtures/controller.tsrx';
 import { RetainedControllerToggle } from '../_fixtures/retained-presence.tsrx';
 
 describe('animation controls', () => {
+	it.each(['subscribe', 'unsubscribe'] as const)(
+		'releases the visual when external controls throw during %s',
+		(phase) => {
+			const x = motionValue(0);
+			let subscribed: any;
+			const report = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const controls = {
+				start: () => Promise.resolve(),
+				set() {},
+				stop() {},
+				mount: () => () => {},
+				subscribe(visual: any) {
+					subscribed = visual;
+					if (phase === 'subscribe') throw new Error('subscribe failed');
+					return () => {
+						throw new Error('unsubscribe failed');
+					};
+				},
+			} as LegacyAnimationControls;
+			const r = mount(ExternalController, { controls, x });
+			try {
+				if (phase === 'subscribe') expect(subscribed.current).toBe(null);
+				r.unmount();
+				expect(subscribed.current).toBe(null);
+				expect(report).toHaveBeenCalled();
+			} finally {
+				r.container.remove();
+				report.mockRestore();
+			}
+		},
+	);
+
 	it.each([false, true])(
 		'returns an interrupted retained exit to its authored base on controller reentry (swap: %s)',
 		async (swap) => {

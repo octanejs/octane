@@ -1,7 +1,7 @@
 import { motion, m, RetainedPresence, useAnimationControls, useIsPresent } from '@octanejs/motion';
 import { Activity, useLayoutEffect, useState } from 'octane';
 import type { Ref } from 'octane';
-import type { LegacyAnimationControls } from 'motion-dom';
+import type { LegacyAnimationControls, MotionValue } from 'motion-dom';
 
 function Row({
 	record,
@@ -229,5 +229,74 @@ export function RetainedNamedToggle({
 }) @{
 	<RetainedPresence onExitComplete={() => record('complete')}>
 		{show ? <NamedRow key="row" record={record} label={label} /> : null}
+	</RetainedPresence>
+}
+
+function AuthoredValueRow({
+	original,
+	fresh,
+	mode,
+	record,
+	end,
+}: {
+	original: MotionValue<number>;
+	fresh: MotionValue<number>;
+	mode: 'add' | 'remove' | 'fresh' | 'disjoint';
+	record: (event: string) => void;
+	end?: boolean;
+}) @{
+	const [switched, setSwitched] = useState(false);
+	const opacity =
+		mode === 'disjoint'
+			? original
+			: switched
+				? mode === 'remove'
+					? 1
+					: fresh
+				: mode === 'add'
+					? 1
+					: original;
+	<div>
+		<button id="switch-authored-value" onClick={() => setSwitched(true)}>
+			Switch
+		</button>
+		<motion.div
+			id="authored-exit"
+			initial={false}
+			style={{ opacity, ...(mode === 'disjoint' && switched ? { x: fresh } : {}) }}
+			animate={{ opacity: 1 }}
+			exit={{ opacity: 0, ...(end ? { transitionEnd: { display: 'none' } } : {}) }}
+			transition={{ duration: 0.15, ease: 'linear' }}
+			onAnimationComplete={() => record('host')}
+		/>
+	</div>
+}
+
+export function RetainedAuthoredValueToggle({
+	show,
+	original,
+	fresh,
+	mode,
+	record,
+	end,
+}: {
+	show: boolean;
+	original: MotionValue<number>;
+	fresh: MotionValue<number>;
+	mode: 'add' | 'remove' | 'fresh' | 'disjoint';
+	record: (event: string) => void;
+	end?: boolean;
+}) @{
+	<RetainedPresence onExitComplete={() => record('owner')}>
+		{show ? (
+			<AuthoredValueRow
+				key="row"
+				original={original}
+				fresh={fresh}
+				mode={mode}
+				record={record}
+				end={end}
+			/>
+		) : null}
 	</RetainedPresence>
 }

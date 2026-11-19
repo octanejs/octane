@@ -17,6 +17,7 @@ import {
 } from './compile-universal.js';
 import { formatDomBindingIslandRequest } from './dom-binding-request.js';
 import { findPrivateCompiledContextProofs } from './private-context.js';
+import { isGeneratedSignalHandleCall } from './native-attribute-reads.js';
 
 export const HYDRATE_QUERY_PARAM = 'octane-hydrate';
 
@@ -1457,16 +1458,9 @@ function signalSitesInBoundary(boundary) {
 			return;
 		}
 		if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') {
-			const callee = node.callee;
-			const name =
-				callee?.type === 'Identifier'
-					? callee.name
-					: callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression'
-						? nameOf(callee.property)
-						: null;
 			const site = node.arguments?.[0];
 			if (
-				/^_?\$?__(?:signal|derived|query)At$/.test(name ?? '') &&
+				isGeneratedSignalHandleCall(node) &&
 				site?.type === 'Literal' &&
 				typeof site.value === 'string'
 			) {

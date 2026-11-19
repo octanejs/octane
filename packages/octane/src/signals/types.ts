@@ -138,6 +138,16 @@ export interface DerivedOptions {
 	readonly sync?: boolean;
 }
 
+/** Cell options belong to the first declaration resolved for an owner and site. */
+export type AuthoredSignalOptions<T> = SignalOptions & ScopeSignalOptions<T>;
+
+/** Observation and semantic equality are supported only for asserted synchronous derived cells. */
+export type AuthoredDerivedOptions<T> = SignalOptions &
+	(
+		| (DerivedOptions & { readonly equals?: never; readonly watched?: never })
+		| (ScopeSignalOptions<T> & { readonly sync: true })
+	);
+
 export interface QueryOptions {
 	readonly kind?: 'promise' | 'stream';
 }

@@ -9,6 +9,8 @@ import {
 	skip,
 	type Resource,
 } from 'octane/signals';
+import { signal$ as clientSignal$ } from 'octane/signals/client';
+import { derived$ as serverDerived$ } from 'octane/signals/server';
 
 const scope = createScope({ scopeKey: 'resource-types' });
 const selected$ = scope.signal$('selected', 1);
@@ -16,6 +18,25 @@ const draft$ = signal$('', { key: 'draft' });
 const draft: string = draft$.get();
 const length$ = derived$(() => draft$.get().length, { key: 'length', sync: true });
 const length: number = length$.get();
+const point$ = signal$({ x: 0 }, { equals: (a, b) => a.x === b.x, watched: () => () => {} });
+const pointCopy$ = derived$(() => ({ x: point$.get().x }), {
+	sync: true,
+	equals: (a, b) => a.x === b.x,
+	watched: () => () => {},
+});
+const pointX: number = pointCopy$.get().x;
+const clientPoint$ = clientSignal$({ x: 0 }, { equals: (a, b) => a.x === b.x });
+const serverPoint$ = serverDerived$(() => clientPoint$.get(), {
+	sync: true,
+	equals: (a, b) => a.x === b.x,
+});
+const serverPointX: number = serverPoint$.get().x;
+// @ts-expect-error — authored observed/equal derived declarations must assert synchronous evaluation.
+derived$(() => 1, { equals: (a: number, b: number) => a === b });
+// @ts-expect-error — equality/observation options cannot configure an async computation.
+derived$(async () => 1, { sync: true, equals: (a: number, b: number) => a === b });
+// @ts-expect-error — comparator arguments retain the declaration's payload type.
+signal$({ x: 0 }, { equals: (a: string, b: string) => a === b });
 const keyedUser$ = query$(
 	() => selected$.get(),
 	async (id) => ({ id }),

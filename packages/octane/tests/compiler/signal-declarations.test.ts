@@ -6,7 +6,7 @@ import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { compile } from '../../src/compiler/compile.js';
+import { compile, compileForBundler } from '../../src/compiler/compile.js';
 import { createOctaneCompiler } from '../../src/compiler/bundler.js';
 import { slotHooks } from '../../src/compiler/slot-hooks.js';
 import * as signals from 'octane/signals';
@@ -87,7 +87,7 @@ function compiledCalls(source: string, mode: 'client' | 'server' = 'client') {
 					: node.callee?.type === 'MemberExpression' && node.callee.property?.name;
 			if (
 				typeof callee === 'string' &&
-				/^_?\$?__(?:signal|derived(?:Scalar)?|query)At/.test(callee)
+				/^_?\$?__(?:signal(?:Options)?|derived(?:Options|Scalar(?:Options)?)?|query)At/.test(callee)
 			) {
 				calls.push({ callee, site: node.arguments?.[0]?.value });
 			}
@@ -233,6 +233,178 @@ export function exercise() { return 1; }
 }
 
 describe('compiler-owned signal declaration sites', () => {
+	it('keeps configured inline declarations on the direct text binding path', () => {
+		for (const expression of [
+			`signal$('one')`,
+			`signal$('one', {equals: Object.is})`,
+			`derived$((ctx) => 1, {key: 'd'})`,
+			`derived$(() => 2, {sync: true, equals: Object.is})`,
+		]) {
+			const source = `import {signal$, derived$} from 'octane/signals'; export function App() @{ <p>{${expression}}</p> }`;
+			const client = compile(source, FILENAME, { mode: 'client', hmr: false }).code;
+			const server = compile(source, FILENAME, { mode: 'server', hmr: false }).code;
+			expect(client, expression).toContain('bindSignalText');
+			expect(client, expression).not.toContain('bindSignalChild');
+			expect(server, expression).toContain('ssrChildText');
+		}
+	});
+
+	it('includes configured inline declaration sites in independent hydration manifests', () => {
+		for (const expression of [
+			`signal$('one')`,
+			`signal$('one', {equals: Object.is})`,
+			`derived$((ctx) => 1, {key: 'd'})`,
+			`derived$(() => 2, {sync: true, equals: Object.is})`,
+		]) {
+			const source = `import {Hydrate} from 'octane'; import {signal$, derived$} from 'octane/signals'; export function App() @{ <Hydrate independent when={true}><p>{${expression}}</p></Hydrate> }`;
+			const calls = compiledCalls(source, 'server');
+			expect(calls, expression).toHaveLength(1);
+			for (const mode of ['client', 'server'] as const) {
+				const compiled = compileForBundler(source, FILENAME, { mode, hmr: false });
+				expect(compiled.independentWidgets, expression).toHaveLength(1);
+				expect(compiled.independentWidgets[0].signalSites, expression).toEqual([calls[0].site]);
+			}
+			const activation = compile(source, `${FILENAME}?octane-hydrate=0`, {
+				mode: 'client',
+				hmr: false,
+			}).code;
+			expect(activation, expression).toContain('bindSignalText');
+			expect(activation, expression).not.toContain('bindSignalChild');
+		}
+	});
+
+	it('retains direct text and hydration sites when a generated helper alias collides', () => {
+		const source = `import {Hydrate} from 'octane'; import {signal$} from 'octane/signals'; const _$__signalOptionsAt = 'reserved'; export function App() @{ <Hydrate independent when={true}><p>{signal$('one', {equals: Object.is})}</p></Hydrate> }`;
+		const client = compile(
+			`import {signal$} from 'octane/signals'; const _$__signalOptionsAt = 'reserved'; export function App() @{ <p>{signal$('one', {equals: Object.is})}</p> }`,
+			FILENAME,
+			{ mode: 'client', hmr: false },
+		).code;
+		expect(client).toContain('_$__signalOptionsAt$1');
+		expect(client).toContain('bindSignalText');
+		expect(client).not.toContain('bindSignalChild');
+		const calls = compiledCalls(source, 'server');
+		expect(calls).toHaveLength(1);
+		for (const mode of ['client', 'server'] as const) {
+			const compiled = compileForBundler(source, FILENAME, { mode, hmr: false });
+			expect(compiled.independentWidgets[0].signalSites).toEqual([calls[0].site]);
+		}
+	});
+
+	it('does not classify foreign lookalike calls as generated signal aliases', () => {
+		for (const expression of [
+			`__signalOptionsAt$0()`,
+			`_$__signalOptionsAt$0()`,
+			`_$__signalOptionsAt$01()`,
+			`__signalOptionsAt$1()`,
+			`_$__signalOptionsAt$1()`,
+			`foreign.__signalOptionsAt$1()`,
+		]) {
+			const source = `export function App() @{ <p>{${expression}}</p> }`;
+			const client = compile(source, FILENAME, { mode: 'client', hmr: false }).code;
+			expect(client, expression).not.toContain('bindSignalText');
+		}
+		const island = `import {Hydrate} from 'octane'; function _$__signalOptionsAt$1(site) { return site; } export function App() @{ <Hydrate independent when={true}><p>{_$__signalOptionsAt$1('i:foreign')}</p></Hydrate> }`;
+		expect(
+			compileForBundler(island, FILENAME, { mode: 'client', hmr: false }).independentWidgets[0]
+				.signalSites,
+		).toEqual([]);
+	});
+
+	it('keeps proven optionless general declarations separate from dynamic options', () => {
+		const source = `import { derived$ } from 'octane/signals';
+const options = {sync: true, watched: () => {}};
+const optionless$ = derived$(async () => 1);
+const nullOptions$ = derived$(async () => 2, null);
+const dynamic$ = derived$(() => ({}), options);
+const keyed$ = derived$(async () => 3, {key: 'keyed'});`;
+		for (const mode of ['client', 'server'] as const) {
+			expect(compiledCalls(source, mode).map((call) => call.callee)).toEqual([
+				expect.stringContaining('__derivedAt'),
+				expect.stringContaining('__derivedAt'),
+				expect.stringContaining('__derivedOptionsAt'),
+				expect.stringContaining('__derivedOptionsAt'),
+			]);
+		}
+		const instance = compile(
+			`import { derived$ } from 'octane/signals';
+export function App(props) @{ const value$ = derived$(() => ({value: props.value}), props.options); <output>{value$.get().value}</output> }`,
+			FILENAME,
+			{ mode: 'client' },
+		).code;
+		expect(instance).toContain('__derivedViews');
+		expect(instance).toContain('__derivedScalarViews');
+	});
+
+	it('honors authored equality and observation options on client and server sites', async () => {
+		const authored = `import {signal$, derived$} from 'octane/signals';
+const point$ = signal$({x: 0}, {equals: (a, b) => a.x === b.x});
+const copy$ = derived$(() => ({x: point$.get().x}), {sync: true, equals: (a, b) => a.x === b.x});`;
+		const clientCalls = compiledCalls(authored, 'client');
+		expect(clientCalls.map((call) => call.callee)).toEqual([
+			expect.stringContaining('__signalOptionsAt'),
+			expect.stringContaining('__derivedScalarOptionsAt'),
+		]);
+		expect(clientCalls.map((call) => call.site)).toEqual(
+			compiledCalls(authored, 'server').map((call) => call.site),
+		);
+		for (const environment of ['client', 'server'] as const) {
+			const module = await evaluateDeclarations(
+				`import {signal$, derived$, runWithSignalOwner, retireSignalOwnerIdentity} from 'octane/signals';
+const events = [];
+const source$ = signal$({x: 0}, {key: 'point', equals: (a, b) => a.x === b.x, watched: () => { events.push('source:start'); return () => events.push('source:stop'); }});
+let runs = 0;
+const parity$ = derived$(() => { runs++; return {value: source$.get().x % 2}; }, {sync: true, equals: (a, b) => a.value === b.value, watched: () => { events.push('derived:start'); return () => events.push('derived:stop'); }});
+export function exercise() {
+ const owner = {scopeKey: 'authored-options'};
+ return runWithSignalOwner(owner, () => {
+  const initial = source$.get(), first = parity$.get();
+  const before = [...events]; let heard = 0;
+  const stop1 = parity$.subscribe(() => heard++), stop2 = parity$.subscribe(() => heard++);
+  source$.set({x: 0}); const sameSource = source$.get() === initial;
+  source$.set({x: 2}); const sameDerived = parity$.get() === first;
+  source$.set({x: 3}); const changed = parity$.get().value;
+  stop1(); const still = [...events]; stop2(); const stopped = [...events];
+  const stop3 = source$.subscribe(() => {}); retireSignalOwnerIdentity(owner); stop3();
+  return {before, sameSource, sameDerived, changed, heard, runs, still, stopped, events};
+ });
+}`,
+				'ts',
+				environment,
+				false,
+			);
+			const result = module.exercise();
+			expect(result.before).toEqual([]);
+			expect(result.sameSource).toBe(true);
+			expect(result.sameDerived).toBe(true);
+			expect(result.changed).toBe(1);
+			expect(result.heard).toBe(2);
+			expect(result.runs).toBe(3);
+			expect(result.still).toEqual(['source:start', 'derived:start']);
+			expect(result.stopped).toEqual([
+				'source:start',
+				'derived:start',
+				'derived:stop',
+				'source:stop',
+			]);
+			expect(result.events.slice(-2)).toEqual(['source:start', 'source:stop']);
+		}
+	});
+
+	it('rejects asynchronous results from configured authored derived declarations', async () => {
+		const module = await evaluateDeclarations(
+			`import {derived$, runWithSignalOwner} from 'octane/signals';
+const value$ = derived$(async () => 1, {sync: true, equals: (a, b) => a === b});
+export function exercise() { return runWithSignalOwner({scopeKey:'async-options'}, () => value$.get()); }`,
+			'ts',
+			'client',
+			false,
+		);
+		expect(() => module.exercise()).toThrow(
+			productionErrorMessage('derived$ requires a synchronous computation.'),
+		);
+	});
+
 	it('reports signal usage as metadata without marking ordinary or shadowed code', () => {
 		const signal = `import { signal$ } from 'octane/signals'; export const draft$ = signal$(''); export function App() @{ <p /> }`;
 		const ordinary = `export function App() @{ <p>ordinary</p> }`;

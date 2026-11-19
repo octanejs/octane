@@ -1,9 +1,22 @@
 import { formatClientError } from '../error-codes.client.generated.js';
 import { createDeclaredDerivedCell } from './computations.js';
 import { signalDeclarationSequence } from './engine.js';
-import { declarationKey, DerivedDescriptor, descriptorKey, signalOptionsKey } from './facade.js';
+import {
+	__derivedScalarOptionsAt,
+	declarationKey,
+	DerivedDescriptor,
+	descriptorKey,
+	signalOptionsKey,
+} from './facade.js';
 import { runWithSignalOwner } from './owner-context.js';
-import type { DerivedCompute, DerivedOptions, DerivedSignal, SignalOptions } from './types.js';
+import type {
+	AuthoredDerivedOptions,
+	DerivedCompute,
+	DerivedOptions,
+	DerivedSignal,
+	ScopeSignalOptions,
+	SignalOptions,
+} from './types.js';
 
 // General derived values may start async work. Scalar compiler output imports
 // only the shared facade, even when a separate cold entry uses this factory.
@@ -12,7 +25,7 @@ import type { DerivedCompute, DerivedOptions, DerivedSignal, SignalOptions } fro
 export function __derivedAt<T>(
 	site: string | undefined,
 	compute: DerivedCompute<T>,
-	options?: DerivedOptions & SignalOptions,
+	options?: SignalOptions & DerivedOptions,
 	captures?: readonly unknown[],
 ): DerivedSignal<T> {
 	if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
@@ -35,9 +48,35 @@ export function __derivedAt<T>(
 	);
 }
 
+/** General declarations whose options may configure the resolved cell. */
+export function __derivedOptionsAt<T>(
+	site: string | undefined,
+	compute: DerivedCompute<T>,
+	options?: AuthoredDerivedOptions<T>,
+	captures?: readonly unknown[],
+): DerivedSignal<T> {
+	if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
+	const equals = options?.equals;
+	const watched = options?.watched;
+	return equals !== undefined || watched !== undefined
+		? __derivedScalarOptionsAt(site, compute, options, captures, {
+				equals,
+				watched,
+			} as ScopeSignalOptions<T>)
+		: __derivedAt(site, compute, options, captures);
+}
+
+export function derived$<T>(
+	compute: (() => T) & (T extends PromiseLike<unknown> | AsyncIterable<unknown> ? never : unknown),
+	options: SignalOptions & ScopeSignalOptions<T> & { readonly sync: true },
+): DerivedSignal<T>;
 export function derived$<T>(
 	compute: DerivedCompute<T>,
-	options?: DerivedOptions & SignalOptions,
+	options?: SignalOptions & DerivedOptions & { readonly equals?: never; readonly watched?: never },
+): DerivedSignal<T>;
+export function derived$<T>(
+	compute: DerivedCompute<T>,
+	options?: AuthoredDerivedOptions<T>,
 ): DerivedSignal<T> {
-	return __derivedAt(undefined, compute, options);
+	return __derivedOptionsAt(undefined, compute, options);
 }

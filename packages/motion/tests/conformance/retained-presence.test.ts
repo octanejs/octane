@@ -5,6 +5,7 @@ vi.mock('motion', async (original) => ({
 	animate: animateMock,
 }));
 import { resolve } from 'node:path';
+import { motionValue } from 'motion';
 import { act, flushSync, hydrateRoot } from 'octane';
 import { octane } from 'octane/compiler/vite';
 import { createServer } from 'vite';
@@ -14,6 +15,7 @@ import {
 	RetainedRemovable,
 	RetainedControllerToggle,
 	RetainedNamedToggle,
+	RetainedAuthoredValueToggle,
 } from '../_fixtures/retained-presence.tsrx';
 
 beforeEach(() => {
@@ -21,6 +23,37 @@ beforeEach(() => {
 });
 
 describe('retained presence', () => {
+	it('suppresses a stale transitionEnd completion after authored value replacement', async () => {
+		const finishes: Array<() => void> = [];
+		const stops: Array<ReturnType<typeof vi.fn>> = [];
+		animateMock.mockImplementation(() => {
+			const stop = vi.fn();
+			stops.push(stop);
+			return { stop, then: (done: () => void) => finishes.push(done) };
+		});
+		const record = vi.fn(),
+			original = motionValue(1),
+			fresh = motionValue(0.7);
+		const props = { original, fresh, mode: 'fresh' as const, record, end: true };
+		const r = mount(RetainedAuthoredValueToggle, { ...props, show: true });
+		try {
+			r.update(RetainedAuthoredValueToggle, { ...props, show: false });
+			expect(finishes).toHaveLength(1);
+			finishes[0]();
+			expect(finishes).toHaveLength(2);
+			r.click('#switch-authored-value');
+			expect(stops[0]).toHaveBeenCalledOnce();
+			expect(stops[1]).toHaveBeenCalledOnce();
+			finishes[1]();
+			await Promise.resolve();
+			await nextPaint();
+			expect(record.mock.calls).toEqual([['owner']]);
+			expect(r.container.querySelector('#authored-exit')).toBeNull();
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('does not complete a changed equal-target label while its host is exiting', async () => {
 		const exits: Array<() => void> = [];
 		animateMock.mockImplementation(() => ({
