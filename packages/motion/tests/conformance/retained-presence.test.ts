@@ -13,6 +13,7 @@ import {
 	RetainedToggle,
 	RetainedRemovable,
 	RetainedControllerToggle,
+	RetainedNamedToggle,
 } from '../_fixtures/retained-presence.tsrx';
 
 beforeEach(() => {
@@ -20,6 +21,50 @@ beforeEach(() => {
 });
 
 describe('retained presence', () => {
+	it('does not complete a changed equal-target label while its host is exiting', async () => {
+		const exits: Array<() => void> = [];
+		animateMock.mockImplementation(() => ({
+			stop: vi.fn(),
+			then: (done: () => void) => exits.push(done),
+		}));
+		const record = vi.fn();
+		const r = mount(RetainedNamedToggle, { show: true, record });
+		try {
+			r.update(RetainedNamedToggle, { show: false, record });
+			r.click('#change-label');
+			await nextPaint();
+			expect(record).not.toHaveBeenCalled();
+			expect(exits).toHaveLength(1);
+			exits[0]();
+			await nextPaint();
+			expect(record.mock.calls.map(([event]) => event).sort()).toEqual(['complete', 'exit']);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('completes a reentering changed label only when its physical animation finishes', () => {
+		const finishes: Array<() => void> = [];
+		animateMock.mockImplementation(() => ({
+			stop: vi.fn(),
+			then: (done: () => void) => finishes.push(done),
+		}));
+		const record = vi.fn();
+		const r = mount(RetainedNamedToggle, { show: true, record, label: 'first' });
+		try {
+			r.update(RetainedNamedToggle, { show: false, record, label: 'first' });
+			r.update(RetainedNamedToggle, { show: true, record, label: 'second' });
+			expect(record).not.toHaveBeenCalled();
+			expect(finishes).toHaveLength(2);
+			finishes[0]();
+			expect(record).not.toHaveBeenCalled();
+			finishes[1]();
+			expect(record.mock.calls).toEqual([['second']]);
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('restarts an exit after controller replacement or a controller-to-declarative switch', async () => {
 		const finishes: Array<() => void> = [],
 			stops: Array<ReturnType<typeof vi.fn>> = [];

@@ -192,3 +192,42 @@ export function RetainedControllerToggle({
 		) : null}
 	</RetainedPresence>
 }
+
+function NamedRow({
+	record,
+	label: externalLabel,
+}: {
+	record: (event: string) => void;
+	label?: string;
+}) @{
+	const [label, setLabel] = useState('first');
+	<div>
+		<button id="change-label" onClick={() => setLabel('second')}>
+			Change
+		</button>
+		<motion.div
+			id="named-exit"
+			initial={false}
+			animate={externalLabel ?? label}
+			variants={{ first: { opacity: 1 }, second: { opacity: 1 } }}
+			exit={{ opacity: 0 }}
+			onAnimationComplete={(definition) =>
+				record(typeof definition === 'string' ? definition : 'exit')
+			}
+		/>
+	</div>
+}
+
+export function RetainedNamedToggle({
+	show,
+	record,
+	label,
+}: {
+	show: boolean;
+	record: (event: string) => void;
+	label?: string;
+}) @{
+	<RetainedPresence onExitComplete={() => record('complete')}>
+		{show ? <NamedRow key="row" record={record} label={label} /> : null}
+	</RetainedPresence>
+}
