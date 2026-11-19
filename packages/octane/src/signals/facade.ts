@@ -1,3 +1,4 @@
+import type { NativeReadSubscription } from './read-protocol.js';
 import { formatClientError } from '../error-codes.client.generated.js';
 import {
 	createDeclaredSignalCell,
@@ -490,11 +491,16 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 			: readBinding(this.resolve());
 	}
 
-	[SIGNAL_BINDING_SUBSCRIBE](notify: () => void, onRetire?: () => void): () => void {
+	[SIGNAL_BINDING_SUBSCRIBE](
+		notify: () => void,
+		onRetire?: () => void,
+		speculative?: boolean,
+	): NativeReadSubscription {
 		const run = captureSignalOwner(this.reader());
 		return this.resolve()[SIGNAL_BINDING_SUBSCRIBE](
 			forwardNativeTransitionConsumer(notify, () => run(notify)),
 			onRetire === undefined ? undefined : () => run(onRetire),
+			speculative,
 		);
 	}
 

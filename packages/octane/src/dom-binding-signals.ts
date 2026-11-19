@@ -1,3 +1,4 @@
+import { __withBindingObservations, type BindingObservations } from './dom-binding-observations.js';
 import { formatClientError } from './error-codes.client.generated.js';
 import { captureSignalOwner, currentSignalOwner } from './signals/owner-context.js';
 import { __retiredBindingSource } from './dom-binding-styles.js';
@@ -23,6 +24,8 @@ export interface BindingSignalConnection {
 	write?(value: unknown): void;
 	/** Error path only: whether the owner of a source this connection observes retired. */
 	retired(): boolean;
+	/** Select this connection only after its own binding was accepted. */
+	accept(): void;
 	dispose(preservePresentation?: boolean): void;
 }
 
@@ -199,15 +202,16 @@ export function __createBindingReads(notify: () => void): BindingReadTracker {
 }
 
 /** @internal Query-selected capability; captures the existing owner, never creates a graph. */
-export function __createBindingSignals() {
+const createBindingSignals = function __createBindingSignals(observations?: BindingObservations) {
 	const owner = currentSignalOwner();
 	const run = owner === null ? <T>(callback: () => T): T => callback() : captureSignalOwner(owner);
 	return {
 		isSignal: isSignalHandle,
 		connect(notify: () => void): BindingSignalConnection {
+			const observation = observations?.owner();
 			let value: unknown;
 			let handle: SignalHandle<unknown> | undefined;
-			let unsubscribe: (() => void) | undefined;
+			let unsubscribe: NativeReadSubscription | undefined;
 			let generation = 0;
 			let disposed = false;
 			const get = (): unknown =>
@@ -219,16 +223,22 @@ export function __createBindingSignals() {
 				handle = undefined;
 				const stop = unsubscribe;
 				unsubscribe = undefined;
-				stop?.();
+				if (stop) observations ? observations.release(observation!, stop) : stop();
+				if (observation) observations!.accept(observation);
 			};
 			return {
 				get,
+				accept: () => observation && observations!.accept(observation),
 				dispose,
 				// Only a subscribed handle is observed. Its own owner retiring wakes
 				// this connection, and the read that follows throws.
 				retired(): boolean {
 					try {
-						return !!unsubscribe && run(() => handle![SIGNAL_BINDING_RETIRED]?.()) === true;
+						return (
+							!!unsubscribe &&
+							!observation?.pending?.has(unsubscribe) &&
+							run(() => handle![SIGNAL_BINDING_RETIRED]?.()) === true
+						);
 					} catch {
 						// An unresolvable handle is not proof of retirement; report.
 						return false;
@@ -242,7 +252,7 @@ export function __createBindingSignals() {
 						const stop = unsubscribe;
 						unsubscribe = undefined;
 						handle = undefined;
-						stop?.();
+						if (stop) observations ? observations.release(observation!, stop) : stop();
 						if (disposed) return undefined;
 						handle = nextHandle;
 						if (handle) {
@@ -251,13 +261,21 @@ export function __createBindingSignals() {
 								typeof handle[SIGNAL_BINDING_SUBSCRIBE] !== 'function'
 							)
 								throw new TypeError(formatClientError(309));
-							const stopNext = run(() =>
-								handle![SIGNAL_BINDING_SUBSCRIBE](() => {
-									if (!disposed && ticket === generation) notify();
-								}),
+							let stopNext: NativeReadSubscription | undefined;
+							stopNext = run(() =>
+								handle![SIGNAL_BINDING_SUBSCRIBE](
+									() => {
+										if (!disposed && ticket === generation)
+											observations ? observations.notify(observation!, stopNext, notify) : notify();
+									},
+									observations ? () => observations.retire(observation!, stopNext) : undefined,
+									!!observations,
+								),
 							);
 							if (typeof stopNext !== 'function') throw new TypeError(formatClientError(310));
-							if (disposed || ticket !== generation) stopNext();
+							if (observations && !observations.add(observation!, stopNext)) return undefined;
+							if (disposed || ticket !== generation)
+								observations ? observations.release(observation!, stopNext) : stopNext();
 							else unsubscribe = stopNext;
 						}
 					}
@@ -267,4 +285,7 @@ export function __createBindingSignals() {
 			};
 		},
 	};
-}
+};
+
+export const __createBindingSignals =
+	/* @__PURE__ */ __withBindingObservations(createBindingSignals);

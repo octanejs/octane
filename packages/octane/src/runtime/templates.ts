@@ -774,11 +774,20 @@ export function textareaText(parts: unknown[], textHoles?: string): unknown {
 		key: signals.map((handle) => handle.key).join('+'),
 		[SIGNAL_BINDING_READ]: () => joinTextareaParts(parts, textHoles, readSignalBinding),
 		get: () => joinTextareaParts(parts, textHoles, (handle) => handle.get()),
-		[SIGNAL_BINDING_SUBSCRIBE](notify: () => void, onRetire?: () => void) {
-			const stops = signals.map((handle) => handle[SIGNAL_BINDING_SUBSCRIBE](notify, onRetire));
-			return () => {
+		[SIGNAL_BINDING_SUBSCRIBE](notify: () => void, onRetire?: () => void, speculative?: boolean) {
+			const stops = signals.map((handle) =>
+				handle[SIGNAL_BINDING_SUBSCRIBE](notify, onRetire, speculative),
+			);
+			const cleanup: import('../signals/read-protocol.js').NativeReadSubscription = () => {
 				for (const stop of stops) stop();
 			};
+			if (speculative)
+				cleanup.observation = {
+					setObserved(observed) {
+						for (const stop of stops) stop.observation?.setObserved(observed);
+					},
+				};
+			return cleanup;
 		},
 	} as unknown as SignalHandle<string>;
 }
