@@ -277,8 +277,44 @@ no observer does not start it. Here `chat.subscribe` is an application function
 that returns an unsubscribe function.
 
 ```ts
-import { createScope } from 'octane/signals';
+import { createScope, ScopeDisposedError } from 'octane/signals';
 import { chat, type Message } from './chat';
+
+function subscribeSafely<T>(
+	start: (publish: (value: T) => void) => (() => void) | Promise<() => void>,
+	publish: (value: T) => void,
+) {
+	let active = true;
+	let cleanup: (() => void) | undefined;
+	const fail = (error: unknown) => {
+		active = false;
+		if (typeof reportError === 'function') reportError(error);
+		else console.error(error);
+	};
+	let setup: (() => void) | Promise<() => void>;
+	try {
+		setup = start((value) => {
+			if (active) publish(value);
+		});
+	} catch (error) {
+		active = false;
+		if (error instanceof ScopeDisposedError) throw error;
+		fail(error);
+		return () => {};
+	}
+	if (typeof setup === 'function') cleanup = setup;
+	else
+		void setup
+			.then((stop) => {
+				if (active) cleanup = stop;
+				else stop();
+			})
+			.catch(fail);
+	return () => {
+		active = false;
+		cleanup?.();
+	};
+}
 
 const room = createScope({ scopeKey: 'room' });
 const roomId$ = room.signal$('room-id', 'general');
@@ -286,12 +322,20 @@ const messages$ = room.signal$<Message[]>('messages', [], {
 	equals: (previous, next) =>
 		previous.length === next.length && previous.every((message, i) => message.id === next[i].id),
 	watched: () =>
-		room.effect(() => chat.subscribe(roomId$.get(), (messages) => messages$.set(messages))),
+		room.effect(() =>
+			subscribeSafely<Message[]>(
+				(publish) => chat.subscribe(roomId$.get(), publish),
+				(messages) => messages$.set(messages),
+			),
+		),
 });
 ```
 
 Returning the effect's stop function connects the source while the messages
-are observed and reconnects it when `roomId$` changes.
+are observed and reconnects it when `roomId$` changes. The active flag rejects
+callbacks from an old connection; cleanup returned later by an asynchronous
+setup still runs after the connection is stopped. Setup failures and errors in
+late cleanup are reported through `reportError`.
 
 <h3 id="transactions">Group writes you can undo</h3>
 

@@ -151,14 +151,56 @@ Writes use `Object.is` equality and become visible immediately. Pass `{ equals }
 Pass `{ watched }` to start work only while something observes a signal. `watched()` runs, untracked, when the signal gains its first observer: an effect, a subscriber or a rendered binding that reads it, directly or through derived values. The function it returns runs when the last observer leaves or the scope is disposed, and the next first observer runs `watched` again. A read with no observer, including one through a derived value nothing observes, neither starts it nor keeps it running. Return a `scope.effect` stop to connect an external source that follows other signals: the effect restarts its subscription when they change and its stop disconnects it. A synchronous write inside `watched` is what the first observer reads. An error thrown by `watched` or its cleanup is reported through `reportError` and does not fail the read, stop or disposal that ran it.
 
 ```ts
-const messages$ = account.signal$('messages', [], {
+import { ScopeDisposedError } from 'octane/signals';
+
+function subscribeSafely<T>(
+	start: (publish: (value: T) => void) => (() => void) | Promise<() => void>,
+	publish: (value: T) => void,
+) {
+	let active = true;
+	let cleanup: (() => void) | undefined;
+	const fail = (error: unknown) => {
+		active = false;
+		if (typeof reportError === 'function') reportError(error);
+		else console.error(error);
+	};
+	let setup: (() => void) | Promise<() => void>;
+	try {
+		setup = start((value) => {
+			if (active) publish(value);
+		});
+	} catch (error) {
+		active = false;
+		if (error instanceof ScopeDisposedError) throw error;
+		fail(error);
+		return () => {};
+	}
+	if (typeof setup === 'function') cleanup = setup;
+	else
+		void setup
+			.then((stop) => {
+				if (active) cleanup = stop;
+				else stop();
+			})
+			.catch(fail);
+	return () => {
+		active = false;
+		cleanup?.();
+	};
+}
+
+const messages$ = account.signal$<Message[]>('messages', [], {
 	watched: () =>
-		account.effect(() => {
-			const room = room$.get();
-			return chat.subscribe(room, (messages) => messages$.set(messages));
-		}),
+		account.effect(() =>
+			subscribeSafely<Message[]>(
+				(publish) => chat.subscribe(room$.get(), publish),
+				(messages) => messages$.set(messages),
+			),
+		),
 });
 ```
+
+The fence belongs to each effect run: it ignores callbacks from a replaced or stopped subscription, installs synchronous cleanup immediately, and runs asynchronously acquired cleanup even if it arrives after the effect stopped. Rejected setup or late cleanup is reported through `reportError`.
 
 `scope.transaction(fn)` is a batch that can be rolled back. If `fn` throws, or returns a promise, every signal it changed takes back its previous value before the batch ends, and the error is rethrown. No subscriber, effect or render sees a failed write: an effect that read one inside the transaction may run again, reading the restored values. Otherwise it returns `{ value, changes, undo, redo }`. `value` is what `fn` returned. `changes` lists each signal it changed once, as `{ signal$, previous, next }`, in the order it first wrote them, and leaves out one it wrote back to where it started. `undo()` writes the previous values back, last change first, and `redo()` writes the next values again, each in one batch, skipping signals whose scope has retired. A transaction inside another one joins it: an inner failure rolls back only the inner writes, and an outer failure rolls back both. An `undo` or `redo` inside a transaction is recorded like any write. A restored value is the exact previous reference, even when `equals` finds it equal to the value it replaces. Writes a transition stages are not recorded, but a rollback puts back a pending transition value that an urgent write in the transaction applied to. `scope.batch` is unchanged and keeps its writes when its callback throws.
 
