@@ -109,6 +109,12 @@ export interface NativeReadInspection {
  * the channel separate from either runtime lets the engine run without DOM or
  * server dependencies, and lets compiled native readers select their renderer.
  */
+/** A native subscription can track invalidation before its render is accepted. */
+export interface NativeReadSubscription {
+	(): void;
+	observation?: { setObserved(observed: boolean): void };
+}
+
 export interface NativeReadSource {
 	/**
 	 * A conservative invalidation revision. Reading it must not evaluate user
@@ -116,8 +122,8 @@ export interface NativeReadSource {
 	 * of the live source whose value was captured.
 	 */
 	getVersion(): number;
-	/** Subscribe without evaluating a user computation. */
-	subscribe(notify: () => void): () => void;
+	/** Subscribe without evaluating a user computation; speculative reads do not observe. */
+	subscribe(notify: () => void, speculative?: boolean): NativeReadSubscription;
 	/** Ready values from the observed revision, without running computations. */
 	serialize?(observedVersion: number): readonly NativeSerializedScope[] | undefined;
 	/** Whether the data scope this source reads has retired. Never evaluates. */
@@ -132,6 +138,7 @@ export interface NativeReadSource {
 export type NativeReadObserver = (source: NativeReadSource, version: number) => void;
 
 let nativeReadObserver: NativeReadObserver | null = null;
+let nativeDomBoundary = 0;
 let nativeWriteGuarded = false;
 
 /**
@@ -160,8 +167,35 @@ export const NATIVE_DOM_VALUE: unique symbol = Symbol('octane.nativeDomValue');
 export function readNativeDomValue<T>(value: T): T extends SignalHandle<infer V> ? V : T;
 export function readNativeDomValue(value: any): any {
 	return value !== null && typeof value === 'object' && NATIVE_DOM_VALUE in value
-		? value[NATIVE_DOM_VALUE]()
+		? nativeReadObserver === null
+			? value[NATIVE_DOM_VALUE]()
+			: readObservedNativeDomValue(value)
 		: value;
+}
+
+function readObservedNativeDomValue(value: any): any {
+	const observer = nativeReadObserver as NativeReadObserver & {
+		__domBoundary?: number;
+		__domHandle?: unknown;
+		__domResolved?: unknown;
+		__domSource?: NativeReadSource | undefined;
+	};
+	if (observer.__domBoundary === undefined) return value[NATIVE_DOM_VALUE]();
+	const boundary = observer.__domBoundary;
+	const handle = observer.__domHandle;
+	const resolved = observer.__domResolved;
+	const source = observer.__domSource;
+	observer.__domBoundary = ++nativeDomBoundary;
+	observer.__domHandle = observer.__domResolved = value;
+	observer.__domSource = undefined;
+	try {
+		return value[NATIVE_DOM_VALUE]();
+	} finally {
+		observer.__domBoundary = boundary;
+		observer.__domHandle = handle;
+		observer.__domResolved = resolved;
+		observer.__domSource = source;
+	}
 }
 
 /** Snapshot values so later writes can diff against the last applied style. */

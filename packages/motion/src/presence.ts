@@ -11,7 +11,7 @@ import {
 	useState,
 	type ElementDescriptor,
 } from 'octane';
-import type { Scope } from 'octane/internal/client';
+import { type Scope } from 'octane/internal/client';
 
 const ENTRY = Symbol.for('octane-motion:presence-entry');
 const OWNER = Symbol.for('octane-motion:presence-owner');

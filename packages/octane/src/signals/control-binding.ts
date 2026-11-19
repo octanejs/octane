@@ -1,3 +1,8 @@
+import {
+	__withBindingObservations,
+	type BindingObservations,
+} from '../dom-binding-observations.js';
+import type { NativeReadSubscription } from './read-protocol.js';
 import { formatClientError } from '../error-codes.client.generated.js';
 import { radioGroupCandidates, toControlledString } from '../radio-group.js';
 import {
@@ -66,6 +71,7 @@ export interface BindingControlPrepared {
 export interface BindingControlLease {
 	prepare(value: unknown): BindingControlPrepared;
 	prepareCurrent(): BindingControlPrepared;
+	prepareCommitted(): BindingControlPrepared;
 	active(): boolean;
 	composing(): boolean;
 	/** Whether the bound handle's own owner retired, which ended this lease. */
@@ -74,10 +80,18 @@ export interface BindingControlLease {
 }
 
 /** @internal Optional compiled-control capability; captures, but never creates, an owner. */
-export function __createBindingControls(owner = currentSignalOwner()) {
+const createBindingControls = function __createBindingControls(
+	owner = currentSignalOwner(),
+	observations?: BindingObservations,
+) {
 	const run = owner === null ? <T>(callback: () => T): T => callback() : captureSignalOwner(owner);
 	return {
-		claim(element: Element, channel: ControlChannel, notify: () => void): BindingControlLease {
+		claim(
+			element: Element,
+			channel: ControlChannel,
+			notify: (committed?: boolean) => void,
+		): BindingControlLease {
+			const observation = observations?.owner();
 			const control = element as SignalControl;
 			if (
 				control?.nodeType !== 1 ||
@@ -101,9 +115,10 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 			let initialized = false;
 			let composing = false;
 			let raw: unknown;
+			let publishedRaw: unknown;
 			let handle: SignalHandle<unknown> | undefined;
 			let active: SignalHandle<unknown> | undefined;
-			let unsubscribe: (() => void) | undefined;
+			let unsubscribe: NativeReadSubscription | undefined;
 			let stopWriter: (() => void) | undefined;
 			let generation = 0;
 			let revision = 0;
@@ -152,13 +167,13 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 				if (disposed) return;
 				composing = false;
 				input();
-				if (!disposed) notify();
+				if (!disposed) notify(true);
 			};
 			const dispose = (): void => {
 				if (disposed) return;
 				disposed = true;
 				generation++;
-				raw = undefined;
+				raw = publishedRaw = undefined;
 				active = handle = undefined;
 				if (channel === 'checked') RADIO_WRITERS.delete(control);
 				let failed = false;
@@ -175,7 +190,8 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 				};
 				const stop = unsubscribe;
 				unsubscribe = undefined;
-				attempt(stop);
+				attempt(stop && (() => (observations ? observations.release(observation!, stop) : stop())));
+				if (observation) observations!.accept(observation);
 				attempt(stopWriter);
 				stopWriter = undefined;
 				control.removeEventListener('input', input);
@@ -186,7 +202,7 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 				if (channels.size === 0) CONTROL_BINDINGS.delete(control);
 				if (failed) throw failure;
 			};
-			const prepare = (next: unknown): BindingControlPrepared => {
+			const prepare = (next: unknown, committed = false): BindingControlPrepared => {
 				if (disposed) return { publish() {}, commit() {} };
 				if (
 					isSignalHandle(next) &&
@@ -194,12 +210,12 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 						typeof next[SIGNAL_BINDING_SUBSCRIBE] !== 'function')
 				)
 					throw new TypeError(formatClientError(116));
-				if (raw !== next) {
+				if (!committed && raw !== next) {
 					const ticket = ++generation;
 					const stop = unsubscribe;
 					unsubscribe = undefined;
 					handle = undefined;
-					stop?.();
+					if (stop) observations ? observations.release(observation!, stop) : stop();
 					if (disposed) return { publish() {}, commit() {} };
 					raw = next;
 					// Reads, subscriptions and writes run inside the captured owner;
@@ -207,31 +223,42 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 					handle = isSignalHandle(next) ? next : undefined;
 					if (handle) {
 						const candidate = handle;
-						const stopNext = run(() =>
+						let stopNext: NativeReadSubscription | undefined;
+						stopNext = run(() =>
 							candidate[SIGNAL_BINDING_SUBSCRIBE](
 								() => {
-									if (!disposed && generation === ticket) {
+									if (
+										!disposed &&
+										(generation === ticket || observation?.retired?.has(stopNext!))
+									) {
 										revision++;
-										notify();
+										observations ? observations.notify(observation!, stopNext, notify) : notify();
 									}
 								},
 								() => {
 									// The document may retire before application pagehide cleanup.
 									// Do not read dead authority or release a replacement's lease.
-									if (!disposed && generation === ticket) {
-										ownerRetired = true;
-										dispose();
+									if (!disposed) {
+										if (observations) observations.retire(observation!, stopNext);
+										else if (generation === ticket) {
+											ownerRetired = true;
+											dispose();
+										}
 									}
 								},
+								!!observations,
 							),
 						);
 						if (typeof stopNext !== 'function') throw new TypeError(formatClientError(118));
-						if (disposed || generation !== ticket) stopNext();
+						if (observations && !observations.add(observation!, stopNext))
+							return { publish() {}, commit() {} };
+						if (disposed || generation !== ticket)
+							observations ? observations.release(observation!, stopNext) : stopNext();
 						else unsubscribe = stopNext;
 					}
 				}
 				if (disposed) return { publish() {}, commit() {} };
-				const candidate = handle;
+				const candidate = committed ? active : handle;
 				const value = candidate ? read(candidate) : next;
 				if (disposed) return { publish() {}, commit() {} };
 				const multiple = control.localName === 'select' && (control as HTMLSelectElement).multiple;
@@ -267,7 +294,9 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 				const version = revision;
 				return {
 					publish(): void {
+						if (committed) return;
 						if (disposed || ticket !== generation) return;
+						publishedRaw = next;
 						active = candidate;
 						if (isWritableSignal(active)) {
 							// Document capture runs before the native target listener. Snapshot
@@ -306,13 +335,12 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 						} while (!consumeHydrationControl(control, snapshot.revision));
 					},
 					commit(): void {
+						if (disposed || ticket !== generation || version !== revision || active !== candidate)
+							return;
+						if (observation && !committed) observations!.accept(observation);
 						if (
-							disposed ||
 							value == null ||
 							(multiple && selected === undefined) ||
-							ticket !== generation ||
-							version !== revision ||
-							active !== candidate ||
 							composing ||
 							snapshotHydrationControl(control)!.composing
 						)
@@ -339,6 +367,7 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 			return {
 				prepare,
 				prepareCurrent: () => prepare(raw),
+				prepareCommitted: () => prepare(publishedRaw, true),
 				active: () => !disposed,
 				composing: () => composing,
 				retired: () => ownerRetired,
@@ -346,7 +375,10 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 			};
 		},
 	};
-}
+};
+
+export const __createBindingControls =
+	/* @__PURE__ */ __withBindingObservations(createBindingControls);
 
 function controlSignalOwner(owner: SignalOwner | null, document: boolean): object | null {
 	return owner !== null && 'documentOwner' in owner
@@ -411,7 +443,7 @@ export function bindSignalControl(
 		}
 	};
 	const owner = currentSignalOwner();
-	lease = __createBindingControls(owner).claim(control, channel, refresh);
+	lease = createBindingControls(owner).claim(control, channel, refresh);
 	refresh();
 	return Object.assign(dispose, {
 		[CONTROL_HANDOFF](): ControlHandoff {

@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { createScope } from 'octane/signals';
 import type { Block, Scope } from '../src/runtime';
 import { createNativeReadDriver, rebaseNativeRead } from '../src/signals/native-read-client';
-import { reportNativeRead, type NativeReadSource } from '../src/signals/read-protocol';
+import {
+	reportNativeRead,
+	setNativeReadObserver,
+	type NativeReadSource,
+} from '../src/signals/read-protocol';
 
 // This unit supplies only the host's ownership/capture boundary. Reads and
 // source metadata come from the real engine; runtime traversal is exercised
@@ -200,6 +204,60 @@ describe('native read attempts', () => {
 			for (const cleanup of cleanups) cleanup();
 			data.dispose();
 		}
+	});
+
+	it('demotes a hydrated live dependency while a transition still retains it', () => {
+		const data = createScope({ scopeKey: 'watched-rebase-transition' });
+		const log: string[] = [];
+		const watched = (name: string) => () => {
+			log.push(`watch ${name}`);
+			return () => log.push(`unwatch ${name}`);
+		};
+		const left$ = data.signal$('left', 'left', { watched: watched('left') });
+		const right$ = data.signal$('right', 'right', { watched: watched('right') });
+		let live!: NativeReadSource;
+		const previous = setNativeReadObserver((source) => (live = source));
+		try {
+			left$.get();
+		} finally {
+			setNativeReadObserver(previous);
+		}
+		let notify!: () => void;
+		const historical: NativeReadSource = {
+			getVersion: () => 1,
+			subscribe(next) {
+				notify = next;
+				return () => {};
+			},
+		};
+		const { driver, cleanups, render } = harness();
+		const attempt = (read: () => void) => {
+			const capture = {};
+			render(capture, read);
+			return capture;
+		};
+		try {
+			driver.acceptCapture(attempt(() => reportNativeRead(historical, 1)));
+			expect(
+				rebaseNativeRead(notify, {
+					historical,
+					binding: false,
+					successor: () => ({ live, version: live.getVersion() }),
+				}),
+			).toBe(true);
+			expect([...log]).toEqual(['watch left']);
+			const held = attempt(() => left$.get());
+			driver.acceptCapture(attempt(() => right$.get()));
+			expect([...log].sort()).toEqual(['watch left', 'unwatch left', 'watch right'].sort());
+			driver.discardCapture(held);
+			expect([...log].sort()).toEqual(['watch left', 'unwatch left', 'watch right'].sort());
+		} finally {
+			for (const cleanup of cleanups) cleanup();
+			data.dispose();
+		}
+		expect([...log].sort()).toEqual(
+			['watch left', 'unwatch left', 'watch right', 'unwatch right'].sort(),
+		);
 	});
 
 	it('moves a released historical read to its live successor unless an attempt shares it', () => {

@@ -44,6 +44,34 @@ describe('native signal server output and adoption', () => {
 		return { scope, value$: scope.signal$('value', initial) };
 	}
 
+	it('starts watching only when hydration commits and stops after the last reader unmounts', () => {
+		const scope = createScope({ scopeKey: 'watched-hydration' });
+		scopes.push(scope);
+		const log: string[] = [];
+		const value$ = scope.signal$('value', 'Ada', {
+			watched: () => {
+				log.push('watch');
+				return () => log.push('unwatch');
+			},
+		});
+		const model = { scope, value$ };
+		container.innerHTML = renderToString(server.SignalHydration, model).html;
+		const output = container.querySelector('output');
+		expect(output?.textContent).toBe('Ada');
+		expect(log).toEqual([]);
+
+		flushSync(() => {
+			root = hydrateRoot(container, client.SignalHydration, model);
+		});
+		expect(container.querySelector('output')).toBe(output);
+		expect(log).toEqual(['watch']);
+		root.unmount();
+		root = undefined;
+		expect(log).toEqual(['watch', 'unwatch']);
+		scope.dispose();
+		expect(log).toEqual(['watch', 'unwatch']);
+	});
+
 	it('adopts the server value without rewinding live state or replacing focused hosts', () => {
 		const model = state$('native-hydration-ready');
 		container.innerHTML = renderToString(server.SignalHydration, model).html;

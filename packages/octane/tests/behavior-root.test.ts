@@ -35,7 +35,9 @@ import {
 import { setStyle } from '../src/runtime.js';
 import {
 	createScope,
+	createFamily,
 	__signalAt,
+	__derivedScalarAt,
 	runWithSignalOwner,
 	SIGNAL_BINDING_SUBSCRIBE,
 	createResource,
@@ -9054,6 +9056,822 @@ export function Counter() @{
 					scope.dispose();
 				}
 			}
+		});
+
+		for (const [capability, markup, observe] of [
+			[
+				'signal attribute',
+				'<p title={props.selected ? right$ : left$}>text</p>',
+				(node: HTMLElement) => node.title,
+			],
+			[
+				'signal text',
+				'<p>{(props.selected ? right$ : left$) as string}</p>',
+				(node: HTMLElement) => node.textContent,
+			],
+			[
+				'style',
+				'<p style={{ color: props.selected ? right$ : left$, backgroundColor: count$ }}>text</p>',
+				(node: HTMLElement) => node.style.color,
+			],
+			[
+				'projection',
+				'<p sx={styles.paint(props.selected ? right$ : left$, count$)}>text</p>',
+				(node: HTMLElement) => node.style.color,
+			],
+			[
+				'control',
+				'<input value={props.selected ? right$ : left$} />',
+				(node: HTMLElement) => (node as HTMLInputElement).value,
+			],
+		] as const)
+			for (const outcome of ['commit', 'cancel'] as const)
+				it(`keeps a staged ${capability} quiet until its binding can ${outcome} (${dev ? 'dev' : 'prod'})`, async () => {
+					const scope = createScope({ scopeKey: `watched-binding-${capability}-${dev}` });
+					const log: string[] = [];
+					const selected$ = scope.signal$('selected', false);
+					const count$ = scope.signal$('count', 'white');
+					const left$ = scope.signal$('left', 'red', {
+						watched: () => {
+							log.push('watch left');
+							return () => log.push('unwatch left');
+						},
+					});
+					const right$ = scope.signal$('right', 'blue', {
+						watched: () => {
+							log.push('watch right');
+							right$.set('green');
+							return () => log.push('unwatch right');
+						},
+					});
+					let resolve!: (value: string) => void;
+					const pending = new Promise<string>((done) => (resolve = done));
+					const load = query(`watched-binding-${capability}-${dev}`, (selected: boolean) =>
+						selected ? pending : 'ready',
+					);
+					const gate$ = createResource(scope, 'gate', () => load(selected$.get()));
+					await act(() => {});
+					const source = `import { selected$, left$, right$, gate$, count$ } from 'state';
+import * as stylex from 'binding-styles';
+const styles = stylex.create({ paint: (color, backgroundColor) => ({ className: 'painted', style: { color, backgroundColor } }) });
+export function Watched(props) @{ 'use dom bindings'; <section>${markup}<output title={count$} /><i>{gate$.get() as string}</i></section> }`;
+					const fixture = authoredPresentation(
+						'Watched',
+						{ selected: false },
+						dev,
+						source,
+						{
+							state: { selected$, left$, right$, gate$, count$ },
+							'binding-styles': {
+								create: (configuration: unknown) => configuration,
+								props: (value: unknown) => value,
+							},
+						},
+						{
+							knownAttributeSpreads: [
+								{
+									source: 'binding-styles',
+									imported: '*',
+									members: ['props'],
+									fields: ['className', 'style'],
+									style: 'object',
+									jsxAttribute: 'sx',
+								},
+							],
+						},
+					);
+					const handle = fixture.mount({ parent: container }, fixture.state);
+					try {
+						const node = container.querySelector('section')!.firstElementChild as HTMLElement;
+						expect(observe(node)).toBe('red');
+						expect([...log]).toEqual(['watch left']);
+						selected$.set(true);
+						fixture.publish({ selected: true });
+						expect([...log]).toEqual(['watch left']);
+						expect(observe(node)).toBe('red');
+						count$.set('black');
+						expect(container.querySelector('output')?.title).toBe('black');
+						if (capability === 'style' || capability === 'projection')
+							expect(node.style.backgroundColor).toBe('black');
+						expect([...log]).toEqual(['watch left']);
+						count$.set('purple');
+						expect(container.querySelector('output')?.title).toBe('purple');
+						if (capability === 'style' || capability === 'projection')
+							expect(node.style.backgroundColor).toBe('purple');
+						expect([...log]).toEqual(['watch left']);
+						if (capability === 'control') {
+							const input = node as HTMLInputElement;
+							input.value = 'typed';
+							input.dispatchEvent(new InputEvent('input', { bubbles: true }));
+							expect(left$.get()).toBe('typed');
+							expect(right$.get()).toBe('blue');
+						}
+						left$.set('orange');
+						expect(observe(node)).toBe('orange');
+						expect([...log]).toEqual(['watch left']);
+						if (outcome === 'cancel') fixture.publish({ selected: false });
+						await act(() => resolve('ready'));
+						expect(observe(node)).toBe(outcome === 'commit' ? 'green' : 'orange');
+						expect([...log].sort()).toEqual(
+							(outcome === 'commit'
+								? ['watch left', 'unwatch left', 'watch right']
+								: ['watch left']
+							).sort(),
+						);
+					} finally {
+						handle.dispose();
+						scope.dispose();
+					}
+					expect([...log].sort()).toEqual(
+						(outcome === 'commit'
+							? ['watch left', 'unwatch left', 'watch right', 'unwatch right']
+							: ['watch left', 'unwatch left']
+						).sort(),
+					);
+				});
+
+		for (const [name, acceptedSignal, replacementSignal, held] of [
+			['signal to signal', true, true, true],
+			['signal to scalar', true, false, true],
+			['scalar to signal', false, true, true],
+			['scalar to scalar', false, false, true],
+			['ordinary scalar', false, false, false],
+		] as const)
+			it(`keeps composition on the accepted ${name} control (${dev ? 'dev' : 'prod'})`, async () => {
+				const scope = createScope({ scopeKey: `composition-held-${name}-${dev}` });
+				const log: string[] = [];
+				const hold$ = scope.signal$('hold', false);
+				const left$ = scope.signal$('left', 'red', {
+					watched: () => {
+						log.push('watch left');
+						return () => log.push('unwatch left');
+					},
+				});
+				const right$ = scope.signal$('right', 'blue', {
+					watched: () => {
+						log.push('watch right');
+						right$.set('green');
+						return () => log.push('unwatch right');
+					},
+				});
+				let resolve!: (value: string) => void;
+				const pending = new Promise<string>((done) => (resolve = done));
+				const load = query(`composition-held-${name}-${dev}`, (hold: boolean) =>
+					hold ? pending : 'ready',
+				);
+				const gate$ = createResource(scope, 'gate', () => load(hold$.get()));
+				await act(() => {});
+				const source = `import { gate$ } from 'state'; export function CompositionControl(props) @{ 'use dom bindings'; <section><input value={props.value} /><i>{gate$.get() as string}</i></section> }`;
+				const fixture = authoredPresentation<{ value: unknown }>(
+					'CompositionControl',
+					{ value: acceptedSignal ? left$ : 'red' },
+					dev,
+					source,
+					{ state: { gate$ } },
+				);
+				const handle = fixture.mount({ parent: container }, fixture.state);
+				try {
+					const input = container.querySelector('input')!;
+					input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+					if (held) {
+						hold$.set(true);
+						fixture.publish({ value: replacementSignal ? right$ : 'blue' });
+					}
+					input.value = 'composed';
+					input.setSelectionRange(1, 4, 'backward');
+					input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+					expect(input.value).toBe(acceptedSignal ? 'composed' : 'red');
+					if (acceptedSignal)
+						expect([input.selectionStart, input.selectionEnd, input.selectionDirection]).toEqual([
+							1,
+							4,
+							'backward',
+						]);
+					expect(log).toEqual(acceptedSignal ? ['watch left'] : []);
+					input.value = 'next';
+					input.dispatchEvent(new InputEvent('input', { bubbles: true }));
+					expect([left$.get(), right$.get()]).toEqual([acceptedSignal ? 'next' : 'red', 'blue']);
+					if (held) {
+						await act(() => resolve('ready'));
+						expect(input.value).toBe(replacementSignal ? 'green' : 'blue');
+					}
+				} finally {
+					handle.dispose();
+					scope.dispose();
+				}
+				expect([...log].sort()).toEqual(
+					[
+						...(acceptedSignal ? ['watch left', 'unwatch left'] : []),
+						...(held && replacementSignal ? ['watch right', 'unwatch right'] : []),
+					].sort(),
+				);
+			});
+
+		it(`keeps a whole-style getter on accepted sources while its replacement is held (${dev ? 'dev' : 'prod'})`, async () => {
+			const scope = createScope({ scopeKey: `whole-style-selector-${dev}` });
+			const log: string[] = [];
+			const hold$ = scope.signal$('hold', false);
+			const selector$ = scope.signal$('selector', false);
+			const left$ = scope.signal$('left', 'red', {
+				watched: () => {
+					log.push('watch left');
+					return () => log.push('unwatch left');
+				},
+			});
+			const right$ = scope.signal$('right', 'blue', {
+				watched: () => {
+					log.push('watch right');
+					right$.set('green');
+					return () => log.push('unwatch right');
+				},
+			});
+			let resolve!: (value: string) => void;
+			const pending = new Promise<string>((done) => (resolve = done));
+			const load = query(`whole-style-selector-${dev}`, (hold: boolean) =>
+				hold ? pending : 'ready',
+			);
+			const gate$ = createResource(scope, 'gate', () => load(hold$.get()));
+			await act(() => {});
+			const paint = {
+				get color() {
+					return selector$.get() ? right$ : left$;
+				},
+			};
+			const source = `import { gate$ } from 'state'; export function WholeStyle(props) @{ 'use dom bindings'; <section><p style={props.paint}>text</p><i>{gate$.get() as string}</i></section> }`;
+			const fixture = authoredPresentation('WholeStyle', { paint }, dev, source, {
+				state: { gate$ },
+			});
+			const handle = fixture.mount({ parent: container }, fixture.state);
+			try {
+				const paragraph = container.querySelector('p')!;
+				expect(paragraph.style.color).toBe('red');
+				hold$.set(true);
+				fixture.publish({ paint: { color: right$ } });
+				left$.set('orange');
+				expect(paragraph.style.color).toBe('orange');
+				selector$.set(true);
+				expect(paragraph.style.color).toBe('orange');
+				expect(log).toEqual(['watch left']);
+				await act(() => resolve('ready'));
+				expect(paragraph.style.color).toBe('green');
+				expect([...log].sort()).toEqual(['watch left', 'unwatch left', 'watch right'].sort());
+			} finally {
+				handle.dispose();
+				scope.dispose();
+			}
+			expect([...log].sort()).toEqual(
+				['watch left', 'unwatch left', 'watch right', 'unwatch right'].sort(),
+			);
+		});
+
+		for (const form of [
+			'keyed derived',
+			'keyless signal',
+			'keyless derived',
+			'family',
+			'authored signal',
+			'authored derived',
+		] as const)
+			it(`refreshes an accepted sx ${form} while its replacement is held (${dev ? 'dev' : 'prod'})`, async () => {
+				const scope = createScope({ scopeKey: `sx-form-${form}-${dev}` });
+				const selected$ = scope.signal$('selected', false);
+				const base$ = scope.signal$(null, 'red');
+				let rightStarts = 0;
+				const right$ = scope.signal$('right', 'blue', {
+					watched: () => {
+						rightStarts++;
+					},
+				});
+				let left$: any;
+				let update: () => void;
+				if (form === 'keyed derived') {
+					left$ = scope.derived$('derived', () => base$.get());
+					update = () => base$.set('orange');
+				} else if (form === 'keyless signal') {
+					left$ = base$;
+					update = () => base$.set('orange');
+				} else if (form === 'keyless derived') {
+					left$ = scope.derived$(null, () => base$.get());
+					update = () => base$.set('orange');
+				} else if (form === 'family') {
+					left$ = createFamily(scope, () => scope.signal$(null, 'red')).get('row');
+					update = () => left$.set('orange');
+				} else {
+					const authored$ = __signalAt(`g:sx-${form}-${dev}`, 'red');
+					left$ =
+						form === 'authored signal'
+							? authored$
+							: __derivedScalarAt(`g:sx-derived-${dev}`, () => authored$.get());
+					update = () => runWithSignalOwner(scope, () => authored$.set('orange'));
+				}
+				let resolve!: (value: string) => void;
+				const pending = new Promise<string>((done) => (resolve = done));
+				const load = query(`sx-form-${form}-${dev}`, (selected: boolean) =>
+					selected ? pending : 'ready',
+				);
+				const gate$ = createResource(scope, 'gate', () => load(selected$.get()));
+				await act(() => {});
+				const source = `import { left$, right$, gate$ } from 'state';
+import * as stylex from 'binding-styles';
+const styles = stylex.create({ paint: (color) => ({ className: 'painted', style: { color } }) });
+export function SxForm(props) @{ 'use dom bindings'; <section><p sx={styles.paint(props.selected ? right$ : left$)} /><i>{gate$.get() as string}</i></section> }`;
+				const fixture = authoredPresentation(
+					'SxForm',
+					{ selected: false },
+					dev,
+					source,
+					{
+						state: { left$, right$, gate$ },
+						'binding-styles': {
+							create: (value: unknown) => value,
+							props: (value: unknown) => value,
+						},
+					},
+					{
+						knownAttributeSpreads: [
+							{
+								source: 'binding-styles',
+								imported: '*',
+								members: ['props'],
+								fields: ['className', 'style'],
+								style: 'object',
+								jsxAttribute: 'sx',
+							},
+						],
+					},
+				);
+				const handle = runWithSignalOwner(scope, () =>
+					fixture.mount({ parent: container }, fixture.state),
+				);
+				try {
+					const paragraph = container.querySelector('p')!;
+					expect(paragraph.style.color).toBe('red');
+					selected$.set(true);
+					fixture.publish({ selected: true });
+					update();
+					expect(paragraph.style.color).toBe('orange');
+					expect(rightStarts).toBe(0);
+					// Cancel the replacement before resolving, so its watched hook remains unreachable.
+					fixture.publish({ selected: false });
+					await act(() => resolve('ready'));
+					expect(paragraph.style.color).toBe('orange');
+				} finally {
+					handle.dispose();
+					scope.dispose();
+				}
+			});
+
+		for (const empty of ['missing', 'null'] as const)
+			it(`keeps accepted projected raw style through a held ${empty} field (${dev ? 'dev' : 'prod'})`, async () => {
+				const scope = createScope({ scopeKey: `sx-raw-${empty}-${dev}` });
+				const log: string[] = [];
+				const selected$ = scope.signal$('selected', false);
+				const dummy$ = scope.signal$('dummy', 1);
+				const left$ = scope.signal$('left', 'red', {
+					watched: () => {
+						log.push('watch left');
+						return () => log.push('unwatch left');
+					},
+				});
+				let resolve!: (value: string) => void;
+				const pending = new Promise<string>((done) => (resolve = done));
+				const load = query(`sx-raw-${empty}-${dev}`, (selected: boolean) =>
+					selected ? pending : 'ready',
+				);
+				const gate$ = createResource(scope, 'gate', () => load(selected$.get()));
+				await act(() => {});
+				const source = `import { dummy$, gate$ } from 'state'; import * as stylex from 'binding-styles';
+const styles = stylex.create({ paint: (width, label, color, empty) => empty === 'missing' ? { className: label + ':' + width } : empty === 'null' ? { className: label + ':' + width, style: null } : { className: label + ':' + width, style: { height: width, color } } });
+export function SxRaw(props) @{ 'use dom bindings'; <section><p sx={styles.paint(dummy$, props.label, props.color, props.empty)} /><i>{gate$.get() as string}</i></section> }`;
+				const fixture = authoredPresentation(
+					'SxRaw',
+					{ label: 'old', color: left$, empty: '' },
+					dev,
+					source,
+					{
+						state: { dummy$, gate$ },
+						'binding-styles': {
+							create: (value: unknown) => value,
+							props: (value: unknown) => value,
+						},
+					},
+					{
+						knownAttributeSpreads: [
+							{
+								source: 'binding-styles',
+								imported: '*',
+								members: ['props'],
+								fields: ['className', 'style'],
+								style: 'object',
+								jsxAttribute: 'sx',
+							},
+						],
+					},
+				);
+				const handle = fixture.mount({ parent: container }, fixture.state);
+				try {
+					const paragraph = container.querySelector('p')!;
+					dummy$.set(2);
+					expect([paragraph.className, paragraph.style.height]).toEqual(['old:2', '2px']);
+					selected$.set(true);
+					fixture.publish({ label: 'new', color: left$, empty });
+					left$.set('orange');
+					expect([paragraph.className, paragraph.style.height, paragraph.style.color]).toEqual([
+						'old:2',
+						'2px',
+						'orange',
+					]);
+					dummy$.set(3);
+					expect([paragraph.className, paragraph.style.height, paragraph.style.color]).toEqual([
+						'old:3',
+						'3px',
+						'orange',
+					]);
+					expect(log).toEqual(['watch left']);
+					await act(() => resolve('ready'));
+					expect([paragraph.className, paragraph.style.height, paragraph.style.color]).toEqual([
+						'new:3',
+						'',
+						'',
+					]);
+					expect(log).toEqual(['watch left', 'unwatch left']);
+				} finally {
+					handle.dispose();
+					scope.dispose();
+				}
+			});
+
+		it(`keeps ambiguous sx selectors quiet while held (${dev ? 'dev' : 'prod'})`, async () => {
+			for (const kind of ['explicit', 'custom', 'overridden descriptor'] as const) {
+				const scope = createScope({ scopeKey: `sx-selector-${kind}-${dev}` });
+				const hold$ = scope.signal$('hold', false);
+				const dummy$ = scope.signal$('dummy', 'fixed');
+				const selected$ = scope.signal$('selected', false);
+				let custom$: unknown;
+				let update = () => selected$.set(true);
+				if (kind === 'custom') custom$ = { [SignalReads.NATIVE_DOM_VALUE]: () => selected$.get() };
+				if (kind === 'overridden descriptor') {
+					const descriptor = __signalAt(`g:sx-override-${dev}`, false);
+					const native = (descriptor as any)[SignalReads.NATIVE_DOM_VALUE];
+					Object.defineProperty(descriptor, SignalReads.NATIVE_DOM_VALUE, {
+						value(this: unknown) {
+							return native.call(this);
+						},
+					});
+					custom$ = descriptor;
+					update = () => runWithSignalOwner(scope, () => descriptor.set(true));
+				}
+				let resolve!: (value: string) => void;
+				const pending = new Promise<string>((done) => (resolve = done));
+				const load = query(`sx-selector-${kind}-${dev}`, (hold: boolean) =>
+					hold ? pending : 'ready',
+				);
+				const gate$ = createResource(scope, 'gate', () => load(hold$.get()));
+				await act(() => {});
+				const expression = kind === 'explicit' ? 'selected$.get()' : 'custom$';
+				const source = `import { dummy$, selected$, custom$, gate$ } from 'state'; import * as stylex from 'binding-styles';
+const styles = stylex.create({ paint: (label, selected) => ({ className: label, style: { color: selected ? 'blue' : 'red' } }) });
+export function SxSelector() @{ 'use dom bindings'; <section><p sx={styles.paint(dummy$, ${expression})} /><i>{gate$.get() as string}</i></section> }`;
+				const fixture = authoredPresentation(
+					'SxSelector',
+					{},
+					dev,
+					source,
+					{
+						state: { dummy$, selected$, custom$, gate$ },
+						'binding-styles': {
+							create: (value: unknown) => value,
+							props: (value: unknown) => value,
+						},
+					},
+					{
+						knownAttributeSpreads: [
+							{
+								source: 'binding-styles',
+								imported: '*',
+								members: ['props'],
+								fields: ['className', 'style'],
+								style: 'object',
+								jsxAttribute: 'sx',
+							},
+						],
+					},
+				);
+				const handle = runWithSignalOwner(scope, () =>
+					fixture.mount({ parent: container }, fixture.state),
+				);
+				try {
+					const paragraph = container.querySelector('p')!;
+					hold$.set(true);
+					fixture.publish({});
+					update();
+					dummy$.set('wide');
+					expect([paragraph.className, paragraph.style.color]).toEqual(['fixed', 'red']);
+					await act(() => resolve('ready'));
+					expect([paragraph.className, paragraph.style.color]).toEqual(['wide', 'blue']);
+				} finally {
+					handle.dispose();
+					scope.dispose();
+					container.replaceChildren();
+				}
+			}
+		});
+
+		for (const [kind, markup, update] of [
+			['control release', '<input value={props.value} />', { value: undefined }],
+			['conditional removal', '@if (props.show) { <p title={props.value} /> }', { show: false }],
+			[
+				'keyed row removal',
+				'@for (const item of props.items; key item) { <p title={props.value} /> }',
+				{ items: [] },
+			],
+		] as const)
+			it(`disconnects a watched binding after ${kind} (${dev ? 'dev' : 'prod'})`, () => {
+				const scope = createScope({ scopeKey: `watch-release-${kind}-${dev}` });
+				const log: string[] = [];
+				const value$ = scope.signal$('value', 'red', {
+					watched: () => {
+						log.push('watch');
+						return () => log.push('unwatch');
+					},
+				});
+				const initial: {
+					value: typeof value$ | undefined;
+					show: boolean;
+					items: readonly string[];
+				} = { value: value$, show: true, items: ['one'] };
+				const fixture = authoredPresentation(
+					'Released',
+					initial,
+					dev,
+					`export function Released(props) @{ 'use dom bindings'; <section>${markup}</section> }`,
+				);
+				const handle = fixture.mount({ parent: container }, fixture.state);
+				try {
+					expect(log).toEqual(['watch']);
+					fixture.publish(update);
+					expect(log).toEqual(['watch', 'unwatch']);
+				} finally {
+					handle.dispose();
+					scope.dispose();
+				}
+				expect(log).toEqual(['watch', 'unwatch']);
+			});
+
+		it(`releases a watcher when its first committed observation aborts the binding (${dev ? 'dev' : 'prod'})`, () => {
+			const scope = createScope({ scopeKey: `watch-abort-${dev}` });
+			const controller = new AbortController();
+			const log: string[] = [];
+			const value$ = scope.signal$('value', 'red', {
+				watched() {
+					log.push('watch');
+					controller.abort();
+					return () => log.push('unwatch');
+				},
+			});
+			const fixture = authoredPresentation(
+				'WatchedAbort',
+				{},
+				dev,
+				`import { value$ } from 'state';
+export function WatchedAbort() @{ 'use dom bindings'; <p title={value$}>text</p> }`,
+				{ state: { value$ } },
+			);
+			try {
+				fixture.mount({ parent: container }, fixture.state, { signal: controller.signal });
+				expect(log).toEqual(['watch', 'unwatch']);
+				value$.set('blue');
+				expect(container.querySelector('p')?.title).toBe('red');
+			} finally {
+				scope.dispose();
+			}
+			expect(log).toEqual(['watch', 'unwatch']);
+		});
+
+		it(`cleans up the prior watch after an abort restarts observation (${dev ? 'dev' : 'prod'})`, () => {
+			const scope = createScope({ scopeKey: `watch-restart-${dev}` });
+			const controller = new AbortController();
+			const log: string[] = [];
+			let stopNested: (() => void) | undefined;
+			let calls = 0;
+			const value$ = scope.signal$('value', 'red', {
+				watched() {
+					const turn = ++calls;
+					log.push(`watch ${turn}`);
+					if (turn === 1) {
+						controller.abort();
+						stopNested = value$.subscribe(() => {});
+					}
+					return () => log.push(`unwatch ${turn}`);
+				},
+			});
+			const fixture = authoredPresentation(
+				'Restarted',
+				{},
+				dev,
+				`import { value$ } from 'state';
+export function Restarted() @{ 'use dom bindings'; <p title={value$}>text</p> }`,
+				{ state: { value$ } },
+			);
+			try {
+				fixture.mount({ parent: container }, fixture.state, { signal: controller.signal });
+				expect(log).toEqual(['watch 1', 'watch 2', 'unwatch 1']);
+				stopNested?.();
+				expect(log).toEqual(['watch 1', 'watch 2', 'unwatch 1', 'unwatch 2']);
+			} finally {
+				stopNested?.();
+				scope.dispose();
+			}
+		});
+
+		for (const retired of ['committed', 'staged'] as const)
+			it(`handles retirement of a ${retired} watched scope during suspension (${dev ? 'dev' : 'prod'})`, async () => {
+				const leftScope = createScope({ scopeKey: `watched-retire-left-${dev}` });
+				const rightScope = createScope({ scopeKey: `watched-retire-right-${dev}` });
+				const gateScope = createScope({ scopeKey: `watched-retire-gate-${dev}` });
+				const log: string[] = [];
+				const left$ = leftScope.signal$('left', 'red', {
+					watched: () => {
+						log.push('watch left');
+						return () => log.push('unwatch left');
+					},
+				});
+				const right$ = rightScope.signal$('right', 'blue', {
+					watched: () => {
+						log.push('watch right');
+						return () => log.push('unwatch right');
+					},
+				});
+				const selected$ = gateScope.signal$('selected', false);
+				let resolve!: (value: string) => void;
+				const pending = new Promise<string>((done) => (resolve = done));
+				const load = query(`watched-retire-${dev}`, (selected: boolean) =>
+					selected ? pending : 'ready',
+				);
+				const gate$ = createResource(gateScope, 'gate', () => load(selected$.get()));
+				await act(() => {});
+				const source = `import { left$, right$, gate$ } from 'state';
+export function Watched(props) @{ 'use dom bindings';
+  <section><p title={props.selected ? right$ : left$}>text</p><i>{gate$.get() as string}</i></section>
+}`;
+				const fixture = authoredPresentation('Watched', { selected: false }, dev, source, {
+					state: { left$, right$, gate$ },
+				});
+				const handle = fixture.mount({ parent: container }, fixture.state);
+				const report = vi.fn();
+				const previousReport = globalThis.reportError;
+				globalThis.reportError = report;
+				try {
+					const paragraph = container.querySelector('p')!;
+					expect([paragraph.title, log]).toEqual(['red', ['watch left']]);
+					selected$.set(true);
+					fixture.publish({ selected: true });
+					expect([paragraph.title, log]).toEqual(['red', ['watch left']]);
+					if (retired === 'committed') {
+						expect(() => leftScope.dispose()).not.toThrow();
+						await act(() => resolve('ready'));
+						expect(log).toEqual(['watch left', 'unwatch left']);
+						expect(fixture.cleanup).toHaveBeenCalledOnce();
+						expect(report).not.toHaveBeenCalled();
+					} else {
+						expect(() => rightScope.dispose()).not.toThrow();
+						expect(report).toHaveBeenCalled();
+						expect(log).toEqual(['watch left']);
+						expect(fixture.cleanup).not.toHaveBeenCalled();
+						fixture.publish({ selected: false });
+						await act(() => resolve('ready'));
+						expect(log).toEqual(['watch left']);
+					}
+					expect(paragraph.title).toBe('red');
+				} finally {
+					globalThis.reportError = previousReport;
+					handle.dispose();
+					leftScope.dispose();
+					rightScope.dispose();
+					gateScope.dispose();
+				}
+			});
+
+		it(`keeps a staged watch quiet in an adopted @try while its outer commit succeeds (${dev ? 'dev' : 'prod'})`, async () => {
+			const scope = createScope({ scopeKey: `watched-adopted-try-${dev}` });
+			const log: string[] = [];
+			const left$ = scope.signal$('left', 'red', {
+				watched: () => {
+					log.push('watch left');
+					return () => log.push('unwatch left');
+				},
+			});
+			const right$ = scope.signal$('right', 'blue', {
+				watched: () => {
+					log.push('watch right');
+					right$.set('green');
+					return () => log.push('unwatch right');
+				},
+			});
+			const selected$ = scope.signal$('selected', false);
+			let resolve!: (value: string) => void;
+			const pending = new Promise<string>((done) => (resolve = done));
+			const load = query(`watched-adopted-try-${dev}`, (selected: boolean) =>
+				selected ? pending : 'ready',
+			);
+			const gate$ = createResource(scope, 'gate', () => load(selected$.get()));
+			await act(() => {});
+			const source = `import { left$, right$, gate$ } from 'state';
+export function WatchedTry(props) @{ 'use dom bindings';
+  <section title={props.title}>
+    @try { <><p title={props.selected ? right$ : left$}>text</p><i>{gate$.get() as string}</i></> }
+    @pending { <em>loading</em> }
+    <output>{props.count as string}</output>
+  </section>
+}`;
+			const state = { state: { left$, right$, gate$ } };
+			const server = authoredPresentation(
+				'WatchedTry',
+				{ selected: false, title: 'old', count: 'one' },
+				dev,
+				source,
+				state,
+			);
+			container.innerHTML = server.html;
+			const section = container.querySelector('section')!;
+			const paragraph = section.querySelector('p')!;
+			expect(log).toEqual([]);
+			selected$.set(true);
+			const client = authoredPresentation(
+				'WatchedTry',
+				{ selected: true, title: 'new', count: 'two' },
+				dev,
+				source,
+				state,
+			);
+			const handle = client.attach(section, client.state);
+			try {
+				expect(section.title).toBe('new');
+				expect(section.querySelector('output')?.textContent).toBe('two');
+				expect(section.querySelector('p')).toBe(paragraph);
+				expect(paragraph.title).toBe('red');
+				expect(section.querySelector('em')).toBeNull();
+				expect(log).toEqual([]);
+				await act(() => resolve('ready'));
+				expect(section.querySelector('p')).toBe(paragraph);
+				expect(paragraph.title).toBe('green');
+				expect(log).toEqual(['watch right']);
+			} finally {
+				handle.dispose();
+				scope.dispose();
+			}
+		});
+
+		it(`keeps a suspended binding projection quiet until it publishes (${dev ? 'dev' : 'prod'})`, async () => {
+			const scope = createScope({ scopeKey: `watched-projection-${dev}` });
+			const log: string[] = [];
+			const selected$ = scope.signal$('selected', false);
+			const left$ = scope.signal$('left', 'left', {
+				watched: () => {
+					log.push('watch left');
+					return () => log.push('unwatch left');
+				},
+			});
+			const right$ = scope.signal$('right', 'right', {
+				watched: () => {
+					log.push('watch right');
+					right$.set('right live');
+					return () => log.push('unwatch right');
+				},
+			});
+			let resolve!: (value: string) => void;
+			const pending = new Promise<string>((done) => (resolve = done));
+			const load = query(`watched-projection-${dev}`, (selected: boolean) =>
+				selected ? pending : 'ready',
+			);
+			const gate$ = createResource(scope, 'gate', () => load(selected$.get()));
+			await act(() => {});
+			const source = `import { selected$, left$, right$, gate$ } from 'state';
+export function Projection() @{ 'use dom bindings';
+  <p title={selected$.get() ? right$.get() : left$.get()}>{gate$.get() as string}</p>
+}`;
+			const fixture = authoredPresentation('Projection', {}, dev, source, {
+				state: { selected$, left$, right$, gate$ },
+			});
+			const handle = fixture.mount({ parent: container }, fixture.state);
+			try {
+				const paragraph = container.querySelector('p')!;
+				expect(paragraph.title).toBe('left');
+				expect([...log]).toEqual(['watch left']);
+				selected$.set(true);
+				expect(paragraph.title).toBe('left');
+				expect([...log]).toEqual(['watch left']);
+				await act(() => resolve('ready'));
+				expect(container.querySelector('p')).toBe(paragraph);
+				expect(paragraph.title).toBe('right live');
+				expect([...log].sort()).toEqual(['watch left', 'unwatch left', 'watch right'].sort());
+			} finally {
+				handle.dispose();
+				scope.dispose();
+			}
+			expect([...log].sort()).toEqual(
+				['watch left', 'unwatch left', 'watch right', 'unwatch right'].sort(),
+			);
 		});
 
 		// An island reads module signals directly. Its program subscribes to every

@@ -1,7 +1,12 @@
+import { __withBindingObservations, type BindingObservations } from './dom-binding-observations.js';
 import { formatClientError } from './error-codes.client.generated.js';
 import { captureSignalOwner, currentSignalOwner } from './signals/owner-context.js';
 import { __retiredBindingSource } from './dom-binding-styles.js';
-import { setNativeReadObserver, type NativeReadSource } from './signals/read-protocol.js';
+import {
+	setNativeReadObserver,
+	type NativeReadSource,
+	type NativeReadSubscription,
+} from './signals/read-protocol.js';
 import { isSignalHandle } from './signals/handle-protocol.js';
 import {
 	SIGNAL_BINDING_READ,
@@ -14,11 +19,16 @@ export interface BindingSignalConnection {
 	/** Resolve and observe a projected handle, or disconnect for an ordinary value. */
 	read(value: unknown): unknown;
 	/** Read only the already connected channel; never reevaluate the authored projection. */
-	get(): unknown;
+	get(committed?: boolean): unknown;
+	readAccepted?(value: unknown): { valid: boolean; value: unknown };
+	publishAccepted?(): void;
+	publishAcceptedValue?(value: unknown): void;
 	/** Optional whole-style writer, present only on the selected style capability. */
 	write?(value: unknown): void;
 	/** Error path only: whether the owner of a source this connection observes retired. */
 	retired(): boolean;
+	/** Select this connection only after its own binding was accepted. */
+	accept(): void;
 	dispose(preservePresentation?: boolean): void;
 }
 
@@ -95,7 +105,7 @@ export interface BindingReadTracker {
 export function __createBindingReads(notify: () => void): BindingReadTracker {
 	const owner = currentSignalOwner();
 	const run = owner === null ? <T>(callback: () => T): T => callback() : captureSignalOwner(owner);
-	const subscriptions = new Map<NativeReadSource, () => void>();
+	const subscriptions = new Map<NativeReadSource, NativeReadSubscription>();
 	const waits = new WeakSet<object>();
 	let reads = new Map<NativeReadSource, number>();
 	let disposed = false;
@@ -104,21 +114,23 @@ export function __createBindingReads(notify: () => void): BindingReadTracker {
 		const stop = run(() =>
 			source.subscribe(() => {
 				if (live && !disposed) notify();
-			}),
+			}, true),
 		);
 		if (typeof stop !== 'function') throw new TypeError(formatClientError(304));
-		const cleanup = (): void => {
+		const cleanup: NativeReadSubscription = (): void => {
 			live = false;
 			stop();
 		};
+		if (stop.observation !== undefined) cleanup.observation = stop.observation;
 		if (disposed) cleanup();
 		else subscriptions.set(source, cleanup);
 	};
-	const add = (): boolean => {
+	const add = (published: boolean): boolean => {
 		let changed = false;
 		for (const [source, version] of reads) {
 			if (disposed) break;
 			if (!subscriptions.has(source)) acquire(source);
+			if (published) subscriptions.get(source)?.observation?.setObserved(true);
 			// A write between the read and its subscription has no notification.
 			if (source.getVersion() !== version) changed = true;
 		}
@@ -141,10 +153,10 @@ export function __createBindingReads(notify: () => void): BindingReadTracker {
 				subscriptions.delete(source);
 				stop();
 			}
-			if (add()) notify();
+			if (add(true)) notify();
 		},
 		fail(error, committed) {
-			if (add()) notify();
+			if (add(false)) notify();
 			if (
 				error !== null &&
 				(typeof error === 'object' || typeof error === 'function') &&
@@ -193,19 +205,33 @@ export function __createBindingReads(notify: () => void): BindingReadTracker {
 }
 
 /** @internal Query-selected capability; captures the existing owner, never creates a graph. */
-export function __createBindingSignals() {
+const createBindingSignals = function __createBindingSignals(observations?: BindingObservations) {
 	const owner = currentSignalOwner();
 	const run = owner === null ? <T>(callback: () => T): T => callback() : captureSignalOwner(owner);
 	return {
 		isSignal: isSignalHandle,
-		connect(notify: () => void): BindingSignalConnection {
+		connect(notify: (committed?: boolean) => void): BindingSignalConnection {
 			let value: unknown;
 			let handle: SignalHandle<unknown> | undefined;
-			let unsubscribe: (() => void) | undefined;
+			let acceptedValue: unknown;
+			let acceptedHandle: SignalHandle<unknown> | undefined;
+			const observation = observations?.owner(() => {
+				acceptedValue = value;
+				acceptedHandle = handle;
+			});
+			let unsubscribe: NativeReadSubscription | undefined;
 			let generation = 0;
 			let disposed = false;
-			const get = (): unknown =>
-				disposed ? undefined : handle ? run(() => handle![SIGNAL_BINDING_READ]()) : value;
+			const get = (committed = false): unknown => {
+				const selected = committed ? acceptedHandle : handle;
+				return disposed
+					? undefined
+					: selected
+						? run(() => selected[SIGNAL_BINDING_READ]())
+						: committed
+							? acceptedValue
+							: value;
+			};
 			const dispose = (): void => {
 				if (disposed) return;
 				disposed = true;
@@ -213,16 +239,31 @@ export function __createBindingSignals() {
 				handle = undefined;
 				const stop = unsubscribe;
 				unsubscribe = undefined;
-				stop?.();
+				if (stop) observations ? observations.release(observation!, stop) : stop();
+				if (observation) observations!.accept(observation);
 			};
 			return {
 				get,
+				accept: () => {
+					if (
+						observation &&
+						(acceptedValue !== value ||
+							acceptedHandle !== handle ||
+							observation.pending?.size ||
+							observation.retired?.size)
+					)
+						observations!.accept(observation);
+				},
 				dispose,
 				// Only a subscribed handle is observed. Its own owner retiring wakes
 				// this connection, and the read that follows throws.
 				retired(): boolean {
 					try {
-						return !!unsubscribe && run(() => handle![SIGNAL_BINDING_RETIRED]?.()) === true;
+						return (
+							!!unsubscribe &&
+							!observation?.pending?.has(unsubscribe) &&
+							run(() => handle![SIGNAL_BINDING_RETIRED]?.()) === true
+						);
 					} catch {
 						// An unresolvable handle is not proof of retirement; report.
 						return false;
@@ -236,7 +277,7 @@ export function __createBindingSignals() {
 						const stop = unsubscribe;
 						unsubscribe = undefined;
 						handle = undefined;
-						stop?.();
+						if (stop) observations ? observations.release(observation!, stop) : stop();
 						if (disposed) return undefined;
 						handle = nextHandle;
 						if (handle) {
@@ -245,13 +286,24 @@ export function __createBindingSignals() {
 								typeof handle[SIGNAL_BINDING_SUBSCRIBE] !== 'function'
 							)
 								throw new TypeError(formatClientError(309));
-							const stopNext = run(() =>
-								handle![SIGNAL_BINDING_SUBSCRIBE](() => {
-									if (!disposed && ticket === generation) notify();
-								}),
+							let stopNext: NativeReadSubscription | undefined;
+							stopNext = run(() =>
+								handle![SIGNAL_BINDING_SUBSCRIBE](
+									() => {
+										if (
+											!disposed &&
+											(ticket === generation || observation?.retired?.has(stopNext!))
+										)
+											observations ? observations.notify(observation!, stopNext, notify) : notify();
+									},
+									observations ? () => observations.retire(observation!, stopNext) : undefined,
+									!!observations,
+								),
 							);
 							if (typeof stopNext !== 'function') throw new TypeError(formatClientError(310));
-							if (disposed || ticket !== generation) stopNext();
+							if (observations && !observations.add(observation!, stopNext)) return undefined;
+							if (disposed || ticket !== generation)
+								observations ? observations.release(observation!, stopNext) : stopNext();
 							else unsubscribe = stopNext;
 						}
 					}
@@ -261,4 +313,7 @@ export function __createBindingSignals() {
 			};
 		},
 	};
-}
+};
+
+export const __createBindingSignals =
+	/* @__PURE__ */ __withBindingObservations(createBindingSignals);

@@ -354,6 +354,42 @@ describe('octane/signals/react', () => {
 		expect(mounted.map(({ container }) => container.textContent)).toEqual(['5', '0']);
 	});
 
+	it('does not watch during SSR and shares one observation across hydrated React readers', async () => {
+		const scope = createScope({ scopeKey: 'watched-react-hydration' });
+		const log: string[] = [];
+		const handle = scope.signal$('name', 'Ada', {
+			watched: () => {
+				log.push('watch');
+				return () => log.push('unwatch');
+			},
+		});
+		const tree = (readers: number) =>
+			h(
+				'div',
+				null,
+				Array.from({ length: readers }, (_, key) => h(Value, { key, handle })),
+			);
+		const container = document.createElement('div');
+		container.innerHTML = renderToString(tree(2));
+		const first = container.querySelector('output');
+		expect(container.textContent).toBe('AdaAda');
+		expect(log).toEqual([]);
+		let root!: Root;
+		await act(() => {
+			root = hydrateRoot(container, tree(2));
+		});
+		roots.push(root);
+		expect(container.querySelector('output')).toBe(first);
+		expect(log).toEqual(['watch']);
+		await act(() => root.render(tree(1)));
+		expect(log).toEqual(['watch']);
+		await act(() => root.unmount());
+		roots.splice(roots.indexOf(root), 1);
+		expect(log).toEqual(['watch', 'unwatch']);
+		scope.dispose();
+		expect(log).toEqual(['watch', 'unwatch']);
+	});
+
 	it('isolates overlapping streamed requests and hydrates each completed seed', async () => {
 		function request(label: string, seed?: ReturnType<Scope['serialize']>) {
 			const scope = createScope({ scopeKey: 'request', ...(seed ? { seed } : {}) });

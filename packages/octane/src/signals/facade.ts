@@ -1,3 +1,4 @@
+import type { NativeReadSubscription } from './read-protocol.js';
 import { formatClientError } from '../error-codes.client.generated.js';
 import {
 	createDeclaredSignalCell,
@@ -23,6 +24,7 @@ import {
 	SIGNAL_SAME_CAPTURE,
 	currentSignalDeclarationInvocation,
 	forwardNativeTransitionConsumer,
+	getNativeReadObserver,
 	registerEarlySignalHydration,
 } from './read-protocol.js';
 import { isSignalHandle, isThenable } from './handle-protocol.js';
@@ -481,7 +483,25 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 	[NATIVE_DOM_VALUE](): T {
 		// Native styles belong to the active renderer read frame. Unlike targeted
 		// binding reads, they must retain observation and historical seed evidence.
-		return this.get();
+		return this.lexical === this
+			? readAsDeclared(this.owner!, () => this.readNativeDom())
+			: this.readNativeDom();
+	}
+
+	private readNativeDom(): T {
+		const cell = this.resolve();
+		const observer = getNativeReadObserver() as
+			| (ReturnType<typeof getNativeReadObserver> & {
+					__domHandle?: unknown;
+					__domResolved?: unknown;
+			  })
+			| null;
+		if (
+			observer?.__domHandle === this &&
+			this[NATIVE_DOM_VALUE] === Descriptor.prototype[NATIVE_DOM_VALUE]
+		)
+			observer.__domResolved = cell;
+		return cell.get();
 	}
 
 	[SIGNAL_BINDING_READ](): T {
@@ -490,11 +510,16 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 			: readBinding(this.resolve());
 	}
 
-	[SIGNAL_BINDING_SUBSCRIBE](notify: () => void, onRetire?: () => void): () => void {
+	[SIGNAL_BINDING_SUBSCRIBE](
+		notify: () => void,
+		onRetire?: () => void,
+		speculative?: boolean,
+	): NativeReadSubscription {
 		const run = captureSignalOwner(this.reader());
 		return this.resolve()[SIGNAL_BINDING_SUBSCRIBE](
 			forwardNativeTransitionConsumer(notify, () => run(notify)),
 			onRetire === undefined ? undefined : () => run(onRetire),
+			speculative,
 		);
 	}
 

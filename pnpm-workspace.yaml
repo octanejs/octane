@@ -680,6 +680,11 @@ patchedDependencies:
   # freezes this install's @tsrx/core into the published `octane/compiler/volar`.
   # Guarded by "type-checks dynamic tags against the element or component named
   # by the tag" in packages/octane/tests/compiler/volar.test.ts.
+  # Two mapping hunks: a compiler-made `return` marks no keyword end
+  # (tsrx-org/tsrx#1391, guarded by "claims only the @for keyword"), and a
+  # member wrapped in a same-location call maps from its own name
+  # (tsrx-org/tsrx#1392, guarded by "maps type-only structural closing tokens").
+  # Drop each hunk when the adopted release fixes its issue.
   '@tsrx/core@0.6.3': patches/@tsrx__core@0.6.3.patch
   # The same type-only import rule for the native parser: the compat facade's
   # scope check mirrors acorn-typescript's lexical import bindings, and the
