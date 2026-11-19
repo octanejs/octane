@@ -10,6 +10,7 @@ import { renderToPipeableStream, renderToString } from 'react-dom/server';
 import { PassThrough } from 'node:stream';
 import { deferred } from '../_fixtures/signals-async-controls.js';
 import {
+	createFamily,
 	createResource,
 	createScope,
 	query,
@@ -205,6 +206,146 @@ describe('octane/signals/react', () => {
 		});
 		expect(container.textContent).toBe('retired');
 	});
+
+	it.each(['writable', 'derived'] as const)(
+		'retires an evicted %s family reader without affecting its sibling',
+		async (kind) => {
+			vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+			const scope = createScope({ scopeKey: `react-family-${kind}` });
+			const source$ = scope.signal$('source', 0);
+			const log: string[] = [];
+			const generations = new Map<string, number>();
+			const family = createFamily(
+				scope,
+				(id: string) => {
+					const generation = (generations.get(id) ?? 0) + 1;
+					generations.set(id, generation);
+					const name = `${id}:${generation}`;
+					const options = {
+						watched: () => {
+							log.push(`watch ${name}`);
+							return () => {
+								log.push(`unwatch ${name}`);
+							};
+						},
+					};
+					return kind === 'writable'
+						? scope.signal$(null, `${id}:0`, options)
+						: scope.derived$(null, () => `${id}:${source$.get()}`, options);
+				},
+				{ idle: 25 },
+			);
+			const old$ = family.get('a');
+			const sibling$ = family.get('b');
+			const idle$ = family.get('idle');
+			const errors: unknown[] = [];
+			const tree = (member$: SignalHandle<string>, generation: number) =>
+				h(
+					'div',
+					null,
+					h(Boundary, { key: generation }, h(Value, { handle: member$ })),
+					h(Value, { handle: sibling$ }),
+				);
+			const container = document.createElement('div');
+			const root = createRoot(container, {
+				onCaughtError: (error) => {
+					errors.push(error);
+				},
+			});
+			try {
+				await act(() => root.render(tree(old$, 0)));
+				expect(container.textContent).toBe('a:0b:0');
+				await act(() => {
+					vi.advanceTimersByTime(25);
+				});
+				expect(family.get('a')).toBe(old$);
+				expect(family.get('b')).toBe(sibling$);
+				expect(family.has('idle')).toBe(false);
+				expect(() => idle$.get()).toThrow(ScopeDisposedError);
+
+				await act(() => {
+					family.delete('a');
+				});
+				expect(errors).toHaveLength(1);
+				expect(errors[0]).toBeInstanceOf(ScopeDisposedError);
+				expect(container.textContent).toBe('retiredb:0');
+				expect(log).toEqual(['watch a:1', 'watch b:1', 'unwatch a:1']);
+				await act(() => {
+					if ('set' in sibling$) sibling$.set('b:1');
+					else source$.set(1);
+				});
+				expect(container.textContent).toBe('retiredb:1');
+				const fresh$ = family.get('a');
+				expect(fresh$).not.toBe(old$);
+				expect(() => old$.get()).toThrow(ScopeDisposedError);
+				await act(() => root.render(tree(fresh$, 1)));
+				expect(container.textContent).toBe(kind === 'writable' ? 'a:0b:1' : 'a:1b:1');
+				expect(log).toEqual(['watch a:1', 'watch b:1', 'unwatch a:1', 'watch a:2']);
+
+				await act(() => root.render(null));
+				expect(log.filter((entry) => entry.startsWith('unwatch')).sort()).toEqual([
+					'unwatch a:1',
+					'unwatch a:2',
+					'unwatch b:1',
+				]);
+				await act(() => {
+					vi.advanceTimersByTime(24);
+				});
+				expect([family.has('a'), family.has('b')]).toEqual([true, true]);
+				await act(() => {
+					vi.advanceTimersByTime(1);
+				});
+				expect([family.has('a'), family.has('b')]).toEqual([false, false]);
+			} finally {
+				await act(() => root.unmount());
+				scope.dispose();
+				vi.useRealTimers();
+			}
+		},
+	);
+
+	it.each(['clear', 'scope.dispose'] as const)(
+		'removes mounted writable and derived family readers on %s',
+		async (action) => {
+			const scope = createScope({ scopeKey: `react-family-${action}` });
+			const writable = createFamily(scope, (_id: string) => scope.signal$(null, 'writable live'));
+			const derived = createFamily(scope, (_id: string) =>
+				scope.derived$(null, () => 'derived live'),
+			);
+			const errors: unknown[] = [];
+			const container = document.createElement('div');
+			const root = createRoot(container, {
+				onCaughtError: (error) => {
+					errors.push(error);
+				},
+			});
+			try {
+				await act(() =>
+					root.render(
+						h(
+							'div',
+							null,
+							h(Boundary, null, h(Value, { handle: writable.get('a') })),
+							h(Boundary, null, h(Value, { handle: derived.get('a') })),
+						),
+					),
+				);
+				expect(container.textContent).toBe('writable livederived live');
+				await act(() => {
+					if (action === 'clear') {
+						writable.clear();
+						derived.clear();
+					} else scope.dispose();
+				});
+				expect(errors).toHaveLength(2);
+				for (const error of errors) expect(error).toBeInstanceOf(ScopeDisposedError);
+				expect(container.textContent).toBe('retiredretired');
+			} finally {
+				await act(() => root.unmount());
+				scope.dispose();
+			}
+		},
+	);
 
 	it('isolates separate roots with separate scopes', async () => {
 		const scopes = [labelScope('app', 0), labelScope('app', 0)];
