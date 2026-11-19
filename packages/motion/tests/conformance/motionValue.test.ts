@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { animate, motionValue } from 'motion';
+import { createElement } from 'octane';
 import { mount, nextPaint } from '../_helpers';
 import {
 	MVBox,
@@ -12,8 +13,9 @@ import { StyleXLater } from '../_fixtures/style-rebind.tsrx';
 import { StyleOpacity } from '../_fixtures/style-opacity.tsrx';
 import { StyleXY } from '../_fixtures/style-xy.tsrx';
 import { ControllerGroup } from '../_fixtures/controller.tsrx';
-import type { LegacyAnimationControls } from 'motion-dom';
+import { frame, type LegacyAnimationControls } from 'motion-dom';
 import { removeTransformFn, patchTransformFn } from '../../src/useMotionValue';
+import { motion } from '../../src/index';
 
 describe('useMotionValue', function useMotionValueSuite() {
 	it('drives authored MotionValues through animation and transitionEnd on HTML and SVG hosts', async () => {
@@ -37,6 +39,108 @@ describe('useMotionValue', function useMotionValueSuite() {
 			expect(r.find('#animated-cx').getAttribute('cx')).toBe('18');
 		} finally {
 			unsubscribe();
+			r.unmount();
+		}
+	});
+
+	it('keeps direct SVG bindings and independent imperative attributes on their own writers', async () => {
+		const x = motionValue(3),
+			cx = motionValue(5);
+		const r = mount(AuthoredValueAnimation, { x, cx, run: false, onReady: () => {} });
+		try {
+			const circle = r.find('#animated-cx');
+			circle.setAttribute('r', '4');
+			const unmanaged = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+			unmanaged.setAttribute('r', '2');
+			circle.parentElement!.append(unmanaged);
+			const owned = animate(circle, { cx: 30, r: 10 }, { duration: 0.15, ease: 'linear' });
+			const external = animate(unmanaged, { r: 14 }, { duration: 0.15, ease: 'linear' });
+			await new Promise((resolve) => setTimeout(resolve, 65));
+			expect(cx.get()).toBeGreaterThan(5);
+			expect(cx.get()).toBeLessThan(30);
+			await Promise.all([owned, external]);
+			await nextPaint();
+			expect(cx.get()).toBe(30);
+			expect(circle.getAttribute('cx')).toBe('30');
+			expect(circle.getAttribute('r')).toBe('10');
+			expect(unmanaged.getAttribute('r')).toBe('14');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('preserves SVG alias winner order and independent imperative alias priority', async () => {
+		const width = motionValue(2),
+			loser = motionValue(2),
+			x = motionValue(0);
+		const View = () =>
+			createElement(
+				'svg',
+				null,
+				createElement(motion.circle, { id: 'direct-alias', 'stroke-width': width }),
+				createElement(motion.circle, {
+					id: 'static-alias',
+					strokeWidth: loser,
+					'stroke-width': 7,
+					style: { x },
+				}),
+			);
+		const r = mount(View, {});
+		try {
+			const direct = r.find('#direct-alias'),
+				staticWinner = r.find('#static-alias');
+			expect(staticWinner.getAttribute('stroke-width')).toBe('7');
+			const controls = animate(direct, { strokeWidth: 10 }, { duration: 0.1 });
+			x.set(4);
+			await controls;
+			expect(width.get()).toBe(2);
+			expect(direct.getAttribute('stroke-width')).toBe('10');
+			expect(staticWinner.getAttribute('stroke-width')).toBe('7');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('schedules controller SVG writes at the matching Motion frame phase', async () => {
+		let controls!: LegacyAnimationControls;
+		const cx = motionValue(5),
+			samples: Array<[number, string | null]> = [];
+		const r = mount(ControllerGroup, {
+			rows: [],
+			circle: cx,
+			circleInitial: { cx: [9, 12] },
+			onReady: (first: LegacyAnimationControls) => (controls = first),
+		});
+		try {
+			const circle = r.find('#circle');
+			const sample = () => samples.push([cx.get(), circle.getAttribute('cx')]);
+			await new Promise<void>((resolve) =>
+				frame.update(() => {
+					controls.set({ cx: 10 });
+					sample();
+					frame.postRender(() => {
+						sample();
+						resolve();
+					});
+				}),
+			);
+			await new Promise<void>((resolve) =>
+				frame.postRender(() => {
+					controls.set({ cx: 20 });
+					sample();
+					frame.postRender(() => {
+						sample();
+						resolve();
+					});
+				}),
+			);
+			expect(samples).toEqual([
+				[10, '9'],
+				[10, '10'],
+				[20, '10'],
+				[20, '20'],
+			]);
+		} finally {
 			r.unmount();
 		}
 	});

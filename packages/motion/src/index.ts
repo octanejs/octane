@@ -16,6 +16,7 @@ import {
 	camelToDash,
 	cancelFrame,
 	frame as motionFrame,
+	frameData,
 	getValueAsType,
 	isSVGElement,
 	isSVGTag,
@@ -159,6 +160,11 @@ interface SVGAttributeValue {
 	sample: unknown;
 }
 
+interface SVGAttributeInventory {
+	subscriptions: SVGAttributeValue[];
+	retired?: string[];
+}
+
 function svgAttributeValue(key: string, sample: unknown): unknown {
 	return key === 'x' || key === 'y' || key === 'scale'
 		? sample
@@ -192,7 +198,7 @@ function bindSVGAttributes(node: SVGElement, attributes: SVGAttributeValue[]): (
 			else node.removeAttribute(attribute);
 		}
 		const onChange = () => {
-			if (active) motionFrame.postRender(write, false, true);
+			if (active) motionFrame.postRender(write);
 		};
 		const unsubscribe = value.on('change', onChange);
 		if (!Object.is(value.get(), sample)) onChange();
@@ -204,6 +210,22 @@ function bindSVGAttributes(node: SVGElement, attributes: SVGAttributeValue[]): (
 	return () => {
 		active = false;
 		for (const cleanup of cleanups) cleanup();
+	};
+}
+
+function deferBoundSVGAttributes(visual: SVGVisualElement, latest: any): () => void {
+	const original = visual.renderInstance;
+	const renderInstance: typeof original = (instance, state, style, projection) => {
+		// The guarded post-render binding owns these attributes. Rendering them in
+		// the engine's earlier render phase could write after a same-frame takeover.
+		const attributes: SVGAttributeValue[] | undefined = latest.visualSVGAttrs;
+		if (frameData.isProcessing && attributes)
+			for (const { key } of attributes) delete state.attrs[key];
+		original.call(visual, instance, state, style, projection);
+	};
+	visual.renderInstance = renderInstance;
+	return () => {
+		if (visual.renderInstance === renderInstance) visual.renderInstance = original;
 	};
 }
 
@@ -230,23 +252,29 @@ function readDomProps(
 	const originalAttrs = frame?.attrs;
 	const motionAttrs = frame?.motionAttrs;
 	let attrs = originalAttrs;
-	let subscriptions: SVGAttributeValue[] | undefined;
+	let inventory: SVGAttributeInventory | undefined;
 	for (const key in props) {
 		if (!MOTION_PROPS.has(key)) {
 			const value = props[key];
 			const motion = svg && isMotionValue(value);
 			out[key] = motion ? resolveMotionValue(value) : value;
-			if (motion || subscriptions?.length) {
+			if (motion || inventory?.subscriptions.length) {
 				const attribute = motionAttributeName(key);
-				if (subscriptions) {
-					for (let i = 0; i < subscriptions.length; i++) {
-						if (subscriptions[i].attribute !== attribute) continue;
-						subscriptions.splice(i, 1);
+				if (inventory) {
+					for (let i = 0; i < inventory.subscriptions.length; i++) {
+						if (inventory.subscriptions[i].attribute !== attribute) continue;
+						(inventory.retired ??= []).push(inventory.subscriptions[i].key);
+						inventory.subscriptions.splice(i, 1);
 						break;
 					}
 				}
 				if (motion && isMotionSVGAttribute(attribute, svgRoot))
-					(subscriptions ??= []).push({ key, attribute, value, sample: out[key] });
+					(inventory ??= { subscriptions: [] }).subscriptions.push({
+						key,
+						attribute,
+						value,
+						sample: out[key],
+					});
 			}
 			// A fresh authored MotionValue or static value owns the attribute even if
 			// its sample equals the original value beneath the first-frame projection.
@@ -285,7 +313,7 @@ function readDomProps(
 			);
 		}
 	}
-	return subscriptions;
+	return inventory;
 }
 
 // Imperative animate(<svg>) registers an HTML visual. Keep it alive for pending
@@ -481,6 +509,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 					controller: undefined,
 					visual: undefined,
 					visualViewBox: undefined,
+					visualSVGAttrs: undefined,
 					releaseVisual: undefined,
 					unsubscribeController: undefined,
 					authoredMotionDeps: undefined,
@@ -574,7 +603,8 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		latest.layoutMode = layoutAnimationMode(props.layout);
 
 		const host: Record<string, any> = {};
-		const subscriptions = readDomProps(props, svg, svgRoot, host, latest);
+		const svgInventory = readDomProps(props, svg, svgRoot, host, latest);
+		const subscriptions = svgInventory?.subscriptions;
 		const styleMvDeps: any[] = [];
 		let authoredMotionDeps: any[] | undefined;
 		if (props.style && typeof props.style === 'object') {
@@ -622,11 +652,16 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 						latest.cancelAnimate?.();
 						latest.authoredMotionDeps = authoredMotionDeps;
 					}
-					const committed =
+					let committed =
 						props.transition === undefined && config.transition
 							? { ...props, transition: config.transition }
 							: props;
+					if (svgInventory?.retired) {
+						committed = { ...committed };
+						for (const key of svgInventory.retired) delete committed[key];
+					}
 					latest.committedVisualProps = committed;
+					latest.visualSVGAttrs = subscriptions;
 					latest.nextVisualKey = visualKey;
 					if (visualKey && latest.visual) {
 						const visual = latest.visual;
@@ -662,6 +697,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 					const registered = visualElementStore.get(node);
 					const reuse = latest.hostMounted && !!registered;
 					const seed = !latest.hostMounted ? { ...latest.frame?.values } : {};
+					if (svgInventory?.retired) for (const key of svgInventory.retired) delete seed[key];
 					const scraped = svg
 						? scrapeSVGMotionValuesFromProps(latest.committedVisualProps, {})
 						: scrapeHTMLMotionValuesFromProps(latest.committedVisualProps, {});
@@ -711,6 +747,10 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 						}
 						visual.mount(node);
 					}
+					const restoreSVGRenderer =
+						visual instanceof SVGVisualElement
+							? deferBoundSVGAttributes(visual, latest)
+							: undefined;
 					latest.visual = visual;
 					let active = true;
 					const release = () => {
@@ -731,6 +771,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 									if (visualElementStore.get(node) === visual) visualElementStore.delete(node);
 								}
 							} finally {
+								restoreSVGRenderer?.();
 								if (latest.visual === visual) latest.visual = undefined;
 								latest.visualViewBox = undefined;
 								if (latest.releaseVisual === release) latest.releaseVisual = undefined;
