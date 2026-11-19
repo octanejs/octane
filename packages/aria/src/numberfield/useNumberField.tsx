@@ -42,7 +42,8 @@ import {
 	useState,
 } from '../compat/react';
 import { filterDOMProps } from '../utils/filterDOMProps';
-import { flushSync, withSlot } from 'octane';
+import { flushSync } from 'octane';
+import { withSlot } from 'octane/internal/client';
 import { getActiveElement, getEventTarget } from '../utils/shadowdom/DOMFunctions';
 import intlMessages from '../intl/numberfield/index';
 import { isAndroid, isIOS, isIPhone } from '../utils/platform';

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createRoot, drainPassiveEffects, flushSync } from 'octane';
+import { createRoot, flushSync } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import * as Octane from 'octane';
 import { cache, mutate } from '../../../src/_internal/index';
 import { setupDevTools } from '../../../src/_internal/utils/devtools';

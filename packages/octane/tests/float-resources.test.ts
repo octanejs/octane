@@ -8,8 +8,10 @@
 // contract — Octane documents that as out of scope.
 // Links WITHOUT precedence keep the existing per-site head-element behavior.
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { act, createRoot, flushSync, hydrateRoot, resetFloatResourceState } from '../src/index.js';
+import { act, createRoot, flushSync, hydrateRoot } from '../src/index.js';
+import { resetFloatResourceState } from '../src/internal/client.js';
 import * as Server from 'octane/server';
+import * as ServerInternal from 'octane/internal/server';
 import { loadServerFixture } from './_server-fixture.js';
 import {
 	activateStreamedMarkup,
@@ -326,7 +328,7 @@ describe('Float resources — SSR + hydration dedupe', () => {
 		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 		try {
 			const App = () => {
-				Server.ssrStyleResource(
+				ServerInternal.ssrStyleResource(
 					{ href: 'evil', precedence: 'default' },
 					'.x{}</style><script>alert(1)</script>',
 				);

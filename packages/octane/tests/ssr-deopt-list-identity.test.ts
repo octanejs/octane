@@ -1,11 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-	createElement,
-	Fragment,
-	positionalChildren,
-	renderToPipeableStream,
-	use,
-} from 'octane/server';
+import { createElement, Fragment, renderToPipeableStream, use } from 'octane/server';
+import { positionalChildren } from 'octane/internal/server';
 import { prerender } from 'octane/static';
 import { loadCompiledFixtureSource } from './_server-fixture';
 import {

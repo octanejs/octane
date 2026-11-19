@@ -1,4 +1,5 @@
-import { Children, attachRef, cloneElement, type ElementDescriptor, type OctaneNode } from 'octane';
+import { Children, cloneElement, type ElementDescriptor, type OctaneNode } from 'octane';
+import { attachRef } from 'octane/internal/client';
 
 export type StructuralRef<T> =
 	| { current: T | null }

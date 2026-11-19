@@ -1,11 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-	createRoot,
-	flushSync,
-	getTransitionFallbackTimeout,
-	setTransitionFallbackTimeout,
-	startTransition,
-} from 'octane';
+import { createRoot, flushSync, startTransition } from 'octane';
+import { getTransitionFallbackTimeout, setTransitionFallbackTimeout } from 'octane/internal/client';
 import { bindSignalControl, createScope } from 'octane/signals';
 import { act, createLog, flushEffects, mount } from './_helpers';
 import {
@@ -990,6 +985,64 @@ describe('native signal rendering', () => {
 			stop();
 			rendered.unmount();
 			bindings.unmount();
+			reader.unmount();
+			state.scope.dispose();
+		}
+	});
+
+	it('retains a comparator-equal pending value when an urgent write is rebased', async () => {
+		const first = deferred<string>();
+		const second = deferred<string>();
+		const state = createResource$('held-equals', (key) =>
+			key === 'a' ? first.promise : second.promise,
+		);
+		const initial = { x: 0 };
+		const staged = { x: 1 };
+		const point$ = state.scope.signal$('point', initial, { equals: (a, b) => a.x === b.x });
+		const projected: (typeof initial)[] = [];
+		const projection$ = state.scope.derived$('projection', () => {
+			const point = point$.get();
+			projected.push(point);
+			return point.x;
+		});
+		const notifications: (typeof initial)[] = [];
+		const stop = point$.subscribe(() => notifications.push(point$.get()));
+		const rendered = mount(NativeHeldBoundary, state);
+		const reader = mount(DerivedReader, {
+			scope: state.scope,
+			count$: state.count$,
+			doubled$: projection$,
+			readCount$: () => state.count$.get(),
+		});
+		try {
+			expect(projection$.get()).toBe(0);
+			await act(() => first.resolve('old'));
+			await act(() =>
+				startTransition(() => {
+					point$.set(staged);
+					expect(projection$.get()).toBe(1);
+					state.key$.set('b');
+				}),
+			);
+			expect(point$.get()).toBe(initial);
+			expect(rendered.find('.async-value').textContent).toBe('old');
+			expect(reader.find('.signal-value').textContent).toBe('0');
+			await act(() => point$.set((previous) => ({ ...previous })));
+			expect(point$.get()).toBe(initial);
+			expect(notifications).toEqual([]);
+			expect(reader.find('.signal-value').textContent).toBe('0');
+			await act(() => second.resolve('new'));
+			expect(point$.get()).toBe(staged);
+			expect(notifications).toHaveLength(1);
+			expect(notifications[0]).toBe(staged);
+			expect(projection$.get()).toBe(1);
+			expect(projected).toHaveLength(2);
+			expect(projected[1]).toBe(staged);
+			expect(rendered.find('.async-value').textContent).toBe('new');
+			expect(reader.find('.signal-value').textContent).toBe('1');
+		} finally {
+			stop();
+			rendered.unmount();
 			reader.unmount();
 			state.scope.dispose();
 		}

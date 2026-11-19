@@ -5,14 +5,8 @@ import * as ServerRT from 'octane/server';
 import { act, mount } from './_helpers';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture';
 import { compile } from 'octane/compiler';
-import {
-	createElement,
-	flushSync,
-	hydrateRoot,
-	normalizeClass,
-	startTransition,
-	use,
-} from '../src/index.js';
+import { createElement, flushSync, hydrateRoot, startTransition, use } from '../src/index.js';
+import { normalizeClass } from '../src/internal/client.js';
 import { theme } from './_fixtures/style-theme.tsrx';
 import { SpreadApplied } from './_fixtures/style-theme-consumer.tsrx';
 import {

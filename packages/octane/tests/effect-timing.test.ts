@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { drainPassiveEffects, flushSync } from '../src/index.js';
+import { flushSync } from '../src/index.js';
+import { drainPassiveEffects } from '../src/internal/client.js';
 import { installTestClock } from 'octane/testing';
 import { mount, nextPaint, type MountResult } from './_helpers';
 import {

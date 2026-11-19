@@ -160,10 +160,8 @@ With a DOM container available, the following keeps the nested `span` after
 `active` changes to true instead of rendering `strong` with `next`:
 
 ```js
-import {
-  createContext, createElement as h, createRoot, createScopedElement,
-  createScopedValue, flushSync, useContext,
-} from 'octane';
+import { createContext, createElement as h, createRoot, flushSync, useContext } from 'octane';
+import { createScopedElement, createScopedValue } from 'octane/internal/client';
 
 const Mode = createContext(false);
 const nested = createScopedValue(() => {

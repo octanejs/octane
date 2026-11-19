@@ -1,15 +1,16 @@
 import * as client from 'octane';
+import * as clientInternal from 'octane/internal/client';
 import * as server from 'octane/server';
+import * as serverInternal from 'octane/internal/server';
 import type { SSRScope } from 'octane/internal/server';
 
 // Compiled component hooks use numeric slots; plain custom-hook modules retain
 // Symbol slots. Both forms keep the authored generic value and update types.
-for (const slot of [client.hookSlots(32), Symbol('hook')]) {
-	const [value, update, read] = client.__useStateWithGetter<string | null>(null, slot);
-	const [serverValue, serverUpdate, serverRead] = server.__useStateWithGetter<string | null>(
-		null,
-		slot,
-	);
+for (const slot of [clientInternal.hookSlots(32), Symbol('hook')]) {
+	const [value, update, read] = clientInternal.__useStateWithGetter<string | null>(null, slot);
+	const [serverValue, serverUpdate, serverRead] = serverInternal.__useStateWithGetter<
+		string | null
+	>(null, slot);
 	const values: (string | null)[] = [value, read(), serverValue, serverRead()];
 	update((previous) => previous?.toUpperCase() ?? 'ready');
 	serverUpdate((previous) => previous?.toUpperCase() ?? 'ready');
@@ -29,8 +30,8 @@ for (const slot of [client.hookSlots(32), Symbol('hook')]) {
 		server.useMemo(() => serverState.length, [], slot),
 		callback('ready'),
 		serverCallback('ready'),
-		client.withSlot(slot, () => 1),
-		server.withSlot(slot, () => 1),
+		clientInternal.withSlot(slot, () => 1),
+		serverInternal.withSlot(slot, () => 1),
 		client.useRef(1, slot).current,
 		server.useRef(1, slot).current,
 		client.useLayoutSnapshot(() => 1, { initial: 0 }, slot),
@@ -44,12 +45,16 @@ for (const slot of [client.hookSlots(32), Symbol('hook')]) {
 	const reducer = (state: number, action: number) => state + action;
 	client.useReducer(reducer, 0, undefined, slot)[1](1);
 	server.useReducer(reducer, 0, undefined, slot)[1](1);
-	client.__useReducerWithGetter(reducer, 0, undefined, slot)[1](1);
-	server.__useReducerWithGetter(reducer, 0, undefined, slot)[1](1);
+	clientInternal.__useReducerWithGetter(reducer, 0, undefined, slot)[1](1);
+	serverInternal.__useReducerWithGetter(reducer, 0, undefined, slot)[1](1);
 	client.useLinkedState(1, (value) => value.toString(), undefined, slot)[1]('next');
 	server.useLinkedState(1, (value) => value.toString(), undefined, slot)[1]('next');
-	client.__useLinkedStateWithGetter(1, (value) => value.toString(), undefined, slot)[1]('next');
-	server.__useLinkedStateWithGetter(1, (value) => value.toString(), undefined, slot)[1]('next');
+	clientInternal.__useLinkedStateWithGetter(1, (value) => value.toString(), undefined, slot)[1](
+		'next',
+	);
+	serverInternal.__useLinkedStateWithGetter(1, (value) => value.toString(), undefined, slot)[1](
+		'next',
+	);
 
 	client.useEffect(() => {}, [], slot);
 	server.useEffect(() => {}, [], slot);

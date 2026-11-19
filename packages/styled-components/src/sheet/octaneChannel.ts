@@ -7,7 +7,7 @@
 // Chunk ids are `sc.<componentId>.<name>`; `name` is always derived from the
 // chunk's css content, so an id can never change content across streaming
 // passes (octane emits each id at most once per stream).
-import { injectStyle } from 'octane';
+import { injectStyle } from 'octane/internal/client';
 
 import { IS_BROWSER, OCTANE_CHUNK_PREFIX, SPLITTER } from '../constants';
 

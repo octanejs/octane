@@ -1,5 +1,6 @@
 // Ported from react-i18next@17.0.9 (8b4a9ea): declarations produce octane descriptors.
-import { createElement, positionalChildren } from 'octane';
+import { createElement } from 'octane';
+import { positionalChildren } from 'octane/internal/client';
 
 import { TranslationParserError } from './TranslationParserError.js';
 import { tokenize } from './tokenizer.js';

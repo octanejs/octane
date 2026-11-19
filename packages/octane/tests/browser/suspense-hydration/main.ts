@@ -1,12 +1,7 @@
 // octane-no-slot: this module renders React baselines with React's own hooks,
 // and Octane slots the hook calls of an application's plain modules.
-import {
-	createElement,
-	createRoot,
-	flushSync,
-	hydrateRoot,
-	setTransitionFallbackTimeout,
-} from '../../../src/index.js';
+import { createElement, createRoot, flushSync, hydrateRoot } from '../../../src/index.js';
+import { setTransitionFallbackTimeout } from '../../../src/internal/client.js';
 import * as React from 'react';
 import { flushSync as flushReactSync } from 'react-dom';
 import { createRoot as createReactRoot } from 'react-dom/client';

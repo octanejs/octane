@@ -4,7 +4,7 @@ import {
 	bootstrapIndependentHydration,
 	type IndependentHydrateActivationContext,
 } from '../../src/hydration/independent-island.js';
-import { hasPendingWork } from '../../src/index.js';
+import { hasPendingWork } from '../../src/internal/client.js';
 import { renderToString } from '../../src/runtime.server.js';
 import { createResource, createScope, query } from 'octane/signals';
 import { evaluateCompiledFixtureCode } from '../_server-fixture.js';

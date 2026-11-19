@@ -2,12 +2,15 @@
  * `octane/signals/react`: scoped signal handles observed from a real React 19
  * tree, through subscription, scope ownership, retirement and hydration.
  */
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot, hydrateRoot, type Root } from 'react-dom/client';
-import { renderToString } from 'react-dom/server';
+import { renderToPipeableStream, renderToString } from 'react-dom/server';
+import { PassThrough } from 'node:stream';
+import { deferred } from '../_fixtures/signals-async-controls.js';
 import {
+	createFamily,
 	createResource,
 	createScope,
 	query,
@@ -204,6 +207,146 @@ describe('octane/signals/react', () => {
 		expect(container.textContent).toBe('retired');
 	});
 
+	it.each(['writable', 'derived'] as const)(
+		'retires an evicted %s family reader without affecting its sibling',
+		async (kind) => {
+			vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+			const scope = createScope({ scopeKey: `react-family-${kind}` });
+			const source$ = scope.signal$('source', 0);
+			const log: string[] = [];
+			const generations = new Map<string, number>();
+			const family = createFamily(
+				scope,
+				(id: string) => {
+					const generation = (generations.get(id) ?? 0) + 1;
+					generations.set(id, generation);
+					const name = `${id}:${generation}`;
+					const options = {
+						watched: () => {
+							log.push(`watch ${name}`);
+							return () => {
+								log.push(`unwatch ${name}`);
+							};
+						},
+					};
+					return kind === 'writable'
+						? scope.signal$(null, `${id}:0`, options)
+						: scope.derived$(null, () => `${id}:${source$.get()}`, options);
+				},
+				{ idle: 25 },
+			);
+			const old$ = family.get('a');
+			const sibling$ = family.get('b');
+			const idle$ = family.get('idle');
+			const errors: unknown[] = [];
+			const tree = (member$: SignalHandle<string>, generation: number) =>
+				h(
+					'div',
+					null,
+					h(Boundary, { key: generation }, h(Value, { handle: member$ })),
+					h(Value, { handle: sibling$ }),
+				);
+			const container = document.createElement('div');
+			const root = createRoot(container, {
+				onCaughtError: (error) => {
+					errors.push(error);
+				},
+			});
+			try {
+				await act(() => root.render(tree(old$, 0)));
+				expect(container.textContent).toBe('a:0b:0');
+				await act(() => {
+					vi.advanceTimersByTime(25);
+				});
+				expect(family.get('a')).toBe(old$);
+				expect(family.get('b')).toBe(sibling$);
+				expect(family.has('idle')).toBe(false);
+				expect(() => idle$.get()).toThrow(ScopeDisposedError);
+
+				await act(() => {
+					family.delete('a');
+				});
+				expect(errors).toHaveLength(1);
+				expect(errors[0]).toBeInstanceOf(ScopeDisposedError);
+				expect(container.textContent).toBe('retiredb:0');
+				expect(log).toEqual(['watch a:1', 'watch b:1', 'unwatch a:1']);
+				await act(() => {
+					if ('set' in sibling$) sibling$.set('b:1');
+					else source$.set(1);
+				});
+				expect(container.textContent).toBe('retiredb:1');
+				const fresh$ = family.get('a');
+				expect(fresh$).not.toBe(old$);
+				expect(() => old$.get()).toThrow(ScopeDisposedError);
+				await act(() => root.render(tree(fresh$, 1)));
+				expect(container.textContent).toBe(kind === 'writable' ? 'a:0b:1' : 'a:1b:1');
+				expect(log).toEqual(['watch a:1', 'watch b:1', 'unwatch a:1', 'watch a:2']);
+
+				await act(() => root.render(null));
+				expect(log.filter((entry) => entry.startsWith('unwatch')).sort()).toEqual([
+					'unwatch a:1',
+					'unwatch a:2',
+					'unwatch b:1',
+				]);
+				await act(() => {
+					vi.advanceTimersByTime(24);
+				});
+				expect([family.has('a'), family.has('b')]).toEqual([true, true]);
+				await act(() => {
+					vi.advanceTimersByTime(1);
+				});
+				expect([family.has('a'), family.has('b')]).toEqual([false, false]);
+			} finally {
+				await act(() => root.unmount());
+				scope.dispose();
+				vi.useRealTimers();
+			}
+		},
+	);
+
+	it.each(['clear', 'scope.dispose'] as const)(
+		'removes mounted writable and derived family readers on %s',
+		async (action) => {
+			const scope = createScope({ scopeKey: `react-family-${action}` });
+			const writable = createFamily(scope, (_id: string) => scope.signal$(null, 'writable live'));
+			const derived = createFamily(scope, (_id: string) =>
+				scope.derived$(null, () => 'derived live'),
+			);
+			const errors: unknown[] = [];
+			const container = document.createElement('div');
+			const root = createRoot(container, {
+				onCaughtError: (error) => {
+					errors.push(error);
+				},
+			});
+			try {
+				await act(() =>
+					root.render(
+						h(
+							'div',
+							null,
+							h(Boundary, null, h(Value, { handle: writable.get('a') })),
+							h(Boundary, null, h(Value, { handle: derived.get('a') })),
+						),
+					),
+				);
+				expect(container.textContent).toBe('writable livederived live');
+				await act(() => {
+					if (action === 'clear') {
+						writable.clear();
+						derived.clear();
+					} else scope.dispose();
+				});
+				expect(errors).toHaveLength(2);
+				for (const error of errors) expect(error).toBeInstanceOf(ScopeDisposedError);
+				expect(container.textContent).toBe('retiredretired');
+			} finally {
+				await act(() => root.unmount());
+				scope.dispose();
+			}
+		},
+	);
+
 	it('isolates separate roots with separate scopes', async () => {
 		const scopes = [labelScope('app', 0), labelScope('app', 0)];
 		const mounted = scopes.map((scope) => mount(h(SignalScopeProvider, { scope }, h(Label))));
@@ -247,6 +390,120 @@ describe('octane/signals/react', () => {
 		expect(log).toEqual(['watch', 'unwatch']);
 	});
 
+	it('isolates overlapping streamed requests and hydrates each completed seed', async () => {
+		function request(label: string, seed?: ReturnType<Scope['serialize']>) {
+			const scope = createScope({ scopeKey: 'request', ...(seed ? { seed } : {}) });
+			labels.set(scope, scope.signal$<unknown>('label', label));
+			return scope;
+		}
+		// Server and client bundles have separate React context instances in practice.
+		vi.resetModules();
+		const server = await import('../../src/signals/react.js');
+		function DeferredLabel({ gate }: { gate: Promise<void> }) {
+			React.use(gate);
+			return h('output', null, String(server.useSignalValue(labels.get(server.useSignalScope())!)));
+		}
+		const suspense = (child: React.ReactNode) =>
+			h(React.Suspense, { fallback: h('p', null, 'loading') }, child);
+		const serverTree = (scope: Scope, gate: Promise<void>) =>
+			h(server.SignalScopeProvider, { scope }, suspense(h(DeferredLabel, { gate })));
+		const clientTree = (scope: Scope) => h(SignalScopeProvider, { scope }, suspense(h(Label)));
+		function stream(scope: Scope, gate: Promise<void>) {
+			const shell = deferred<void>();
+			const done = deferred<void>();
+			const errors: unknown[] = [];
+			const sink = new PassThrough();
+			let html = '';
+			sink.on('data', (chunk: Buffer) => (html += chunk.toString()));
+			sink.on('end', () => done.resolve());
+			sink.on('error', done.reject);
+			const render = renderToPipeableStream(serverTree(scope, gate), {
+				onShellReady: () => shell.resolve(),
+				onAllReady: () => queueMicrotask(() => render.pipe(sink)),
+				onShellError: (error) => {
+					shell.reject(error);
+					done.reject(error);
+				},
+				onError: (error) => {
+					errors.push(error);
+				},
+			});
+			return {
+				shell: shell.promise,
+				done: done.promise,
+				errors,
+				html: () => html,
+				abort: render.abort,
+			};
+		}
+
+		const first = request('first initial');
+		const second = request('second initial');
+		const cancelled = request('cancelled initial');
+		const gates = [deferred<void>(), deferred<void>(), deferred<void>()];
+		const streams = [
+			stream(first, gates[0]!.promise),
+			stream(second, gates[1]!.promise),
+			stream(cancelled, gates[2]!.promise),
+		];
+		try {
+			await Promise.all(streams.map((render) => render.shell));
+			let firstFinished = false;
+			void streams[0]!.done.then(() => (firstFinished = true));
+			const abort = new Error('request cancelled');
+			streams[2]!.abort(abort);
+			cancelled.dispose();
+			await streams[2]!.done;
+			expect(streams[2]!.errors).toEqual([abort]);
+			expect([cancelled.retired, first.retired, second.retired]).toEqual([true, false, false]);
+
+			labels.get(second)!.set('request B');
+			gates[1]!.resolve();
+			await streams[1]!.done;
+			expect(firstFinished).toBe(false);
+			labels.get(first)!.set('request A');
+			gates[0]!.resolve();
+			await streams[0]!.done;
+
+			for (const [scope, render, expected, other] of [
+				[first, streams[0]!, 'request A', 'request B'],
+				[second, streams[1]!, 'request B', 'request A'],
+			] as const) {
+				expect(render.errors).toEqual([]);
+				expect(render.html()).toContain(expected);
+				expect(render.html()).not.toContain(other);
+				const client = request('client initial', scope.serialize());
+				const container = document.createElement('div');
+				container.innerHTML = render.html();
+				const output = container.querySelector('output');
+				const errors: unknown[] = [];
+				let root!: Root;
+				try {
+					await act(() => {
+						root = hydrateRoot(container, clientTree(client), {
+							onRecoverableError: (error) => errors.push(error),
+						});
+					});
+					expect(errors).toEqual([]);
+					expect(container.querySelector('output')).toBe(output);
+					expect(output?.textContent).toBe(expected);
+					expect(subscribers(client, 'label')).toBe(1);
+					await act(() => labels.get(client)!.set(`${expected} live`));
+					expect(output?.textContent).toBe(`${expected} live`);
+				} finally {
+					await act(() => root?.unmount());
+					expect(subscribers(client, 'label')).toBe(0);
+					client.dispose();
+				}
+			}
+		} finally {
+			for (const render of streams) render.abort();
+			first.dispose();
+			second.dispose();
+			cancelled.dispose();
+		}
+	});
+
 	it('hydrates from a seeded scope and keeps server requests apart', async () => {
 		const greetings = new WeakMap<Scope, SignalHandle<string>>();
 		const names = new WeakMap<Scope, ReturnType<Scope['signal$']>>();
@@ -288,6 +545,55 @@ describe('octane/signals/react', () => {
 		expect(container.innerHTML).toBe('<p>Hello Ada</p>');
 		await act(() => names.get(scope)!.set('Lin'));
 		expect(container.innerHTML).toBe('<p>Hello Lin</p>');
+	});
+
+	it('adopts a historical server value before catching up to a pre-hydration write', async () => {
+		const request = createScope({ scopeKey: 'historical-request' });
+		const serverName$ = request.signal$('name', 'Ada');
+		function Greeting(props: {
+			name$: SignalHandle<string>;
+			getServerSnapshot?: () => string;
+			layouts?: string[];
+		}) {
+			const name = useSignalValue(props.name$, props.getServerSnapshot);
+			React.useLayoutEffect(() => {
+				props.layouts?.push(name);
+			}, [name, props.layouts]);
+			return h('p', null, name);
+		}
+		const html = renderToString(h(Greeting, { name$: serverName$ }));
+		const seed = request.serialize();
+		request.dispose();
+
+		const scope = createScope({ scopeKey: 'historical-request', seed });
+		const name$ = scope.signal$('name', '');
+		const frame = scope.beginAdoption(seed);
+		name$.set('Lin');
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		const serverNode = container.firstChild;
+		const errors: unknown[] = [];
+		const layouts: string[] = [];
+		let root!: Root;
+		await act(() => {
+			root = hydrateRoot(
+				container,
+				h(Greeting, { name$, getServerSnapshot: () => frame.run(() => name$.get()), layouts }),
+				{ onRecoverableError: (error) => errors.push(error) },
+			);
+		});
+		roots.push(root);
+		expect(errors).toEqual([]);
+		expect(container.firstChild).toBe(serverNode);
+		expect(layouts[0]).toBe('Ada');
+		expect(container.textContent).toBe('Lin');
+		frame.release();
+		await act(() => name$.set('Grace'));
+		expect(container.textContent).toBe('Grace');
+		await act(() => root.unmount());
+		roots.splice(roots.indexOf(root), 1);
+		expect(scope.inspect().retired).toBe(false);
+		scope.dispose();
 	});
 
 	it('suspends on a pending async handle and throws its failure', async () => {

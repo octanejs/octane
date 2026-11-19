@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createElement, drainPassiveEffects, flushSync } from 'octane';
+import { createElement, flushSync } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { Streamdown, type StreamdownProps } from '@octanejs/streamdown';
 import { mount } from '../../octane/tests/_helpers';
 

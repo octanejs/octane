@@ -1,12 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-	createElement,
-	flushSync,
-	hostComponent,
-	hydrateRoot,
-	setFormControlSources,
-	type ComponentBody,
-} from '../src/index.js';
+import { createElement, flushSync, hydrateRoot, type ComponentBody } from '../src/index.js';
+import { hostComponent, setFormControlSources } from '../src/internal/client.js';
 import { act, mount } from './_helpers.js';
 import { loadServerFixture } from './_server-fixture.js';
 import { renderToString } from 'octane/server';

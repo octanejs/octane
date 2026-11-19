@@ -10,13 +10,12 @@ import {
 	createElement,
 	createRoot,
 	flushSync,
-	forBlock,
-	hostComponent,
 	hydrateRoot,
 	use,
 	type ComponentBody,
 	type OctaneNode,
 } from '../src/index.js';
+import { forBlock, hostComponent } from '../src/internal/client.js';
 import { act, mount } from './_helpers';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture';
 import {

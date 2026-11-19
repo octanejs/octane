@@ -193,7 +193,14 @@ export const docsMeta: DocMeta[] = [
 					'permanent static',
 					'streamed DOM',
 					'preserveDOM',
+					'captureFormSubmissions',
+					'data-octane-capture-submit',
 				],
+			},
+			{
+				id: 'capture-form-submissions',
+				title: 'Accept form submissions before behavior loads with captureFormSubmissions',
+				level: 3,
 			},
 			{ id: 'responsive-updates', title: 'Responsive updates and actions' },
 			{
@@ -213,7 +220,16 @@ export const docsMeta: DocMeta[] = [
 			},
 			{ id: 'roots-and-rendering', title: 'Roots and rendering' },
 			{ id: 'create-portal', title: 'Render an overlay with createPortal', level: 3 },
-			{ id: 'server-rendering', title: 'Server and static rendering' },
+			{
+				id: 'server-rendering',
+				title: 'Server and static rendering',
+				searchTerms: ['module server', 'batchServerCalls', 'ServerCallUncertainError'],
+			},
+			{
+				id: 'server-functions',
+				title: 'Call server functions',
+				level: 3,
+			},
 			{ id: 'api-index', title: 'API index by job' },
 			{ id: 'practice', title: 'Practice' },
 			{ id: 'next-steps', title: 'Next steps' },

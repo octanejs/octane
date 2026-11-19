@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { compile } from 'octane/compiler';
 import * as Server from 'octane/server';
+import * as ServerInternal from 'octane/internal/server';
 import { createElement } from '../../src/index.js';
 
 // ============================================================================
@@ -18,7 +19,10 @@ function evalServer(source: string, file: string): Record<string, any> {
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
 	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(Server, {});
+	return new Function('__rt', '__exports', code + '\nreturn __exports;')(
+		{ ...ServerInternal, ...Server },
+		{},
+	);
 }
 
 // Round-trip a rendered fragment through the DOM parser — the assertions below

@@ -6,10 +6,10 @@ import {
 	hydrateRoot,
 	lazy,
 	memo,
-	textSlot,
 	ViewTransition,
 	type ComponentBody,
 } from '../src/index.js';
+import { textSlot } from '../src/internal/client.js';
 import * as ServerRuntime from 'octane/server';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { act, mount } from './_helpers.js';

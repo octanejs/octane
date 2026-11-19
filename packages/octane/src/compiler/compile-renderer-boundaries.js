@@ -889,7 +889,7 @@ export function expandDomRendererRegionsAst(ast, domRegions) {
 				origin,
 			),
 			inheritGeneratedOrigin(
-				b.imports([['bindRendererRegionOwner', region.bind]], 'octane'),
+				b.imports([['bindRendererRegionOwner', region.bind]], 'octane/internal/client'),
 				origin,
 			),
 			inheritGeneratedOrigin(

@@ -1,4 +1,5 @@
-import { HYDRATION_RANGE_BOUNDARY, createRoot, drainPassiveEffects, flushSync } from 'octane';
+import { createRoot, flushSync } from 'octane';
+import { HYDRATION_RANGE_BOUNDARY, drainPassiveEffects } from 'octane/internal/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AnyRouter } from '@tanstack/router-core';
 

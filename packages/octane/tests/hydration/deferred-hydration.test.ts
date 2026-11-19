@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, createRoot, flushSync, hasPendingWork, hydrateRoot } from 'octane';
+import { act, createRoot, flushSync, hydrateRoot } from 'octane';
+import { hasPendingWork } from 'octane/internal/client';
 import {
 	HYDRATE_ID_ATTR,
 	HYDRATE_ID_COUNT_ATTR,

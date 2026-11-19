@@ -16,7 +16,8 @@ const automaticSource = `
   }
 `;
 const manualSource = `
-  import { useState, useRef, withSlot, createSubSlot } from 'octane';
+  import { useState, useRef, createSubSlot } from 'octane';
+  import { withSlot } from 'octane/internal/client';
   import { useAutomatic } from './automatic';
   const child = createSubSlot({ global: false });
   export function useNested(value, slot) {

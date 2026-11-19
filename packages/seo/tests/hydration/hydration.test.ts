@@ -3,7 +3,8 @@
 // contract here is that the client ADOPTS the server's elements (same nodes) and
 // keeps updating them in place.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { drainPassiveEffects, flushSync, hydrateRoot } from 'octane';
+import { flushSync, hydrateRoot } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { HydratePage } from '../_fixtures/hydrate-page.tsrx';
 import { SERVER_BODY, SERVER_HEAD } from './server-html.ts';
 

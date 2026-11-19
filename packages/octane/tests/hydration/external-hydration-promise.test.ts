@@ -1,14 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { join } from 'node:path';
-import {
-	EXTERNAL_HYDRATION_PROMISE,
-	act,
-	createRoot,
-	flushSync,
-	hydrateRoot,
-} from '../../src/index.js';
+import { act, createRoot, flushSync, hydrateRoot } from '../../src/index.js';
+import { EXTERNAL_HYDRATION_PROMISE } from '../../src/internal/client.js';
 import { EXTERNAL_HYDRATION_PROMISE as CONSTANTS_MARKER } from '../../src/constants.js';
 import * as ServerRuntime from 'octane/server';
+import * as ServerRuntimeInternal from 'octane/internal/server';
 import { loadServerFixture } from '../_server-fixture.js';
 import {
 	ExternalBoundary,
@@ -57,7 +53,7 @@ afterEach(() => container.remove());
 describe('externally hydrated thenables', () => {
 	it('exports one marker and leaves ordinary seed ordering intact', () => {
 		expect(EXTERNAL_HYDRATION_PROMISE).toBe(CONSTANTS_MARKER);
-		expect(ServerRuntime.EXTERNAL_HYDRATION_PROMISE).toBe(CONSTANTS_MARKER);
+		expect(ServerRuntimeInternal.EXTERNAL_HYDRATION_PROMISE).toBe(CONSTANTS_MARKER);
 
 		const { html } = ServerRuntime.renderToString(server.MixedHydrationOwners, {
 			external: fulfilled('external', true),

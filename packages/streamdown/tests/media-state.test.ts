@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createElement, drainPassiveEffects, flushSync } from 'octane';
+import { createElement, flushSync } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { Streamdown, type DiagramPlugin, type StreamdownProps } from '@octanejs/streamdown';
 import { mount } from '../../octane/tests/_helpers';
 import { Mermaid } from '../src/lib/mermaid/index.tsrx';

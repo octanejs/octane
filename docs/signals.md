@@ -116,19 +116,104 @@ row.delete('a'); // evict and retire it; a later row.get('a') creates a new one
 
 `create` must return a new keyless `signal$(null, …)` or `derived$(null, …)` handle of the family's scope. Keys match as a `Map` matches them, or by the value `keyOf` returns. A member is evicted by `delete`, by `clear`, by the scope's disposal, or, with `idle`, that many milliseconds after it was last observed, as a `watched` hook counts observers (an effect, a subscription or a renderer binding, directly or through derived values); an observer that returns in time keeps it, and a derived value nothing observes does not. Eviction retires the member as a scope's disposal retires its signals: reading it throws `ScopeDisposedError`, renderer bindings and `useSignalValue` invalidate once and then find it retired, public subscriptions end silently, effects that read it stop, and a derived member lets go of its dependencies, so an evicted member can be collected. Evicting is a write, so a computation or render cannot do it. An application that never calls `createFamily` ships none of its code. Members are keyless, so a family's state is not serialized or seeded across the server boundary.
 
+
+### Opt in to family hydration
+
+A family remains transient by default. To send selected string-keyed members to the client, reserve one keyed snapshot per family namespace and keep the members keyless. Capture only the values selected for the response, after server writes and before `scope.serialize()`; recreate the same namespace in a client scope seeded with that response. Both the namespace and each member key have unambiguous identities: the namespace is a JSON tuple used as a reserved scope key, while member keys remain separate entries rather than concatenated strings.
+
+```ts
+import { createFamily, createScope, type FamilyOptions, type Scope } from 'octane/signals';
+
+function seededFamily$<T>(
+	scope: Scope,
+	namespace: string,
+	initial: (id: string) => T,
+	options?: Pick<FamilyOptions<string>, 'idle'>,
+) {
+	const snapshot$ = scope.signal$<[string, T][]>(JSON.stringify(['family', namespace]), []);
+	let selected = new Map(snapshot$.get());
+	const family = createFamily(
+		scope,
+		(id: string) => scope.signal$(null, selected.has(id) ? selected.get(id)! : initial(id)),
+		options,
+	);
+	return {
+		family,
+		capture(ids: readonly string[]) {
+			const entries: [string, T][] = ids.map((id) => [id, family.get(id).get()]);
+			selected = new Map(entries);
+			snapshot$.set(entries);
+		},
+	};
+}
+
+const rows$ = seededFamily$(server, 'rows', () => 'server default', { idle: 30_000 });
+rows$.family.get('a').set('server value');
+rows$.capture(['a']);
+const seed = server.serialize();
+const client = createScope({ scopeKey: server.scopeKey, seed });
+seededFamily$(client, 'rows', () => 'client default').family.get('a').get(); // 'server value'
+```
+
+This recipe uses exact string member keys and accepts only the `idle` family option; it does not support custom `keyOf` aliases. Reserve the `JSON.stringify(['family', namespace])` scope keys for this recipe, and use a distinct namespace for each family in a scope. Send each request's seed only to its matching client scope. Values must be serializable by `scope.serialize()`. A selected member recreated after eviction starts from its last captured value; call `capture([])` to discard that snapshot, or capture a new selection to replace it. This uses one keyed node per family regardless of the number of members created or evicted. Captures are explicit snapshots, so later member writes are not included until captured again.
+
+### Writes and observers
+
 Writes use `Object.is` equality and become visible immediately. Pass `{ equals }` as the third argument to `scope.signal$` or `scope.derived$` to treat more values as unchanged: `account.signal$('filter', [], { equals: sameItems })`. When `equals(previous, next)` returns true, the signal keeps `previous`, by reference, and nothing downstream recomputes, re-renders or is notified. Values `Object.is` already finds equal are never passed to it, a derived value's first result and its first after an error are never compared, and it runs untracked and must not write signals. A transition's write compares against the pending value. Nested batches defer notifications until the outer synchronous batch ends. `scope.action(fn)` preserves `this`, arguments, and the return value while applying that same batching rule. It does not untrack reads, roll back earlier writes on an exception, or keep a batch open across `await`.
 
 Pass `{ watched }` to start work only while something observes a signal. `watched()` runs, untracked, when the signal gains its first observer: an effect, a subscriber or a rendered binding that reads it, directly or through derived values. The function it returns runs when the last observer leaves or the scope is disposed, and the next first observer runs `watched` again. A read with no observer, including one through a derived value nothing observes, neither starts it nor keeps it running. Return a `scope.effect` stop to connect an external source that follows other signals: the effect restarts its subscription when they change and its stop disconnects it. A synchronous write inside `watched` is what the first observer reads. An error thrown by `watched` or its cleanup is reported through `reportError` and does not fail the read, stop or disposal that ran it.
 
 ```ts
-const messages$ = account.signal$('messages', [], {
+import { ScopeDisposedError } from 'octane/signals';
+
+function subscribeSafely<T>(
+	start: (publish: (value: T) => void) => (() => void) | Promise<() => void>,
+	publish: (value: T) => void,
+) {
+	let active = true;
+	let cleanup: (() => void) | undefined;
+	const fail = (error: unknown) => {
+		active = false;
+		if (typeof reportError === 'function') reportError(error);
+		else console.error(error);
+	};
+	let setup: (() => void) | Promise<() => void>;
+	try {
+		setup = start((value) => {
+			if (active) publish(value);
+		});
+	} catch (error) {
+		active = false;
+		if (error instanceof ScopeDisposedError) throw error;
+		fail(error);
+		return () => {};
+	}
+	if (typeof setup === 'function') cleanup = setup;
+	else
+		void setup
+			.then((stop) => {
+				if (active) cleanup = stop;
+				else stop();
+			})
+			.catch(fail);
+	return () => {
+		active = false;
+		cleanup?.();
+	};
+}
+
+const messages$ = account.signal$<Message[]>('messages', [], {
 	watched: () =>
-		account.effect(() => {
-			const room = room$.get();
-			return chat.subscribe(room, (messages) => messages$.set(messages));
-		}),
+		account.effect(() =>
+			subscribeSafely<Message[]>(
+				(publish) => chat.subscribe(room$.get(), publish),
+				(messages) => messages$.set(messages),
+			),
+		),
 });
 ```
+
+The fence belongs to each effect run: it ignores callbacks from a replaced or stopped subscription, installs synchronous cleanup immediately, and runs asynchronously acquired cleanup even if it arrives after the effect stopped. Rejected setup or late cleanup is reported through `reportError`.
 
 `scope.transaction(fn)` is a batch that can be rolled back. If `fn` throws, or returns a promise, every signal it changed takes back its previous value before the batch ends, and the error is rethrown. No subscriber, effect or render sees a failed write: an effect that read one inside the transaction may run again, reading the restored values. Otherwise it returns `{ value, changes, undo, redo }`. `value` is what `fn` returned. `changes` lists each signal it changed once, as `{ signal$, previous, next }`, in the order it first wrote them, and leaves out one it wrote back to where it started. `undo()` writes the previous values back, last change first, and `redo()` writes the next values again, each in one batch, skipping signals whose scope has retired. A transaction inside another one joins it: an inner failure rolls back only the inner writes, and an outer failure rolls back both. An `undo` or `redo` inside a transaction is recorded like any write. A restored value is the exact previous reference, even when `equals` finds it equal to the value it replaces. Writes a transition stages are not recorded, but a rollback puts back a pending transition value that an urgent write in the transaction applied to. `scope.batch` is unchanged and keeps its writes when its callback throws.
 
@@ -433,9 +518,23 @@ Styled native returned fragments use an inspectable `Fragment` descriptor, inclu
 `octane/signals/react` reads the same handles from React 19 components with no Octane compiler. It imports only `react` (an optional peer); `octane/signals` itself stays renderer-free.
 
 - `useSignalValue(handle$)` subscribes with `useSyncExternalStore`. Its subscribe and snapshot callbacks are stable per handle, so a new handle resubscribes and an unchanged one does not. It subscribes as a renderer binding, not through the public `subscribe`: when the handle's scope retires, the component re-reads and the read throws `ScopeDisposedError` to the nearest error boundary instead of showing a retired value. A derived value re-renders its readers only when the value changes.
-- The server snapshot is the same read. Render each request with its own scope, serialize it, and hydrate with `createScope({ scopeKey, seed })`; the seeded values win over the client's initial values.
+- By default the server snapshot is the live handle read. Render each request with its own scope, serialize it, and hydrate with `createScope({ scopeKey, seed })`; this is sufficient if live state has not advanced before hydration. If it can advance, pass `useSignalValue(handle$, getServerSnapshot)` a stable historical snapshot. React uses that callback on the server and during hydration, then catches up to the live handle through the regular subscription.
 - A read that throws throws from the component: a pending async handle suspends, and a failed one reaches the error boundary.
 - `SignalScopeProvider` passes a scope to `useSignalScope()`. It borrows the scope and never disposes it. The application creates one per root or request and disposes it after unmounting the tree that reads it. React does not own scopes here: a scope created during render is lost when StrictMode or Suspense discards that render, and one created in an effect is missing from the first render and from SSR.
+
+For a seeded scope, an adoption frame supplies that historical read without rewinding live state:
+
+```tsx
+const scope = createScope({ scopeKey, seed });
+const name$ = scope.signal$('name', '');
+const frame = scope.beginAdoption(seed);
+
+function Name() {
+  return <span>{useSignalValue(name$, () => frame.run(() => name$.get()))}</span>;
+}
+```
+
+Create the frame outside React render and retain it until every boundary that needs its historical snapshot has hydrated, including delayed Suspense boundaries. Release it after those boundaries complete, or when the root unmounts; do not release it from a parent layout effect while a child boundary can still hydrate. The application owns the frame and the borrowed scope. The callback must return the same snapshot for repeated hydration reads; for decoded objects, read from the retained frame rather than decoding again.
 
 ## Server rendering and historical adoption
 

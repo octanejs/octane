@@ -2,12 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import {
 	createElement,
 	createRoot,
-	drainPassiveEffects,
 	flushSync,
 	useEffect,
 	useInsertionEffect,
 	useLayoutEffect,
 } from '../src/index.js';
+import { drainPassiveEffects } from '../src/internal/client.js';
 
 const phases = [
 	['insertion', useInsertionEffect],

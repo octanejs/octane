@@ -13,7 +13,8 @@ import { compile } from 'octane/compiler';
 import { slotHooks } from '../src/compiler/slot-hooks.js';
 import * as ServerRuntime from 'octane/server';
 import * as HydrationRuntime from 'octane/hydration';
-import * as InternalClientRuntime from 'octane/internal/client';
+// Relative like the client entry: SSR resolution retargets octane/internal/client.
+import * as InternalClientRuntime from '../src/internal/client.js';
 import * as InternalServerRuntime from 'octane/internal/server';
 import * as ClientRuntime from '../src/index.js';
 import 'octane/signals';

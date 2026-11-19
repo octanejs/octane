@@ -1,12 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-	__createDiscreteEventListener,
-	act,
-	addTransitionType,
-	createRoot,
-	flushSync,
-	startTransition,
-} from '../src/index.js';
+import { act, addTransitionType, createRoot, flushSync, startTransition } from '../src/index.js';
+import { __createDiscreteEventListener } from '../src/internal/client.js';
 import {
 	ActionProbe,
 	ActionShell,

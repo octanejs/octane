@@ -134,12 +134,22 @@ describe('loadOctaneConfig', () => {
 			JSON.stringify({
 				name: 'octane',
 				type: 'module',
-				exports: { './server': './server.mjs' },
+				exports: {
+					'./server': './server.mjs',
+					'./internal/server': './internal-server.mjs',
+				},
 			}),
 		);
+		// Compiled helpers come from the internal entry; splitting keeps one runtime.
+		const octaneSource = path.resolve(import.meta.dirname, '../../octane/src');
 		await build({
-			entryPoints: [path.resolve(import.meta.dirname, '../../octane/src/server/index.ts')],
-			outfile: path.join(fixtureRoot, 'node_modules/octane/server.mjs'),
+			entryPoints: {
+				server: path.join(octaneSource, 'server/index.ts'),
+				'internal-server': path.join(octaneSource, 'internal/server.ts'),
+			},
+			outdir: path.join(fixtureRoot, 'node_modules/octane'),
+			outExtension: { '.js': '.mjs' },
+			splitting: true,
 			bundle: true,
 			format: 'esm',
 			platform: 'node',

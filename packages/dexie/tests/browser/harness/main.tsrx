@@ -1,5 +1,6 @@
 import Dexie from 'dexie';
-import { createRoot, delegateEvents } from 'octane';
+import { createRoot } from 'octane';
+import { delegateEvents } from 'octane/internal/client';
 import { UpstreamApp } from '../../_fixtures/upstream-app.tsrx';
 
 type Item = { id: number; name: string };

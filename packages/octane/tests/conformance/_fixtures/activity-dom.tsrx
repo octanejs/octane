@@ -1,6 +1,5 @@
 import {
 	Activity,
-	bindRendererRegionOwner,
 	createContext,
 	createElement,
 	createPortal,
@@ -12,6 +11,7 @@ import {
 	useMemo,
 	useState,
 } from 'octane';
+import { bindRendererRegionOwner } from 'octane/internal/client';
 import { useRepeatedSharedInsertions } from './activity-dom-insertion-helpers.js';
 
 export type ActivityMode = 'visible' | 'hidden';

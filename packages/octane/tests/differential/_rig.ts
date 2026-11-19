@@ -25,9 +25,9 @@ import { expect, vi } from 'vitest';
 import {
 	createRoot as octaneCreateRoot,
 	flushSync as octaneFlushSync,
-	drainPassiveEffects as octaneDrainEffects,
 	act as octaneAct,
 } from '../../src/index.js';
+import { drainPassiveEffects as octaneDrainEffects } from '../../src/internal/client.js';
 import { existsSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';

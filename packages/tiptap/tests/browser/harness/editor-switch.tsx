@@ -1,7 +1,8 @@
 /** @jsxImportSource octane */
 import StarterKit from '@tiptap/starter-kit';
 import { useEditor } from '@octanejs/tiptap';
-import { createRoot, delegateEvents } from 'octane';
+import { createRoot } from 'octane';
+import { delegateEvents } from 'octane/internal/client';
 import { EditorModeSwitch } from './editor-mode-switch.tsx';
 
 delegateEvents(['click']);

@@ -1,4 +1,5 @@
-import { createElement, ErrorBoundary, HYDRATION_RANGE_BOUNDARY, use, useState } from 'octane';
+import { createElement, ErrorBoundary, use, useState } from 'octane';
+import { HYDRATION_RANGE_BOUNDARY } from 'octane/internal/client';
 import type { ComponentBody, OctaneNode } from 'octane';
 
 // A template (`@{}`) component clones its root element before its holes run, so

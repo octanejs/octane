@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createElement, useState, useCallback, withSlot, flushSync, template, clone } from 'octane';
+import { createElement, useState, useCallback, flushSync } from 'octane';
+import { withSlot, template, clone } from 'octane/internal/client';
 import { mount } from './_helpers';
 import {
 	ReuseApp,

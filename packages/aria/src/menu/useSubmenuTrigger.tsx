@@ -13,7 +13,7 @@
  */
 
 import type { AriaMenuItemProps } from './useMenuItem';
-import { withSlot } from 'octane';
+import { withSlot } from 'octane/internal/client';
 import type { AriaMenuOptions } from './useMenu';
 import type { AriaPopoverProps } from '../overlays/usePopover';
 import type {
