@@ -1,3 +1,4 @@
+import type { NativeReadSubscription } from './read-protocol.js';
 import { formatClientError } from '../error-codes.client.generated.js';
 import {
 	adoptResourceValue,
@@ -272,13 +273,18 @@ class OptimisticDescriptor<T> implements OptimisticSignal<T>, OwnerBoundSignal<T
 		return this.manager().view$[SIGNAL_BINDING_READ]();
 	}
 
-	[SIGNAL_BINDING_SUBSCRIBE](notify: () => void, onRetire?: () => void): () => void {
+	[SIGNAL_BINDING_SUBSCRIBE](
+		notify: () => void,
+		onRetire?: () => void,
+		speculative?: boolean,
+	): NativeReadSubscription {
 		const owner = currentSignalOwner();
 		if (!owner) throw new Error(formatClientError(91));
 		const run = captureSignalOwner(owner);
 		return this.manager().view$[SIGNAL_BINDING_SUBSCRIBE](
 			forwardNativeTransitionConsumer(notify, () => run(notify)),
 			onRetire === undefined ? undefined : () => run(onRetire),
+			speculative,
 		);
 	}
 

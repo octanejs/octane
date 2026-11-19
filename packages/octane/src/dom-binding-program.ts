@@ -1,3 +1,4 @@
+import type { BindingObservationFactory, BindingObservations } from './dom-binding-observations.js';
 import { formatClientError } from './error-codes.client.generated.js';
 import { FRAMEWORK_POLICY } from './trusted-types.js';
 import {
@@ -384,11 +385,11 @@ export interface CompiledBindingProgram<Props> {
 	prepareProps?(props: Props): readonly unknown[];
 	readonly scalar?: CompiledBindings<Props>;
 	readonly adoptScalar?: typeof __adoptBindings | typeof __adoptScalarBindings;
-	readonly connectSignal?: typeof __createBindingSignals;
+	readonly connectSignal?: BindingObservationFactory<typeof __createBindingSignals>;
 	readonly trackReads?: typeof __createBindingReads;
-	readonly connectStyle?: typeof __createBindingStyles;
-	readonly connectProjection?: typeof __createBindingProjections;
-	readonly createControls?: typeof __createBindingControls;
+	readonly connectStyle?: BindingObservationFactory<typeof __createBindingStyles>;
+	readonly connectProjection?: BindingObservationFactory<typeof __createBindingProjections>;
+	readonly createControls?: BindingObservationFactory<typeof __createBindingControls>;
 	readonly list?: BindingListCapability;
 	readonly tryRegions?: BindingTryCapability;
 	readonly effects?: BindingEffectsCapability;
@@ -495,6 +496,7 @@ interface Transaction {
 	effects?: BindingEffectsCapability | undefined;
 	notifySignal?(prepare: () => () => void): void;
 	reads?: BindingReadTracker | undefined;
+	observations?: BindingObservations | undefined;
 	refresh?: () => void;
 	run?: <T>(callback: () => T) => T;
 	waits?: WeakSet<object>;
@@ -1211,7 +1213,10 @@ function prepareFragment(
 							return () => {};
 						}
 						return () => {
-							if (!instance.disposed && !transaction.disposed) writeText(region, next);
+							if (!instance.disposed && !transaction.disposed) {
+								writeText(region, next);
+								region.signal?.accept();
+							}
 						};
 					};
 					connection = region.signal = transaction.signals.connect(() =>
@@ -1481,6 +1486,7 @@ function commitRegion(plan: RegionPlan, id: string, transaction: Transaction): v
 	if (definition.kind === 'text') {
 		region.signalPlan = undefined;
 		writeText(region, plan.text!);
+		region.signal?.accept();
 		return;
 	}
 	if (definition.kind === 'for') {
@@ -1545,6 +1551,7 @@ function writeOperation(
 	transaction: Transaction,
 ): void {
 	if (transaction.disposed || instance.disposed) return;
+	(instance.projections?.get(index) ?? instance.signals?.get(index))?.accept();
 	const previous = instance.previous[index];
 	if (value === previous) return;
 	const operation = instance.definition.bindings[index]!;
@@ -1675,6 +1682,7 @@ function releaseEffects(instance: FragmentInstance, attempt: (callback: () => vo
  */
 function observesRetiredSource(transaction: Transaction): boolean {
 	if (transaction.reads?.retired()) return true;
+	if (transaction.observations?.retired()) return true;
 	for (const instance of transaction.all) {
 		for (const region of instance.regions) if (region.signal?.retired()) return true;
 		for (const connections of [instance.signals, instance.projections, instance.controls])
@@ -1700,6 +1708,12 @@ function bindProgram<Props>(
 		(!target.parent || (target.before != null && target.before.parentNode !== target.parent))
 	)
 		throw new TypeError(formatClientError(295));
+	const createObservations =
+		descriptor.connectSignal?.observations ??
+		descriptor.connectStyle?.observations ??
+		descriptor.connectProjection?.observations ??
+		descriptor.createControls?.observations;
+	const observations = createObservations?.(() => transaction.refresh?.());
 	const transaction: Transaction = {
 		disposed: false,
 		all: new Set(),
@@ -1707,16 +1721,17 @@ function bindProgram<Props>(
 		focused: null,
 		contentEditable: false,
 		restoreStyles: options?.restoreStyles === true,
-		signals: descriptor.connectSignal?.(),
-		styles: descriptor.connectStyle?.(),
-		projections: descriptor.connectProjection?.(),
-		controls: descriptor.createControls?.(),
+		signals: descriptor.connectSignal?.(observations),
+		styles: descriptor.connectStyle?.(observations),
+		projections: descriptor.connectProjection?.(observations),
+		controls: descriptor.createControls?.(undefined, observations),
 		list,
 		tryRegions: descriptor.tryRegions,
 		effects: descriptor.effects,
 		hostOperations,
 		initialOperations: descriptor.initialOperations ?? hostOperations,
 		frame: 0,
+		observations,
 	};
 	const signalUpdates =
 		transaction.signals || transaction.styles || transaction.projections || transaction.controls
@@ -1781,6 +1796,14 @@ function bindProgram<Props>(
 			}
 		}
 		try {
+			observations?.dispose();
+		} catch (error) {
+			if (!failed) {
+				failed = true;
+				failure = error;
+			}
+		}
+		try {
 			transaction.reads?.dispose();
 		} catch (error) {
 			if (!failed) {
@@ -1814,6 +1837,11 @@ function bindProgram<Props>(
 		}
 		try {
 			while ((dirty || signalUpdates?.size) && !transaction.disposed) {
+				observations?.clear();
+				if (committed && observations?.retired()) {
+					dispose();
+					return;
+				}
 				if (!dirty) {
 					if (transaction.projections) {
 						// A group may invalidate while another field coerces. Replace its
@@ -1826,6 +1854,7 @@ function bindProgram<Props>(
 						}
 						if (!dirty && !transaction.disposed) {
 							for (const write of writes.values()) write();
+							if (!dirty && !transaction.disposed) observations?.publish();
 							transaction.published?.();
 						}
 						continue;
@@ -1835,6 +1864,7 @@ function bindProgram<Props>(
 					const writes = pending.map((prepare) => prepare());
 					if (!dirty && !transaction.disposed) {
 						for (const write of writes) write();
+						if (!dirty && !transaction.disposed) observations?.publish();
 						transaction.published?.();
 					}
 					continue;
@@ -1907,6 +1937,7 @@ function bindProgram<Props>(
 					moveRange(instance!.range, target!.parent, target!.before ?? null, transaction);
 					mounted = true;
 				}
+				if (!transaction.disposed) observations?.publish();
 				transaction.candidates.clear();
 				activateInstance(instance!, transaction);
 				settleFirstCommit(true);

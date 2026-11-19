@@ -1,3 +1,5 @@
+import type { NativeReadSubscription } from './read-protocol.js';
+
 /** Runtime brands for signal handles and legacy query requests. */
 export const SIGNAL_HANDLE: unique symbol = Symbol.for('octane.signal-handle') as any;
 export const SIGNAL_BINDING_READ: unique symbol = Symbol.for('octane.signal-binding-read') as any;
@@ -37,7 +39,11 @@ export interface SignalHandle<T> {
 	readonly [SIGNAL_HANDLE]: true;
 	readonly [SIGNAL_BINDING_READ]: () => T;
 	/** @internal Observe invalidation; optional teardown replaces the owning scope's final invalidation. */
-	readonly [SIGNAL_BINDING_SUBSCRIBE]: (notify: () => void, onRetire?: () => void) => () => void;
+	readonly [SIGNAL_BINDING_SUBSCRIBE]: (
+		notify: () => void,
+		onRetire?: () => void,
+		speculative?: boolean,
+	) => NativeReadSubscription;
 	/** @internal Whether the handle's own owner retired, as `onRetire` would report. Failure paths only. */
 	readonly [SIGNAL_BINDING_RETIRED]?: () => boolean;
 	readonly [SIGNAL_BINDING_IDENTITY]: () => SignalBindingIdentity;

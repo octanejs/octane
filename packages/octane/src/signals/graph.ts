@@ -1130,7 +1130,11 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 		return readSignalBinding(this);
 	}
 
-	[SIGNAL_BINDING_SUBSCRIBE](notify: () => void, onRetire?: () => void): () => void {
+	[SIGNAL_BINDING_SUBSCRIBE](
+		notify: () => void,
+		onRetire?: () => void,
+		speculative?: boolean,
+	): NativeReadSubscription {
 		assertAlive(this.owner);
 		// An optional native lease can end when its exact owner retires. A live
 		// computation throwing ScopeDisposedError still uses normal invalidation.
@@ -1142,6 +1146,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 						this.owner.retired ? onRetire() : notify(),
 					),
 			true,
+			speculative,
 		);
 	}
 
@@ -2293,12 +2298,17 @@ export class PlainCell<T = any> implements ReactiveNode {
 		return this.last;
 	}
 
-	[SIGNAL_BINDING_SUBSCRIBE](notify: () => void, onRetire?: () => void): () => void {
+	[SIGNAL_BINDING_SUBSCRIBE](
+		notify: () => void,
+		onRetire?: () => void,
+		speculative?: boolean,
+	): NativeReadSubscription {
 		assertAlive(this.owner);
 		return attachObserver(
 			this as unknown as ScopedNode,
 			onRetire === undefined ? notify : () => (this.owner.retired ? onRetire() : notify()),
 			true,
+			speculative,
 		);
 	}
 
@@ -2598,6 +2608,7 @@ let watchHooks: WeakMap<ReactiveNode, WatchHook>;
 interface WatchHook {
 	watched: () => void | (() => void);
 	cleanup: void | (() => void);
+	generation: number;
 }
 
 export function setWatched(
@@ -2621,7 +2632,7 @@ export function setWatched(
 			},
 		};
 	}
-	watchHooks.set(node, { watched, cleanup: undefined });
+	watchHooks.set(node, { watched, cleanup: undefined, generation: 0 });
 	countObservers(node);
 }
 
@@ -2671,16 +2682,20 @@ function unwatch(node: ReactiveNode): void {
 
 function startWatch(node: ReactiveNode): void {
 	const hook = watchHooks.get(node);
-	if (hook !== undefined) hook.cleanup = runHook(hook.watched);
+	if (hook === undefined) return;
+	const generation = ++hook.generation;
+	const cleanup = runHook(hook.watched);
+	if (hook.generation === generation && watchHooks.get(node) === hook) hook.cleanup = cleanup;
+	else if (typeof cleanup === 'function') runHook(cleanup);
 }
 
 function stopWatch(node: ReactiveNode): void {
 	const hook = watchHooks.get(node);
-	const cleanup = hook?.cleanup;
-	if (typeof cleanup === 'function') {
-		hook!.cleanup = undefined;
-		runHook(cleanup);
-	}
+	if (hook === undefined) return;
+	hook.generation++;
+	const cleanup = hook.cleanup;
+	hook.cleanup = undefined;
+	if (typeof cleanup === 'function') runHook(cleanup);
 }
 
 /**
@@ -2800,8 +2815,12 @@ export class PlainComputed<T = any> implements ReactiveNode {
 		}
 	}
 
-	[SIGNAL_BINDING_SUBSCRIBE](notify: () => void): () => void {
-		return attachObserver(this as unknown as ScopedNode, notify, true);
+	[SIGNAL_BINDING_SUBSCRIBE](
+		notify: () => void,
+		_onRetire?: () => void,
+		speculative?: boolean,
+	): NativeReadSubscription {
+		return attachObserver(this as unknown as ScopedNode, notify, true, speculative);
 	}
 
 	[SIGNAL_BINDING_IDENTITY]() {

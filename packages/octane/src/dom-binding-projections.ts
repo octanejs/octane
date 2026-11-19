@@ -1,3 +1,4 @@
+import { __withBindingObservations, type BindingObservations } from './dom-binding-observations.js';
 import { formatClientError } from './error-codes.client.generated.js';
 import { __normalizeBinding, type BindingOperation, type BindingValue } from './dom-bindings.js';
 import { __createBindingStyles, __retiredBindingSource } from './dom-binding-styles.js';
@@ -8,6 +9,7 @@ import {
 	endNativeWriteGuard,
 	setNativeReadObserver,
 	type NativeReadSource,
+	type NativeReadSubscription,
 } from './signals/read-protocol.js';
 
 export type BindingProjectionGroup = readonly (readonly [index: number, field: string])[];
@@ -19,14 +21,17 @@ export interface BindingProjectionConnection {
 	writeStyle(index: number, value: BindingValue): void;
 	/** Error path only: whether the owner of a source this group observes retired. */
 	retired(): boolean;
+	accept(): void;
 	dispose(preservePresentation?: boolean): void;
 }
 
 /** Optional, view-owned projections share a read and prepare every field before any write. */
-export function __createBindingProjections() {
+const createBindingProjections = function __createBindingProjections(
+	observations?: BindingObservations,
+) {
 	const owner = currentSignalOwner();
 	const run = owner === null ? <T>(callback: () => T): T => callback() : captureSignalOwner(owner);
-	const styles = __createBindingStyles();
+	const styles = __createBindingStyles(observations);
 	return {
 		connect(
 			group: BindingProjectionGroup,
@@ -35,9 +40,10 @@ export function __createBindingProjections() {
 			notify: () => void,
 			restoreStyles = false,
 		): BindingProjectionConnection {
+			const observation = observations?.owner();
 			let compute: (() => Record<string, unknown> | null | undefined) | undefined;
 			let disposed = false;
-			const subscriptions = new Map<NativeReadSource, () => void>();
+			const subscriptions = new Map<NativeReadSource, (inspect?: boolean) => boolean | void>();
 			const styleConnections = new Map<number, BindingSignalConnection>();
 			const get = (): BindingValue[] => {
 				if (disposed) return [];
@@ -59,7 +65,12 @@ export function __createBindingProjections() {
 							if (binding[1] === 'styleObject') {
 								let style = styleConnections.get(index);
 								if (!style) {
-									style = styles.connect(nodes[binding[0]] as Element, notify, restoreStyles);
+									style = styles.connect(
+										nodes[binding[0]] as Element,
+										notify,
+										restoreStyles,
+										observation,
+									);
 									styleConnections.set(index, style);
 								}
 								values[index] = style.read(value) as BindingValue;
@@ -79,29 +90,41 @@ export function __createBindingProjections() {
 					if (disposed) break;
 					if (!subscriptions.has(source)) {
 						let active = true;
-						const stop = run(() =>
+						let stop: NativeReadSubscription | undefined;
+						stop = run(() =>
 							source.subscribe(() => {
-								if (active && !disposed) notify();
-							}),
+								if (!disposed) {
+									if (active)
+										observations ? observations.notify(observation!, stop, notify) : notify();
+									else if (observations && source.retired?.())
+										observations.retire(observation!, stop);
+								}
+							}, !!observations),
 						);
 						if (typeof stop !== 'function') throw new TypeError(formatClientError(304));
-						const cleanup = (): void => {
+						if (observations && !observations.add(observation!, stop)) break;
+						const cleanup = (inspect = false): boolean | void => {
+							if (inspect) return !observation?.pending?.has(stop!);
 							active = false;
-							stop();
+							observations ? observations.release(observation!, stop!) : stop!();
 						};
 						if (disposed) cleanup();
 						else subscriptions.set(source, cleanup);
 					}
-					if (!disposed && source.getVersion() !== version) notify();
+					if (!disposed && source.getVersion() !== version)
+						observations ? observations.notify(observation!, undefined, notify) : notify();
 				}
 				return values;
 			};
 			return {
 				group,
 				get,
+				accept: () => observation && observations!.accept(observation),
 				retired: () =>
-					__retiredBindingSource(subscriptions) ||
-					[...styleConnections.values()].some((style) => style.retired()),
+					__retiredBindingSource(
+						subscriptions,
+						observations ? (stop) => (stop as (inspect: boolean) => boolean)(true) : undefined,
+					) || [...styleConnections.values()].some((style) => style.retired()),
 				read(next) {
 					if (typeof next !== 'function') throw new TypeError(formatClientError(305));
 					compute = next as typeof compute;
@@ -133,9 +156,13 @@ export function __createBindingProjections() {
 					}
 					subscriptions.clear();
 					styleConnections.clear();
+					if (observation) observations!.accept(observation);
 					if (failed) throw failure;
 				},
 			};
 		},
 	};
-}
+};
+
+export const __createBindingProjections =
+	/* @__PURE__ */ __withBindingObservations(createBindingProjections);
