@@ -1045,7 +1045,7 @@ describe('SSR Phase 4 — render() awaits use(promise)', () => {
 		'renders opaque keyed children after an async component awaits (dev=%s)',
 		async (dev) => {
 			const fixture = loadCompiledFixtureSource(
-				`import { enableServerSignalBindings } from 'octane/server';
+				`import { enableServerSignalBindings } from 'octane/internal/server';
 enableServerSignalBindings();
 function Row(props) @{
  <output>{props.label as string}</output>

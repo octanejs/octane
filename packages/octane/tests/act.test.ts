@@ -5,7 +5,8 @@
 //   - the warning text mirrors React's so port-from-React tests recognise it
 //   - act() always returns a Promise; awaits drain microtasks + passive effects to quiescence
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, createRoot, flushSync, setIsOctaneActEnvironment } from '../src/index.js';
+import { act, createRoot, flushSync } from '../src/index.js';
+import { setIsOctaneActEnvironment } from '../src/internal/client.js';
 import { mount } from './_helpers';
 import Counter, {
 	ActLayoutLoop,

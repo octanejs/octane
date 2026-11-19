@@ -15,9 +15,9 @@ import { createRoot as reactCreateRoot, type Root as ReactRoot } from 'react-dom
 import {
 	createElement as octaneCreateElement,
 	createRoot as octaneCreateRoot,
-	drainPassiveEffects as octaneDrainEffects,
 	flushSync as octaneFlushSync,
 } from 'octane';
+import { drainPassiveEffects as octaneDrainEffects } from 'octane/internal/client';
 import {
 	StyleSheetManager as OctaneStyleSheetManager,
 	__PRIVATE__ as octanePrivate,

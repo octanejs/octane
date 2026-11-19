@@ -202,7 +202,7 @@ describe('Valdi compiler option', () => {
 		compile(source, filename, { renderer, hmr: false });
 		expect(compile(source, filename, { hmr: false })).toEqual(dom);
 		expect(compile(source, filename, universalOptions)).toEqual(universal);
-		expect(imports(dom.code)).toContain('octane');
+		expect(imports(dom.code)).toContain('octane/internal/client');
 		expect(imports(universal.code)).toContain(renderer.module);
 	});
 });

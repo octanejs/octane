@@ -1,4 +1,5 @@
-import { hookSlots, useRef } from 'octane';
+import { useRef } from 'octane';
+import { hookSlots } from 'octane/internal/client';
 import { useRef as useServerRef } from 'octane/server';
 import { useRef as useUniversalRef } from 'octane/universal';
 

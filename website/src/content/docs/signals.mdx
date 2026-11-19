@@ -277,8 +277,44 @@ no observer does not start it. Here `chat.subscribe` is an application function
 that returns an unsubscribe function.
 
 ```ts
-import { createScope } from 'octane/signals';
+import { createScope, ScopeDisposedError } from 'octane/signals';
 import { chat, type Message } from './chat';
+
+function subscribeSafely<T>(
+	start: (publish: (value: T) => void) => (() => void) | Promise<() => void>,
+	publish: (value: T) => void,
+) {
+	let active = true;
+	let cleanup: (() => void) | undefined;
+	const fail = (error: unknown) => {
+		active = false;
+		if (typeof reportError === 'function') reportError(error);
+		else console.error(error);
+	};
+	let setup: (() => void) | Promise<() => void>;
+	try {
+		setup = start((value) => {
+			if (active) publish(value);
+		});
+	} catch (error) {
+		active = false;
+		if (error instanceof ScopeDisposedError) throw error;
+		fail(error);
+		return () => {};
+	}
+	if (typeof setup === 'function') cleanup = setup;
+	else
+		void setup
+			.then((stop) => {
+				if (active) cleanup = stop;
+				else stop();
+			})
+			.catch(fail);
+	return () => {
+		active = false;
+		cleanup?.();
+	};
+}
 
 const room = createScope({ scopeKey: 'room' });
 const roomId$ = room.signal$('room-id', 'general');
@@ -286,12 +322,20 @@ const messages$ = room.signal$<Message[]>('messages', [], {
 	equals: (previous, next) =>
 		previous.length === next.length && previous.every((message, i) => message.id === next[i].id),
 	watched: () =>
-		room.effect(() => chat.subscribe(roomId$.get(), (messages) => messages$.set(messages))),
+		room.effect(() =>
+			subscribeSafely<Message[]>(
+				(publish) => chat.subscribe(roomId$.get(), publish),
+				(messages) => messages$.set(messages),
+			),
+		),
 });
 ```
 
 Returning the effect's stop function connects the source while the messages
-are observed and reconnects it when `roomId$` changes.
+are observed and reconnects it when `roomId$` changes. The active flag rejects
+callbacks from an old connection; cleanup returned later by an asynchronous
+setup still runs after the connection is stopped. Setup failures and errors in
+late cleanup are reported through `reportError`.
 
 <h3 id="transactions">Group writes you can undo</h3>
 
@@ -384,6 +428,8 @@ done.delete('task-1');
 `delete` evicts a member, and reading an evicted member throws. With `idle`, a
 member that nothing has observed for that many milliseconds is evicted too. A later
 `get` of the same key creates a fresh member.
+
+A family is transient by default: keyless members are not included in a scope seed. For server-rendered members, opt in by capturing selected string keys and values in one namespaced keyed signal before serializing the request scope, then initialize client family members from that snapshot. Unselected members still use their client defaults. Eviction keeps the last selected snapshot until you explicitly replace or clear it, without adding keyed nodes for individual members. See the [tested family hydration recipe](https://github.com/octanejs/octane/blob/main/docs/signals.md#opt-in-to-family-hydration) for the complete composition and namespace policy.
 
 <h3 id="react-components">Read a scope from React</h3>
 

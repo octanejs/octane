@@ -1,4 +1,5 @@
-import { createRoot, delegateEvents, flushSync } from 'octane';
+import { createRoot, flushSync } from 'octane';
+import { delegateEvents } from 'octane/internal/client';
 
 import { BrowserSelectFixture, type BrowserSelectOption } from './select-fixture.tsrx';
 

@@ -1,4 +1,5 @@
-import { createRoot, delegateEvents, useEffect, useRef, useState } from 'octane';
+import { createRoot, useEffect, useRef, useState } from 'octane';
+import { delegateEvents } from 'octane/internal/client';
 import * as pdfjs from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { createProbePdf } from '../fixture';

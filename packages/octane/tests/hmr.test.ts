@@ -1,17 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderToString } from 'octane/server';
-import {
-	bagOf,
-	clone,
-	hmr,
-	HMR,
-	template,
-	useState,
-	flushSync,
-	hydrateRoot,
-	type ComponentBody,
-	type Scope,
-} from '../src/index.js';
+import { useState, flushSync, hydrateRoot, type ComponentBody } from '../src/index.js';
+import { bagOf, clone, hmr, HMR, template, type Scope } from '../src/internal/client.js';
 import { setRenderText } from '../src/runtime.js';
 import { mount } from './_helpers';
 import { loadCompiledFixtureSource } from './_server-fixture';
@@ -1394,7 +1384,7 @@ export function Value() @{
 			const transformed =
 				code
 					.replace(
-						/^import\s*\{([\s\S]*?)\}\s*from\s*(['"])octane\2;/m,
+						/^import\s*\{([\s\S]*?)\}\s*from\s*(['"])octane(?:\/internal\/client)?\2;/gm,
 						(_match, imports: string) => {
 							const properties = imports
 								.split(',')

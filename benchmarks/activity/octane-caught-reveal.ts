@@ -1,4 +1,5 @@
-import { createRoot, drainPassiveEffects, flushSync } from 'octane';
+import { createRoot, flushSync } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { installCaughtRevealBenchmark } from './caught-reveal-browser';
 import type { CaughtRevealModel } from './caught-reveal-model';
 import { HiddenCaughtReveal } from './HiddenCaughtReveal.tsrx';

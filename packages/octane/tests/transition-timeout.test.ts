@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { installTestClock, type TestClock } from 'octane/testing';
 import { mount, act } from './_helpers';
+import { startTransition } from '../src/index.js';
 import {
-	startTransition,
 	setTransitionFallbackTimeout,
 	getTransitionFallbackTimeout,
-} from '../src/index.js';
+} from '../src/internal/client.js';
 import {
 	TimedEntangledSupersession,
 	TimedHiddenDependentGroup,

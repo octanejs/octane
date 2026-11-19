@@ -56,7 +56,7 @@
         {
           "path": "packages/remix-router/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "faf9737dc94b2e62f9b8b7d7333794d1e92a288e3480ccd68abde495eee18408",
+          "sha256": "8e768d2dbfd32266d938613096383f00eb6c46ced6bbadca8a025c5e228341d2",
           "cases": [
             {
               "id": "differential:remix-router-nested",
@@ -163,7 +163,7 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "3b7e60f5d1d410e0d3b5ffe79b45c9ad8936a02353a9a3eff29df6b8da8c2d16"
+          "sha256": "98e3409edbbd90c64d22684a283e2848c494f323dc3d288b7bbd995bb8394f81"
         }
       ]
     },

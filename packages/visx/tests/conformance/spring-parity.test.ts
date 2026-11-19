@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { drainPassiveEffects, flushSync } from 'octane';
+import { flushSync } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { mount } from '../../../octane/tests/_helpers';
 import { SpringRafFixture } from '../_fixtures/spring-raf.tsrx';
 

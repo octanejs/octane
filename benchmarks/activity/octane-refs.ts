@@ -1,4 +1,5 @@
-import { createRoot, drainPassiveEffects, flushSync } from 'octane';
+import { createRoot, flushSync } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { ActivityRefPrimer, RefControl } from './RefControl.tsrx';
 import { installRefBenchmark } from './ref-browser';
 

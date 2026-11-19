@@ -25,7 +25,7 @@
 import { describe, it, beforeAll, afterAll } from 'vitest';
 import { resolve } from 'node:path';
 import { act as reactAct } from 'react';
-import { drainPassiveEffects as octaneDrainEffects } from 'octane';
+import { drainPassiveEffects as octaneDrainEffects } from 'octane/internal/client';
 import {
 	mountDifferential,
 	preloadDifferentialFixture,

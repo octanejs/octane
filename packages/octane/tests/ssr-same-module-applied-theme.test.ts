@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { hydrateRoot } from 'octane';
 import * as ServerRuntime from 'octane/server';
+import * as ServerRuntimeInternal from 'octane/internal/server';
 import { App as ClientApp } from './_fixtures/style-imported-applied-theme.tsrx';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
 
@@ -119,8 +120,8 @@ for (const dev of [false, true]) {
 			const themeHash = card.split(' ')[0];
 			const baseHash = base.base.$class;
 			const { css } = ServerRuntime.renderToString(() => {
-				ServerRuntime.injectStyle(baseHash, ':root { --ink: purple; }', 'base-nonce');
-				ServerRuntime.injectStyle(themeHash, '.card { color: orange; }', 'theme-nonce');
+				ServerRuntimeInternal.injectStyle(baseHash, ':root { --ink: purple; }', 'base-nonce');
+				ServerRuntimeInternal.injectStyle(themeHash, '.card { color: orange; }', 'theme-nonce');
 				return ServerRuntime.createElement('div', { class: card }, 'Probe');
 			});
 			expect(css.match(/<style /g)).toHaveLength(3);

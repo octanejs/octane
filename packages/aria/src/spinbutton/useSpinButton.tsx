@@ -14,7 +14,7 @@ type DOMAttributes = Record<string, any>;
  */
 
 import { announce, clearAnnouncer } from '../live-announcer/LiveAnnouncer';
-import { withSlot } from 'octane';
+import { withSlot } from 'octane/internal/client';
 
 import type { AriaButtonProps } from '../button/useButton';
 import type { InputBase, RangeInputBase, Validation, ValueBase } from '@react-types/shared';

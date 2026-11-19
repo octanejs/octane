@@ -1,6 +1,6 @@
 'use strong';
 
-import { __createDiscreteEventListener } from 'octane';
+import { __createDiscreteEventListener } from 'octane/internal/client';
 import type { RootState, RootStore } from '../core/store.js';
 import {
 	createEvents,

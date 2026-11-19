@@ -1,7 +1,8 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { describe, expect, it } from 'vitest';
 import type { Middleware, RpcRequestOptions } from '@octanejs/app-core';
-import { __registerServerFunction, batchServerCalls, type ServerCallContext } from 'octane/server';
+import { batchServerCalls, type ServerCallContext } from 'octane/server';
+import { __registerServerFunction } from 'octane/internal/server';
 import { createContext } from '../src/server/middleware.js';
 import { createServerCallHost } from '../src/server/server-calls.js';
 import {

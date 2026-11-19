@@ -1,4 +1,5 @@
-import { bindRendererRegionOwner, use } from 'octane';
+import { use } from 'octane';
+import { bindRendererRegionOwner } from 'octane/internal/client';
 
 // A reverse-region DOM child whose suspension routes to its universal owner and
 // keeps suspending on a wakeable whose settlement has already been observed.

@@ -1,5 +1,4 @@
 import {
-	bindRendererRegionOwner,
 	Fragment,
 	memo,
 	use,
@@ -12,6 +11,7 @@ import {
 	useSyncExternalStore,
 	type FragmentInstance,
 } from 'octane';
+import { bindRendererRegionOwner } from 'octane/internal/client';
 import { MirrorLocale, MirrorTheme } from './mirror-context.js';
 
 /**

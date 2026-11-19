@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from './_helpers';
-import { flushSync, setSpread } from '../src/index.js';
+import { flushSync } from '../src/index.js';
+import { setSpread } from '../src/internal/client.js';
 import { PropRemoval, setAlt } from './_fixtures/deopt-prop-removal.tsrx';
 
 // Prop REMOVAL parity across the three prop-diff loops (setSpread, patchDeoptProps,

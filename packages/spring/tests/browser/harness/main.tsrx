@@ -1,4 +1,5 @@
-import { createRoot, delegateEvents } from 'octane';
+import { createRoot } from 'octane';
+import { delegateEvents } from 'octane/internal/client';
 
 import { ReactSpringDemo } from '../../../../../playground/octane/src/demos/ReactSpring.tsrx';
 

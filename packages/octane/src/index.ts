@@ -29,16 +29,12 @@ export {
 // Profiling's application API and compiler ABI live at `octane/profiling`;
 // neither belongs on the React-shaped main namespace.
 
-// The export surface has exactly three tiers — keep new exports in the right one:
-//
-//  1. PUBLIC API — React parity plus deliberately documented Octane extensions
-//     such as compiler-backed deferred hydration.
-//  2. SEMI-PUBLIC compiler/binding helpers — the contract between the compiler's
-//     emitted code (and the @octanejs/* bindings) and the runtime. Not for app
-//     code; may change with the compiler in lockstep.
-//  3. TEST-ONLY — used by this repo's test infrastructure. Not API at all.
+// Only public API lives here: React parity plus deliberately documented Octane
+// extensions such as compiler-backed deferred hydration. Compiler-emitted
+// helpers, binding infrastructure and test-only hooks import from
+// `octane/internal/client`; compiler/public-runtime-exports.js lists these
+// names so compiled output never imports anything else from this entry.
 export {
-	// ── 1. Public API (React parity) ──────────────────────────────────────────
 	createRoot,
 	hydrateRoot,
 	flushSync,
@@ -104,8 +100,6 @@ export {
 	Suspense,
 	ErrorBoundary,
 	Hydrate,
-	__HydrateCompiled,
-	__HydrateIndependent,
 	Activity,
 	// React shipped Activity as unstable_Activity before 19.2 — alias it so
 	// experimental-channel ports compile unchanged (mirrors unstable_ViewTransition).
@@ -120,6 +114,7 @@ export {
 	type ViewTransitionProps,
 	type ViewTransitionInstance,
 	Fragment,
+	FragmentInstance,
 	type FragmentProps,
 	createPortal,
 	type PortalDescriptor,
@@ -133,194 +128,6 @@ export {
 	type ElementDescriptor,
 	type ComponentBody,
 	type OctaneNode,
-
-	// ── 2. Semi-public: compiler-emitted / binding-infrastructure helpers ─────
-	// (the compiled-output ↔ runtime contract; also used by @octanejs/* bindings)
-	// `@try`/`@catch` as the language tooling's type-only virtual TSX spells it.
-	TsrxErrorBoundary,
-	__runOnCatch,
-	__createDiscreteEventListener,
-	__useCommittedState,
-	__useStateWithGetter,
-	__useLinkedStateWithGetter,
-	__useReducerWithGetter,
-	__createVoidRoot,
-	__hydrateVoidRoot,
-	__voidRootProps,
-	bindRendererRegionOwner,
-	EXTERNAL_HYDRATION_PROMISE,
-	HYDRATION_RANGE_BOUNDARY,
-	createHostContextRequest,
-	// Module-load "this module uses <ViewTransition>" hint (view-transitions plan).
-	__vtSeen,
-	template,
-	scriptTemplate,
-	__PermanentStaticHydrate,
-	clone,
-	drainFrag,
-	// Binding-bag arity factories — one-shot allocate+insert+commit for the
-	// compiled mount path (fields are compiler-assigned 1-char names).
-	bag0,
-	bag1,
-	bag2,
-	bag3,
-	bag4,
-	bag5,
-	bag6,
-	bag7,
-	bag8,
-	bag9,
-	bag10,
-	bag11,
-	bag12,
-	bag13,
-	bag14,
-	bag15,
-	bag16,
-	bagOf,
-	// Event-bundle helpers (3b) — build an arity-specific descriptor once at
-	// mount, mutate it in place on update (dispatch reads `el[key]` per event).
-	evt0,
-	evt0u,
-	evt1,
-	evt1u,
-	evt2,
-	evt2u,
-	evt1e,
-	evt2e,
-	evtN,
-	evtNu,
-	setEventHandler,
-	devEventListener,
-	devHtmlNesting,
-	htext,
-	htextSwap,
-	textareaText,
-	child,
-	sibling,
-	setText,
-	setScriptText,
-	setHTML,
-	setDangerouslySetInnerHTML,
-	setDangerouslySetInnerHTMLSources,
-	markDangerouslySetInnerHTMLChildren,
-	setAttribute,
-	setStringData,
-	setBooleanAttribute,
-	setAriaAttribute,
-	setClassName,
-	setClassAttr,
-	normalizeClass,
-	isHydratingStyle,
-	setStyle,
-	setStyleProperty,
-	setStyleProperties,
-	setSpread,
-	snapshotSpread,
-	setHostPropSources,
-	queueNativeChangeDiagnostic,
-	queueFormAuthoringDiagnostic,
-	markNativeChangeDiagnosticStatic,
-	setFormAction,
-	// Controlled form components (value/checked/defaultValue/defaultChecked
-	// property bindings on input/textarea/select — React-parity semantics on
-	// native events).
-	setValue,
-	setFormControlSources,
-	setChecked,
-	setCheckedCheckable,
-	setSelectValue,
-	setDefaultValue,
-	setDefaultValueUncontrolled,
-	setDefaultChecked,
-	// autoFocus (commit-phase focus on mount; never an attribute)
-	setAutoFocus,
-	attachRef,
-	queueRefAttach,
-	queueRefDetach,
-	replaceRef,
-	queueOwnRefDetach,
-	injectStyle,
-	headBlock,
-	// React Float resources (stylesheet precedence links, style resources, async scripts)
-	stylesheetResource,
-	styleResource,
-	scriptResource,
-	namespaceHead,
-	namespaceHeadElement,
-	delegateEvents,
-	delegateCaptureEvents,
-	fastForBlock,
-	fastKeyedForBlock,
-	fastMapSlot,
-	forBlock,
-	keyedForBlock,
-	mapSlot,
-	ifBlock,
-	errorBlock,
-	tryBlock,
-	switchBlock,
-	activityBlock,
-	componentSlot,
-	componentSlotVoid,
-	componentSlotFunction,
-	componentSlotFromConfig,
-	componentSlotLite,
-	compilerCacheArray,
-	compilerCacheImmutableArrayFilter,
-	compilerCacheMappedArray,
-	compilerCacheContext,
-	compilerOwnsContextProvider,
-	markSingleRoot,
-	markWarm,
-	// Compact compiler ABI; keep the descriptive export for older compiled output.
-	markSingleRoot as __s,
-	markChildrenBlock,
-	createScopedValue,
-	createScopedElement,
-	childSlot,
-	positionalChildren,
-	textSlot,
-	textHole,
-	childTextHole,
-	hostComponent,
-	renderBlock,
-	portal,
-	hookSlots,
-	withSlot,
-	manualHook,
-	invokeManualHook,
-	// Compiler-emitted parallel use(): batched stratum unwrap + fetch-tree
-	// warming (docs/suspense-parallel-use-plan.md).
-	useBatch,
-	registerWarmPlan,
-	seedOrCreate,
-	warmMemo,
-	warmChild,
-	// Closure-free creation take/publish ABI (inline hook-memo tier).
-	puMiss,
-	puTake0,
-	puTake1,
-	puTake2,
-	puTake3,
-	puTake4,
-	puPub,
-	provideContext,
-	mountFragmentRef,
-	FragmentInstance,
-	hmr,
-	HMR,
-	// Scheduler-quiescence probe for @octanejs/testing-library's sync settle.
-	hasPendingWork,
-	type Scope,
-	type Block,
-
-	// ── 3. Test-only (this repo's test infrastructure; not API) ───────────────
-	drainPassiveEffects,
-	setIsOctaneActEnvironment,
-	resetFloatResourceState,
-	setTransitionFallbackTimeout,
-	getTransitionFallbackTimeout,
 } from './runtime.js';
 
 export type {
@@ -337,10 +144,5 @@ export type {
 	HydrationWhen,
 } from './hydration/types.js';
 
-// Semi-public compiler target for `module server` browser stubs.
-export { __serverRpc, __serverRpcStream } from './server-rpc-client.js';
 export { ServerCallUncertainError } from './server-rpc-protocol.js';
 export { batchServerCalls, type ServerCallBatchOptions } from './server-rpc-batch-client.js';
-
-// Semi-public compiler target for inferred method-call dependencies.
-export { __methodDep } from './method-dep.js';

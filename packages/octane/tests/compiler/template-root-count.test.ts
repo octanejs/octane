@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { compile } from 'octane/compiler';
-import { clone, template } from '../../src/index.js';
+import { clone, template } from '../../src/internal/client.js';
 
 // A raw multi-root template passes its root count to `template()`. A
 // production hydration reads it, without parsing the template, to find where

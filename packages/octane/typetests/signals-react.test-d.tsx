@@ -10,6 +10,10 @@ const label$ = scope.derived$('label', () => `${count$.get()}`);
 function Count() {
 	const count: number = useSignalValue(count$);
 	const label: string = useSignalValue(label$);
+	const hydrated: number = useSignalValue(count$, () => 1);
+	// @ts-expect-error A server snapshot must return the handle's value type.
+	useSignalValue(count$, () => 'one');
+	void hydrated;
 	// @ts-expect-error A number handle reads as a number.
 	const wrong: string = useSignalValue(count$);
 	const owner: Scope = useSignalScope();

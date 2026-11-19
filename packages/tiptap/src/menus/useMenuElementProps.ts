@@ -1,4 +1,5 @@
-import { normalizeClass, useEffect, useLayoutEffect, useRef } from 'octane';
+import { useEffect, useLayoutEffect, useRef } from 'octane';
+import { normalizeClass } from 'octane/internal/client';
 
 import { splitSlot, subSlot } from '../internal';
 

@@ -20,7 +20,7 @@ const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'runtime-style-dedup-'));
 const hash = (text) => createHash('sha256').update(text).digest('hex');
 const stat = (value) => ({ score: value, median: value, min: value, samples: 1 });
 const fixtureSource = `
-import { injectStyle } from 'octane/server';
+import { injectStyle } from 'octane/internal/server';
 export function Leaf(p) @{
   if (p.mode !== 'empty') injectStyle(p.styleId, p.css, p.nonce);
   <span>{p.index as string}</span>

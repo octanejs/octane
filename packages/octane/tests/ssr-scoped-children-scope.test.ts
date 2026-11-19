@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createScopedElement, renderToString } from 'octane/server';
+import { renderToString } from 'octane/server';
+import { createScopedElement } from 'octane/internal/server';
 
 // A scoped component descriptor defers its children: they resolve in the scope
 // of the component that reads them, never in the parent that created them.

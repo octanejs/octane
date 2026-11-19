@@ -14,7 +14,7 @@ type DOMAttributes = Record<string, any>;
  */
 
 import type { FocusableElement, Key, RefObject } from '@react-types/shared';
-import { withSlot } from 'octane';
+import { withSlot } from 'octane/internal/client';
 import { focusSafely } from '../interactions/focusSafely';
 import {
 	getActiveElement,

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { clone, createRoot, drainPassiveEffects, flushSync, template, useEffect } from 'octane';
+import { createRoot, flushSync, useEffect } from 'octane';
+import { clone, drainPassiveEffects, template } from 'octane/internal/client';
 
 describe('lazy client initialization', () => {
 	it('parses a template on its first clone and reuses that parsed template', () => {

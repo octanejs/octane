@@ -2469,16 +2469,20 @@ export function prepareHydrateBoundaries(
 			captureBindings,
 		);
 	}
-	if (analysis.boundaries.some((boundary) => boundary.permanentStatic)) {
+	const permanentStatic = analysis.boundaries.find((boundary) => boundary.permanentStatic);
+	if (permanentStatic) {
 		// Import the static body directly: reaching it through Hydrate's property
 		// also retains the deferred activation implementation in client bundles.
 		ast = pruneUnusedImportsAst(
 			{
 				...ast,
 				body: [
-					b.import_declaration(
-						[b.import_specifier('__PermanentStaticHydrate', staticComponentName)],
-						'octane',
+					inheritGeneratedOrigin(
+						b.import_declaration(
+							[b.import_specifier('__PermanentStaticHydrate', staticComponentName)],
+							'octane/internal/client',
+						),
+						permanentStatic.node,
 					),
 					...ast.body,
 				],

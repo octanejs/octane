@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderToString } from 'octane/server';
-import { __runOnCatch, flushSync, startTransition } from '../src/index.js';
+import { flushSync, startTransition } from '../src/index.js';
+import { __runOnCatch } from '../src/internal/client.js';
 import { act, mount, nextPaint } from './_helpers';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture';
 import {

@@ -102,7 +102,7 @@
         {
           "path": "packages/sonner/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "beeca6185868a7b5e0ddd6ad10c5a513f791f63481b39d31da34c9d10bb5bc23",
+          "sha256": "8d48584fd3c79e0fa86d76b0aeb1b2cdc3480b9adc4476f3b2e103abfe0a8690",
           "cases": [
             {
               "id": "differential:sonner-toast-lifecycle",
@@ -129,7 +129,7 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "3b7e60f5d1d410e0d3b5ffe79b45c9ad8936a02353a9a3eff29df6b8da8c2d16"
+          "sha256": "98e3409edbbd90c64d22684a283e2848c494f323dc3d288b7bbd995bb8394f81"
         }
       ]
     }

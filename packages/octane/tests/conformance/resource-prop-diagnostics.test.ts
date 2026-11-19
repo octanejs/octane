@@ -6,8 +6,8 @@ import {
 	preinitModule,
 	preload,
 	preloadModule,
-	resetFloatResourceState,
 } from '../../src/index.js';
+import { resetFloatResourceState } from '../../src/internal/client.js';
 import * as Server from 'octane/server';
 
 type HintSurface = {

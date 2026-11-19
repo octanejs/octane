@@ -318,6 +318,13 @@ export async function run(container) {
 		// A forced CommonJS build is a semantic negative control for the reachability
 		// observation, and verifies that an explicit absolute runtime remains respected.
 		expect(commonjs.modules.some((module) => module.startsWith(commonjsDirectory))).toBe(true);
+		// Compiled helpers import private entries, which must stay in the same graph.
+		const distDirectory = `${installedOctane.split(sep).join('/')}/dist/`;
+		expect(
+			commonjs.modules.filter(
+				(module) => module.startsWith(distDirectory) && !module.startsWith(commonjsDirectory),
+			),
+		).toEqual([]);
 		expect(explicit.modules.filter((module) => module.startsWith(commonjsDirectory))).toEqual([]);
 		expect(
 			automatic.modules.filter((module) => module.startsWith(commonjsDirectory)),

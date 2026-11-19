@@ -3,12 +3,12 @@ import { act, flushEffects, mount } from './_helpers';
 import {
 	createElement,
 	flushSync,
-	hostComponent,
 	startTransition,
 	use,
 	type ComponentBody,
 	type OctaneNode,
 } from '../src/index.js';
+import { hostComponent } from '../src/internal/client.js';
 import {
 	HostComponentChildren,
 	HostComponentInSvg,

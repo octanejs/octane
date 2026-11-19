@@ -11,7 +11,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import * as React from 'react';
 import { createRoot as createReactRoot } from 'react-dom/client';
-import { __createDiscreteEventListener } from '../src/index.js';
+import { __createDiscreteEventListener } from '../src/internal/client.js';
 import { act, mount } from './_helpers';
 import {
 	Counter,

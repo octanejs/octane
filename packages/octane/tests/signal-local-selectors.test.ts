@@ -4,6 +4,7 @@ import { act, createRoot, startTransition } from 'octane';
 import { renderToString } from 'octane/server';
 import { createSignalOwnerLifecycle } from '../src/signals/facade.js';
 import * as universal from '../src/universal.js';
+import * as universalChildren from '../src/internal/universal-children.js';
 import { mount } from './_helpers.js';
 import { loadCompiledFixtureSource, loadPlainHookFixtureSource } from './_server-fixture.js';
 
@@ -532,7 +533,10 @@ export function App(props) @{
 					hmr: false,
 					renderer: { id: 'object', module: 'octane/universal', target: 'universal', text: 'host' },
 				},
-				runtimeModules: { 'octane/universal': universal },
+				runtimeModules: {
+					'octane/universal': universal,
+					'octane/internal/universal-children': universalChildren,
+				},
 			});
 			const events: string[] = [];
 			const container = universal.createObjectContainer();

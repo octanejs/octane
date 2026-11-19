@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as Server from 'octane/server';
+import * as ServerInternal from 'octane/internal/server';
 import * as Static from 'octane/static';
 import { flushSync, hydrateRoot } from 'octane';
 import * as Client from './_fixtures/server-renderable-contract.tsrx';
@@ -196,7 +197,7 @@ describe('server renderable values', () => {
 		for (const inner of [
 			Server.Suspense,
 			Server.createContext('value'),
-			Server.markChildrenBlock(() => ''),
+			ServerInternal.markChildrenBlock(() => ''),
 		]) {
 			const Wrapper = () => hostile;
 			for (const key of Reflect.ownKeys(inner)) {

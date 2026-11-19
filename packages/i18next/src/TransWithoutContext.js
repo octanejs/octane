@@ -7,8 +7,8 @@ import {
 	createElement,
 	Children,
 	isChildrenBlock,
-	positionalChildren,
 } from 'octane';
+import { positionalChildren } from 'octane/internal/client';
 import { keyFromSelector } from 'i18next';
 import HTML from 'html-parse-stringify';
 import { isObject, isString, warn, warnOnce } from './utils.js';

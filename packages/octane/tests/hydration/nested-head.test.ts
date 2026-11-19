@@ -5,7 +5,8 @@
 // same partition: metadata renders into the head channel, the host body keeps
 // only its real children, and hydration adopts without mismatch warnings.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createRoot, hydrateRoot, flushSync, resetFloatResourceState } from '../../src/index.js';
+import { createRoot, hydrateRoot, flushSync } from '../../src/index.js';
+import { resetFloatResourceState } from '../../src/internal/client.js';
 import * as ServerRT from 'octane/server';
 import { loadServerFixture } from '../_server-fixture.js';
 import { NestedHead, DeepNestedHead } from './_fixtures/nested-head.tsrx';

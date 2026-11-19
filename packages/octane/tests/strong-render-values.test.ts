@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import * as Client from '../src/index.js';
+import * as ClientInternal from '../src/internal/client.js';
 import * as Server from 'octane/server';
 import * as fixture from './_fixtures/strong-render-values.tsrx';
 import { act, flushEffects } from './_helpers.js';
@@ -432,7 +433,7 @@ for (const mode of ['render', 'hydrate'] as const) {
 				: (['descriptor', 'dynamic host'] as const),
 		)('replaces forwarded bodies through a %s wrapper', (kind) => {
 			const Host: Client.ComponentBody<{ content: Client.OctaneNode }> = (props, scope) => {
-				Client.hostComponent(scope, 0, 'div', null, props.content);
+				ClientInternal.hostComponent(scope, 0, 'div', null, props.content);
 			};
 			const forward = (content: Client.OctaneNode) =>
 				kind === 'host'

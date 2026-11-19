@@ -1214,6 +1214,59 @@ previous root is disposed without deleting the DOM. `root.dispose()` and parent-
 aborts preserve existing markup by default. Pass `root.dispose({ preserveDOM: false })`
 only when clearing the container is explicitly intended.
 
+<h3 id="capture-form-submissions">
+	Accept form submissions before behavior loads with <code>captureFormSubmissions</code>
+</h3>
+
+A server-rendered form can be submitted before its behavior module has loaded. To
+accept that submission instead of letting the browser navigate, opt in on both sides.
+On the server, emit `earlySignalBootstrapScript({ formSubmissions: true })` from
+`octane/server` in the document head, pass `earlySignalBootstrap: 'external'` to the
+renderer so it does not emit its own copy, and mark each participating form with its
+behavior owner's `id`:
+
+```html
+<form data-octane-capture-submit="save" action="/save" method="post">
+	<input name="draft" value="Server draft" />
+	<button name="command" value="save" type="submit">Save</button>
+</form>
+```
+
+On the client, pass `captureFormSubmissions()` to the root, then register the owner
+with `events: ['submit']` and a `captureEvent` callback:
+
+```ts
+import { attachBehaviorRoot, captureFormSubmissions } from 'octane/behavior';
+
+const root = attachBehaviorRoot(container, {
+	formSubmissions: captureFormSubmissions(),
+});
+
+root.registerBehavior({
+	id: 'save',
+	target: 'form[data-octane-capture-submit="save"]',
+	events: ['submit'],
+	ready: import('./save-behavior.js'),
+	captureEvent(event, form, submission) {
+		event.preventDefault();
+		const fields = submission?.fields ?? [...new FormData(form as HTMLFormElement)];
+		return { draft: String(fields.find(([name]) => name === 'draft')?.[1] ?? '') };
+	},
+	adopt() {},
+	handleEvent(_event, _form, _context, payload) {
+		save(payload);
+	},
+});
+```
+
+The early listener cancels the native submit after browser validation. A submit button,
+implicit Enter, and `form.requestSubmit()` all take this path. `captureEvent` runs once
+per submission, before the behavior is ready, and receives a frozen
+`CapturedFormSubmission` snapshot of the form's fields, including the submitter. Its
+return value is queued in order and passed to `handleEvent` once the behavior adopts
+the form. Moving, removing, or repurposing the form discards undelivered submissions.
+Forms without the marker keep their native behavior.
+
 <h2 id="responsive-updates">Responsive updates and actions</h2>
 
 Some updates should feel immediate, such as typing. Others may reveal UI that needs to
@@ -1533,6 +1586,61 @@ hydration. The streaming APIs have no `css` field: they flush each scoped `<styl
 with the content that uses it, send the shell first, and reveal Suspense content as it
 becomes ready.
 
+<h3 id="server-functions">Call server functions</h3>
+
+A `module server` block in a `.tsrx` file holds functions that run only on the server.
+The browser imports them like ordinary async functions; the compiler replaces each one
+with a stub that sends the call to the server. [Get started with
+Data](/docs/data#first-handler) shows a complete example.
+
+A server call that fails can fail in two ways. If the server refused the call before
+running the function, for example because of an origin check, middleware, or invalid
+arguments, the promise rejects with an `Error` carrying the response `status`. Otherwise
+the outcome is unknown: the function failed after it started, the connection dropped,
+the call was aborted, the deadline passed, or the response could not be read. Then the
+promise rejects with
+`ServerCallUncertainError` (`code: 'OCTANE_RPC_UNCERTAIN'`). The server may or may not
+have run the function, so retrying a write can run it twice:
+
+```ts
+import { ServerCallUncertainError } from 'octane';
+import { saveDraft } from './drafts.tsrx';
+
+try {
+	await saveDraft(draft);
+} catch (error) {
+	if (error instanceof ServerCallUncertainError) {
+		// Re-read the saved state before offering a retry.
+		await refreshDraft();
+	} else {
+		throw error;
+	}
+}
+```
+
+`batchServerCalls` sends independent reads in one request. Calls made synchronously
+inside the callback share the request, up to 32 per request; calls after an `await` do
+not join. Each call is still authorized separately and settles on its own, so a slow
+read never delays a fast one:
+
+```ts
+import { batchServerCalls } from 'octane';
+import { readProfile, readNotifications } from './account.tsrx';
+
+const { profile, notifications } = batchServerCalls(
+	{ kind: 'independent-reads', authority: 'viewer', document: 'account-page' },
+	() => ({ profile: readProfile(id), notifications: readNotifications(id) }),
+);
+```
+
+`kind: 'independent-reads'` asserts that the calls are finite reads that do not depend
+on each other. Keep writes and streaming subscriptions outside the callback. A nested
+`batchServerCalls` starts its own request, and a call that passes its own result limits
+is sent separately. `authority` and `document` are required labels for the account and
+page the reads belong to; they stay on the client and are never trusted as credentials.
+The optional `maxFrameBytes`, `maxTotalBytes`, and `timeoutMs` limits apply to the whole
+request.
+
 <h2 id="api-index">API index by job</h2>
 
 You do not need to memorize this list. Start with components, `useState`, and event
@@ -1549,6 +1657,10 @@ handlers; return here when you have a specific problem to solve.
 			<li>
 				<code>useReducer</code>
 				<span>Centralize several related state updates.</span>
+			</li>
+			<li>
+				<code>useInitialValue</code>
+				<span>Capture a value from the first render and keep it for the component's lifetime.</span>
 			</li>
 			<li>
 				<code>useLinkedState</code>
@@ -1604,6 +1716,20 @@ handlers; return here when you have a specific problem to solve.
 				<span>Queue layout reads before DOM writes so a frame lays out once.</span>
 			</li>
 			<li>
+				<code>flushLayoutSync</code>
+				<span>Run queued layout reads and writes now instead of next frame.</span>
+			</li>
+			<li>
+				<code>getPhase</code>
+				{' / '}
+				<code>RenderingPhase</code>
+				<span>Check whether code is running in a layout read, a write, or neither.</span>
+			</li>
+			<li>
+				<code>setLayoutSnapshotTiming</code>
+				<span>Choose whether layout snapshots measure at commit or in the next frame.</span>
+			</li>
+			<li>
 				<code>createResizeObserver</code>
 				<span>Publish resize measurements outside the browser's delivery loop.</span>
 			</li>
@@ -1631,6 +1757,10 @@ handlers; return here when you have a specific problem to solve.
 			<li>
 				<code>Hydrate</code>
 				<span>Keep server HTML dormant and load its behavior on demand.</span>
+			</li>
+			<li>
+				<code>initializeHydrationEventCapture</code>
+				<span>Record interactions that arrive before hydration so they can be replayed.</span>
 			</li>
 			<li>
 				<code>Suspense</code>
@@ -1681,6 +1811,20 @@ handlers; return here when you have a specific problem to solve.
 				<code>requestFormReset</code>
 				<span>Request an uncontrolled-form reset from an action or transition.</span>
 			</li>
+			<li>
+				<code>captureFormSubmissions</code>
+				<span>Accept server-rendered form submissions before their behavior loads.</span>
+			</li>
+			<li>
+				<code>batchServerCalls</code>
+				<span>Send independent server-function reads in one request.</span>
+			</li>
+			<li>
+				<code>ServerCallUncertainError</code>
+				<span>
+					Identify a server call whose outcome is unknown, so a write is not retried blindly.
+				</span>
+			</li>
 		</ul>
 	</section>
 	<section className="api-index-card">
@@ -1689,6 +1833,12 @@ handlers; return here when you have a specific problem to solve.
 			<li>
 				<code>Fragment</code>
 				<span>Group siblings without an extra DOM element.</span>
+			</li>
+			<li>
+				<code>trustHTML</code>
+				<span>
+					Mark HTML as trusted for <code>dangerouslySetInnerHTML</code>; it does not sanitize.
+				</span>
 			</li>
 			<li>
 				<code>memo</code>
@@ -1735,6 +1885,10 @@ handlers; return here when you have a specific problem to solve.
 				<code>preload</code>
 				{' / '}
 				<code>preinit</code>
+				{' / '}
+				<code>preloadModule</code>
+				{' / '}
+				<code>preinitModule</code>
 				<span>Tell the browser about important resources early.</span>
 			</li>
 			<li>
@@ -1758,14 +1912,52 @@ handlers; return here when you have a specific problem to solve.
 				<span>Inspect component children in library code.</span>
 			</li>
 			<li>
+				<code>descriptorChildren</code>
+				<span>Keep a component's JSX children inspectable as element descriptors.</span>
+			</li>
+			<li>
+				<code>createCompiledContext</code>
+				{' / '}
+				<code>CompiledContext</code>
+				{' / '}
+				<code>CompiledOutlet</code>
+				<span>
+					Provide context and render compiled components in routing and binding infrastructure.
+				</span>
+			</li>
+			<li>
+				<code>subSlot</code>
+				{' / '}
+				<code>createSubSlot</code>
+				<span>Derive per-hook slots in libraries that forward hook slots by hand.</span>
+			</li>
+			<li>
 				<code>flushSync</code>
 				{' / '}
 				<code>act</code>
+				{' / '}
+				<code>isInActScope</code>
 				<span>Integrate synchronous DOM work or test updates.</span>
 			</li>
 			<li>
 				<code>useDebugValue</code>
 				<span>Compatibility hook; it currently has no visible runtime effect.</span>
+			</li>
+			<li>
+				<code>StrictMode</code>
+				{' / '}
+				<code>unstable_batchedUpdates</code>
+				<span>Migration shims: Octane never double-invokes, and updates already batch.</span>
+			</li>
+			<li>
+				<code>useFormState</code>
+				{' / '}
+				<code>unstable_Activity</code>
+				{' / '}
+				<code>unstable_ViewTransition</code>
+				{' / '}
+				<code>unstable_addTransitionType</code>
+				<span>Aliases for older React names, so ported code compiles unchanged.</span>
 			</li>
 			<li>
 				<code>setSsrSuspenseTimeout</code>

@@ -1,6 +1,7 @@
 import Dexie from 'dexie';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { drainPassiveEffects, flushSync, hydrateRoot } from 'octane';
+import { flushSync, hydrateRoot } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { HydrationLiveQuery } from '../_fixtures/hydration.tsrx';
 
 const databases: Dexie[] = [];

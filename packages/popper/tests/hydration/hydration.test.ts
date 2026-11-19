@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { drainPassiveEffects, flushSync, hydrateRoot } from 'octane';
+import { flushSync, hydrateRoot } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { ServerPopperHarness } from '../runtime/_fixtures/Harness.tsrx';
 
 const SERVER_HTML =

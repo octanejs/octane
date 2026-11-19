@@ -38,8 +38,8 @@ import {
 	useMemo,
 	useState,
 	type OctaneElement,
-	type Scope,
 } from 'octane';
+import { type Scope } from 'octane/internal/client';
 import {
 	LayoutGroupContext,
 	LazyMotionContext,
@@ -75,6 +75,8 @@ const HOST_REF = Symbol.for('octane-motion:hostRef');
 const ENTER = Symbol.for('octane-motion:enter');
 const ANIMATE = Symbol.for('octane-motion:animate');
 const ANIMATE_COMPLETE = Symbol.for('octane-motion:animate-complete');
+const NAMED_COMMIT = Symbol.for('octane-motion:named-commit');
+const NAMED_COMPLETE = Symbol.for('octane-motion:named-complete');
 const CONTROLLER_PROPS = Symbol.for('octane-motion:controller-props');
 const CONTROLLER = Symbol.for('octane-motion:controller');
 const GESTURE = Symbol.for('octane-motion:gesture');
@@ -291,6 +293,17 @@ function whenDone(controls: any, done: () => void): void {
 	else done();
 }
 
+function notifyAnimationComplete(latest: any, definition: any): void {
+	const complete = latest.animationComplete;
+	if (!complete) return;
+	try {
+		complete(definition);
+	} catch (error) {
+		if (typeof reportError === 'function') reportError(error);
+		else console.error(error);
+	}
+}
+
 function clamp(v: number, min: number, max: number): number {
 	return v < min ? min : v > max ? max : v;
 }
@@ -456,6 +469,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 				({
 					host: { current: null as HTMLElement | null },
 					animationComplete: undefined,
+					namedSnapshot: null,
 					committedControllerProps: undefined,
 					nextController: undefined,
 					controller: undefined,
@@ -693,6 +707,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		// If we're a stagger child, fold in our per-child delay (our index + the sibling
 		// count are both known by now — all children registered during the parent render).
 		const animationKey = stableKey(resolvedAnimate);
+		const transitionKey = stableKey(transition);
 		const animationComplete = props.onAnimationComplete;
 		// An existing animation can finish after a render that never commits.
 		if (animationEnabled && resolvedAnimate && animationComplete) {
@@ -705,6 +720,55 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 				},
 				[animationComplete],
 				ANIMATE_COMPLETE,
+			);
+		}
+		// A changed name can complete even when its resolved target needs no new animation.
+		// Publish the accepted label during commit; layout effects run child-first.
+		const namedKey = isVariantLabel(animateLabel)
+			? `${typeof animateLabel === 'string' ? 's' : 'a'}:${stableKey(animateLabel)}`
+			: null;
+		const previousNamed = latest.namedSnapshot;
+		if (namedKey !== null || previousNamed) {
+			const labelOnly =
+				namedKey !== null &&
+				previousNamed &&
+				previousNamed.key !== namedKey &&
+				animationEnabled &&
+				resolvedAnimate &&
+				previousNamed.enabled === animationEnabled &&
+				previousNamed.target === animationKey &&
+				previousNamed.transition === transitionKey &&
+				previousNamed.reduced === shouldReduceMotion;
+			const deps = [namedKey, animationKey, transitionKey, animationEnabled, shouldReduceMotion];
+			useInsertionEffect(
+				() => {
+					if (namedKey === null) latest.namedSnapshot = null;
+					else if (latest.namedSnapshot) {
+						const snapshot = latest.namedSnapshot;
+						snapshot.key = namedKey;
+						snapshot.target = animationKey;
+						snapshot.transition = transitionKey;
+						snapshot.enabled = animationEnabled;
+						snapshot.reduced = shouldReduceMotion;
+					} else
+						latest.namedSnapshot = {
+							key: namedKey,
+							target: animationKey,
+							transition: transitionKey,
+							enabled: animationEnabled,
+							reduced: shouldReduceMotion,
+						};
+				},
+				deps,
+				NAMED_COMMIT,
+			);
+			useLayoutEffect(
+				() => {
+					if (labelOnly && latest.namedSnapshot?.key === namedKey && latest.host.current)
+						notifyAnimationComplete(latest, animateLabel);
+				},
+				deps,
+				NAMED_COMPLETE,
 			);
 		}
 		// The first-frame style is captured during render, including hidden Activity
@@ -739,14 +803,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 					const controls = animateTarget(node, resolvedAnimate, t, latest.shouldReduceMotion);
 					let active = true;
 					whenDone(controls, () => {
-						const complete = latest.animationComplete;
-						if (!active || !complete) return;
-						try {
-							complete(animateLabel);
-						} catch (error) {
-							if (typeof reportError === 'function') reportError(error);
-							else console.error(error);
-						}
+						if (active) notifyAnimationComplete(latest, animateLabel);
 					});
 					return () => {
 						active = false;
@@ -754,7 +811,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 					};
 				}
 			},
-			[animationEnabled, animationKey, stableKey(transition), shouldReduceMotion],
+			[animationEnabled, animationKey, transitionKey, shouldReduceMotion],
 			ANIMATE,
 		);
 

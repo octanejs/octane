@@ -5,13 +5,12 @@ import {
 	Children,
 	cloneElement,
 	createElement,
-	createScopedElement,
-	createScopedValue,
 	flushSync,
 	hydrateRoot,
 	type ComponentBody,
 	type ElementDescriptor,
 } from '../src/index.js';
+import { createScopedElement, createScopedValue } from '../src/internal/client.js';
 import { act, mount } from './_helpers.js';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
 import * as tsx from './_fixtures/scoped-jsx-values.tsx';

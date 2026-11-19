@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { act, flushSync, hydrateRoot } from '../../src/index.js';
 import { bindPresentationView, type SSRScope } from '../../src/runtime.server.js';
 import * as ServerRuntime from 'octane/server';
+import * as ServerRuntimeInternal from 'octane/internal/server';
 import * as BehaviorRuntime from 'octane/behavior';
 import { getLeadingHydrationListRange } from 'octane/hydration';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture.js';
@@ -66,11 +67,11 @@ afterEach(() => {
 
 describe('hydration range boundary', () => {
 	it('lets a fixed presentation view inherit its caller range during server rendering', () => {
-		const child = () => ServerRuntime.ssrHtml('<p>child</p>');
+		const child = () => ServerRuntimeInternal.ssrHtml('<p>child</p>');
 		const renderNested = (view: () => string) =>
 			ServerRuntime.renderToString(
 				(_props: object, scope: SSRScope) =>
-					ServerRuntime.ssrHtml(ServerRuntime.ssrComponent(scope, view, {}, true)),
+					ServerRuntimeInternal.ssrHtml(ServerRuntimeInternal.ssrComponent(scope, view, {}, true)),
 				{},
 			).html;
 		const inherited = renderNested(child);

@@ -1,4 +1,5 @@
-import { flushSync, setValue } from 'octane';
+import { flushSync } from 'octane';
+import { setValue } from 'octane/internal/client';
 
 export interface DiagnosticBatch {
 	commit(): { count: number; revision: number; sampledValuesMatch: boolean };

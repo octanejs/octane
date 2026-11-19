@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createElement, injectStyle, ssrHeadEl } from 'octane/server';
+import { createElement } from 'octane/server';
+import { injectStyle, ssrHeadEl } from 'octane/internal/server';
 import renderer from '../src/server.js';
 
 describe('Astro server renderer', () => {

@@ -1,5 +1,5 @@
 import type { Element, Root } from 'hast';
-import { markChildrenBlock } from 'octane';
+import { markChildrenBlock } from 'octane/internal/client';
 import { expect, it } from 'vitest';
 import { createFile, processAsync, processSync, transformTree } from '../../src/processor';
 

@@ -1,5 +1,6 @@
 import type { EmblaCarouselType } from 'embla-carousel';
-import { drainPassiveEffects, flushSync, hydrateRoot } from 'octane';
+import { flushSync, hydrateRoot } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { describe, expect, it, vi } from 'vitest';
 import { CarouselHarness } from '../_fixtures/carousel.tsrx';
 import { SERVER_HTML } from './server-html';

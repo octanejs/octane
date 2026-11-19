@@ -36,7 +36,8 @@ if (args.bundle) {
 } else {
 	const built = await build({
 		stdin: {
-			contents: `export {renderToReadableStream, enableServerSignalBindings, createStreamedSignalInjection} from './packages/octane/src/server/index.ts';
+			contents: `export {renderToReadableStream, createStreamedSignalInjection} from './packages/octane/src/server/index.ts';
+export {enableServerSignalBindings} from './packages/octane/src/internal/server.ts';
 export {query$} from './packages/octane/src/signals/index.ts';
 export {decodeSignalValue} from './packages/octane/src/data-encoding.ts';
 export {decodeStreamedRendererFrame} from './packages/octane/src/streamed-signals-protocol.ts';`,

@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 import { satisfies } from 'semver';
@@ -57,9 +57,12 @@ function extractPublishedOctaneEntry(directory: string): string {
 }
 
 async function bundleTestingLibraryAgainst(octaneEntry: string): Promise<string> {
+	// Each package root keeps its private client entry beside the public one.
+	const internalClient = join(dirname(octaneEntry), 'internal', `client${extname(octaneEntry)}`);
 	const result = await build({
 		absWorkingDir: packageDirectory,
 		alias: {
+			'octane/internal/client': internalClient,
 			octane: octaneEntry,
 		},
 		bundle: true,

@@ -461,7 +461,8 @@ describe('inline hook-memo behavior', () => {
 
 		it(`caches arbitrary values without a value-sentinel collision (inline=${inlineHookMemo})`, () => {
 			const { App, sentinel } = loadCompiledFixtureSource(
-				`import { useMemo, puMiss } from 'octane';
+				`import { useMemo } from 'octane';
+				import { puMiss } from 'octane/internal/client';
 				export const sentinel = puMiss;
 				function useValue(value, mark) {
 					return useMemo(() => (mark(), value), [value]);
