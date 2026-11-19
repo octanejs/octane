@@ -444,7 +444,7 @@ export function App() @{ <p>ready</p> }`;
 					expect(
 						typecheck({
 							'nullable-memo.ts': result.code,
-							'compiled-only.ts': `import { ssrComponent, ssrHtml } from 'octane/server';
+							'compiled-only.ts': `import { ssrComponent, ssrHtml } from 'octane/internal/server';
 								import type { SSRScope } from 'octane/internal/server';
 								import type { PanelResult } from './nullable-memo';
 								declare const scope: SSRScope;

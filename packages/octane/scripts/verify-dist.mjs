@@ -197,7 +197,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 	'./internal/hydration-query': ['__beginHydrationQueryRead', '__readHydrationQueryInput'],
 	'./internal/server-rpc': ['__serverRpc', '__serverRpcPreload', '__serverRpcStream'],
 	'./internal/context': ['isContext', 'registerContext'],
-	'./internal/universal-children': ['createUniversalChildren', 'descriptorChildren'],
+	'./internal/universal-children': ['__methodDep', 'createUniversalChildren', 'descriptorChildren'],
 	'./internal/client': [
 		'EXTERNAL_HYDRATION_PROMISE',
 		'FragmentInstance',

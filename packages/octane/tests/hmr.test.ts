@@ -1384,7 +1384,7 @@ export function Value() @{
 			const transformed =
 				code
 					.replace(
-						/^import\s*\{([\s\S]*?)\}\s*from\s*(['"])octane\2;/m,
+						/^import\s*\{([\s\S]*?)\}\s*from\s*(['"])octane(?:\/internal\/client)?\2;/gm,
 						(_match, imports: string) => {
 							const properties = imports
 								.split(',')

@@ -169,8 +169,11 @@ describe('Lynx runtime compatibility evidence', () => {
 				resolve(REPOSITORY_ROOT, 'packages/octane/src/internal/universal-children.ts'),
 			),
 		).toEqual({
+			// Compiled universal output also imports the pure `__methodDep` helper here.
 			files: [
+				'../octane/src/has-own.ts',
 				'../octane/src/internal/universal-children.ts',
+				'../octane/src/method-dep.ts',
 				'../octane/src/universal-children.ts',
 			],
 			packages: [],

@@ -3,10 +3,18 @@ import { parseModule } from '@tsrx/core';
 import { compile } from 'octane/compiler';
 import { slotHooks } from '../../src/compiler/slot-hooks.js';
 
+// Compiler-emitted helpers come from the internal entry beside each public one.
+const INTERNAL_ENTRY: Record<string, string> = {
+	octane: 'octane/internal/client',
+	'octane/server': 'octane/internal/server',
+};
+
 function importedLocal(code: string, imported: string, from = 'octane'): string | undefined {
 	const ast = parseModule(code, '/compiled/linked-state.js');
+	const requests = [from, INTERNAL_ENTRY[from]];
 	for (const statement of ast.body ?? []) {
-		if (statement.type !== 'ImportDeclaration' || statement.source?.value !== from) continue;
+		if (statement.type !== 'ImportDeclaration' || !requests.includes(statement.source?.value))
+			continue;
 		for (const specifier of statement.specifiers ?? []) {
 			if (
 				specifier.type === 'ImportSpecifier' &&

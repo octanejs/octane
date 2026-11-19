@@ -108,7 +108,7 @@ describe('slotHooks surgical pass', () => {
 		// runtime-reserved Symbol range; Symbol.for is dev-serve only.)
 		const stripped = code
 			.replace(
-				/^import \{ hookSlots as _\$hookSlots(?:, withSlot as _\$withSlot)? \} from 'octane';\n/gm,
+				/^import \{ hookSlots as _\$hookSlots(?:, withSlot as _\$withSlot)? \} from 'octane\/internal\/client';\n/gm,
 				'',
 			)
 			.replace(/_\$withSlot\(_h\$\d+, (\w+), /g, '$1(')

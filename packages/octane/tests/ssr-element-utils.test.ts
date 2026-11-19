@@ -15,11 +15,10 @@ const {
 	isValidElement,
 	Children,
 	createPortal,
-	createScopedElement,
-	createScopedValue,
 	memo,
 	renderToStaticMarkup,
 } = Server as any;
+const { createScopedElement, createScopedValue } = ServerInternal as any;
 
 function captureThrown(run: () => unknown): unknown {
 	try {
@@ -403,7 +402,7 @@ describe('octane/server element utilities', () => {
 		const promise = new Promise(() => {});
 		const App = (props: { promise: Promise<unknown> }, scope: unknown) =>
 			ServerInternal.ssrHtml(
-				(Server as any).ssrTry(
+				(ServerInternal as any).ssrTry(
 					scope,
 					'children-promise',
 					() => {

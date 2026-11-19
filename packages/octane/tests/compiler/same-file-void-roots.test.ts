@@ -135,7 +135,7 @@ export function useValue(value){
 		expect(result?.code.slice(rootCalleeOffset(result!.code))).toMatch(/^createRoot\(/);
 	});
 
-	it('routes only the new default-options factories through the private client entry', () => {
+	it('routes every void-root helper through the private client entry', () => {
 		const source = `import {createRoot,hydrateRoot} from 'octane';
 import View from './View.tsrx';
 createRoot(document.body).render(View);
@@ -156,12 +156,11 @@ export const root=createRoot(document.body);`;
 				.flatMap((node: any) => node.specifiers.map((specifier: any) => specifier.imported?.name));
 		expect(helpers('octane/internal/client').sort()).toEqual([
 			'__createRootDefaultOptions',
+			'__createVoidRoot',
 			'__createVoidRootDefaultOptions',
+			'__hydrateVoidRoot',
 		]);
-		expect(helpers('octane')).toContain('__createVoidRoot');
-		expect(helpers('octane')).toContain('__hydrateVoidRoot');
-		expect(helpers('octane')).not.toContain('__createRootDefaultOptions');
-		expect(helpers('octane')).not.toContain('__createVoidRootDefaultOptions');
+		expect(helpers('octane').sort()).toEqual(['createRoot', 'hydrateRoot']);
 	});
 
 	it('keeps call-only root specialization copy-on-write and outside component bodies', () => {

@@ -60,7 +60,7 @@ export function Row({item, environment}) @{
  <button data-row={item.id} onClick={() => setCount(count + 1)}>{item.label + ':' + environment + ':' + count}</button>
 }`;
 const compiled = compile(source, 'root-inputs-row.tsrx', { dev: false, hmr: false }).code;
-const adapter = `import {bag1, clone, forBlock, template} from 'octane';
+const adapter = `import {bag1, clone, forBlock, template} from 'octane/internal/client';
 const hostTemplate = template('<section></section>');
 const key = item => item.id;
 function rowBody(item, scope, environment) { Row({item, environment: environment[0]}, scope); }

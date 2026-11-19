@@ -21,7 +21,7 @@ function evalServer(source: string, file: string): Record<string, any> {
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
 	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
-	return fn(RT, {});
+	return fn({ ...RTInternal, ...RT }, {});
 }
 const m = evalServer(readFileSync(join(FIXTURES, 'ssr-control.tsrx'), 'utf8'), 'ssr-control.tsrx');
 

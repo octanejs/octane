@@ -10,8 +10,10 @@ import { describe, expect, it } from 'vitest';
 import * as client from '../../src/index.js';
 import * as internalClient from '../../src/internal/client.js';
 import * as internalServer from '../../src/internal/server.js';
+import * as universalChildren from '../../src/internal/universal-children.js';
 import * as server from '../../src/server/index.js';
 import { compile } from '../../src/compiler/compile.js';
+import { normalizeRendererConfig } from '../../src/compiler/renderers.js';
 import {
 	CLIENT_PUBLIC_RUNTIME_EXPORTS,
 	SERVER_PUBLIC_RUNTIME_EXPORTS,
@@ -26,6 +28,7 @@ const ANY_PUBLIC = new Set([...CLIENT_PUBLIC_RUNTIME_EXPORTS, ...SERVER_PUBLIC_R
 const INTERNAL = new Map<string, ReadonlySet<string>>([
 	['octane/internal/client', new Set(Object.keys(internalClient))],
 	['octane/internal/server', new Set(Object.keys(internalServer))],
+	['octane/internal/universal-children', new Set(Object.keys(universalChildren))],
 ]);
 
 /** Every non-public name on a public entry, and every missing internal name. */
@@ -86,9 +89,9 @@ describe('public runtime entries', () => {
 		expect([...violations]).toEqual([]);
 	}, 120_000);
 
-	it('leaves universal renderers to resolve bare octane themselves', () => {
-		// An inferred method dependency emits `__methodDep`, which universal
-		// runtimes re-export from bare `octane` rather than the DOM internal entry.
+	it('imports the universal method-dependency helper from a renderer-neutral entry', () => {
+		// An inferred method dependency emits `__methodDep`. Universal output can run
+		// without the DOM runtime, so it must not import the DOM internal entry.
 		const source = `import { useMemo } from 'octane';
 			export function Panel(props) @{
 				const value = useMemo(() => props.format(props.value));
@@ -100,7 +103,36 @@ describe('public runtime entries', () => {
 			.filter((statement) => statement.type === 'ImportDeclaration')
 			.map((statement) => statement.source.value);
 		expect(code).toContain('__methodDep');
+		expect(requests).toContain('octane/internal/universal-children');
 		expect(requests).not.toContain('octane/internal/client');
+		expect(requests).not.toContain('octane');
+	});
+
+	it('keeps DOM helpers in mixed renderer modules off the public entry', () => {
+		// The DOM half of a universal-owned module compiles inside the universal pass.
+		const bridge = '@test/renderer-bridge';
+		const config = normalizeRendererConfig({
+			registry: { object: { module: 'octane/universal', text: 'host' } },
+			boundaries: {
+				[bridge]: { Html: { ownerRenderer: 'object', childRenderer: 'dom', prop: 'children' } },
+			},
+		});
+		const source = `import { Html } from '${bridge}';
+			export function App(props) @{
+				<group>
+					<Html><main onClick={props.onClick}>{props.label as string}</main></Html>
+				</group>
+			}`;
+		for (const hmr of [false, 'vite'] as const) {
+			const { code } = compile(source, '/src/Mixed.object.tsrx', {
+				hmr,
+				renderer: { id: 'object', module: 'octane/universal', target: 'universal', text: 'host' },
+				rendererBoundaries: config.boundaries,
+				rendererRegistry: config.registry,
+			});
+			expect(code).toContain(`from 'octane/internal/client'`);
+			expect(runtimeImportViolations(code)).toEqual([]);
+		}
 	});
 
 	it('keeps plain-module hook helpers off the public entries', () => {

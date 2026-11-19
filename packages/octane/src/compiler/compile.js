@@ -1785,10 +1785,13 @@ function runtimeImportModuleFor(ctx, fallback, imported, local) {
 				imported === '__serverRpcStream')
 		)
 			return 'octane/internal/server-rpc';
-		// Compiler-emitted helpers never import from a public DOM entry.
-		if (!ctx.domRuntimeEntries) return fallback;
+		// Compiler-emitted helpers never import from a public DOM entry. Universal
+		// output can run without the DOM runtime (Lynx's main thread), so its one
+		// shared helper comes from a renderer-neutral entry.
 		if (fallback === 'octane' && !CLIENT_PUBLIC_RUNTIME_EXPORTS.has(imported)) {
-			return 'octane/internal/client';
+			return !ctx.domRuntimeEntries && imported === METHOD_DEP_IMPORT
+				? 'octane/internal/universal-children'
+				: 'octane/internal/client';
 		}
 		if (fallback === 'octane/server' && !SERVER_PUBLIC_RUNTIME_EXPORTS.has(imported)) {
 			return 'octane/internal/server';
