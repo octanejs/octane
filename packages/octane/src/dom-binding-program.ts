@@ -116,6 +116,89 @@ type BindingActivationCleanup = (() => void) & {
 	prepare?(environment: readonly unknown[]): () => void;
 };
 
+function drainAdapters(callbacks: Array<() => void>): void {
+	let failed = false;
+	let failure: unknown;
+	for (const cleanup of callbacks) {
+		try {
+			cleanup();
+		} catch (error) {
+			if (!failed) {
+				failed = true;
+				failure = error;
+			}
+		}
+	}
+	callbacks.length = 0;
+	if (failed) throw failure;
+}
+
+function attachBindingEvent(
+	node: Node,
+	context: BindingActivationContext,
+	definition: Extract<BindingAdapter, { kind: 'event' }>,
+	isDisposed: () => boolean,
+	own: (cleanup: () => void) => void,
+): void {
+	const listener = (event: Event): void => {
+		if (isDisposed()) return;
+		const handler = definition.read(context.getEnvironment());
+		if (handler == null || handler === false) return;
+		if (typeof handler !== 'function') throw new TypeError(formatClientError(279));
+		markBindingEvent(event, node, !!definition.capture);
+		handler.call(node, event);
+	};
+	node.addEventListener(definition.name, listener, !!definition.capture);
+	own(registerBindingEvent(node, definition.name));
+	own(() => node.removeEventListener(definition.name, listener, !!definition.capture));
+}
+
+/** @internal Event-only fragments do not retain ref lifecycle machinery. */
+export function __activateBindingEvents(
+	nodes: readonly Node[],
+	context: BindingActivationContext,
+	definitions: readonly Extract<BindingAdapter, { kind: 'event' }>[],
+): BindingActivationCleanup {
+	const cleanups: Array<() => void> = [];
+	let disposed = false;
+	let cleaned = false;
+	const abort = (): void => {
+		disposed = true;
+	};
+	const dispose = (): void => {
+		if (cleaned) return;
+		cleaned = disposed = true;
+		context.signal.removeEventListener('abort', abort);
+		drainAdapters(cleanups);
+	};
+	if (context.signal.aborted) {
+		dispose();
+		return dispose;
+	}
+	context.signal.addEventListener('abort', abort, { once: true });
+	const isDisposed = (): boolean => disposed;
+	const own = (cleanup: () => void): void => {
+		if (disposed) cleanup();
+		else cleanups.push(cleanup);
+	};
+	try {
+		for (const definition of definitions) {
+			if (disposed) break;
+			const node = nodes[definition.node];
+			if (node?.nodeType !== 1) mismatch();
+			attachBindingEvent(node, context, definition, isDisposed, own);
+		}
+		return dispose;
+	} catch (error) {
+		try {
+			dispose();
+		} catch {
+			/* The failed attachment remains primary. */
+		}
+		throw error;
+	}
+}
+
 /** @internal Native adapters are installed once for an authored fragment lifetime. */
 export function __activateBindingAdapters(
 	nodes: readonly Node[],
@@ -132,22 +215,6 @@ export function __activateBindingAdapters(
 	}> = [];
 	let disposed = false;
 	let cleaned = false;
-	const drain = (callbacks: Array<() => void>): void => {
-		let failed = false;
-		let failure: unknown;
-		for (const cleanup of callbacks) {
-			try {
-				cleanup();
-			} catch (error) {
-				if (!failed) {
-					failed = true;
-					failure = error;
-				}
-			}
-		}
-		callbacks.length = 0;
-		if (failed) throw failure;
-	};
 	// The fragment aborts first, then invokes the returned cleanup directly.
 	// Close event delivery immediately, but run fallible application ref cleanup
 	// through that direct call rather than through EventTarget error reporting.
@@ -163,7 +230,7 @@ export function __activateBindingAdapters(
 			if (ref.cleanup) cleanups.push(ref.cleanup);
 			ref.cleanup = undefined;
 		}
-		drain(cleanups);
+		drainAdapters(cleanups);
 	};
 	const own = (cleanup: () => void): void => {
 		if (disposed) cleanup();
@@ -199,7 +266,7 @@ export function __activateBindingAdapters(
 		ref.cleanup = () => {
 			if (detached) return;
 			detached = true;
-			drain(attached);
+			drainAdapters(attached);
 		};
 		attachRef(value, ref.node, (stop) => {
 			if (disposed || detached) stop();
@@ -212,6 +279,7 @@ export function __activateBindingAdapters(
 		return handle;
 	}
 	context.signal.addEventListener('abort', abort, { once: true });
+	const isDisposed = (): boolean => disposed;
 	try {
 		for (const definition of definitions) {
 			if (disposed) break;
@@ -226,19 +294,7 @@ export function __activateBindingAdapters(
 				};
 				refs.push(ref);
 				replaceRef(ref, definition.read(context.getEnvironment()));
-			} else {
-				const listener = (event: Event): void => {
-					if (disposed) return;
-					const handler = definition.read(context.getEnvironment());
-					if (handler == null || handler === false) return;
-					if (typeof handler !== 'function') throw new TypeError(formatClientError(279));
-					markBindingEvent(event, node, !!definition.capture);
-					handler.call(node, event);
-				};
-				node.addEventListener(definition.name, listener, !!definition.capture);
-				own(registerBindingEvent(node, definition.name));
-				own(() => node.removeEventListener(definition.name, listener, !!definition.capture));
-			}
+			} else attachBindingEvent(node, context, definition, isDisposed, own);
 		}
 		if (refs.some((ref) => !ref.definition.stable))
 			handle.prepare = (environment) => {

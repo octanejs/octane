@@ -112,7 +112,10 @@ const createBindingStyles = function __createBindingStyles(observations?: Bindin
 			};
 			const get = (committed = false): BindingValue => {
 				if (disposed) return null;
-				if (committed) return sampleAccepted(acceptedRaw);
+				if (committed) {
+					const sampled = readAccepted(acceptedRaw);
+					return sampled.valid ? sampled.value : previous;
+				}
 				const reads = new Map<NativeReadSource, number>();
 				const previousObserver = setNativeReadObserver((source, version) =>
 					reads.set(source, version),
