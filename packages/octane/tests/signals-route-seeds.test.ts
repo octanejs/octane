@@ -23,9 +23,9 @@ const server = loadServerFixture<typeof client>(
  *
  * Finding: the seed must reach `createScope` itself. Hydration alone adopts the
  * server's nodes, but by then each unseeded resource has already started its
- * own load. The router therefore needs a supported way to read the manifest's
- * scope seeds before `hydrateRoot` consumes the sidecar; this spike reads the
- * sidecar's JSON directly.
+ * own load, so an unseeded router refetches every match. The router therefore
+ * needs a supported way to read the manifest's scope seeds before `hydrateRoot`
+ * consumes the sidecar; this spike reads the sidecar's JSON directly.
  */
 type Load = (args: Record<string, string>) => Promise<object>;
 
@@ -126,7 +126,7 @@ describe('explicit route:* scope seeds (RFC #3001 R2)', () => {
 		return { ...browser, requests, resolve };
 	}
 
-	async function hydrate$(seedFromManifest = true) {
+	async function hydrate$() {
 		const html = await serverRender$();
 		container = document.createElement('div');
 		container.innerHTML = html;
@@ -137,9 +137,7 @@ describe('explicit route:* scope seeds (RFC #3001 R2)', () => {
 
 		const sidecar = container.querySelector('script[data-octane-native-signals]');
 		const manifest = JSON.parse(sidecar!.textContent!) as { scopes: ScopeSeed[] };
-		const browser = browserRouter$(
-			seedFromManifest ? new Map(manifest.scopes.map((s) => [s.scopeKey, s])) : undefined,
-		);
+		const browser = browserRouter$(new Map(manifest.scopes.map((s) => [s.scopeKey, s])));
 		// Like the router's start(): the current matches exist before hydration.
 		browser.matches$(browser.location$.get());
 		const errors: unknown[] = [];
@@ -172,12 +170,6 @@ describe('explicit route:* scope seeds (RFC #3001 R2)', () => {
 		expect(container!.querySelector('.org')).toBe(org);
 		expect(container!.querySelector('.task')).toBe(task);
 		expect(task!.textContent).toBe('Task 3');
-	});
-
-	// Flips to passing once an unseeded scope can defer its load to hydration's seed.
-	it.fails('adopts unseeded scopes created before hydration without a load', async () => {
-		const { browser } = await hydrate$(false);
-		expect(browser.requests).toEqual([]);
 	});
 
 	it('loads only the new leaf on the first navigation after hydration', async () => {
