@@ -194,7 +194,7 @@ export function planBindingProgram(fn, render, context) {
 	const expressions = [];
 	const importedPrograms = new Map();
 	const childPrograms = new Set();
-	let activationHelper = null;
+	const activationHelpers = new Map();
 	let classFactory = null;
 	let methodDependency = null;
 	let slotFactory = null;
@@ -407,6 +407,7 @@ export function planBindingProgram(fn, render, context) {
 		const initialTemporaries = [];
 		const regions = [];
 		const adapters = [];
+		let hasRefAdapters = false;
 		const restSites = [];
 		let constructionError = null;
 		const initialize = (index, kind, name, value, unitless) => {
@@ -846,6 +847,7 @@ export function planBindingProgram(fn, render, context) {
 						record.node,
 					);
 				});
+				hasRefAdapters ||= name === 'ref';
 				adapters.push(
 					object({
 						node: b.literal(index),
@@ -1162,16 +1164,15 @@ export function planBindingProgram(fn, render, context) {
 			properties.constructionError = b.literal(constructionError);
 		}
 		if (adapters.length > 0) {
-			if (activationHelper === null) {
-				activationHelper = allocateProgramName('_bindingAdapters');
+			const helper = hasRefAdapters ? '__activateBindingAdapters' : '__activateBindingEvents';
+			let activationHelper = activationHelpers.get(helper);
+			if (activationHelper === undefined) {
+				activationHelper = allocateProgramName(
+					hasRefAdapters ? '_bindingAdapters' : '_bindingEvents',
+				);
+				activationHelpers.set(helper, activationHelper);
 				dependencies.push(
-					origin(
-						b.imports(
-							[['__activateBindingAdapters', activationHelper]],
-							'octane/dom-binding-program',
-						),
-						fn,
-					),
+					origin(b.imports([[helper, activationHelper]], 'octane/dom-binding-program'), fn),
 				);
 			}
 			const nodesName = allocateProgramName('_bindingNodes');

@@ -268,7 +268,10 @@ const createBindingProjections = function __createBindingProjections(
 				accept: () => {
 					if (
 						observation &&
-						(compute !== acceptedCompute || observation.pending?.size || observation.retired?.size)
+						(compute !== acceptedCompute ||
+							currentValues !== acceptedValues ||
+							observation.pending?.size ||
+							observation.retired?.size)
 					)
 						observations!.accept(observation);
 				},
