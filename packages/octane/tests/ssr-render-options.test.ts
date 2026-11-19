@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import * as RT from 'octane/server';
+import * as RTInternal from 'octane/internal/server';
 import { prerender } from 'octane/static';
 import { installTestClock } from 'octane/testing';
 
@@ -21,7 +22,7 @@ function evalServer(source: string, file: string): Record<string, any> {
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
 	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
-	return fn(RT, {});
+	return fn({ ...RTInternal, ...RT }, {});
 }
 
 const suspense = evalServer(
