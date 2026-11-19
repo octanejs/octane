@@ -31,16 +31,17 @@ export function useSignalScope(): Scope {
 
 /**
  * The handle's value, kept current while the component is mounted. Writes go
- * through the handle itself, `handle.set(next)`. The server snapshot is the
- * same read, so a client scope seeded from the server's `scope.serialize()`
- * hydrates without a mismatch. A read that throws, such as a pending or failed
- * async handle, throws from the component.
+ * through the handle itself, `handle.set(next)`. By default the server snapshot
+ * is the same read. If live state can advance before hydration, supply a stable
+ * historical `getServerSnapshot` for the server and initial hydration reads.
+ * A read that throws, such as a pending or failed async handle, throws from the
+ * component.
  */
-export function useSignalValue<T>(handle$: SignalHandle<T>): T {
+export function useSignalValue<T>(handle$: SignalHandle<T>, getServerSnapshot?: () => T): T {
 	const subscribe = useCallback(
 		(notify: () => void) => handle$[SIGNAL_BINDING_SUBSCRIBE](notify),
 		[handle$],
 	);
 	const read = useCallback(() => handle$[SIGNAL_BINDING_READ](), [handle$]);
-	return useSyncExternalStore(subscribe, read, read);
+	return useSyncExternalStore(subscribe, read, getServerSnapshot ?? read);
 }
