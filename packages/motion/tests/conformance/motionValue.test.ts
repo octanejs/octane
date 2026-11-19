@@ -43,6 +43,38 @@ describe('useMotionValue', function useMotionValueSuite() {
 		}
 	});
 
+	it('keeps a named physical completion behind its authored transitionEnd', async () => {
+		const x = motionValue(0),
+			completed: Array<[unknown, number]> = [];
+		const variants = {
+			first: { x: 0 },
+			second: { x: 20, transitionEnd: { x: 42 } },
+			third: { x: 20, transitionEnd: { x: 42 } },
+		};
+		const View = ({ label }: { label: string }) =>
+			createElement(motion.div, {
+				initial: false,
+				style: { x },
+				animate: label,
+				variants,
+				transition: { duration: 0.1 },
+				onAnimationComplete: (definition: unknown) => completed.push([definition, x.get()]),
+			});
+		const r = mount(View, { label: 'first' });
+		try {
+			r.update(View, { label: 'second' });
+			r.update(View, { label: 'third' });
+			expect(completed).toEqual([['third', 0]]);
+			await new Promise((resolve) => setTimeout(resolve, 220));
+			expect(completed).toEqual([
+				['third', 0],
+				['second', 42],
+			]);
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('keeps direct SVG bindings and independent imperative attributes on their own writers', async () => {
 		const x = motionValue(3),
 			cx = motionValue(5);
