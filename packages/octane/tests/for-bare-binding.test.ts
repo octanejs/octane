@@ -284,14 +284,29 @@ describe('bare-left @for row bindings', () => {
 		const defaults = { rows: [{}, {}] };
 		const properties = { rows: [{ 0: 10 }, { 1: 20 }] };
 		const keyed = { rows: [{ id: 'a' }, { id: 'b' }] };
+		const nested = {
+			rows: [
+				{ id: 'a', cells: [{}, {}] },
+				{ id: 'b', cells: [{ label: 'B' }, {}] },
+			],
+		};
 		const hosts = [
 			container(renderToString(server.IndexedDefault, defaults).html),
 			container(renderToString(server.IndexedProperty, properties).html),
 			container(renderToString(server.IndexedTransparentKey, keyed).html),
 			container(renderToString(server.IndexedExpressions, expressionRows).html),
+			container(renderToString(server.IndexedNestedRows, nested).html),
+			container(renderToString(server.IndexedWritable, defaults).html),
 		];
 		const rows = () => hosts.map((host) => [...host.querySelectorAll('li')]);
-		const expected = [['0', '1'], ['10', '20'], ['row', 'row'], expressionText];
+		const expected = [
+			['0', '1'],
+			['10', '20'],
+			['row', 'row'],
+			expressionText,
+			['a0:0', 'a0:1', 'B', 'b1:1'],
+			['11', '12'],
+		];
 		const before = rows();
 		expect(before.map(text)).toEqual(expected);
 
@@ -300,6 +315,8 @@ describe('bare-left @for row bindings', () => {
 			hydrateRoot(hosts[1], client.IndexedProperty, properties, options),
 			hydrateRoot(hosts[2], client.IndexedTransparentKey, keyed, options),
 			hydrateRoot(hosts[3], client.IndexedExpressions, expressionRows, options),
+			hydrateRoot(hosts[4], client.IndexedNestedRows, nested, options),
+			hydrateRoot(hosts[5], client.IndexedWritable, defaults, options),
 		];
 		cleanups.push(() => roots.forEach((root) => root.unmount()));
 		flushSync(() => {});

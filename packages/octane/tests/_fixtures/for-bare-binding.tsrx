@@ -134,6 +134,27 @@ export function IndexedExpressions({ rows }: { rows: IndexedRow[] }) @{
 	</ul>
 }
 
+type NestedRow = { id: string; cells: { label?: string }[] };
+
+export function IndexedNestedRows({ rows }: { rows: NestedRow[] }) @{
+	<ul>
+		@for (const { id, cells } of rows; index index) {
+			@for (const { label = `${id}${index}:${cell}` } of cells; index cell) {
+				<li>{label as string}</li>
+			}
+		}
+	</ul>
+}
+
+export function IndexedWritable({ rows }: { rows: { value?: number }[] }) @{
+	<ul>
+		@for (let { value = index + 1 } of rows; index index) {
+			value += 10;
+			<li>{value as number}</li>
+		}
+	</ul>
+}
+
 export function Scores(props: { scores: [string, ...number[]][] }) @{
 	<ul>
 		@for ([name, ...points] of props.scores; key name) {
