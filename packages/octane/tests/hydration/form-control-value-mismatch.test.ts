@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { EXTERNAL_HYDRATION_PROMISE, act, flushSync, hydrateRoot } from 'octane';
+import { act, flushSync, hydrateRoot } from 'octane';
+import { EXTERNAL_HYDRATION_PROMISE } from 'octane/internal/client';
 import * as Server from 'octane/server';
 import { loadServerFixture } from '../_server-fixture.js';
 import { Controls, SuspendingControls } from './_fixtures/form-control-value-mismatch.tsrx';

@@ -1,12 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { act, mount, flushEffects } from './_helpers';
+import { flushSync, startTransition } from '../src/index.js';
 import {
-	flushSync,
 	getTransitionFallbackTimeout,
 	setFormAction,
 	setTransitionFallbackTimeout,
-	startTransition,
-} from '../src/index.js';
+} from '../src/internal/client.js';
 import {
 	ActionForm,
 	SubmitterActionForm,

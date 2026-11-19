@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as RT from 'octane/server';
+import * as RTInternal from 'octane/internal/server';
 import { prerender } from 'octane/static';
 import {
 	createElement as createClientElement,
@@ -863,7 +864,7 @@ describe('SSR — nested render entry isolation', () => {
 
 describe('SSR — ssrSpread attribute-name validation', () => {
 	it('skips injection-unsafe attr names but keeps valid ones', () => {
-		const out = RT.ssrSpread({
+		const out = RTInternal.ssrSpread({
 			'data-x': '1',
 			'aria-label': 'ok',
 			'xlink:href': '#a',

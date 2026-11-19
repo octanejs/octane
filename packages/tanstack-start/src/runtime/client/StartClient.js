@@ -1,4 +1,5 @@
-import { HYDRATION_RANGE_BOUNDARY, createElement, hookSlots, useEffect } from 'octane';
+import { createElement, useEffect } from 'octane';
+import { HYDRATION_RANGE_BOUNDARY, hookSlots } from 'octane/internal/client';
 import { RouterProvider } from '@octanejs/tanstack-router';
 
 export function StartClient({ router }) {

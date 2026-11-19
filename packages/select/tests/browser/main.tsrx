@@ -8,7 +8,8 @@ import { flushSync as flushReact } from 'react-dom';
 import { useStateManager as useReactStateManager } from 'react-select';
 import { useAsync as useReactAsync } from 'react-select/async';
 import ReactAsyncCreatableSelect from 'react-select/async-creatable';
-import { createRoot, delegateEvents, flushSync } from 'octane';
+import { createRoot, flushSync } from 'octane';
+import { delegateEvents } from 'octane/internal/client';
 
 import { MenuPortal, type MenuPortalProps } from '../../src/components.tsrx';
 import { defaultStyles } from '../../src/default-styles';

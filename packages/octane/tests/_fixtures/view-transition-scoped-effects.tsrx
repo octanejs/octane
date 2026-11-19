@@ -1,5 +1,4 @@
 import {
-	__useCommittedState,
 	ViewTransition,
 	createPortal,
 	use,
@@ -8,6 +7,7 @@ import {
 	useState,
 	type ViewTransitionInstance,
 } from 'octane';
+import { __useCommittedState } from 'octane/internal/client';
 
 const committedSlot = Symbol('committed-scope');
 

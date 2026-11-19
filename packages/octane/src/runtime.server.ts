@@ -8359,6 +8359,10 @@ export { readLayout as writeLayout };
 export function flushLayoutSync(): void {}
 // Snapshots never measure on the server, at either timing.
 export function setLayoutSnapshotTiming(_timing: 'commit' | 'frame'): void {}
+// Server twin of the client adapter query: a server render never hides an owner.
+export function getRendererOwnerVisibility(_scope: unknown): 'visible' {
+	return 'visible';
+}
 function noopLayoutCancel(): void {}
 
 /** @internal The server has no DOM event scheduler. */

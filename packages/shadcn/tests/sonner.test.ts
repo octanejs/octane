@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { flushSync } from 'octane';
 import { toast } from '@octanejs/sonner';
-import { drainPassiveEffects } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { mount } from '../../octane/tests/_helpers';
 import { DefaultToasterFixture, ToasterFixture } from './_fixtures/sonner-app.tsrx';
 

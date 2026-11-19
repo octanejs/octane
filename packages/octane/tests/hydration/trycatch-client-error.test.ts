@@ -5,6 +5,10 @@ import { compile } from 'octane/compiler';
 import { prerender } from 'octane/static';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
+import * as ServerInternalRuntime from 'octane/internal/server';
+
+// Server-compiled output imports private helpers from `octane/internal/server`.
+const compiledServerRuntime = { ...ServerInternalRuntime, ...ServerRT };
 import {
 	Page,
 	NestedPage,
@@ -33,13 +37,13 @@ function serverModule(): Record<string, any> {
 		mode: 'server',
 	});
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/(?:internal\/)?server['"];?/g,
 		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
 	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
 	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
-	return fn(ServerRT, {});
+	return fn(compiledServerRuntime, {});
 }
 const server = serverModule();
 

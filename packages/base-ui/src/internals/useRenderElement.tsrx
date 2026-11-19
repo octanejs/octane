@@ -1,4 +1,5 @@
 import * as React from 'octane';
+import * as ReactInternal from 'octane/internal/client';
 import { useMergedRefs, useMergedRefsN } from '@octanejs/base-ui-utils/useMergedRefs';
 import { getReactElementRef } from '@octanejs/base-ui-utils/getReactElementRef';
 import { mergeObjects } from '@octanejs/base-ui-utils/mergeObjects';
@@ -106,7 +107,10 @@ function useRenderElementProps<
 	}
 
 	if (className !== undefined) {
-		outProps.className = mergeClassNames(React.normalizeClass(outProps.className), className);
+		outProps.className = mergeClassNames(
+			ReactInternal.normalizeClass(outProps.className),
+			className,
+		);
 	}
 
 	if (style !== undefined) {

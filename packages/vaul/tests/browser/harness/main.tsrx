@@ -1,5 +1,6 @@
 // @ts-nocheck -- browser fixture exercises React-compatible pointer props.
-import { createRoot, delegateEvents, useState } from 'octane';
+import { createRoot, useState } from 'octane';
+import { delegateEvents } from 'octane/internal/client';
 import { Drawer } from '../../../src/index.tsrx';
 import '../../../src/style.css';
 

@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { compile } from 'octane/compiler';
-import { hydrateRoot, flushSync, delegateEvents } from '../../src/index.js';
+import { hydrateRoot, flushSync } from '../../src/index.js';
+import { delegateEvents } from '../../src/internal/client.js';
 import * as ServerRT from 'octane/server';
 import {
 	loadCompiledFixtureSource,

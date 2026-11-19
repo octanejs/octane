@@ -1,6 +1,6 @@
 'use strong';
 
-import { HYDRATION_RANGE_BOUNDARY } from 'octane';
+import { HYDRATION_RANGE_BOUNDARY } from 'octane/internal/client';
 import type { BodyProps } from '../Body';
 
 // This boundary returns the authored children directly, as the ordinary Body

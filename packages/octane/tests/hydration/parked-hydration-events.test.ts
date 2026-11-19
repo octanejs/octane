@@ -1,12 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
+import { act, createRoot, hydrateRoot, startTransition } from '../../src/index.js';
 import {
-	act,
-	createRoot,
 	getTransitionFallbackTimeout,
-	hydrateRoot,
 	setTransitionFallbackTimeout,
-	startTransition,
-} from '../../src/index.js';
+} from '../../src/internal/client.js';
 import { renderToString } from 'octane/server';
 import { loadCompiledFixtureSource } from '../_server-fixture.js';
 

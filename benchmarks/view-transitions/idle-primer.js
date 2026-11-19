@@ -1,13 +1,7 @@
 // Public-API setup for an installed-but-idle ViewTransition work comparison.
 // Both URL modes load this same module and fixture bundle. Setup is untimed.
-import {
-	createElement,
-	createRoot,
-	drainPassiveEffects,
-	flushSync,
-	startTransition,
-	ViewTransition,
-} from 'octane';
+import { createElement, createRoot, flushSync, startTransition, ViewTransition } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 
 const mode = new URL(location.href).searchParams.get('vt-primer') ?? 'cold';
 const report = {

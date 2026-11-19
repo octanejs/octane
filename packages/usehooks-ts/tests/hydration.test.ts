@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { drainPassiveEffects, hydrateRoot } from 'octane';
+import { hydrateRoot } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { renderHydrationFixture } from '../../octane/tests/_hydration-ssr';
 import { SsrProbe } from './_fixtures/hooks.tsrx';
 

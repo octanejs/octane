@@ -3,7 +3,8 @@
 // stays behind, or a component re-renders and loses its own registration to an
 // outer default.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createRoot, drainPassiveEffects, flushSync } from 'octane';
+import { createRoot, flushSync } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { NavApp } from './_fixtures/nav-app.tsrx';
 
 function settle(): void {

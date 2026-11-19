@@ -64,9 +64,7 @@ import { discardSubtreeRefAttachesFrom, type FragmentInstance } from '../runtime
 import type { RefAttach } from '../runtime/types.js';
 import {
 	Activity,
-	bindRendererRegionOwner,
 	createContext as createOctaneContext,
-	createHostContextRequest,
 	createRoot as createOctaneRoot,
 	hydrateRoot as hydrateOctaneRoot,
 	flushSync as octaneFlushSync,
@@ -76,6 +74,7 @@ import {
 	type Root as OctaneRoot,
 	type RootOptions,
 } from '../index.js';
+import { bindRendererRegionOwner, createHostContextRequest } from '../runtime.js';
 import {
 	OCTANE_COMPAT_HOST_STYLE,
 	OPAQUE_HOST_SENTINEL,

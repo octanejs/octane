@@ -38,8 +38,8 @@ import {
 	useMemo,
 	useState,
 	type OctaneElement,
-	type Scope,
 } from 'octane';
+import { type Scope } from 'octane/internal/client';
 import {
 	LayoutGroupContext,
 	LazyMotionContext,

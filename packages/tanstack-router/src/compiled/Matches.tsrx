@@ -1,7 +1,6 @@
 'use strong';
 
 import {
-	__runOnCatch,
 	CompiledOutlet as CompiledComponent,
 	CompiledContext,
 	Hydrate,
@@ -10,6 +9,7 @@ import {
 	useLayoutEffect,
 	useRef,
 } from 'octane';
+import { __runOnCatch } from 'octane/internal/client';
 import { never } from 'octane/hydration';
 import type { AnyRouter, NotFoundError } from '@tanstack/router-core';
 import { isNotFound, rootRouteId, setupScrollRestoration } from '@tanstack/router-core';

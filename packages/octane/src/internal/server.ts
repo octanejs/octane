@@ -4,3 +4,9 @@
  */
 export * from '../runtime.server.js';
 export { isContext } from '../context-identity.js';
+export { __methodDep } from '../method-dep.js';
+export {
+	__registerServerFunction,
+	__serverCall,
+	__setServerCallContextSource,
+} from '../server-call.js';

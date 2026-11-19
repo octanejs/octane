@@ -90,8 +90,7 @@ function componentChildren(code: string, component: string): unknown {
 	const componentSlots = new Set<string>();
 	for (const statement of ast.body) {
 		if (statement.type !== 'ImportDeclaration') continue;
-		if (statement.source?.value !== 'octane' && statement.source?.value !== 'octane/server')
-			continue;
+		if (!RUNTIME_REQUESTS.has(statement.source?.value)) continue;
 		for (const specifier of statement.specifiers) {
 			if (
 				specifier.type === 'ImportSpecifier' &&
@@ -155,8 +154,7 @@ function isChildrenBlock(code: string, value: any): boolean {
 	const factories = new Set<string>();
 	for (const statement of ast.body) {
 		if (statement.type !== 'ImportDeclaration') continue;
-		if (statement.source?.value !== 'octane' && statement.source?.value !== 'octane/server')
-			continue;
+		if (!RUNTIME_REQUESTS.has(statement.source?.value)) continue;
 		for (const specifier of statement.specifiers) {
 			if (
 				specifier.type === 'ImportSpecifier' &&
@@ -168,6 +166,13 @@ function isChildrenBlock(code: string, value: any): boolean {
 	}
 	return value?.type === 'CallExpression' && factories.has(value.callee?.name);
 }
+
+const RUNTIME_REQUESTS = new Set([
+	'octane',
+	'octane/server',
+	'octane/internal/client',
+	'octane/internal/server',
+]);
 
 describe('octane/compiler/vite public options', () => {
 	it('rejects TypeScript output when Vite disables its OXC transform globally', async () => {

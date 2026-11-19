@@ -5,11 +5,11 @@ import {
 	createElement,
 	createRoot,
 	flushSync,
-	hostComponent,
 	startTransition,
 	ViewTransition,
 	type ComponentBody,
 } from '../src/index.js';
+import { hostComponent } from '../src/internal/client.js';
 import {
 	createScope,
 	currentSignalOwner,

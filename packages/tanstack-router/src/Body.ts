@@ -1,4 +1,5 @@
-import { HYDRATION_RANGE_BOUNDARY, createElement } from 'octane';
+import { createElement } from 'octane';
+import { HYDRATION_RANGE_BOUNDARY } from 'octane/internal/client';
 import { isServer } from '@tanstack/router-core/isServer';
 import { useRouter } from './context';
 import type { ComponentBody } from 'octane';

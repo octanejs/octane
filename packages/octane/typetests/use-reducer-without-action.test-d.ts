@@ -1,8 +1,7 @@
-import { __useReducerWithGetter, useReducer } from 'octane';
-import {
-	__useReducerWithGetter as __useServerReducerWithGetter,
-	useReducer as useServerReducer,
-} from 'octane/server';
+import { useReducer } from 'octane';
+import { __useReducerWithGetter } from 'octane/internal/client';
+import { useReducer as useServerReducer } from 'octane/server';
+import { __useReducerWithGetter as __useServerReducerWithGetter } from 'octane/internal/server';
 
 // A reducer that reads only state dispatches with no argument, so the dispatch
 // also fits a `() => void` callback such as a store subscription.

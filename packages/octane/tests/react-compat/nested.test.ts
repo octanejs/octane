@@ -2,7 +2,8 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
 import { createRoot as createReactRoot } from 'react-dom/client';
-import { act as octaneAct, drainPassiveEffects, flushSync } from 'octane';
+import { act as octaneAct, flushSync } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { mount } from '../_helpers.js';
 import { OctaneMiddle, OctaneOuter } from './nested.tsrx';
 import { ReactOuter } from './nested.react.js';

@@ -1,7 +1,7 @@
 import createEmotionCacheModule from '@emotion/cache';
 import { serializeStyles } from '@emotion/serialize';
 import { getRegisteredStyles, insertStyles } from '@emotion/utils';
-import { injectStyle } from 'octane';
+import { injectStyle } from 'octane/internal/client';
 
 const createEmotionCache = createEmotionCacheModule.default ?? createEmotionCacheModule;
 let clientCache;

@@ -1,14 +1,14 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { __serverRpc, batchServerCalls } from 'octane';
-import { __serverRpcPreload } from 'octane/internal/server-rpc';
+import { batchServerCalls } from 'octane';
+import { __serverRpc, __serverRpcPreload } from 'octane/internal/server-rpc';
 import {
-	__registerServerFunction,
 	executeServerFunction,
 	executeServerFunctionBatch,
 	executeServerFunctionStream,
 	type ServerCallContext,
 } from 'octane/server';
+import { __registerServerFunction } from 'octane/internal/server';
 import type { Middleware, RpcRequestOptions } from '@octanejs/app-core';
 import { handleRpcRequest } from '../src/server/rpc.js';
 import { encodeServerResultFrame } from '../../octane/src/server-rpc-protocol.js';

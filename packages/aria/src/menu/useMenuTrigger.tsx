@@ -15,7 +15,7 @@ type KeyboardEvent = BaseEvent<globalThis.KeyboardEvent>;
  */
 
 import type { AriaButtonProps } from '../button/useButton';
-import { withSlot } from 'octane';
+import { withSlot } from 'octane/internal/client';
 import type { AriaMenuOptions } from './useMenu';
 import type { FocusableElement, FocusStrategy, RefObject } from '@react-types/shared';
 import { focusWithoutScrolling } from '../utils/focusWithoutScrolling';

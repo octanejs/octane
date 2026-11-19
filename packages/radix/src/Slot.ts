@@ -13,7 +13,8 @@
 // (`el={<button/>}`), `createElement`, and `.map()` returns are descriptors, but
 // children-position JSX compiles to a render function — so `asChild` consumers pass the
 // child element through a prop / value position (see docs/radix-migration-plan.md).
-import { Children, cloneElement, isValidElement, normalizeClass } from 'octane';
+import { Children, cloneElement, isValidElement } from 'octane';
+import { normalizeClass } from 'octane/internal/client';
 
 import { useComposedRefs } from './compose-refs';
 import { S, subSlot } from './internal';

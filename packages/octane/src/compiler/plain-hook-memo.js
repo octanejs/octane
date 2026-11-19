@@ -129,7 +129,7 @@ function inferredDependencyList(inferred, state, origin) {
 			inferred.dependencies.map((dependency) =>
 				dependency.method
 					? b.call(
-							requireHelper(state, METHOD_DEP_IMPORT, 'octane'),
+							requireHelper(state, METHOD_DEP_IMPORT),
 							cloneAstNode(dependency.method.root),
 							b.literal(dependency.method.name),
 							...methodDepFlags(dependency.method).map((flag) => b.literal(flag)),
@@ -163,7 +163,7 @@ function slotBaseHooks(ast, state, options) {
 					wrap: (call, origin, method) =>
 						inheritHookMemoOrigin(
 							b.call(
-								requireHelper(state, 'withSlot', 'octane'),
+								requireHelper(state, 'withSlot'),
 								allocateHookSlot(state, origin, [method]),
 								b.arrow([], call),
 							),
@@ -180,7 +180,7 @@ function slotBaseHooks(ast, state, options) {
 			const slot = allocateHookSlot(state, node, [method]);
 			const mapped = mapChildren(node, visit);
 			return inheritHookMemoOrigin(
-				b.call(requireHelper(state, 'withSlot', 'octane'), slot, b.arrow([], mapped)),
+				b.call(requireHelper(state, 'withSlot'), slot, b.arrow([], mapped)),
 				node,
 			);
 		}
@@ -196,7 +196,7 @@ function slotBaseHooks(ast, state, options) {
 				: mapped.callee;
 			return {
 				...mapped,
-				callee: b.id(requireHelper(state, 'withSlot', 'octane'), node),
+				callee: b.id(requireHelper(state, 'withSlot'), node),
 				typeArguments: null,
 				// Keep foreign/default parameters and arguments.length unchanged;
 				// Octane base aliases resolve their slot from this call's path.
@@ -225,7 +225,7 @@ function slotBaseHooks(ast, state, options) {
 		}
 		let callee = mapped.callee;
 		if (options.getterCalls.has(node) && options.stateGetterHelpers[imported]) {
-			callee = b.id(requireHelper(state, options.stateGetterHelpers[imported], 'octane'), node);
+			callee = b.id(requireHelper(state, options.stateGetterHelpers[imported]), node);
 		}
 		if (node._octaneNativeInferredMemo === true) {
 			callee = b.id(requireHelper(state, 'nativePuMemo'), node);
@@ -244,7 +244,7 @@ function slotBaseHooks(ast, state, options) {
 					: callee;
 				return {
 					...mapped,
-					callee: b.id(requireHelper(state, 'withSlot', 'octane'), node),
+					callee: b.id(requireHelper(state, 'withSlot'), node),
 					typeArguments: null,
 					arguments: [slot, fn, ...args],
 				};
@@ -439,7 +439,7 @@ export function inlinePlainHookMemos(ast, source, id, options) {
 	if (options.manualSlots) {
 		transformed = adaptManualHookProviders(
 			transformed,
-			(name) => requireHelper(state, name, 'octane'),
+			(name) => requireHelper(state, name),
 			(preferred) => allocName(state, preferred),
 		);
 	}
@@ -452,7 +452,7 @@ export function inlinePlainHookMemos(ast, source, id, options) {
 		: null;
 	const trailing = [];
 	if (state.slotDeclarations.length > 0) {
-		const hookSlots = requireHelper(state, 'hookSlots', 'octane');
+		const hookSlots = requireHelper(state, 'hookSlots');
 		trailing.push(
 			inheritHookMemoOrigin(
 				b.const(state.slotBase, pure(b.call(hookSlots, b.literal(state.slotDeclarations.length)))),

@@ -1,4 +1,5 @@
-import { createRoot, drainPassiveEffects, flushSync } from 'octane';
+import { createRoot, flushSync } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { App } from './App.tsrx';
 import { installBenchmark } from './browser';
 

@@ -15,7 +15,8 @@ describe('memo hooks in plain modules', () => {
 
 		it(`keeps repeated custom-hook calls independent and their getters live (inline=${inlineHookMemo})`, () => {
 			const { App } = load(`
-				import { createElement, useCallback, useMemo, useState, withSlot } from 'octane';
+				import { createElement, useCallback, useMemo, useState } from 'octane';
+				import { withSlot } from 'octane/internal/client';
 				const leftSlot = Symbol('left');
 				const rightSlot = Symbol('right');
 				interface Counter { value: number; }
@@ -329,7 +330,8 @@ describe('memo hooks in plain modules', () => {
 		it(`retains manual slots and the omitted-dependency runtime behavior (inline=${inlineHookMemo})`, () => {
 			const { App } = load(
 				`
-				import { createElement, useCallback, useMemo, withSlot } from 'octane';
+				import { createElement, useCallback, useMemo } from 'octane';
+				import { withSlot } from 'octane/internal/client';
 				const leftSlot = Symbol('left');
 				const rightSlot = Symbol('right');
 				const valueSlot = Symbol('value');
@@ -415,7 +417,8 @@ describe('memo hooks in plain modules', () => {
 		it(`retains a previous manual memo when a replacement throws (inline=${inlineHookMemo})`, () => {
 			const { App } = load(
 				`
-				import { createElement, useMemo, withSlot } from 'octane';
+				import { createElement, useMemo } from 'octane';
+				import { withSlot } from 'octane/internal/client';
 				const caller = Symbol('caller');
 				const valueSlot = Symbol('value');
 				function useValue(value) {
@@ -442,7 +445,8 @@ describe('memo hooks in plain modules', () => {
 		it(`caches every return value with Object.is dependency semantics (inline=${inlineHookMemo})`, () => {
 			const { App, missValue } = load(
 				`
-				import { createElement, puMiss, useMemo, withSlot } from 'octane';
+				import { createElement, useMemo } from 'octane';
+				import { puMiss, withSlot } from 'octane/internal/client';
 				const caller = Symbol('caller');
 				const valueSlot = Symbol('value');
 				function useValue(dep, value, record) {

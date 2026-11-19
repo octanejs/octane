@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, flushSync, hasPendingWork, hydrateRoot, type Root } from '../../src/index.js';
+import { act, flushSync, hydrateRoot, type Root } from '../../src/index.js';
+import { hasPendingWork } from '../../src/internal/client.js';
 import { prerender } from 'octane/static';
 import { loadCompiledFixtureSource } from '../_server-fixture.js';
 

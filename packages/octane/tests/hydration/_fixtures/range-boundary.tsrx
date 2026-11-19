@@ -2,12 +2,12 @@ import {
 	createElement,
 	createPortal,
 	ErrorBoundary,
-	HYDRATION_RANGE_BOUNDARY,
 	Suspense,
 	useState,
 	type ComponentBody,
 	type OctaneNode,
 } from 'octane';
+import { HYDRATION_RANGE_BOUNDARY } from 'octane/internal/client';
 
 interface ChildProps {
 	children?: OctaneNode;

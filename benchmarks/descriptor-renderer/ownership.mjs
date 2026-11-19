@@ -108,7 +108,8 @@ const compiled = compile(fixture, 'descriptor-classification.tsrx', {
 	inlineHookMemo: true,
 }).code;
 const adapter = `
-import {createRoot,createElement,createScopedElement,flushSync} from 'octane';
+import { createRoot, createElement, flushSync } from 'octane';
+import { createScopedElement } from 'octane/internal/client';
 export {createRoot,flushSync};
 const stableChildren=[createElement('input',{defaultValue:'draft'}),createElement('span',{},'plain')];
 const stableHost=createScopedElement('section',{},()=>stableChildren);

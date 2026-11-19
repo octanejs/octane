@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createRoot, flushSync, hostComponent, type ComponentBody } from '../src/index.js';
+import { createRoot, flushSync, type ComponentBody } from '../src/index.js';
+import { hostComponent } from '../src/internal/client.js';
 import { act, mount } from './_helpers';
 
 const Host: ComponentBody<{ tag?: string; props: Record<string, unknown>; read?: () => void }> = (

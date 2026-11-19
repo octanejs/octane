@@ -5,10 +5,10 @@ import {
 	createRoot,
 	flushLayoutSync,
 	flushSync,
-	hasPendingWork,
 	RenderingPhase,
 	setLayoutSnapshotTiming,
 } from '../src/index.js';
+import { hasPendingWork } from '../src/internal/client.js';
 import { mount } from './_helpers.js';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 

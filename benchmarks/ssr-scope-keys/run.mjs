@@ -93,8 +93,13 @@ const built = await build({
 		{
 			name: 'ssr-scope-keys-source',
 			setup(plugin) {
-				plugin.onResolve({ filter: /^octane(?:\/(?:server|internal\/server))?$/ }, () => ({
-					path: join(REPO, 'packages/octane/src/server/index.ts'),
+				plugin.onResolve({ filter: /^octane(?:\/(?:server|internal\/server))?$/ }, (args) => ({
+					path: join(
+						REPO,
+						args.path === 'octane/internal/server'
+							? 'packages/octane/src/internal/server.ts'
+							: 'packages/octane/src/server/index.ts',
+					),
 				}));
 			},
 		},

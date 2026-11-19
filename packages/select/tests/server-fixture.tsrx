@@ -1,4 +1,4 @@
-import { injectStyle } from 'octane';
+import { injectStyle } from 'octane/internal/client';
 
 import { createStyleCache } from './style-adapter.mjs';
 import { resolveOctaneStyle } from './octane-style.mjs';

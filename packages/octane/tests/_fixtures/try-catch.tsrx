@@ -1,4 +1,5 @@
-import { __runOnCatch, useState, useEffect } from 'octane';
+import { useState, useEffect } from 'octane';
+import { __runOnCatch } from 'octane/internal/client';
 
 // Inner component that throws on render when `props.bang` is true.
 function ThrowsOnRender(props) @{

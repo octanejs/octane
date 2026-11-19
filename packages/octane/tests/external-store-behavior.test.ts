@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { act, mount, flushEffects } from './_helpers';
-import { flushSync, setIsOctaneActEnvironment, startTransition } from '../src/index.js';
+import { flushSync, startTransition } from '../src/index.js';
+import { setIsOctaneActEnvironment } from '../src/internal/client.js';
 import {
 	CrossComponentStoreApp,
 	HeldSelectionBoundary,

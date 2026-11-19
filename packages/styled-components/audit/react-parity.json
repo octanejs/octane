@@ -90,7 +90,7 @@
         {
           "path": "packages/styled-components/tests/differential/_styled-rig.ts",
           "role": "support",
-          "sha256": "503c43be7a4efee3e8148e4d174bc2a5b084f44e95d446003727dd78f7ecabde"
+          "sha256": "c92d231c17c1592964acbccd171d220bbda7eb7c59b7ae8967ad17b75f632f6f"
         },
         {
           "path": "packages/styled-components/tests/differential/_setup.ts",
@@ -135,7 +135,7 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "3b7e60f5d1d410e0d3b5ffe79b45c9ad8936a02353a9a3eff29df6b8da8c2d16"
+          "sha256": "98e3409edbbd90c64d22684a283e2848c494f323dc3d288b7bbd995bb8394f81"
         }
       ]
     }

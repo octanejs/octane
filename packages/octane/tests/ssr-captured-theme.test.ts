@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { hydrateRoot } from 'octane';
 import * as ServerRuntime from 'octane/server';
+import * as ServerRuntimeInternal from 'octane/internal/server';
 import { prerender } from 'octane/static';
 import { CapturedTheme } from './_fixtures/style-captured-theme.tsrx';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
@@ -96,7 +97,7 @@ describe('server: captured theme classes retain their CSS', () => {
 		const captured = themes.theme.dark;
 		expect(() =>
 			ServerRuntime.renderToString(() => {
-				ServerRuntime.ssrAttr('class', captured);
+				ServerRuntimeInternal.ssrAttr('class', captured);
 				throw new Error('failed render');
 			}),
 		).toThrow('failed render');

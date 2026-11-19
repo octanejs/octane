@@ -1,9 +1,5 @@
-import {
-	createElement,
-	createRoot,
-	flushSync,
-	hostComponent,
-} from '../../packages/octane/src/index.ts';
+import { createElement, createRoot, flushSync } from '../../packages/octane/src/index.ts';
+import { hostComponent } from '../../packages/octane/src/internal/client.ts';
 
 const container = document.getElementById('main');
 let root;

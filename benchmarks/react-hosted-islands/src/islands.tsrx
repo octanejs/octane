@@ -1,4 +1,5 @@
-import { bindRendererRegionOwner, use } from 'octane';
+import { use } from 'octane';
+import { bindRendererRegionOwner } from 'octane/internal/client';
 import { BenchTheme } from './host-context.js';
 
 /**
