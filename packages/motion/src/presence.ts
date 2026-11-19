@@ -10,8 +10,8 @@ import {
 	useMemo,
 	useState,
 	type ElementDescriptor,
-	type Scope,
 } from 'octane';
+import { type Scope } from 'octane/internal/client';
 
 const ENTRY = Symbol.for('octane-motion:presence-entry');
 const OWNER = Symbol.for('octane-motion:presence-owner');
