@@ -1,9 +1,14 @@
 import { expect, it } from 'vitest';
-import { flushSync } from 'octane';
+import { act, flushSync } from 'octane';
 import { renderToString } from 'octane/server';
 import * as Signals from 'octane/signals';
+import * as DomBindings from '../src/dom-bindings.js';
+import * as DomBindingPrograms from '../src/dom-binding-program.js';
+import * as DomBindingSignals from '../src/dom-binding-signals.js';
+import * as DomBindingControls from '../src/dom-binding-controls.js';
+import * as SignalReads from '../src/signals/read-protocol.js';
 import { mount } from './_helpers.js';
-import { loadCompiledFixtureSource } from './_server-fixture.js';
+import { loadCompiledFixtureSource, loadPlainHookFixtureSource } from './_server-fixture.js';
 
 const source = `import {signal$, derived$} from 'octane/signals';
 function Child(props) @{
@@ -194,3 +199,104 @@ it('retains an equal derived result and the first comparator across rerenders', 
 		rendered.unmount();
 	}
 });
+
+it.each(['scalar', 'signal'] as const)(
+	'keeps an authored watched control authoritative through composition while a %s replacement is held',
+	async (replacement) => {
+		const scope = Signals.createScope({ scopeKey: `authored-ime-${replacement}` });
+		const events: string[] = [];
+		const state = Signals.runWithSignalOwner(scope, () =>
+			loadPlainHookFixtureSource(
+				`import {signal$} from 'octane/signals'; import {events} from 'tracking';
+export const draft$ = signal$('red', {watched: () => { events.push('watch draft'); return () => events.push('unwatch draft'); }});
+export const right$ = signal$('blue', {watched: () => { events.push('watch right'); return () => events.push('unwatch right'); }});`,
+				{
+					id: `/src/authored-ime-${replacement}.ts`,
+					inlineHookMemo: false,
+					hmr: false,
+					runtimeModules: { 'octane/signals': Signals, tracking: { events } },
+				},
+			),
+		);
+		const hold$ = scope.signal$('hold', false);
+		const pending = new Promise<string>(() => {});
+		const request = Signals.query(`authored-ime-${replacement}`, (hold: boolean) =>
+			hold ? pending : 'ready',
+		);
+		const gate$ = Signals.createResource(scope, 'gate', () => request(hold$.get()));
+		await act(() => {});
+		const id = '/src/authored-ime-view.tsrx';
+		const view = `import {gate$} from 'state'; export function Editor(props) @{ 'use dom bindings'; <section><input value={props.value}/><i>{gate$.get() as string}</i></section> }`;
+		const modules = {
+			'octane/behavior': DomBindings,
+			'octane/dom-bindings': DomBindings,
+			'octane/dom-binding-program': DomBindingPrograms,
+			'octane/dom-binding-signals': DomBindingSignals,
+			'octane/dom-binding-controls': DomBindingControls,
+			'octane/internal/signal-read': SignalReads,
+			state: { gate$ },
+		};
+		const options = { compileOptions: { hmr: false }, runtimeModules: modules };
+		const artifact = loadCompiledFixtureSource(view, {
+			...options,
+			id: `${id}?octane-bindings=Editor&octane-mount=1`,
+			mode: 'client',
+		});
+		const activation = loadCompiledFixtureSource(
+			`import {mountBindings} from 'octane/behavior'; import {Editor} from './authored-ime-view.tsrx'; export function attach(target, source) { return mountBindings(target, Editor, source); }`,
+			{
+				...options,
+				id: '/src/authored-ime-activation.tsrx',
+				mode: 'client',
+				runtimeModules: {
+					...modules,
+					'./authored-ime-view.tsrx?octane-bindings=Editor&octane-mount=1': artifact,
+				},
+			},
+		);
+		let snapshot = { value: state['draft$'] };
+		const listeners = new Set<() => void>();
+		const source = {
+			getSnapshot: () => snapshot,
+			subscribe(notify: () => void) {
+				listeners.add(notify);
+				return () => listeners.delete(notify);
+			},
+		};
+		const container = document.createElement('div');
+		document.body.append(container);
+		const binding = Signals.runWithSignalOwner(scope, () =>
+			activation['attach']({ parent: container }, source),
+		);
+		try {
+			const input = container.querySelector('input')!;
+			expect(input.value).toBe('red');
+			expect(events).toEqual(['watch draft']);
+			input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+			hold$.set(true);
+			snapshot = { value: replacement === 'scalar' ? 'blue' : state['right$'] };
+			for (const listener of listeners) listener();
+			input.value = 'composed';
+			input.setSelectionRange(1, 4, 'backward');
+			input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+			expect(input.value).toBe('composed');
+			expect([input.selectionStart, input.selectionEnd, input.selectionDirection]).toEqual([
+				1,
+				4,
+				'backward',
+			]);
+			expect(Signals.runWithSignalOwner(scope, () => state['draft$'].get())).toBe('composed');
+			expect(events).toEqual(['watch draft']);
+			input.value = 'next';
+			input.dispatchEvent(new InputEvent('input', { bubbles: true }));
+			expect(Signals.runWithSignalOwner(scope, () => state['draft$'].get())).toBe('next');
+			expect(Signals.runWithSignalOwner(scope, () => state['right$'].get())).toBe('blue');
+			expect(events).toEqual(['watch draft']);
+		} finally {
+			binding.dispose();
+			scope.dispose();
+			container.remove();
+		}
+		expect(events).toEqual(['watch draft', 'unwatch draft']);
+	},
+);
