@@ -37,7 +37,8 @@ import {
 	createScope,
 	createFamily,
 	__signalAt,
-	__derivedScalarAt,
+	__signalOptionsAt,
+	__derivedScalarOptionsAt,
 	runWithSignalOwner,
 	SIGNAL_BINDING_SUBSCRIBE,
 	createResource,
@@ -9210,6 +9211,7 @@ export function Watched(props) @{ 'use dom bindings'; <section>${markup}<output 
 				});
 				let left$: any;
 				let update: () => void;
+				const authoredEvents: string[] = [];
 				if (form === 'keyed derived') {
 					left$ = scope.derived$('derived', () => base$.get());
 					update = () => base$.set('orange');
@@ -9223,11 +9225,22 @@ export function Watched(props) @{ 'use dom bindings'; <section>${markup}<output 
 					left$ = createFamily(scope, () => scope.signal$(null, 'red')).get('row');
 					update = () => left$.set('orange');
 				} else {
-					const authored$ = __signalAt(`g:sx-${form}-${dev}`, 'red');
+					const authored$ = __signalOptionsAt(`g:sx-${form}-${dev}`, 'red', {
+						watched: () => {
+							authoredEvents.push('watch signal');
+							return () => authoredEvents.push('unwatch signal');
+						},
+					});
 					left$ =
 						form === 'authored signal'
 							? authored$
-							: __derivedScalarAt(`g:sx-derived-${dev}`, () => authored$.get());
+							: __derivedScalarOptionsAt(`g:sx-derived-${dev}`, () => authored$.get(), {
+									sync: true,
+									watched: () => {
+										authoredEvents.push('watch derived');
+										return () => authoredEvents.push('unwatch derived');
+									},
+								});
 					update = () => runWithSignalOwner(scope, () => authored$.set('orange'));
 				}
 				let resolve!: (value: string) => void;
@@ -9277,6 +9290,10 @@ export function SxForm(props) @{ 'use dom bindings'; <section><p sx={styles.pain
 					update();
 					expect(paragraph.style.color).toBe('orange');
 					expect(rightStarts).toBe(0);
+					if (form.startsWith('authored'))
+						expect(authoredEvents).toEqual(
+							form === 'authored signal' ? ['watch signal'] : ['watch signal', 'watch derived'],
+						);
 					// Cancel the replacement before resolving, so its watched hook remains unreachable.
 					fixture.publish({ selected: false });
 					await act(() => resolve('ready'));
@@ -9285,6 +9302,12 @@ export function SxForm(props) @{ 'use dom bindings'; <section><p sx={styles.pain
 					handle.dispose();
 					scope.dispose();
 				}
+				if (form.startsWith('authored'))
+					expect(authoredEvents).toEqual(
+						form === 'authored signal'
+							? ['watch signal', 'unwatch signal']
+							: ['watch signal', 'watch derived', 'unwatch derived', 'unwatch signal'],
+					);
 			});
 
 		for (const empty of ['missing', 'null'] as const)

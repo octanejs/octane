@@ -972,16 +972,21 @@ export function lowerSignalDeclarations(ast, filename, options) {
 			trusted.factory === 'derived$' && revision === null
 				? hydrationDerivedCapture(node, listed)
 				: null;
+		const helper = declarationHelper(trusted.factory, node);
+		const configured = helper.endsWith('OptionsAt');
 		return {
 			...node,
-			...(hydration === null
+			...(hydration === null && !configured
 				? null
-				: { metadata: { ...node.metadata, hydrationDerived: hydration } }),
+				: {
+						metadata: {
+							...node.metadata,
+							...(hydration === null ? null : { hydrationDerived: hydration }),
+							...(configured ? { octaneConfiguredSignalDeclaration: true } : null),
+						},
+					}),
 			...(pureSignalDeclaration(trusted.factory, node) ? { __octanePure: true } : null),
-			callee: inheritHookMemoOrigin(
-				trusted.helper(declarationHelper(trusted.factory, node)),
-				node.callee,
-			),
+			callee: inheritHookMemoOrigin(trusted.helper(helper), node.callee),
 			arguments: args,
 		};
 	});

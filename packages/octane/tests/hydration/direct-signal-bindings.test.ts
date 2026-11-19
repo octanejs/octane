@@ -493,6 +493,65 @@ describe('direct signal child bindings', () => {
 		vi.restoreAllMocks();
 	});
 
+	it.each([
+		['signal', `signal$('one', {watched: props.watched})`, 'one', true],
+		['derived', `derived$((ctx) => 1, {key: 'd'})`, '1', false],
+		[
+			'scalar derived',
+			`derived$(() => 2, {sync: true, equals: Object.is, watched: props.watched})`,
+			'2',
+			true,
+		],
+	])(
+		'adopts configured inline %s text without replacing the server text node',
+		async (name, expression, expected, watched) => {
+			const source = `import {signal$, derived$} from 'octane/signals'; export function App(props) @{ <p>{${expression}}</p> }`;
+			const options = {
+				id: `/src/configured-inline-${name.replace(' ', '-')}.tsrx`,
+				compileOptions: { hmr: false },
+				runtimeModules: { 'octane/signals': Signals },
+			};
+			const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const events: string[] = [];
+			const props = { watched: () => (events.push('watch'), () => events.push('unwatch')) };
+			const container = document.createElement('div');
+			document.body.append(container);
+			container.innerHTML = renderToString(server.App, props).html;
+			const paragraph = container.querySelector('p')!;
+			const text = paragraph.firstChild;
+			expect(paragraph.textContent).toBe(expected);
+			expect(text?.nodeType).toBe(Node.TEXT_NODE);
+			expect(events).toEqual([]);
+			await act(() => {
+				root = hydrateRoot(container, client.App, props);
+			});
+			expect(container.querySelector('p')).toBe(paragraph);
+			expect(paragraph.firstChild).toBe(text);
+			expect(events).toEqual(watched ? ['watch'] : []);
+			root!.unmount();
+			root = undefined;
+			expect(events).toEqual(watched ? ['watch', 'unwatch'] : []);
+		},
+	);
+
+	it.each(['__signalOptionsAt$0', '_$__signalOptionsAt$1'])(
+		'renders the foreign helper %s as an ordinary renderable',
+		(name) => {
+			const source = `import {createElement} from 'octane'; function ${name}() { return createElement('b', null, 'foreign'); } export function App() @{ <p>{${name}()}</p> }`;
+			const client = loadCompiledFixtureSource(source, {
+				id: '/src/foreign-signal-alias.tsrx',
+				mode: 'client',
+				compileOptions: { hmr: false },
+			});
+			const container = document.createElement('div');
+			document.body.append(container);
+			root = createRoot(container);
+			root.render(client.App);
+			expect(container.querySelector('p > b')?.textContent).toBe('foreign');
+		},
+	);
+
 	it('discovers a signal passed through an unmarked renderable prop at runtime', async () => {
 		// Explicit authority must survive even before any optional signal module
 		// activates the document capability.

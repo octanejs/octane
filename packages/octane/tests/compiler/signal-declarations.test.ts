@@ -6,7 +6,7 @@ import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { compile } from '../../src/compiler/compile.js';
+import { compile, compileForBundler } from '../../src/compiler/compile.js';
 import { createOctaneCompiler } from '../../src/compiler/bundler.js';
 import { slotHooks } from '../../src/compiler/slot-hooks.js';
 import * as signals from 'octane/signals';
@@ -233,6 +233,84 @@ export function exercise() { return 1; }
 }
 
 describe('compiler-owned signal declaration sites', () => {
+	it('keeps configured inline declarations on the direct text binding path', () => {
+		for (const expression of [
+			`signal$('one')`,
+			`signal$('one', {equals: Object.is})`,
+			`derived$((ctx) => 1, {key: 'd'})`,
+			`derived$(() => 2, {sync: true, equals: Object.is})`,
+		]) {
+			const source = `import {signal$, derived$} from 'octane/signals'; export function App() @{ <p>{${expression}}</p> }`;
+			const client = compile(source, FILENAME, { mode: 'client', hmr: false }).code;
+			const server = compile(source, FILENAME, { mode: 'server', hmr: false }).code;
+			expect(client, expression).toContain('bindSignalText');
+			expect(client, expression).not.toContain('bindSignalChild');
+			expect(server, expression).toContain('ssrChildText');
+		}
+	});
+
+	it('includes configured inline declaration sites in independent hydration manifests', () => {
+		for (const expression of [
+			`signal$('one')`,
+			`signal$('one', {equals: Object.is})`,
+			`derived$((ctx) => 1, {key: 'd'})`,
+			`derived$(() => 2, {sync: true, equals: Object.is})`,
+		]) {
+			const source = `import {Hydrate} from 'octane'; import {signal$, derived$} from 'octane/signals'; export function App() @{ <Hydrate independent when={true}><p>{${expression}}</p></Hydrate> }`;
+			const calls = compiledCalls(source, 'server');
+			expect(calls, expression).toHaveLength(1);
+			for (const mode of ['client', 'server'] as const) {
+				const compiled = compileForBundler(source, FILENAME, { mode, hmr: false });
+				expect(compiled.independentWidgets, expression).toHaveLength(1);
+				expect(compiled.independentWidgets[0].signalSites, expression).toEqual([calls[0].site]);
+			}
+			const activation = compile(source, `${FILENAME}?octane-hydrate=0`, {
+				mode: 'client',
+				hmr: false,
+			}).code;
+			expect(activation, expression).toContain('bindSignalText');
+			expect(activation, expression).not.toContain('bindSignalChild');
+		}
+	});
+
+	it('retains direct text and hydration sites when a generated helper alias collides', () => {
+		const source = `import {Hydrate} from 'octane'; import {signal$} from 'octane/signals'; const _$__signalOptionsAt = 'reserved'; export function App() @{ <Hydrate independent when={true}><p>{signal$('one', {equals: Object.is})}</p></Hydrate> }`;
+		const client = compile(
+			`import {signal$} from 'octane/signals'; const _$__signalOptionsAt = 'reserved'; export function App() @{ <p>{signal$('one', {equals: Object.is})}</p> }`,
+			FILENAME,
+			{ mode: 'client', hmr: false },
+		).code;
+		expect(client).toContain('_$__signalOptionsAt$1');
+		expect(client).toContain('bindSignalText');
+		expect(client).not.toContain('bindSignalChild');
+		const calls = compiledCalls(source, 'server');
+		expect(calls).toHaveLength(1);
+		for (const mode of ['client', 'server'] as const) {
+			const compiled = compileForBundler(source, FILENAME, { mode, hmr: false });
+			expect(compiled.independentWidgets[0].signalSites).toEqual([calls[0].site]);
+		}
+	});
+
+	it('does not classify foreign lookalike calls as generated signal aliases', () => {
+		for (const expression of [
+			`__signalOptionsAt$0()`,
+			`_$__signalOptionsAt$0()`,
+			`_$__signalOptionsAt$01()`,
+			`__signalOptionsAt$1()`,
+			`_$__signalOptionsAt$1()`,
+			`foreign.__signalOptionsAt$1()`,
+		]) {
+			const source = `export function App() @{ <p>{${expression}}</p> }`;
+			const client = compile(source, FILENAME, { mode: 'client', hmr: false }).code;
+			expect(client, expression).not.toContain('bindSignalText');
+		}
+		const island = `import {Hydrate} from 'octane'; function _$__signalOptionsAt$1(site) { return site; } export function App() @{ <Hydrate independent when={true}><p>{_$__signalOptionsAt$1('i:foreign')}</p></Hydrate> }`;
+		expect(
+			compileForBundler(island, FILENAME, { mode: 'client', hmr: false }).independentWidgets[0]
+				.signalSites,
+		).toEqual([]);
+	});
+
 	it('keeps proven optionless general declarations separate from dynamic options', () => {
 		const source = `import { derived$ } from 'octane/signals';
 const options = {sync: true, watched: () => {}};
