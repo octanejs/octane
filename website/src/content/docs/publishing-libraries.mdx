@@ -143,6 +143,24 @@ dependency is enough. In particular, do not copy this setting from another bindi
 for a library that deliberately implements and verifies slot forwarding itself. Leaving
 it out is the correct default for normal `.ts` and `.js` custom hooks.
 
+A hook that forwards slots by hand receives its call site's slot as its last argument
+and must give every hook it calls a distinct child slot. `subSlot(slot, tag)` from
+`octane` derives that child slot and returns the same symbol on every render:
+
+```ts
+import { subSlot, useId } from 'octane';
+
+export function useDisclosure(slot: symbol) {
+	const triggerId = useId(subSlot(slot, 'triggerId'));
+	const panelId = useId(subSlot(slot, 'panelId'));
+	return { triggerId, panelId };
+}
+```
+
+`subSlot` returns `undefined` when the caller passed no slot. `createSubSlot(options)`
+builds a variant with a fallback for that case (`slotlessPrefix`), its own description
+format, or symbols local to one library instead of global ones.
+
 `source` is the one marker a workspace or linked package may need. A repository that
 pins Octane once in a shared toolkit manifest and consumes it transitively can claim a
 package as Octane source without re-declaring a version range it does not own:
