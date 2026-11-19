@@ -9191,6 +9191,83 @@ export function Watched(props) @{ 'use dom bindings'; <section>${markup}<output 
 					);
 				});
 
+		for (const [name, acceptedSignal, replacementSignal, held] of [
+			['signal to signal', true, true, true],
+			['signal to scalar', true, false, true],
+			['scalar to signal', false, true, true],
+			['scalar to scalar', false, false, true],
+			['ordinary scalar', false, false, false],
+		] as const)
+			it(`keeps composition on the accepted ${name} control (${dev ? 'dev' : 'prod'})`, async () => {
+				const scope = createScope({ scopeKey: `composition-held-${name}-${dev}` });
+				const log: string[] = [];
+				const hold$ = scope.signal$('hold', false);
+				const left$ = scope.signal$('left', 'red', {
+					watched: () => {
+						log.push('watch left');
+						return () => log.push('unwatch left');
+					},
+				});
+				const right$ = scope.signal$('right', 'blue', {
+					watched: () => {
+						log.push('watch right');
+						right$.set('green');
+						return () => log.push('unwatch right');
+					},
+				});
+				let resolve!: (value: string) => void;
+				const pending = new Promise<string>((done) => (resolve = done));
+				const load = query(`composition-held-${name}-${dev}`, (hold: boolean) =>
+					hold ? pending : 'ready',
+				);
+				const gate$ = createResource(scope, 'gate', () => load(hold$.get()));
+				await act(() => {});
+				const source = `import { gate$ } from 'state'; export function CompositionControl(props) @{ 'use dom bindings'; <section><input value={props.value} /><i>{gate$.get() as string}</i></section> }`;
+				const fixture = authoredPresentation<{ value: unknown }>(
+					'CompositionControl',
+					{ value: acceptedSignal ? left$ : 'red' },
+					dev,
+					source,
+					{ state: { gate$ } },
+				);
+				const handle = fixture.mount({ parent: container }, fixture.state);
+				try {
+					const input = container.querySelector('input')!;
+					input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+					if (held) {
+						hold$.set(true);
+						fixture.publish({ value: replacementSignal ? right$ : 'blue' });
+					}
+					input.value = 'composed';
+					input.setSelectionRange(1, 4, 'backward');
+					input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+					expect(input.value).toBe(acceptedSignal ? 'composed' : 'red');
+					if (acceptedSignal)
+						expect([input.selectionStart, input.selectionEnd, input.selectionDirection]).toEqual([
+							1,
+							4,
+							'backward',
+						]);
+					expect(log).toEqual(acceptedSignal ? ['watch left'] : []);
+					input.value = 'next';
+					input.dispatchEvent(new InputEvent('input', { bubbles: true }));
+					expect([left$.get(), right$.get()]).toEqual([acceptedSignal ? 'next' : 'red', 'blue']);
+					if (held) {
+						await act(() => resolve('ready'));
+						expect(input.value).toBe(replacementSignal ? 'green' : 'blue');
+					}
+				} finally {
+					handle.dispose();
+					scope.dispose();
+				}
+				expect([...log].sort()).toEqual(
+					[
+						...(acceptedSignal ? ['watch left', 'unwatch left'] : []),
+						...(held && replacementSignal ? ['watch right', 'unwatch right'] : []),
+					].sort(),
+				);
+			});
+
 		it(`keeps a whole-style getter on accepted sources while its replacement is held (${dev ? 'dev' : 'prod'})`, async () => {
 			const scope = createScope({ scopeKey: `whole-style-selector-${dev}` });
 			const log: string[] = [];

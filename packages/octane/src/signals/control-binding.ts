@@ -115,6 +115,7 @@ const createBindingControls = function __createBindingControls(
 			let initialized = false;
 			let composing = false;
 			let raw: unknown;
+			let publishedRaw: unknown;
 			let handle: SignalHandle<unknown> | undefined;
 			let active: SignalHandle<unknown> | undefined;
 			let unsubscribe: NativeReadSubscription | undefined;
@@ -166,13 +167,13 @@ const createBindingControls = function __createBindingControls(
 				if (disposed) return;
 				composing = false;
 				input();
-				if (!disposed) notify();
+				if (!disposed) notify(true);
 			};
 			const dispose = (): void => {
 				if (disposed) return;
 				disposed = true;
 				generation++;
-				raw = undefined;
+				raw = publishedRaw = undefined;
 				active = handle = undefined;
 				if (channel === 'checked') RADIO_WRITERS.delete(control);
 				let failed = false;
@@ -295,6 +296,7 @@ const createBindingControls = function __createBindingControls(
 					publish(): void {
 						if (committed) return;
 						if (disposed || ticket !== generation) return;
+						publishedRaw = next;
 						active = candidate;
 						if (isWritableSignal(active)) {
 							// Document capture runs before the native target listener. Snapshot
@@ -365,7 +367,7 @@ const createBindingControls = function __createBindingControls(
 			return {
 				prepare,
 				prepareCurrent: () => prepare(raw),
-				prepareCommitted: () => prepare(active, true),
+				prepareCommitted: () => prepare(publishedRaw, true),
 				active: () => !disposed,
 				composing: () => composing,
 				retired: () => ownerRetired,
