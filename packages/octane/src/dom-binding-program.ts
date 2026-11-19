@@ -742,6 +742,11 @@ export function __createStructuralBindingHandoff(
 }
 
 const stopped = {};
+/**
+ * An accepted refresh never re-reads a connected binding: its own committed
+ * channel keeps it accepted, and a live read could select a staged source.
+ */
+const connectedValue = {} as BindingValue;
 const programRoots = /* @__PURE__ */ new WeakSet<Comment>();
 
 /**
@@ -1122,6 +1127,7 @@ function projectValues(
 		for (const index of indices) {
 			requireActive(transaction);
 			let connection = instance.signals?.get(index);
+			const connected = transaction.accepting && connection !== undefined;
 			const style = operations[index]![1] === 'styleObject';
 			if (!connection && (style || transaction.signals?.isSignal(values[index]))) {
 				const prepareChannel = (committed = false): (() => void) => {
@@ -1158,11 +1164,12 @@ function projectValues(
 					values = [...values];
 					copied = true;
 				}
-				(values as unknown[])[index] = connection.read(values[index]);
+				(values as unknown[])[index] = connected ? connectedValue : connection.read(values[index]);
 			}
 		}
 	}
 	return values.map((value, index) => {
+		if (value === connectedValue) return connectedValue;
 		if (operations[index]![1] === 'control') {
 			controls!.set(index, instance.controls!.get(index)!.prepare(value));
 			return null;
@@ -1256,7 +1263,7 @@ function prepareFragment(
 		adapters: instance.cleanup?.prepare?.(environment),
 		kept,
 	};
-	if (instance.signals || instance.controls || instance.projections) {
+	if (!transaction.accepting && (instance.signals || instance.controls || instance.projections)) {
 		instance.signalPlan = plan;
 		instance.signalFrame = transaction.frame;
 	}
@@ -1307,13 +1314,14 @@ function prepareFragment(
 							transaction.notifySignal!(committed ? committedPrepare : prepare),
 						);
 					}
-					if (connection) {
+					if (connection && transaction.accepting) candidate.keep = true;
+					else if (connection) {
 						region.signalPlan = candidate;
 						region.signalFrame = transaction.frame;
 						value = connection.read(value);
 					}
 				}
-				candidate.text = textValue(value, descriptor.generic);
+				if (!candidate.keep) candidate.text = textValue(value, descriptor.generic);
 			} else if (descriptor.kind === 'if') {
 				const arm = descriptor.select(environment);
 				if (!Number.isSafeInteger(arm) || arm < -1 || arm >= descriptor.arms.length)
@@ -1711,8 +1719,9 @@ function commitFragment(plan: FragmentPlan, transaction: Transaction): void {
 	instance.updateAdapters = plan.adapters;
 	transaction.initialOperations?.initialize(plan, false, transaction);
 	for (let index = 0; !plan.kept && index < plan.values.length && !transaction.disposed; index++) {
-		if (instance.definition.bindings[index]![1] === 'control') continue;
-		writeOperation(instance, index, plan.values[index]!, plan.groups.get(index), transaction);
+		const value = plan.values[index]!;
+		if (value === connectedValue || instance.definition.bindings[index]![1] === 'control') continue;
+		writeOperation(instance, index, value, plan.groups.get(index), transaction);
 	}
 	for (const region of plan.regions) {
 		if (transaction.disposed) return;
@@ -2544,6 +2553,7 @@ function projectHostValues(
 			requireActive(transaction);
 			const first = group[0]![0];
 			let connection = instance.projections?.get(first);
+			const connected = transaction.accepting && connection !== undefined;
 			if (!connection) {
 				const prepareChannel = (committed = false): (() => void) => {
 					if (
@@ -2605,8 +2615,9 @@ function projectHostValues(
 				instance.projections ??= new Map();
 				for (const [index] of group) instance.projections.set(index, connection);
 			}
-			const projected = connection.read(values[first]);
-			for (const [index] of group) (values as unknown[])[index] = projected[index];
+			const projected = connected ? null : connection.read(values[first]);
+			for (const [index] of group)
+				(values as unknown[])[index] = projected ? projected[index] : connectedValue;
 		}
 	}
 
@@ -2618,7 +2629,7 @@ function prepareHostGroups(plan: FragmentPlan): void {
 	const definition = instance.definition;
 	for (let index = 0; index < definition.bindings.length; index++) {
 		const operation = definition.bindings[index]!;
-		if (operation[1] !== 'classGroup') continue;
+		if (operation[1] !== 'classGroup' || plan.values[index] === connectedValue) continue;
 		let group = instance.groups.get(index);
 		if (!group) {
 			const receipt = definition.initializers?.findIndex(

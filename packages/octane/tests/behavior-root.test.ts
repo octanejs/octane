@@ -9268,62 +9268,71 @@ export function Watched(props) @{ 'use dom bindings'; <section>${markup}<output 
 				);
 			});
 
-		it(`keeps a whole-style getter on accepted sources while its replacement is held (${dev ? 'dev' : 'prod'})`, async () => {
-			const scope = createScope({ scopeKey: `whole-style-selector-${dev}` });
-			const log: string[] = [];
-			const hold$ = scope.signal$('hold', false);
-			const selector$ = scope.signal$('selector', false);
-			const left$ = scope.signal$('left', 'red', {
-				watched: () => {
-					log.push('watch left');
-					return () => log.push('unwatch left');
-				},
+		for (const refresh of [false, true])
+			it(`keeps a whole-style getter on accepted sources while its replacement is held${refresh ? ' and refreshed' : ''} (${dev ? 'dev' : 'prod'})`, async () => {
+				const scope = createScope({ scopeKey: `whole-style-selector-${refresh}-${dev}` });
+				const log: string[] = [];
+				const hold$ = scope.signal$('hold', false);
+				const selector$ = scope.signal$('selector', false);
+				const note$ = scope.signal$('note', 'first');
+				const left$ = scope.signal$('left', 'red', {
+					watched: () => {
+						log.push('watch left');
+						return () => log.push('unwatch left');
+					},
+				});
+				const right$ = scope.signal$('right', 'blue', {
+					watched: () => {
+						log.push('watch right');
+						right$.set('green');
+						return () => log.push('unwatch right');
+					},
+				});
+				let resolve!: (value: string) => void;
+				const pending = new Promise<string>((done) => (resolve = done));
+				const load = query(`whole-style-selector-${refresh}-${dev}`, (hold: boolean) =>
+					hold ? pending : 'ready',
+				);
+				const gate$ = createResource(scope, 'gate', () => load(hold$.get()));
+				await act(() => {});
+				const paint = {
+					get color() {
+						return selector$.get() ? right$ : left$;
+					},
+				};
+				const source = `import { gate$, note$ } from 'state'; export function WholeStyle(props) @{ 'use dom bindings'; <section><p style={props.paint}>text</p><b>{props.noted ? (note$.get() as string) : 'none'}</b><i>{gate$.get() as string}</i></section> }`;
+				const fixture = authoredPresentation('WholeStyle', { paint, noted: true }, dev, source, {
+					state: { gate$, note$ },
+				});
+				const handle = fixture.mount({ parent: container }, fixture.state);
+				try {
+					const paragraph = container.querySelector('p')!;
+					expect(paragraph.style.color).toBe('red');
+					hold$.set(true);
+					fixture.publish({ paint: { color: right$ }, noted: false });
+					left$.set('orange');
+					expect(paragraph.style.color).toBe('orange');
+					selector$.set(true);
+					expect(paragraph.style.color).toBe('orange');
+					if (refresh) {
+						// An accepted-only read refreshes the accepted presentation, which must
+						// not resample the getter's selector.
+						note$.set('second');
+						expect(container.querySelector('b')!.textContent).toBe('second');
+						expect(paragraph.style.color).toBe('orange');
+					}
+					expect(log).toEqual(['watch left']);
+					await act(() => resolve('ready'));
+					expect(paragraph.style.color).toBe('green');
+					expect([...log].sort()).toEqual(['watch left', 'unwatch left', 'watch right'].sort());
+				} finally {
+					handle.dispose();
+					scope.dispose();
+				}
+				expect([...log].sort()).toEqual(
+					['watch left', 'unwatch left', 'watch right', 'unwatch right'].sort(),
+				);
 			});
-			const right$ = scope.signal$('right', 'blue', {
-				watched: () => {
-					log.push('watch right');
-					right$.set('green');
-					return () => log.push('unwatch right');
-				},
-			});
-			let resolve!: (value: string) => void;
-			const pending = new Promise<string>((done) => (resolve = done));
-			const load = query(`whole-style-selector-${dev}`, (hold: boolean) =>
-				hold ? pending : 'ready',
-			);
-			const gate$ = createResource(scope, 'gate', () => load(hold$.get()));
-			await act(() => {});
-			const paint = {
-				get color() {
-					return selector$.get() ? right$ : left$;
-				},
-			};
-			const source = `import { gate$ } from 'state'; export function WholeStyle(props) @{ 'use dom bindings'; <section><p style={props.paint}>text</p><i>{gate$.get() as string}</i></section> }`;
-			const fixture = authoredPresentation('WholeStyle', { paint }, dev, source, {
-				state: { gate$ },
-			});
-			const handle = fixture.mount({ parent: container }, fixture.state);
-			try {
-				const paragraph = container.querySelector('p')!;
-				expect(paragraph.style.color).toBe('red');
-				hold$.set(true);
-				fixture.publish({ paint: { color: right$ } });
-				left$.set('orange');
-				expect(paragraph.style.color).toBe('orange');
-				selector$.set(true);
-				expect(paragraph.style.color).toBe('orange');
-				expect(log).toEqual(['watch left']);
-				await act(() => resolve('ready'));
-				expect(paragraph.style.color).toBe('green');
-				expect([...log].sort()).toEqual(['watch left', 'unwatch left', 'watch right'].sort());
-			} finally {
-				handle.dispose();
-				scope.dispose();
-			}
-			expect([...log].sort()).toEqual(
-				['watch left', 'unwatch left', 'watch right', 'unwatch right'].sort(),
-			);
-		});
 
 		for (const form of [
 			'keyed derived',
