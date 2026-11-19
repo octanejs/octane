@@ -23,6 +23,10 @@ export function Derived(props) @{
  const value$ = derived$(() => ({x: props.value}), {sync:true, equals:(a,b) => { props.compared.push(props.label); return a.x % 2 === b.x % 2; }});
  const value = value$.get(); props.capture(value);
  <output>{String(value.x)}</output>
+}
+export function NullOptions(props) @{
+ const value$ = signal$(1, props.options);
+ <button onClick={() => value$.set(value$.get() + 1)}>{String(value$.get())}</button>
 }`;
 const fixture = loadCompiledFixtureSource(source, {
 	id: '/packages/octane/tests/_fixtures/authored-options.tsrx',
@@ -45,6 +49,17 @@ it('does not start watched hooks for an unobserved server render', () => {
 	}).html;
 	expect(html).toContain('0');
 	expect(events).toEqual([]);
+});
+
+it('reads and updates a signal when its options are null at runtime', () => {
+	const rendered = mount(fixture.NullOptions, { options: null });
+	try {
+		expect(rendered.container.textContent).toBe('1');
+		flushSync(() => rendered.find('button').click());
+		expect(rendered.container.textContent).toBe('2');
+	} finally {
+		rendered.unmount();
+	}
 });
 
 it('leaves an owner key reusable after invalid JS cell options', () => {

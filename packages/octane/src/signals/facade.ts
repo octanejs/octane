@@ -670,7 +670,12 @@ export function __signalOptionsAt<T>(
 	initial: T,
 	options?: AuthoredSignalOptions<T>,
 ): WritableSignal<T> {
-	return __signalAt(site, initial, options, options && (() => prepareDeclaredCellOptions(options)));
+	return __signalAt(
+		site,
+		initial,
+		options,
+		options == null ? undefined : () => prepareDeclaredCellOptions(options),
+	);
 }
 
 export function signal$<T>(initial: T, options?: AuthoredSignalOptions<T>): WritableSignal<T> {
