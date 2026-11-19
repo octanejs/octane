@@ -19,8 +19,28 @@ import {
 	type ScopedNode,
 } from './graph.js';
 import { isThenable } from './handle-protocol.js';
+import { REACTIVE_SLOW } from './graph-flags.js';
 import { RedeclarableBinding } from './redeclaration.js';
-import type { DerivedCompute, DerivedSignal, OwnerScope } from './types.js';
+import type {
+	DerivedCompute,
+	DerivedOptions,
+	DerivedSignal,
+	OwnerScope,
+	ScopeSignalOptions,
+	SignalEquals,
+} from './types.js';
+
+/** Compare only an existing ready result, including a transition shadow's own result. */
+function equalScalarValue<T>(node: ScopedNode<T>, next: T, equals: SignalEquals<T>): T {
+	let previous: T;
+	if (node.valueOnly) previous = node.last as T;
+	else {
+		const snapshot = node.state?.snapshot;
+		if (snapshot?.status !== 'ready') return next;
+		previous = snapshot.value;
+	}
+	return !Object.is(previous, next) && untrack(() => equals(previous, next)) ? previous : next;
+}
 
 /**
  * The compiler selects this only for a zero-context callback whose result is
@@ -50,9 +70,15 @@ class ScalarBinding<T>
 		readonly owner: ScopeImpl,
 		readonly node: ScopedNode<T>,
 		compute: DerivedCompute<T>,
+		_options?: DerivedOptions,
+		canonical = node,
 	) {
 		super();
 		this.compute = compute;
+		const equals =
+			canonical.flags & REACTIVE_SLOW
+				? (previous: T, next: T) => canonical.isEqual(previous, next)
+				: undefined;
 		node.compute = (target) => {
 			if (owner.readBarrier !== undefined) {
 				this.frozen = true;
@@ -72,7 +98,7 @@ class ScalarBinding<T>
 				return errorState(error);
 			}
 			// sync:true retains its existing thenable-as-value assertion semantics.
-			return derivedResult(target, result);
+			return derivedResult(target, equals ? equalScalarValue(target, result, equals) : result);
 		};
 	}
 
@@ -129,19 +155,22 @@ export function createDeclaredScalarCell<T>(
 	owner: OwnerScope,
 	key: string,
 	compute: DerivedCompute<T>,
+	options?: DerivedOptions & ScopeSignalOptions<T>,
 	sequence?: number,
 	captures?: readonly unknown[],
 	declaring?: number,
+	prepare?: () => ((node: ScopedNode<T>) => void) | undefined,
 ): DerivedSignal<T> {
 	return createDerivedCellWith(
 		owner,
 		key,
 		compute,
-		undefined,
+		options,
 		ScalarBinding,
 		sequence,
 		captures,
 		declaring,
+		prepare,
 	);
 }
 
@@ -169,7 +198,11 @@ function presentScalarView<T>(
 	}
 	if (probe !== undefined) {
 		const state = untrack(() => refreshNode(this.node));
-		if (state.snapshot.status === 'ready' && Object.is(state.snapshot.value, probe.value)) {
+		if (
+			state.snapshot.status === 'ready' &&
+			(Object.is(state.snapshot.value, probe.value) ||
+				this.node.isEqual(state.snapshot.value, probe.value))
+		) {
 			this.probed = { compute, reads: probe.reads };
 			return undefined;
 		}
@@ -178,7 +211,13 @@ function presentScalarView<T>(
 	const node: ScopedNode<T> = createDeclarationView(this.node, (target) =>
 		binding.forkCandidate(target),
 	);
-	const binding: ScalarBinding<T> = new ScalarBinding(this.owner, node, compute);
+	const binding: ScalarBinding<T> = new ScalarBinding(
+		this.owner,
+		node,
+		compute,
+		undefined,
+		this.node,
+	);
 	this.view = { node, binding };
 	if (probe !== undefined) {
 		binding.seeded = { value: probe.value };

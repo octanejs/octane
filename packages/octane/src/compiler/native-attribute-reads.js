@@ -16,6 +16,20 @@ function unwrapExpression(node) {
 	return node;
 }
 
+export function isGeneratedSignalHandleCall(node) {
+	if (node.metadata?.octaneConfiguredSignalDeclaration === true) return true;
+	const callee = unwrapExpression(node.callee);
+	const name =
+		callee?.type === 'Identifier'
+			? callee.name
+			: callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression'
+				? callee.computed
+					? callee.property?.value
+					: callee.property?.name
+				: null;
+	return /^_?\$?__(?:signal|derived|query)At$/.test(name ?? '');
+}
+
 export function isDirectSignalHandleExpression(node) {
 	node = unwrapExpression(node);
 	if (!node) return false;
@@ -29,16 +43,7 @@ export function isDirectSignalHandleExpression(node) {
 		return typeof name === 'string' && name.endsWith('$');
 	}
 	if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') {
-		const callee = unwrapExpression(node.callee);
-		const name =
-			callee?.type === 'Identifier'
-				? callee.name
-				: callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression'
-					? callee.computed
-						? callee.property?.value
-						: callee.property?.name
-					: null;
-		return /^_?\$?__(?:signal|derived|query)At$/.test(name ?? '');
+		return isGeneratedSignalHandleCall(node);
 	}
 	return false;
 }

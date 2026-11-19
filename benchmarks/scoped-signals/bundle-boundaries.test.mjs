@@ -827,7 +827,12 @@ export const result$ = ${factory}(${callback}${options});`;
 					['ts', slotHooks(candidate, '/src/proof.ts', { environment }).code],
 				]) {
 					const label = `${extension}/${environment}: ${factory}(${callback}${options})`;
-					assert.match(code, /__derived(?:Scalar)?At/, label);
+					const helper = scalar
+						? '__derivedScalarAt'
+						: options
+							? '__derivedOptionsAt'
+							: '__derivedAt';
+					assert.ok(code.includes(helper), `${label}: expected ${helper}`);
 					assert.equal(code.includes('__derivedScalarAt'), scalar, label);
 				}
 			}
