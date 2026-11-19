@@ -604,7 +604,7 @@ function hookOwner(node, name) {
 // signals, give each custom-hook call a site keying the declarations it reaches.
 // Either the local or the imported hook name may carry the `$`.
 function customHookSignalSite(st, node, ...names) {
-	return st.signalHookSites &&
+	return st.domRuntime &&
 		(st.nativeReads || names.some((name) => typeof name === 'string' && name.endsWith('$')))
 		? signalHookCallSite(st.filename, node)
 		: null;
@@ -1283,8 +1283,7 @@ export function slotHooks(source, id, options) {
 		);
 	const manualProviders = options?.manualSlots ? findManualHookProviders(ast) : new Map();
 	const nativeReadActivation = options?.nativeReads === true && importsNativeRenderer(ast);
-	// Native signal reads exist only for the DOM client and server renderers.
-	const signalHookSites =
+	const domRuntime =
 		(options?.renderer?.target ?? 'dom') === 'dom' && options?.universalRuntime == null;
 	const signalLowering = signalDeclarationSourceEdits(ast, id, source, {
 		hmr: environment === 'client' && Boolean(options?.hmr),
@@ -1293,10 +1292,7 @@ export function slotHooks(source, id, options) {
 		ast,
 		source,
 		octanePureFactoryNames({
-			clientDom:
-				environment === 'client' &&
-				(options?.renderer?.target ?? 'dom') === 'dom' &&
-				options?.universalRuntime == null,
+			clientDom: environment === 'client' && domRuntime,
 		}),
 	);
 	const defaultOptionsRoot =
@@ -1305,8 +1301,7 @@ export function slotHooks(source, id, options) {
 		!options?.dev &&
 		!options?.profile &&
 		environment === 'client' &&
-		(options?.renderer?.target ?? 'dom') === 'dom' &&
-		options?.universalRuntime == null;
+		domRuntime;
 	const defaultOptionsCalls = defaultOptionsRoot
 		? findDefaultOptionsRootCalls(ast, { factories: findRootFactoryImports(ast) })
 		: [];
@@ -1374,7 +1369,7 @@ export function slotHooks(source, id, options) {
 					: HOOK_NAMES,
 			nativeReads: options?.nativeReads === true,
 			nativeReadActivation,
-			signalHookSites,
+			signalHookSites: domRuntime,
 			inferred,
 			getterCalls,
 			stateGetterHelpers: STATE_GETTER_HELPERS,
@@ -1394,7 +1389,7 @@ export function slotHooks(source, id, options) {
 		),
 		manualSlots: options?.manualSlots === true,
 		nativeReads: options?.nativeReads === true,
-		signalHookSites,
+		domRuntime,
 		locals: importInfo.locals,
 		source,
 		inferred,
@@ -1421,7 +1416,6 @@ export function slotHooks(source, id, options) {
 		slotBaseName: null,
 		hookSlotsName: null,
 		voidRootNames: new Map(),
-		domRuntime: (options?.renderer?.target ?? 'dom') === 'dom' && options?.universalRuntime == null,
 	};
 	if (!st.hmr && !st.profile) st.slotBaseName = allocSlotName(st, '_hs$');
 	if (importInfo.importsHook) {

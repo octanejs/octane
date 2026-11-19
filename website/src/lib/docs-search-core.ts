@@ -1,5 +1,5 @@
 // The pure docs-search engine: sectionizing raw MDX into records and ranking
-// them against a query. No imports and no module state, so it runs anywhere —
+// them against a query. No runtime imports or module state, so it runs anywhere —
 // the website's search dialog builds its index lazily on top of this (see
 // docs-search.ts), and the remote MCP server (mcp/) builds the same index at
 // build time from the same sources.
@@ -10,6 +10,8 @@
 // document's lede record (no hash). Each record keeps its paragraphs and code
 // lines as separate blocks so a result can list the individual matching lines
 // under its section heading, rather than one flattened blob.
+import type { DocMeta } from '../content/docs-meta.ts';
+
 export interface SearchBlock {
 	text: string;
 	/** Came from a ``` fence — rendered monospace. */
@@ -28,7 +30,7 @@ export interface DocumentSearchRecord {
 	text: string;
 	haystack: string;
 	/** Normalized registry search terms: a query equal to one belongs in this document. */
-	searchTerms: string[];
+	searchTerms: Set<string>;
 	/** Position of the owning doc in the curated registry — the tie-breaker. */
 	order: number;
 }
@@ -218,11 +220,12 @@ export function headingsFor(source: string): DocHeading[] {
 }
 
 export function recordsFor(
-	slug: string,
-	docTitle: string,
+	doc: Pick<DocMeta, 'slug' | 'title' | 'sections' | 'searchTerms'>,
 	order: number,
 	source: string,
 ): DocumentSearchRecord[] {
+	const { slug, title: docTitle } = doc;
+	const searchTerms = new Set<string>();
 	const body = source.replace(/^---[\s\S]*?---/, '');
 	const records: DocumentSearchRecord[] = [];
 	const push = (id: string, title: string, raw: string) => {
@@ -238,7 +241,7 @@ export function recordsFor(
 			blocks,
 			text,
 			haystack: (docTitle + ' ' + title + ' ' + text).toLowerCase(),
-			searchTerms: [],
+			searchTerms,
 			order,
 		});
 	};
@@ -254,20 +257,31 @@ export function recordsFor(
 		match = HEADING.exec(body);
 		push(id, title, body.slice(start, match ? match.index : body.length));
 	}
+	if (doc.searchTerms?.length) {
+		addSearchTerms(
+			records.find((record) => record.id === doc.sections?.[0]?.id) ?? records[0],
+			doc.searchTerms,
+		);
+	}
+	for (const section of doc.sections ?? []) {
+		if (!section.searchTerms?.length) continue;
+		const target = records.find((record) => record.id === section.id);
+		if (!target) {
+			throw new Error(`Search terms for ${slug}#${section.id} must target an indexed h2 section`);
+		}
+		addSearchTerms(target, section.searchTerms);
+	}
 	return records;
 }
 
 /** Add metadata-only aliases to one section without putting them in rendered prose. */
-export function addSearchTerms(
-	record: DocumentSearchRecord | undefined,
-	terms: readonly string[] | undefined,
-): void {
-	if (!record || !terms?.length) return;
+function addSearchTerms(record: DocumentSearchRecord | undefined, terms: readonly string[]): void {
+	if (!record) return;
 	const block = { text: terms.join(' · '), code: false };
 	record.blocks.push(block);
 	record.text += ' ' + block.text;
 	record.haystack += ' ' + block.text.toLowerCase();
-	record.searchTerms.push(...terms.map(normalize));
+	for (const term of terms) record.searchTerms.add(normalize(term));
 }
 
 function normalize(value: string): string {
@@ -389,11 +403,6 @@ export function searchDocs(
 	const pattern = new RegExp('(' + terms.map(escapeRegExp).join('|') + ')', 'ig');
 	const phrasePattern = new RegExp('\\b' + escapeRegExp(q) + '\\b');
 
-	const owners = new Set(
-		index.flatMap((record) =>
-			record.kind === 'doc' && record.searchTerms.includes(q) ? [record.slug] : [],
-		),
-	);
 	const groups: SearchResult[] = [];
 	for (const record of index) {
 		if (record.kind === 'package') {
@@ -461,14 +470,14 @@ export function searchDocs(
 		if (title.includes(q)) score += 12;
 		if (text.includes(q)) score += 6;
 		// A whole-word prose hit beats an incidental substring ("state" in "stateful").
-		if (new RegExp('\\b' + escapeRegExp(q) + '\\b').test(text)) score += 4;
+		if (phrasePattern.test(text)) score += 4;
 		// Term frequency: the section that keeps returning to a term is the one
 		// that documents it, rather than one that merely uses it in an example.
 		score += Math.min(occurrences(text, q), 6) * 2;
 		// A curated search term names the document that owns the query, above a
 		// guide that merely uses it in every example. The whole document rises,
 		// so its own sections keep their order.
-		if (owners.has(record.slug)) score += 24;
+		if (record.searchTerms.has(q)) score += 24;
 
 		// Prefer lines carrying the whole query, then any single term. A section
 		// that only matched through its heading still shows its opening lines.

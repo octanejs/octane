@@ -11,14 +11,12 @@ import { createSiteSearchIndexLoader, searchSite } from '../src/lib/site-search.
 const entities = ecosystemIndex as EcosystemEntity[];
 const docRecords = [
 	...recordsFor(
-		'router-guide',
-		'TanStack Router guide',
+		{ slug: 'router-guide', title: 'TanStack Router guide' },
 		0,
 		'<h2 id="routing">Routing</h2>Configure TanStack Router for an Octane app.',
 	),
 	...recordsFor(
-		'server-rendering',
-		'Server rendering',
+		{ slug: 'server-rendering', title: 'Server rendering' },
 		1,
 		'<h2 id="rendering">Server rendering</h2>Render an Octane application on the server.',
 	),

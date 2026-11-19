@@ -798,7 +798,7 @@ const RENDERER_INVOCATION_SITE = 'r:';
 // import alias may drop the `$`, so the exported name counts too, exactly as in
 // plain modules. Native signal reads exist only for the DOM renderers.
 function customHookSignalSite(ctx, node, name) {
-	return ctx.signalHookSites &&
+	return ctx.domRuntime &&
 		ctx._universalRuntimeUnit == null &&
 		(ctx.nativeReads || name.endsWith('$') || importedSpecifierName(ctx, name)?.endsWith('$'))
 		? signalHookCallSite(ctx.filename, node)
@@ -1790,7 +1790,7 @@ function runtimeImportModuleFor(ctx, fallback, imported, local) {
 		// output can run without the DOM runtime (Lynx's main thread), so its one
 		// shared helper comes from a renderer-neutral entry.
 		if (fallback === 'octane' && !CLIENT_PUBLIC_RUNTIME_EXPORTS.has(imported)) {
-			return !ctx.domRuntimeEntries && imported === METHOD_DEP_IMPORT
+			return !ctx.domRuntime && imported === METHOD_DEP_IMPORT
 				? 'octane/internal/universal-children'
 				: 'octane/internal/client';
 		}
@@ -13025,7 +13025,7 @@ function compileInternal(
 		opaqueSignalHandles:
 			options?.opaqueSignalHandles === true || options?.__signalModuleImport === true,
 		nativeModuleStyles: options?.nativeReads === true && hasModuleStyleMaps(ast.body),
-		signalHookSites: domSignalTarget(options),
+		domRuntime: domSignalTarget(options),
 		// A split Hydrate query module is invoked as the existing server-rendered
 		// boundary body. Its sole component child must therefore keep the server's
 		// own component marker pair instead of borrowing the Hydrate block range.
@@ -13055,8 +13055,6 @@ function compileInternal(
 		userRuntimeNames: new Set(), // specifiers USER code references — imported verbatim
 		userRuntimeNamespaces: new Set(), // `import * as ns from 'octane'`
 		userRuntimeDefaults: new Set(), // preserved verbatim; package resolution owns validity
-		// Universal renderers resolve bare `octane` to their own runtime.
-		domRuntimeEntries: domSignalTarget(options),
 		runtimeImportRoutes: [
 			...(options?.__runtimeImportRoutes ?? []),
 			...universalUnits.map((unit) => ({
@@ -14723,7 +14721,7 @@ function compileServer(
 		opaqueSignalHandles:
 			options?.opaqueSignalHandles === true || options?.__signalModuleImport === true,
 		nativeModuleStyles: options?.nativeReads === true && hasModuleStyleMaps(ast.body),
-		signalHookSites: domSignalTarget(options),
+		domRuntime: domSignalTarget(options),
 		hmr: false, // SSR never hot-swaps in place; client/server production slot shapes stay aligned
 		dev: !!(options && options.dev),
 		signalBindingsUsed: ast._octaneSignalDeclarations === true,
@@ -14739,7 +14737,6 @@ function compileServer(
 		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
 		userRuntimeNames: new Set(), // specifiers USER code references — imported verbatim
 		userRuntimeNamespaces: new Set(), // rewritten to the server runtime module
-		domRuntimeEntries: domSignalTarget(options),
 		userRuntimeDefaults: new Set(),
 		consumedRuntimeLocals,
 		inspect: !!(options && options.inspect),

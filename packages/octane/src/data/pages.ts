@@ -313,8 +313,16 @@ function createPages(store: DataStore, read: Read<any, any>, chain: Chain): Page
 		}
 		// A created record joins every page of a chain that selects its entity; show it once,
 		// after the rows loaded so far, until the server places it.
-		if (chain.linked && current.length > 1 && new Set(rows).size < rows.length)
-			rows = rows.filter((row, index) => rows.indexOf(row, index + 1) < 0);
+		if (chain.linked && current.length > 1) {
+			const remaining = new Set(rows);
+			if (remaining.size < rows.length) {
+				// Keep the last strictly equal row. NaN is distinct from every row.
+				rows = rows
+					.reverse()
+					.filter((row) => Number.isNaN(row) || remaining.delete(row))
+					.reverse();
+			}
+		}
 		// The same rows are the same array, so a reader of the rows alone sees no change.
 		const before = snapshot?.value;
 		if (before?.length === rows.length && rows.every((row, index) => row === before[index]))

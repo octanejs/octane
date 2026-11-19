@@ -62,7 +62,7 @@ function RetainedPresenceImpl(props: RetainedPresenceProps, scope: Scope) {
 	const [entry, setEntry, getEntry] = useLinkedState(child, reconcile, undefined, ENTRY);
 	const [owner] = useState(
 		() => ({
-			hosts: new Set<object>(),
+			host: null as object | null,
 			callback: undefined as (() => void) | undefined,
 			settleQueued: false,
 		}),
@@ -90,18 +90,18 @@ function RetainedPresenceImpl(props: RetainedPresenceProps, scope: Scope) {
 				);
 			},
 			register(token) {
-				if (owner.hosts.size && !owner.hosts.has(token))
+				if (owner.host !== null && owner.host !== token)
 					throw new Error('RetainedPresence supports one exiting motion host.');
-				owner.hosts.add(token);
+				owner.host = token;
 				return () => {
-					owner.hosts.delete(token);
+					if (owner.host === token) owner.host = null;
 					if (!owner.settleQueued) {
 						owner.settleQueued = true;
 						queueMicrotask(() => {
 							owner.settleQueued = false;
 							if (scope.block.disposed) return;
 							const current = getEntry();
-							if (!owner.hosts.size && !current.present) value.complete(current.generation);
+							if (owner.host === null && !current.present) value.complete(current.generation);
 						});
 					}
 				};
@@ -124,7 +124,7 @@ function RetainedPresenceImpl(props: RetainedPresenceProps, scope: Scope) {
 	);
 	useLayoutEffect(
 		() => {
-			if (!entry.present && owner.hosts.size === 0) value.complete(entry.generation);
+			if (!entry.present && owner.host === null) value.complete(entry.generation);
 		},
 		[entry.present, entry.generation],
 		SETTLE,

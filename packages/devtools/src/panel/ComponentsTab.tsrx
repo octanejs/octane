@@ -4,7 +4,7 @@
 // (startBridge) and renders the live component tree plus a selected-node state
 // inspector. Read-only — selecting a node only asks the app to describe it
 // (`inspect-request`); it never mutates app state (see docs/devtools.md P1 scope).
-import { useEffect, useState } from 'octane';
+import { useEffect, useMemo, useState } from 'octane';
 import type { OctaneNode } from 'octane';
 import {
 	OctaneDevtoolsEventClient,
@@ -94,6 +94,7 @@ function flattenTree(nodes: readonly WireTreeNode[]): TreeLine[] {
 export function ComponentsTab(props: { client: OctaneDevtoolsEventClient }): OctaneNode {
 	const { client } = props;
 	const [nodes, setNodes] = useState<WireTreeNode[]>([]);
+	const lines = useMemo(() => flattenTree(nodes));
 	const [selected, setSelected, getSelected] = useState<number | null>(null);
 	const [detail, setDetail] = useState<NodeDetail | null>(null);
 
@@ -129,7 +130,7 @@ export function ComponentsTab(props: { client: OctaneDevtoolsEventClient }): Oct
 				@if (nodes.length === 0) {
 					<div class="odt-empty">No mounted roots yet.</div>
 				} @else {
-					@for (const line of flattenTree(nodes); key line.node.id) {
+					@for (const line of lines; key line.node.id) {
 						<button
 							class={['odt-tree-row', selected === line.node.id && 'odt-selected']}
 							style={{ paddingLeft: `${6 + line.depth * 12}px` }}
