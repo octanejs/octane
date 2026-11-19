@@ -35,6 +35,7 @@ import {
 	MAP_CALLBACK_SCOPE,
 	MAP_PARAMETER_TDZ,
 	MAP_PARAMETER_WRITE,
+	MOTION_PRESENCE_OWNER,
 	projectTypeAt,
 	REACT_TYPE_PROJECTION,
 	RETAINED_REGISTRY_BOUNDARY,
@@ -1705,6 +1706,7 @@ export async function runCodemod(
 				note.rule === INTL_PROVIDER_DEFAULTS ||
 				note.rule === ELEMENT_CHILD_ALIAS ||
 				note.rule === REACT_TYPE_PROJECTION ||
+				note.rule === MOTION_PRESENCE_OWNER ||
 				note.rule === RETAINED_REGISTRY_BOUNDARY ||
 				note.rule === RETAINED_WORKSPACE_HOOK,
 		);

@@ -156,7 +156,7 @@
         {
           "path": "packages/radix/audit/test-classifications.json",
           "role": "support",
-          "sha256": "f79be73ada5b4f08dd8131fc8ab9a1bc4c6a2a35dad6743e83e65b4f20bc6caa"
+          "sha256": "0648754325c542cd481a7a2188ce28a12834bfdbc09569b2e60dca2415a553f3"
         },
         {
           "path": "packages/radix/scripts/check-upstream-ledger.mjs",
@@ -171,7 +171,7 @@
         {
           "path": "packages/radix/audit/export-crosswalk.json",
           "role": "support",
-          "sha256": "5115fa8235e1a41a7cdcd30e6a756971770fc1b5ee2d1e208e40d9374fde0030"
+          "sha256": "cbc4dc8eb34ed05d56f59fcfee5b00fa36c8d21d4352b5473419e0c137309561"
         }
       ]
     },

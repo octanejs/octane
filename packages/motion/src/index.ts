@@ -65,6 +65,7 @@ import {
 	type LayoutBox,
 } from './layout';
 import { LayoutAnimation } from './layout-animation';
+import { RetainedPresenceContext } from './presence';
 import { stopVisualElement } from './useAnimationControls';
 
 // A plain-TS component gets its OWN block per instance (componentSlot), so fixed
@@ -81,6 +82,9 @@ const CONTROLLER_PROPS = Symbol.for('octane-motion:controller-props');
 const CONTROLLER = Symbol.for('octane-motion:controller');
 const GESTURE = Symbol.for('octane-motion:gesture');
 const EXIT = Symbol.for('octane-motion:exit');
+const PRESENCE_HOST = Symbol.for('octane-motion:presence-host');
+const PRESENCE_STATE = Symbol.for('octane-motion:presence-state');
+const PRESENCE_EXIT = Symbol.for('octane-motion:presence-exit');
 const LAYOUT = Symbol.for('octane-motion:layout');
 const DRAG = Symbol.for('octane-motion:drag');
 const DRAG_LISTENER = Symbol.for('octane-motion:drag-listener');
@@ -420,6 +424,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		const layoutGroup = useContext(LayoutGroupContext);
 		const lazy = useContext(LazyMotionContext);
 		const inherited = useContext(VariantContext);
+		const presence = useContext(RetainedPresenceContext);
 		// Read the PARENT's stagger orchestration before providing our own below.
 		const parentStagger = useContext(StaggerContext);
 		const features = preloadedFeatures ? domMax : lazy.features;
@@ -469,6 +474,10 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 				({
 					host: { current: null as HTMLElement | null },
 					animationComplete: undefined,
+					presence: null,
+					presenceAnimate: undefined,
+					presenceInterruptedTarget: undefined,
+					presenceFallbackRebind: undefined,
 					namedSnapshot: null,
 					committedControllerProps: undefined,
 					nextController: undefined,
@@ -574,6 +583,8 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 							: props;
 					latest.committedControllerProps = committed;
 					latest.nextController = controller;
+					if (controller && latest.controller && latest.controller !== controller)
+						latest.presenceFallbackRebind?.();
 					if (controller && latest.controller === controller && latest.controllerVisual) {
 						const visual = latest.controllerVisual;
 						const previousStyle = visual.props.style;
@@ -689,13 +700,177 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 			);
 		}
 
+		if (presence) {
+			useInsertionEffect(
+				() => {
+					latest.presence = presence;
+					latest.presenceAnimate = resolvedAnimate;
+				},
+				[presence],
+				PRESENCE_STATE,
+			);
+		}
+		const eligibleExit = !!(presence && animationEnabled && exitS.values);
+		if (eligibleExit)
+			useInsertionEffect(() => presence!.register(latest), [presence], PRESENCE_HOST);
+		if (presence) {
+			useLayoutEffect(
+				() => {
+					const node = latest.host.current as HTMLElement | null;
+					const interrupted = latest.presenceInterruptedTarget;
+					latest.presenceInterruptedTarget = undefined;
+					if (presence!.present) {
+						if (!controller || !interrupted || !node) return;
+						const visual = visualElementStore.get(node);
+						let fallback: Record<string, any> | undefined;
+						for (const key in interrupted) {
+							const value = visual?.getBaseTarget(key);
+							if (value !== undefined) (fallback ??= {})[key] = value;
+						}
+						if (fallback) {
+							const controls = animateTarget(
+								node,
+								fallback,
+								latest.transition,
+								latest.shouldReduceMotion,
+							);
+							const animations: Record<string, any> = {};
+							for (const key in fallback) {
+								const animation = visual?.getValue(key)?.animation;
+								if (animation) animations[key] = animation;
+							}
+							const rebind = () => {
+								let owned: Record<string, any> | undefined;
+								for (const key in animations)
+									if (visual?.getValue(key)?.animation === animations[key])
+										(owned ??= {})[key] = fallback[key];
+								if (owned) latest.presenceInterruptedTarget = owned;
+							};
+							latest.presenceFallbackRebind = rebind;
+							return () => {
+								if (latest.presenceFallbackRebind === rebind)
+									latest.presenceFallbackRebind = undefined;
+								controls.stop();
+							};
+						}
+						return;
+					}
+					if (!eligibleExit) return;
+					const generation = presence!.generation;
+					if (!node?.isConnected || getRendererOwnerVisibility(scope) !== 'visible') {
+						presence!.complete(generation);
+						return;
+					}
+					const { transitionEnd, ...target } = exitS.values;
+					let endState:
+						| Array<{
+								key: string;
+								attribute: string | null;
+								inline: string | null;
+								priority: string;
+								value: any;
+								hadValue: boolean;
+						  }>
+						| undefined;
+					let active = true;
+					let controls: any;
+					let endControls: any;
+					const finish = () => {
+						if (!active) return;
+						const notify = () => {
+							if (!active) return;
+							try {
+								latest.animationComplete?.(props.exit);
+							} catch (error) {
+								if (typeof reportError === 'function') reportError(error);
+								else console.error(error);
+							}
+							if (active) presence!.complete(generation);
+						};
+						if (transitionEnd) {
+							// End values can land before their completion callback. Capture only
+							// those fields immediately before applying them, for possible reentry.
+							const visual = visualElementStore.get(node);
+							for (const key in transitionEnd) {
+								const name = motionAttributeName(key);
+								const attribute = svg && isMotionSVGAttribute(name, svgRoot) ? name : null;
+								const value = visual?.getValue(key);
+								const authored = props.style?.[key];
+								(endState ??= []).push({
+									key,
+									attribute,
+									inline: attribute
+										? node.getAttribute(attribute)
+										: node.style.getPropertyValue(name),
+									priority: attribute ? '' : node.style.getPropertyPriority(name),
+									value:
+										value?.get() ??
+										(isMotionValue(authored) ? authored.get() : authored) ??
+										latest.frame?.values?.[key],
+									hadValue: !!value,
+								});
+							}
+							endControls = animateTarget(
+								node,
+								transitionEnd,
+								{ duration: 0 },
+								latest.shouldReduceMotion,
+							);
+							whenDone(endControls, notify);
+						} else notify();
+					};
+					if (Object.keys(target).length) {
+						controls = animateTarget(
+							node,
+							target,
+							exitS.transition ?? latest.transition,
+							latest.shouldReduceMotion,
+						);
+						whenDone(controls, finish);
+					} else finish();
+					return () => {
+						active = false;
+						controls?.stop();
+						endControls?.stop();
+						if (endControls && latest.presence?.present && endState) {
+							const visual = visualElementStore.get(node);
+							for (const field of endState) {
+								if (latest.presenceAnimate && Object.hasOwn(latest.presenceAnimate, field.key))
+									continue;
+								if (field.hadValue) visual?.getValue(field.key)?.set(field.value);
+								else visual?.removeValue(field.key);
+								if (field.attribute) {
+									if (field.inline === null) node.removeAttribute(field.attribute);
+									else node.setAttribute(field.attribute, field.inline);
+								} else if (isTransformKey(field.key)) {
+									if (field.value === undefined) removeTransformFn(node, field.key);
+									else applyStyleValue(node, field.key, field.value);
+								} else if (field.inline)
+									node.style.setProperty(
+										motionAttributeName(field.key),
+										field.inline,
+										field.priority,
+									);
+								else node.style.removeProperty(motionAttributeName(field.key));
+							}
+						}
+						if (controls && latest.presence?.present) latest.presenceInterruptedTarget = target;
+						if (!scope.block.disposed && getRendererOwnerVisibility(scope) === 'activity')
+							presence!.complete(generation);
+					};
+				},
+				[presence!.present, presence!.generation, controller, eligibleExit],
+				PRESENCE_EXIT,
+			);
+		}
+
 		// `initial`: apply instantly on mount (before the animate effect runs).
 		// OCTANE DIVERGENCE[motion-initial-only-no-style-materialization][conformance:initial-only-no-style-materialization]
 		useLayoutEffect(
 			() => {
 				const node: HTMLElement = latest.host.current;
 				latest.hostMounted = true;
-				if (animationEnabled && resolvedInitial && !controller) {
+				if (animationEnabled && resolvedInitial && !controller && presence?.present !== false) {
 					animate(node, resolvedInitial, { duration: 0 });
 				}
 			},
@@ -710,7 +885,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		const transitionKey = stableKey(transition);
 		const animationComplete = props.onAnimationComplete;
 		// An existing animation can finish after a render that never commits.
-		if (animationEnabled && resolvedAnimate && animationComplete) {
+		if (animationEnabled && (resolvedAnimate || presence) && animationComplete) {
 			useInsertionEffect(
 				() => {
 					latest.animationComplete = animationComplete;
@@ -724,9 +899,10 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		}
 		// A changed name can complete even when its resolved target needs no new animation.
 		// Publish the accepted label during commit; layout effects run child-first.
-		const namedKey = isVariantLabel(animateLabel)
-			? `${typeof animateLabel === 'string' ? 's' : 'a'}:${stableKey(animateLabel)}`
-			: null;
+		const namedKey =
+			presence?.present !== false && isVariantLabel(animateLabel)
+				? `${typeof animateLabel === 'string' ? 's' : 'a'}:${stableKey(animateLabel)}`
+				: null;
 		const previousNamed = latest.namedSnapshot;
 		if (namedKey !== null || previousNamed) {
 			const labelOnly =
@@ -784,6 +960,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 					latest.initialAnimationKey = null;
 					if (skip) return;
 				}
+				if (presence?.present === false) return;
 				if (resolvedAnimate) {
 					let t = transition;
 					const o = latest.staggerParent;
@@ -811,7 +988,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 					};
 				}
 			},
-			[animationEnabled, animationKey, transitionKey, shouldReduceMotion],
+			[animationEnabled, animationKey, transitionKey, shouldReduceMotion, presence?.present],
 			ANIMATE,
 		);
 
@@ -1177,7 +1354,12 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 				if (latest.layoutEnabled && layoutId && n?.isConnected) {
 					recordLayoutCell(layoutId, boxOf(n));
 				}
-				if (!latest.animationEnabled) return;
+				if (
+					(latest.presence &&
+						(!latest.presence.present || !latest.presence.isCurrent(latest.presence.generation))) ||
+					!latest.animationEnabled
+				)
+					return;
 				const exit = latest.exit;
 				if (!exit || !n || !n.isConnected || n.parentNode == null) return;
 				if (!scope.block.disposed && getRendererOwnerVisibility(scope) !== 'visible') return;
@@ -1432,6 +1614,7 @@ export function LazyMotion(props: LazyMotionProps, _scope?: unknown) {
 	);
 }
 
+export { RetainedPresence, useIsPresent, type RetainedPresenceProps } from './presence';
 export { useAnimate } from './useAnimate';
 export { useAnimationControls } from './useAnimationControls';
 export { useMotionValue } from './useMotionValue';
