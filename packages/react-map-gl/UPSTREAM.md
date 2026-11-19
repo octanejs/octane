@@ -59,7 +59,7 @@ Every runtime and type export of `modules/react-mapbox/src/index.ts` at the pin.
 | `Marker` | component | ported | `tests/upstream/marker.test.ts` (4 cases), differential |
 | `Popup` | component | ported | `tests/upstream/popup.test.ts` (2 cases), `differential:1`, `differential:3` |
 | `Source` | component | ported, one divergence | `tests/upstream/source-layer.test.ts` (1 case), `differential:2` |
-| `Layer` | component | ported, one divergence | `tests/upstream/source-layer.test.ts` (2 cases), `differential:2` |
+| `Layer` | component | ported, two divergences | `tests/upstream/source-layer.test.ts` (2 cases), `differential:2`, `differential:7` |
 | `AttributionControl` | component | ported | `tests/upstream/controls.test.ts:1` |
 | `FullscreenControl` | component | ported | `tests/upstream/controls.test.ts:2` |
 | `GeolocateControl` | component | ported | `tests/upstream/controls.test.ts:3` |
@@ -179,7 +179,7 @@ lane remains open work.
 
 ## Divergences
 
-Four, two of them recorded in `audit/react-parity.json` and bound to a case:
+Five, three of them recorded in `audit/react-parity.json` and bound to a case:
 
 1. **`react-map-gl-source-id-by-context`** — upstream delivers a `<Source>` id to
    child layers with `cloneElement(child, {source: id})`. Octane cannot clone a
@@ -208,6 +208,19 @@ Four, two of them recorded in `audit/react-parity.json` and bound to a case:
    custom element, so the marker is invisible, and the port draws the default
    pin. Pinned by `tests/runtime/marker-element.test.ts` and, against real
    React, by `differential:6`.
+5. **`react-map-gl-layer-missing-anchor`** — upstream hands `beforeId` straight
+   to `addLayer` and `moveLayer`. When it names a layer the style does not hold
+   yet, `Style#moveLayer` takes the layer out of the draw order before it
+   reports the missing anchor, and `getLayer` still returns the layer, so no
+   later render adds it back. Layers anchored each beneath the next hit this
+   whenever one is added on top: the lower layer re-renders first and re-anchors
+   to a layer that does not exist yet. The port leaves a layer in place (or adds
+   it on top) until its anchor exists, keeps the anchor it last applied, and
+   moves it on the `styledata` that follows. `differential:7` runs the same
+   stack through both bindings: upstream loses the lower layer, the port keeps
+   it beneath the new one. The double models Mapbox's missing-anchor behavior
+   (mapbox-gl 3.9.0 `Style#addLayer` and `Style#moveLayer`) and the `styledata`
+   a layer change fires on the next frame.
 
 ## Regenerating
 

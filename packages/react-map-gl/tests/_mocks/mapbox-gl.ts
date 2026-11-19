@@ -345,29 +345,64 @@ class MapImpl extends Evented {
 		return this;
 	}
 
+	/**
+	 * Mapbox reports an anchor the style does not hold through the error event
+	 * and adds nothing (`Style#addLayer`, mapbox-gl 3.9.0).
+	 */
 	addLayer(layer: any, beforeId?: string): this {
-		const index = beforeId ? this._layers.findIndex((l) => l.id === beforeId) : -1;
-		if (index >= 0) this._layers.splice(index, 0, layer);
-		else this._layers.push(layer);
+		const index = beforeId ? this._layers.findIndex((l) => l.id === beforeId) : this._layers.length;
+		if (index < 0) return this._missingLayer(beforeId!);
+		this._layers.splice(index, 0, layer);
+		this._styleChanged();
 		return this;
 	}
 
 	getLayer(id: string): any {
-		return this._layers.find((layer) => layer.id === id);
+		return this._layers.find((layer) => layer.id === id) ?? this._unordered.get(id);
 	}
 
 	removeLayer(id: string): this {
 		const index = this._layers.findIndex((layer) => layer.id === id);
 		if (index >= 0) this._layers.splice(index, 1);
+		this._unordered.delete(id);
+		this._styleChanged();
 		return this;
 	}
 
+	/**
+	 * `Style#moveLayer` takes the layer out of the draw order before it looks up
+	 * the anchor. A missing anchor leaves the layer out of the order, so it no
+	 * longer draws, while `getLayer` still returns it.
+	 */
+	private readonly _unordered = new Map<string, any>();
 	moveLayer(id: string, beforeId?: string): this {
 		const layer = this.getLayer(id);
-		if (!layer) return this;
-		this.removeLayer(id);
-		this.addLayer(layer, beforeId);
+		if (!layer || id === beforeId) return this;
+		this._layers.splice(this._layers.indexOf(layer), 1);
+		const index = beforeId ? this._layers.findIndex((l) => l.id === beforeId) : this._layers.length;
+		if (index < 0) {
+			this._unordered.set(id, layer);
+			return this._missingLayer(beforeId!);
+		}
+		this._layers.splice(index, 0, layer);
+		this._styleChanged();
 		return this;
+	}
+
+	private _missingLayer(id: string): this {
+		this.fire('error', { error: new Error(`Layer with id "${id}" does not exist on this map.`) });
+		return this;
+	}
+
+	/** A changed layer order reaches listeners as `styledata` on the next frame. */
+	private _styleChangePending = false;
+	private _styleChanged(): void {
+		if (this._styleChangePending) return;
+		this._styleChangePending = true;
+		setTimeout(() => {
+			this._styleChangePending = false;
+			if (!this.removed) this.fire('styledata');
+		}, 0);
 	}
 
 	setLayoutProperty(id: string, key: string, value: unknown): this {
