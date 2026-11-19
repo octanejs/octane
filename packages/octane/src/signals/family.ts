@@ -33,8 +33,7 @@ import {
 
 type Member = PlainCell | PlainComputed;
 
-/** What a family keeps per member, beside the member itself. */
-interface MemberEntry {
+interface IdleEntry {
 	readonly family: Family<any, any>;
 	readonly id: unknown;
 	/** Whether something observes the member, as its `watched` hook counts observers. */
@@ -44,9 +43,10 @@ interface MemberEntry {
 	timer: ReturnType<typeof setTimeout> | undefined;
 }
 
-const entries = new WeakMap<Member, MemberEntry>();
+// Membership prevents a handle from joining twice. Only idle eviction needs timing state.
+const entries = new WeakMap<Member, IdleEntry | null>();
 
-function schedule(member: Member, entry: MemberEntry, delay: number): void {
+function schedule(member: Member, entry: IdleEntry, delay: number): void {
 	const timer = setTimeout(() => {
 		entry.timer = undefined;
 		if (entry.observed) return;
@@ -60,7 +60,7 @@ function schedule(member: Member, entry: MemberEntry, delay: number): void {
 }
 
 /** Idle members wait out their time once unobserved, unless an observer comes back. */
-function watchIdle(member: Member, entry: MemberEntry): void {
+function watchIdle(member: Member, entry: IdleEntry): void {
 	const own = watchedHook(member);
 	setWatched(member, () => {
 		entry.observed = true;
@@ -153,17 +153,20 @@ class Family<K, H extends SignalHandle<unknown>> implements SignalFamily<K, H> {
 			member.subs !== undefined
 		)
 			throw new TypeError(formatClientError(371));
-		const entry: MemberEntry = {
-			family: this,
-			id,
-			observed: false,
-			releasedAt: Date.now(),
-			timer: undefined,
-		};
+		const entry =
+			this.idle < 0
+				? null
+				: {
+						family: this,
+						id,
+						observed: false,
+						releasedAt: Date.now(),
+						timer: undefined,
+					};
 		entries.set(member, entry);
 		this.members.set(id, member);
 		if (this.members.size === 1) this.guard();
-		if (this.idle >= 0) {
+		if (entry) {
 			watchIdle(member, entry);
 			schedule(member, entry, this.idle);
 		}
@@ -226,7 +229,7 @@ class Family<K, H extends SignalHandle<unknown>> implements SignalFamily<K, H> {
 	}
 
 	private retire(member: Member): void {
-		const timer = entries.get(member)!.timer;
+		const timer = entries.get(member)?.timer;
 		if (timer !== undefined) clearTimeout(timer);
 		entries.delete(member);
 		let retired = this.retired;

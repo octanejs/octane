@@ -19,7 +19,7 @@ benchmarks/dbmon/
 ├── octane-jsx/    # Vite app, dev :5197 — same app authored in React-style .tsx
 ├── react/         # Vite app, dev :5198 (React 19, production mode)
 ├── ripple/        # Vite app, dev :5199 (Ripple — track + @for)
-├── solid/         # Vite app, dev :5200 (Solid 2.0 — createStore + reconcile + <For>)
+├── solid/         # Vite app, dev :5200 (Solid 2.0 — shallow store + keyed <For>)
 ├── vue-vapor/     # Vite app, dev :5220 (Vue 3.6 Vapor — shallowRef + keyed v-for)
 ├── preact/       # Vite app, dev :5263 (native Preact hooks)
 ├── svelte/       # Vite app, dev :5274 (Svelte 5 runes + keyed #each)
@@ -34,21 +34,13 @@ Both compile through `octane/compiler/vite`, so the two octane columns read the
 JSX backwards-compat path's cost on this update-heavy workload. React is the
 canonical VDOM baseline, and Ripple (`const items = track(...)` with `.value` reads + a keyed
 `@for`) reassigns the whole array each tick — so octane/react/ripple share the
-exact same immutable-newArray + keyed-reconcile model. Solid is the fine-grained
-foil: a plain `createStore` of the rows with `reconcile` on each tick (the
-[solid-dbmon](https://github.com/ryansolid/solid-dbmon) pattern), so unchanged
-rows never re-render and only changed leaf signals update. Vue Vapor (3.6,
+exact same immutable-newArray + keyed-reconcile model. Solid 2.0 replaces the
+row array in a shallow store on each tick. Its `<For>` keys rows by id, and
+each row's cells read the current record through an accessor. Vue Vapor (3.6,
 `<script setup vapor>` — no VDOM) holds the rows in a `shallowRef` replaced
 wholesale each tick, so it shares the immutable-newArray + keyed-reconcile
-model while its per-cell vapor renderEffects do the cell diffing. All eight
-render identical DOM from the same seeded data.
-
-> dbmon is a deliberate worst case for fine-grained reactivity: every tick is a
-> fresh, non-reference-checkable object graph, so `reconcile` must deep-diff the
-> entire dataset to discover what changed, and the per-cell reactive setup over a
-> ~14k-value nested store is heavy. The Solid column trails the keyed-reconcile
-> frameworks here for exactly that reason — it's the scenario the solid-dbmon repo
-> exists to illustrate, not a general Solid result.
+model while its per-cell vapor renderEffects do the cell diffing. All targets
+render the same table from the same seeded data.
 
 ## Shape
 

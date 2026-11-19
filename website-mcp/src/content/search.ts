@@ -2,7 +2,6 @@
 // website's ⌘K dialog uses (docs-search-core.ts), built eagerly at module scope
 // from the build-time snapshot instead of lazily in the browser.
 import {
-	addSearchTerms,
 	liftMarkdownHeadings,
 	recordsFor,
 	searchDocs,
@@ -22,24 +21,7 @@ export type { SearchGroup, SearchRecord };
 const DOCUMENT_SEARCH_INDEX: readonly SearchRecord[] = DOCS.flatMap((doc, order) => {
 	// The sectionizer keys on `<h2 id="…">` anchors: hand-authored in MDX, lifted
 	// from `## ` headings in plain Markdown (repo deep dives, best-practices.md).
-	const records = recordsFor(doc.slug, doc.title, order, liftMarkdownHeadings(doc.markdown));
-	// Extra ranking hints attach to the doc's first section — mirrors the
-	// website's loadSearchIndex.
-	addSearchTerms(
-		records.find((record) => record.id === doc.sections[0]?.id) ?? records[0],
-		doc.searchTerms,
-	);
-	for (const section of doc.sections) {
-		if (!section.searchTerms?.length) continue;
-		const target = records.find((record) => record.id === section.id);
-		if (!target) {
-			throw new Error(
-				`Search terms for ${doc.slug}#${section.id} must target an indexed h2 section`,
-			);
-		}
-		addSearchTerms(target, section.searchTerms);
-	}
-	return records;
+	return recordsFor(doc, order, liftMarkdownHeadings(doc.markdown));
 });
 
 interface PackageMetadata {

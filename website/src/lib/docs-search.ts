@@ -6,13 +6,7 @@
 // The sectionizer and ranking live in docs-search-core.ts (pure, shared with
 // the remote MCP server); this module owns the lazy index build over the raw
 // MDX glob and re-exports the core surface for the dialog and tests.
-import {
-	addSearchTerms,
-	docSlugOf,
-	docSource,
-	recordsFor,
-	type DocumentSearchRecord,
-} from './docs-search-core.ts';
+import { docSlugOf, docSource, recordsFor, type DocumentSearchRecord } from './docs-search-core.ts';
 
 export * from './docs-search-core.ts';
 
@@ -34,24 +28,7 @@ export function loadSearchIndex(): Promise<DocumentSearchRecord[]> {
 					const doc = order === -1 ? undefined : docs[order];
 					const rank = order === -1 ? docs.length : order;
 					const source = docSource(path, await load());
-					const records = recordsFor(slug, doc?.title ?? slug, rank, source);
-					if (doc) {
-						addSearchTerms(
-							records.find((record) => record.id === doc.sections?.[0]?.id) ?? records[0],
-							doc.searchTerms,
-						);
-						for (const section of doc.sections ?? []) {
-							if (!section.searchTerms?.length) continue;
-							const target = records.find((record) => record.id === section.id);
-							if (!target) {
-								throw new Error(
-									`Search terms for ${doc.slug}#${section.id} must target an indexed h2 section`,
-								);
-							}
-							addSearchTerms(target, section.searchTerms);
-						}
-					}
-					return records;
+					return recordsFor(doc ?? { slug, title: slug }, rank, source);
 				}),
 			).then((groups) => groups.flat()),
 		);
