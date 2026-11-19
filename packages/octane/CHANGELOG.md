@@ -1,5 +1,44 @@
 # octane
 
+## 0.22.0
+
+### Minor Changes
+
+- b6dbbe0: `octane` and `octane/server` now export only public API. Compiler-emitted
+  helpers, binding infrastructure and test-only hooks (`template`, `bag*`,
+  `evt*`, `withSlot`, `hookSlots`, `injectStyle`, `drainPassiveEffects`, the
+  `ssr*` string builders, and every `__`-prefixed name) move to
+  `octane/internal/client` and `octane/internal/server`, and compiled output
+  imports them from there. Server builds retarget `octane/internal/client` to
+  `octane/internal/server`, as they already do for bare `octane`.
+  `FragmentInstance` stays public on `octane`. Universal renderer output imports
+  its one shared helper, `__methodDep`, from `octane/internal/universal-children`,
+  so it never reaches the DOM runtime.
+
+  With an explicit `runtime` that selects Octane's CommonJS build, the Rspack
+  plugin resolves the internal entries from the same build, so compiled helpers
+  share that runtime instance.
+
+  Bindings that hand-import these helpers now read them from the internal
+  entries. Recompile any code that was compiled by an earlier Octane compiler,
+  because that output imports the helpers from `octane`.
+- 1931c90: Update the TSRX toolchain to `@tsrx/core` 0.6.3 and `@tsrx/oxc` 0.24.0. Install `@tsrx/oxc@0.24.0` as the Node compiler's parser peer.
+
+  Octane now reports TSRX2030 for a `var` declared in a nested `@{ … }` block or an `@if`, `@for`, `@switch` or `@try` body, as `@tsrx/core` does on its own targets. Previously Octane hoisted such a `var` to the component function, while the editor typed it in the block. Declare it with `const` or `let`, or move it to the component's setup.
+
+### Patch Changes
+
+- a245b0c: Support semantic equality and observation lifecycle options on authored writable and synchronous derived signal declarations.
+- 857b26e: Preserve native map observations when a JSX list receiver is an explicit Proxy construction or a local const bound to one.
+- 1c62ea0: Allow reads and views to restore persisted data concurrently with a required live request.
+- 56d7687: Avoid discarded arrays when executing universal owners and retrying lazy list rows.
+- 343bbec: Merge overlapping cursor pages in linear time, skip eviction bookkeeping for signal families without an idle timeout, and share the compiler's client and server export lists.
+- 2aae6b0: Preserve callback evaluation before rendering ordinal keyed component map rows whose JSX reads properties.
+- dff5a90: Allow React signal readers to supply a historical server snapshot during hydration.
+- ad10124: Preserve a pending signal's value when an urgent rebased write compares equal.
+- 00e05f6: Initialize the index before destructuring an authored `@for` item on the server when a binding default or computed key reads that index inside a larger expression, such as `value = index + 1`, `value = id + index`, or `[index + 1]: value`.
+- c1788cc: Start watched signal subscriptions only when a native render commits, keeping speculative and retry reads quiet.
+
 ## 0.21.0
 
 ### Minor Changes
