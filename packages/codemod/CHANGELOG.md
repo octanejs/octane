@@ -1,5 +1,32 @@
 # @octanejs/codemod
 
+## 0.2.8
+
+### Patch Changes
+
+- 5458caf: Enable the React Intl and scoped-store migration adapters when the project uses Octane 0.22.
+- 410f78d: Keep retained React registry and local-hook proofs consistent when TypeScript resolves project files through physical paths.
+- a86d4e0: Preserve proven React registry factories in mixed modules and block writes when the retained registry type boundary cannot be proved.
+- 195d29d: Migrate direct selected context Provider and Consumer members through unambiguous TypeScript path aliases while preserving ordinary provider objects.
+- 5cf1203: Add an explicit one-child `RetainedPresence` owner and `useIsPresent` hook. Keep React presence-hook imports for manual migration unless a supported owner is established.
+- 343bbec: Analyze an imported context once per module when migrating repeated provider and consumer references.
+- 1931c90: Update the TSRX toolchain to `@tsrx/core` 0.6.3 and `@tsrx/oxc` 0.24.0. Install `@tsrx/oxc@0.24.0` as the Node compiler's parser peer.
+
+  Octane now reports TSRX2030 for a `var` declared in a nested `@{ … }` block or an `@if`, `@for`, `@switch` or `@try` body, as `@tsrx/core` does on its own targets. Previously Octane hoisted such a `var` to the component function, while the editor typed it in the block. Declare it with `const` or `let`, or move it to the component's setup.
+- Updated dependencies [a245b0c]
+- Updated dependencies [857b26e]
+- Updated dependencies [1c62ea0]
+- Updated dependencies [56d7687]
+- Updated dependencies [343bbec]
+- Updated dependencies [2aae6b0]
+- Updated dependencies [b6dbbe0]
+- Updated dependencies [dff5a90]
+- Updated dependencies [ad10124]
+- Updated dependencies [00e05f6]
+- Updated dependencies [1931c90]
+- Updated dependencies [c1788cc]
+  - octane@0.22.0
+
 ## 0.2.7
 
 ### Patch Changes

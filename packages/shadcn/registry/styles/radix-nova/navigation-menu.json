@@ -12,8 +12,8 @@
     }
   ],
   "dependencies": [
-    "@octanejs/lucide@0.1.67",
-    "@octanejs/radix@0.1.74",
+    "@octanejs/lucide@0.1.68",
+    "@octanejs/radix@0.1.75",
     "class-variance-authority",
     "cn"
   ]

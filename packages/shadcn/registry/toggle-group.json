@@ -12,7 +12,7 @@
     }
   ],
   "dependencies": [
-    "@octanejs/base-ui@0.1.75",
+    "@octanejs/base-ui@0.1.76",
     "class-variance-authority",
     "cn"
   ],

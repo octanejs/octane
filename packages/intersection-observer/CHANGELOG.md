@@ -1,5 +1,23 @@
 # @octanejs/intersection-observer
 
+## 0.0.39
+
+### Patch Changes
+
+- Updated dependencies [a245b0c]
+- Updated dependencies [857b26e]
+- Updated dependencies [1c62ea0]
+- Updated dependencies [56d7687]
+- Updated dependencies [343bbec]
+- Updated dependencies [2aae6b0]
+- Updated dependencies [b6dbbe0]
+- Updated dependencies [dff5a90]
+- Updated dependencies [ad10124]
+- Updated dependencies [00e05f6]
+- Updated dependencies [1931c90]
+- Updated dependencies [c1788cc]
+  - octane@0.22.0
+
 ## 0.0.38
 
 ### Patch Changes

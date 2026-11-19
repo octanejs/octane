@@ -1,5 +1,41 @@
 # @octanejs/testing-library
 
+## 0.1.74
+
+### Patch Changes
+
+- b6dbbe0: `octane` and `octane/server` now export only public API. Compiler-emitted
+  helpers, binding infrastructure and test-only hooks (`template`, `bag*`,
+  `evt*`, `withSlot`, `hookSlots`, `injectStyle`, `drainPassiveEffects`, the
+  `ssr*` string builders, and every `__`-prefixed name) move to
+  `octane/internal/client` and `octane/internal/server`, and compiled output
+  imports them from there. Server builds retarget `octane/internal/client` to
+  `octane/internal/server`, as they already do for bare `octane`.
+  `FragmentInstance` stays public on `octane`. Universal renderer output imports
+  its one shared helper, `__methodDep`, from `octane/internal/universal-children`,
+  so it never reaches the DOM runtime.
+
+  With an explicit `runtime` that selects Octane's CommonJS build, the Rspack
+  plugin resolves the internal entries from the same build, so compiled helpers
+  share that runtime instance.
+
+  Bindings that hand-import these helpers now read them from the internal
+  entries. Recompile any code that was compiled by an earlier Octane compiler,
+  because that output imports the helpers from `octane`.
+- Updated dependencies [a245b0c]
+- Updated dependencies [857b26e]
+- Updated dependencies [1c62ea0]
+- Updated dependencies [56d7687]
+- Updated dependencies [343bbec]
+- Updated dependencies [2aae6b0]
+- Updated dependencies [b6dbbe0]
+- Updated dependencies [dff5a90]
+- Updated dependencies [ad10124]
+- Updated dependencies [00e05f6]
+- Updated dependencies [1931c90]
+- Updated dependencies [c1788cc]
+  - octane@0.22.0
+
 ## 0.1.73
 
 ### Patch Changes
