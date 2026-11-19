@@ -477,6 +477,8 @@ interface RegionPlan {
 	keep?: boolean;
 }
 
+type SignalPrepare = (() => () => void) & { committed?: true };
+
 interface Transaction {
 	disposed: boolean;
 	all: Set<FragmentInstance>;
@@ -494,7 +496,7 @@ interface Transaction {
 	list?: BindingListCapability | undefined;
 	tryRegions?: BindingTryCapability | undefined;
 	effects?: BindingEffectsCapability | undefined;
-	notifySignal?(prepare: () => () => void): void;
+	notifySignal?(prepare: SignalPrepare): void;
 	reads?: BindingReadTracker | undefined;
 	observations?: BindingObservations | undefined;
 	refresh?: () => void;
@@ -1062,22 +1064,26 @@ function projectValues(
 			let connection = instance.signals?.get(index);
 			const style = operations[index]![1] === 'styleObject';
 			if (!connection && (style || transaction.signals?.isSignal(values[index]))) {
-				const prepare = (): (() => void) => {
+				const prepareChannel = (committed = false): (() => void) => {
 					if (
 						instance.disposed ||
-						(transaction.preparing && instance.signalFrame !== transaction.frame)
+						(!committed && transaction.preparing && instance.signalFrame !== transaction.frame)
 					)
 						return () => {};
-					const value = __normalizeBinding(operations[index]!, connection!.get());
+					const value = __normalizeBinding(operations[index]!, connection!.get(committed));
 					const group = instance.groups.get(index)?.prepare((value as string | null) ?? '');
-					if (transaction.preparing && instance.signalPlan) {
+					if (!committed && transaction.preparing && instance.signalPlan) {
 						instance.signalPlan.values[index] = value;
 						if (group) instance.signalPlan.groups.set(index, group);
 						return () => {};
 					}
-					return () => writeOperation(instance, index, value, group, transaction);
+					return () => writeOperation(instance, index, value, group, transaction, !committed);
 				};
-				const notify = (): void => transaction.notifySignal!(prepare);
+				const prepare = (): (() => void) => prepareChannel();
+				const committedPrepare: SignalPrepare = () => prepareChannel(true);
+				committedPrepare.committed = true;
+				const notify = (committed?: boolean): void =>
+					transaction.notifySignal!(committed ? committedPrepare : prepare);
 				connection = style
 					? transaction.styles!.connect(
 							instance.nodes[operations[index]![0]] as Element,
@@ -1201,26 +1207,29 @@ function prepareFragment(
 			if (descriptor.signal && transaction.signals) {
 				let connection = region.signal;
 				if (!connection && transaction.signals.isSignal(value)) {
-					const prepare = (): (() => void) => {
+					const prepareChannel = (committed = false): (() => void) => {
 						if (
 							instance.disposed ||
-							(transaction.preparing && region.signalFrame !== transaction.frame)
+							(!committed && transaction.preparing && region.signalFrame !== transaction.frame)
 						)
 							return () => {};
-						const next = textValue(region.signal!.get(), descriptor.generic);
-						if (transaction.preparing && region.signalPlan) {
+						const next = textValue(region.signal!.get(committed), descriptor.generic);
+						if (!committed && transaction.preparing && region.signalPlan) {
 							region.signalPlan.text = next;
 							return () => {};
 						}
 						return () => {
 							if (!instance.disposed && !transaction.disposed) {
 								writeText(region, next);
-								region.signal?.accept();
+								if (!committed) region.signal?.accept();
 							}
 						};
 					};
-					connection = region.signal = transaction.signals.connect(() =>
-						transaction.notifySignal!(prepare),
+					const prepare = (): (() => void) => prepareChannel();
+					const committedPrepare: SignalPrepare = () => prepareChannel(true);
+					committedPrepare.committed = true;
+					connection = region.signal = transaction.signals.connect((committed) =>
+						transaction.notifySignal!(committed ? committedPrepare : prepare),
 					);
 				}
 				if (connection) {
@@ -1549,9 +1558,10 @@ function writeOperation(
 	value: BindingValue,
 	group: { commit(): void } | undefined,
 	transaction: Transaction,
+	accept = true,
 ): void {
 	if (transaction.disposed || instance.disposed) return;
-	(instance.projections?.get(index) ?? instance.signals?.get(index))?.accept();
+	if (accept) (instance.projections?.get(index) ?? instance.signals?.get(index))?.accept();
 	const previous = instance.previous[index];
 	if (value === previous) return;
 	const operation = instance.definition.bindings[index]!;
@@ -1735,7 +1745,7 @@ function bindProgram<Props>(
 	};
 	const signalUpdates =
 		transaction.signals || transaction.styles || transaction.projections || transaction.controls
-			? new Set<() => () => void>()
+			? new Set<SignalPrepare>()
 			: undefined;
 	let instance: FragmentInstance | undefined;
 	let ownedRoot: Comment | undefined;
@@ -1841,6 +1851,22 @@ function bindProgram<Props>(
 				if (committed && observations?.retired()) {
 					dispose();
 					return;
+				}
+				// A shared source can both update the displayed channel and invalidate
+				// a suspended candidate. Write the accepted channel before retrying it.
+				if (dirty && committed && signalUpdates?.size) {
+					const accepted = [...signalUpdates].filter((prepare) => prepare.committed);
+					if (accepted.length) {
+						for (const prepare of accepted) signalUpdates.delete(prepare);
+						dirty = false;
+						const writes = accepted.map((prepare) => prepare());
+						if (!dirty && !transaction.disposed) {
+							for (const write of writes) write();
+							transaction.published?.();
+						} else for (const prepare of accepted) signalUpdates.add(prepare);
+						dirty = true;
+						continue;
+					}
 				}
 				if (!dirty) {
 					if (transaction.projections) {
@@ -2348,23 +2374,30 @@ function claimProgramControl(
 	transaction: Transaction,
 ): void {
 	if (!transaction.controls) throw new TypeError(formatClientError(302));
-	const prepare = (): (() => void) => {
-		if (instance.disposed || (transaction.preparing && instance.signalFrame !== transaction.frame))
+	const prepareChannel = (committed = false): (() => void) => {
+		if (
+			instance.disposed ||
+			(!committed && transaction.preparing && instance.signalFrame !== transaction.frame)
+		)
 			return () => {};
-		const prepared = instance.controls!.get(index)!.prepareCurrent();
-		prepared.publish();
-		if (transaction.preparing && instance.signalPlan) {
+		const lease = instance.controls!.get(index)!;
+		const prepared = committed ? lease.prepareCommitted() : lease.prepareCurrent();
+		if (!committed) prepared.publish();
+		if (!committed && transaction.preparing && instance.signalPlan) {
 			instance.signalPlan.controls!.set(index, prepared);
 			return () => {};
 		}
 		return prepared.commit;
 	};
+	const prepare = (): (() => void) => prepareChannel();
+	const committedPrepare: SignalPrepare = () => prepareChannel(true);
+	committedPrepare.committed = true;
 	(instance.controls ??= new Map()).set(
 		index,
 		transaction.controls.claim(
 			node,
 			instance.definition.bindings[index]![2] as 'value' | 'checked',
-			() => transaction.notifySignal!(prepare),
+			(committed) => transaction.notifySignal!(committed ? committedPrepare : prepare),
 		),
 	);
 }
@@ -2382,13 +2415,24 @@ function projectHostValues(
 			const first = group[0]![0];
 			let connection = instance.projections?.get(first);
 			if (!connection) {
-				const prepare = (): (() => void) => {
+				const prepareChannel = (committed = false): (() => void) => {
 					if (
 						instance.disposed ||
-						(transaction.preparing && instance.signalFrame !== transaction.frame)
+						(!committed && transaction.preparing && instance.signalFrame !== transaction.frame)
 					)
 						return () => {};
-					const projected = connection!.get();
+					let projected: BindingValue[];
+					try {
+						projected = connection!.get(committed);
+					} catch (error) {
+						if (
+							committed &&
+							!observesRetiredSource(transaction) &&
+							transaction.reads?.fail(error, true)
+						)
+							return () => {};
+						throw error;
+					}
 					const groups = new Map<number, { commit(): void }>();
 					for (const [index] of group) {
 						const classGroup = instance.groups
@@ -2396,7 +2440,7 @@ function projectHostValues(
 							?.prepare((projected[index] as string | null) ?? '');
 						if (classGroup) groups.set(index, classGroup);
 					}
-					if (transaction.preparing && instance.signalPlan) {
+					if (!committed && transaction.preparing && instance.signalPlan) {
 						for (const [index] of group) {
 							instance.signalPlan.values[index] = projected[index]!;
 							const classGroup = groups.get(index);
@@ -2406,14 +2450,26 @@ function projectHostValues(
 					}
 					return () => {
 						for (const [index] of group)
-							writeOperation(instance, index, projected[index]!, groups.get(index), transaction);
+							writeOperation(
+								instance,
+								index,
+								projected[index]!,
+								groups.get(index),
+								transaction,
+								!committed,
+							);
+						if (committed && !transaction.disposed && !instance.disposed)
+							connection!.publishCommitted();
 					};
 				};
+				const prepare = (): (() => void) => prepareChannel();
+				const committedPrepare: SignalPrepare = () => prepareChannel(true);
+				committedPrepare.committed = true;
 				connection = transaction.projections.connect(
 					group,
 					operations,
 					instance.nodes,
-					() => transaction.notifySignal!(prepare),
+					(committed) => transaction.notifySignal!(committed ? committedPrepare : prepare),
 					transaction.restoreStyles,
 				);
 				instance.projections ??= new Map();

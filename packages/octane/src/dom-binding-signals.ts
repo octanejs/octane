@@ -19,7 +19,10 @@ export interface BindingSignalConnection {
 	/** Resolve and observe a projected handle, or disconnect for an ordinary value. */
 	read(value: unknown): unknown;
 	/** Read only the already connected channel; never reevaluate the authored projection. */
-	get(): unknown;
+	get(committed?: boolean): unknown;
+	readAccepted?(value: unknown): { valid: boolean; value: unknown };
+	publishAccepted?(): void;
+	publishAcceptedValue?(value: unknown): void;
 	/** Optional whole-style writer, present only on the selected style capability. */
 	write?(value: unknown): void;
 	/** Error path only: whether the owner of a source this connection observes retired. */
@@ -207,15 +210,28 @@ const createBindingSignals = function __createBindingSignals(observations?: Bind
 	const run = owner === null ? <T>(callback: () => T): T => callback() : captureSignalOwner(owner);
 	return {
 		isSignal: isSignalHandle,
-		connect(notify: () => void): BindingSignalConnection {
-			const observation = observations?.owner();
+		connect(notify: (committed?: boolean) => void): BindingSignalConnection {
 			let value: unknown;
 			let handle: SignalHandle<unknown> | undefined;
+			let acceptedValue: unknown;
+			let acceptedHandle: SignalHandle<unknown> | undefined;
+			const observation = observations?.owner(() => {
+				acceptedValue = value;
+				acceptedHandle = handle;
+			});
 			let unsubscribe: NativeReadSubscription | undefined;
 			let generation = 0;
 			let disposed = false;
-			const get = (): unknown =>
-				disposed ? undefined : handle ? run(() => handle![SIGNAL_BINDING_READ]()) : value;
+			const get = (committed = false): unknown => {
+				const selected = committed ? acceptedHandle : handle;
+				return disposed
+					? undefined
+					: selected
+						? run(() => selected[SIGNAL_BINDING_READ]())
+						: committed
+							? acceptedValue
+							: value;
+			};
 			const dispose = (): void => {
 				if (disposed) return;
 				disposed = true;
@@ -228,7 +244,16 @@ const createBindingSignals = function __createBindingSignals(observations?: Bind
 			};
 			return {
 				get,
-				accept: () => observation && observations!.accept(observation),
+				accept: () => {
+					if (
+						observation &&
+						(acceptedValue !== value ||
+							acceptedHandle !== handle ||
+							observation.pending?.size ||
+							observation.retired?.size)
+					)
+						observations!.accept(observation);
+				},
 				dispose,
 				// Only a subscribed handle is observed. Its own owner retiring wakes
 				// this connection, and the read that follows throws.
@@ -265,7 +290,10 @@ const createBindingSignals = function __createBindingSignals(observations?: Bind
 							stopNext = run(() =>
 								handle![SIGNAL_BINDING_SUBSCRIBE](
 									() => {
-										if (!disposed && ticket === generation)
+										if (
+											!disposed &&
+											(ticket === generation || observation?.retired?.has(stopNext!))
+										)
 											observations ? observations.notify(observation!, stopNext, notify) : notify();
 									},
 									observations ? () => observations.retire(observation!, stopNext) : undefined,

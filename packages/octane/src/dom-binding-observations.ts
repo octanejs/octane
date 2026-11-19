@@ -5,17 +5,19 @@ export interface BindingObservationOwner {
 	pending: Map<NativeReadSubscription, number> | undefined;
 	retired: Map<NativeReadSubscription, number> | undefined;
 	selectedAt: number;
+	commit: (() => void) | undefined;
 }
 
 /** Observation belongs to a committed binding presentation, not its preparation. */
 export interface BindingObservations {
-	owner(): BindingObservationOwner;
+	owner(commit?: () => void): BindingObservationOwner;
 	add(owner: BindingObservationOwner, stop: NativeReadSubscription): boolean;
 	release(owner: BindingObservationOwner, stop: NativeReadSubscription): void;
 	notify(
 		owner: BindingObservationOwner,
 		stop: NativeReadSubscription | undefined,
-		notify: () => void,
+		notify: (committed?: boolean) => void,
+		changed?: boolean,
 	): void;
 	retire(owner: BindingObservationOwner, stop: NativeReadSubscription | undefined): void;
 	retired(): boolean;
@@ -68,7 +70,7 @@ export function __createBindingObservations(invalidate: () => void): BindingObse
 		if (failed) throw failure;
 	};
 	return {
-		owner: () => ({ pending: undefined, retired: undefined, selectedAt: 0 }),
+		owner: (commit) => ({ pending: undefined, retired: undefined, selectedAt: 0, commit }),
 		add(owner, stop) {
 			if (disposed) {
 				stop();
@@ -87,10 +89,13 @@ export function __createBindingObservations(invalidate: () => void): BindingObse
 				staged.add(owner);
 			}
 		},
-		notify(owner, stop, notify) {
+		notify(owner, stop, notify, changed) {
 			if (disposed) return;
-			if (!stop || owner.pending?.size || owner.retired?.size) invalidate();
-			else notify();
+			if (!stop || owner.pending?.has(stop)) invalidate();
+			else if (changed || owner.pending?.size || owner.retired?.size) {
+				notify(true);
+				if (!owner.retired?.has(stop)) invalidate();
+			} else notify();
 		},
 		retire(owner, stop) {
 			if (disposed) return;
@@ -99,7 +104,7 @@ export function __createBindingObservations(invalidate: () => void): BindingObse
 		},
 		retired: () => ended,
 		accept(owner) {
-			if (disposed || (!owner.pending?.size && !owner.retired?.size)) return;
+			if (disposed || (!owner.commit && !owner.pending?.size && !owner.retired?.size)) return;
 			owner.selectedAt = ++selection;
 			selected.add(owner);
 		},
@@ -116,6 +121,9 @@ export function __createBindingObservations(invalidate: () => void): BindingObse
 				selected.delete(owner);
 				owner.selectedAt = 0;
 				promoted.add(owner);
+				owner.commit?.();
+			}
+			for (const owner of promoted) {
 				for (const [stop, acquired] of owner.pending ?? []) {
 					if (disposed) return;
 					if (acquired > upper) continue;

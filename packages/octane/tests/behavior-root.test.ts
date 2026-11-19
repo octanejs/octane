@@ -35,7 +35,9 @@ import {
 import { setStyle } from '../src/runtime.js';
 import {
 	createScope,
+	createFamily,
 	__signalAt,
+	__derivedScalarAt,
 	runWithSignalOwner,
 	SIGNAL_BINDING_SUBSCRIBE,
 	createResource,
@@ -9069,12 +9071,12 @@ export function Counter() @{
 			],
 			[
 				'style',
-				'<p style={{ color: props.selected ? right$ : left$ }}>text</p>',
+				'<p style={{ color: props.selected ? right$ : left$, backgroundColor: count$ }}>text</p>',
 				(node: HTMLElement) => node.style.color,
 			],
 			[
 				'projection',
-				'<p sx={styles.paint(props.selected ? right$ : left$)}>text</p>',
+				'<p sx={styles.paint(props.selected ? right$ : left$, count$)}>text</p>',
 				(node: HTMLElement) => node.style.color,
 			],
 			[
@@ -9088,7 +9090,7 @@ export function Counter() @{
 					const scope = createScope({ scopeKey: `watched-binding-${capability}-${dev}` });
 					const log: string[] = [];
 					const selected$ = scope.signal$('selected', false);
-					const count$ = scope.signal$('count', 'one');
+					const count$ = scope.signal$('count', 'white');
 					const left$ = scope.signal$('left', 'red', {
 						watched: () => {
 							log.push('watch left');
@@ -9111,7 +9113,7 @@ export function Counter() @{
 					await act(() => {});
 					const source = `import { selected$, left$, right$, gate$, count$ } from 'state';
 import * as stylex from 'binding-styles';
-const styles = stylex.create({ paint: (color) => ({ className: 'painted', style: { color } }) });
+const styles = stylex.create({ paint: (color, backgroundColor) => ({ className: 'painted', style: { color, backgroundColor } }) });
 export function Watched(props) @{ 'use dom bindings'; <section>${markup}<output title={count$} /><i>{gate$.get() as string}</i></section> }`;
 					const fixture = authoredPresentation(
 						'Watched',
@@ -9147,12 +9149,29 @@ export function Watched(props) @{ 'use dom bindings'; <section>${markup}<output 
 						fixture.publish({ selected: true });
 						expect([...log]).toEqual(['watch left']);
 						expect(observe(node)).toBe('red');
-						count$.set('two');
-						expect(container.querySelector('output')?.title).toBe('two');
+						count$.set('black');
+						expect(container.querySelector('output')?.title).toBe('black');
+						if (capability === 'style' || capability === 'projection')
+							expect(node.style.backgroundColor).toBe('black');
+						expect([...log]).toEqual(['watch left']);
+						count$.set('purple');
+						expect(container.querySelector('output')?.title).toBe('purple');
+						if (capability === 'style' || capability === 'projection')
+							expect(node.style.backgroundColor).toBe('purple');
+						expect([...log]).toEqual(['watch left']);
+						if (capability === 'control') {
+							const input = node as HTMLInputElement;
+							input.value = 'typed';
+							input.dispatchEvent(new InputEvent('input', { bubbles: true }));
+							expect(left$.get()).toBe('typed');
+							expect(right$.get()).toBe('blue');
+						}
+						left$.set('orange');
+						expect(observe(node)).toBe('orange');
 						expect([...log]).toEqual(['watch left']);
 						if (outcome === 'cancel') fixture.publish({ selected: false });
 						await act(() => resolve('ready'));
-						expect(observe(node)).toBe(outcome === 'commit' ? 'green' : 'red');
+						expect(observe(node)).toBe(outcome === 'commit' ? 'green' : 'orange');
 						expect([...log].sort()).toEqual(
 							(outcome === 'commit'
 								? ['watch left', 'unwatch left', 'watch right']
@@ -9170,6 +9189,253 @@ export function Watched(props) @{ 'use dom bindings'; <section>${markup}<output 
 						).sort(),
 					);
 				});
+
+		for (const form of [
+			'keyed derived',
+			'keyless signal',
+			'keyless derived',
+			'family',
+			'authored signal',
+			'authored derived',
+		] as const)
+			it(`refreshes an accepted sx ${form} while its replacement is held (${dev ? 'dev' : 'prod'})`, async () => {
+				const scope = createScope({ scopeKey: `sx-form-${form}-${dev}` });
+				const selected$ = scope.signal$('selected', false);
+				const base$ = scope.signal$(null, 'red');
+				let rightStarts = 0;
+				const right$ = scope.signal$('right', 'blue', {
+					watched: () => {
+						rightStarts++;
+					},
+				});
+				let left$: any;
+				let update: () => void;
+				if (form === 'keyed derived') {
+					left$ = scope.derived$('derived', () => base$.get());
+					update = () => base$.set('orange');
+				} else if (form === 'keyless signal') {
+					left$ = base$;
+					update = () => base$.set('orange');
+				} else if (form === 'keyless derived') {
+					left$ = scope.derived$(null, () => base$.get());
+					update = () => base$.set('orange');
+				} else if (form === 'family') {
+					left$ = createFamily(scope, () => scope.signal$(null, 'red')).get('row');
+					update = () => left$.set('orange');
+				} else {
+					const authored$ = __signalAt(`g:sx-${form}-${dev}`, 'red');
+					left$ =
+						form === 'authored signal'
+							? authored$
+							: __derivedScalarAt(`g:sx-derived-${dev}`, () => authored$.get());
+					update = () => runWithSignalOwner(scope, () => authored$.set('orange'));
+				}
+				let resolve!: (value: string) => void;
+				const pending = new Promise<string>((done) => (resolve = done));
+				const load = query(`sx-form-${form}-${dev}`, (selected: boolean) =>
+					selected ? pending : 'ready',
+				);
+				const gate$ = createResource(scope, 'gate', () => load(selected$.get()));
+				await act(() => {});
+				const source = `import { left$, right$, gate$ } from 'state';
+import * as stylex from 'binding-styles';
+const styles = stylex.create({ paint: (color) => ({ className: 'painted', style: { color } }) });
+export function SxForm(props) @{ 'use dom bindings'; <section><p sx={styles.paint(props.selected ? right$ : left$)} /><i>{gate$.get() as string}</i></section> }`;
+				const fixture = authoredPresentation(
+					'SxForm',
+					{ selected: false },
+					dev,
+					source,
+					{
+						state: { left$, right$, gate$ },
+						'binding-styles': {
+							create: (value: unknown) => value,
+							props: (value: unknown) => value,
+						},
+					},
+					{
+						knownAttributeSpreads: [
+							{
+								source: 'binding-styles',
+								imported: '*',
+								members: ['props'],
+								fields: ['className', 'style'],
+								style: 'object',
+								jsxAttribute: 'sx',
+							},
+						],
+					},
+				);
+				const handle = runWithSignalOwner(scope, () =>
+					fixture.mount({ parent: container }, fixture.state),
+				);
+				try {
+					const paragraph = container.querySelector('p')!;
+					expect(paragraph.style.color).toBe('red');
+					selected$.set(true);
+					fixture.publish({ selected: true });
+					update();
+					expect(paragraph.style.color).toBe('orange');
+					expect(rightStarts).toBe(0);
+					// Cancel the replacement before resolving, so its watched hook remains unreachable.
+					fixture.publish({ selected: false });
+					await act(() => resolve('ready'));
+					expect(paragraph.style.color).toBe('orange');
+				} finally {
+					handle.dispose();
+					scope.dispose();
+				}
+			});
+
+		for (const empty of ['missing', 'null'] as const)
+			it(`keeps accepted projected raw style through a held ${empty} field (${dev ? 'dev' : 'prod'})`, async () => {
+				const scope = createScope({ scopeKey: `sx-raw-${empty}-${dev}` });
+				const log: string[] = [];
+				const selected$ = scope.signal$('selected', false);
+				const dummy$ = scope.signal$('dummy', 1);
+				const left$ = scope.signal$('left', 'red', {
+					watched: () => {
+						log.push('watch left');
+						return () => log.push('unwatch left');
+					},
+				});
+				let resolve!: (value: string) => void;
+				const pending = new Promise<string>((done) => (resolve = done));
+				const load = query(`sx-raw-${empty}-${dev}`, (selected: boolean) =>
+					selected ? pending : 'ready',
+				);
+				const gate$ = createResource(scope, 'gate', () => load(selected$.get()));
+				await act(() => {});
+				const source = `import { dummy$, gate$ } from 'state'; import * as stylex from 'binding-styles';
+const styles = stylex.create({ paint: (width, label, color, empty) => empty === 'missing' ? { className: label + ':' + width } : empty === 'null' ? { className: label + ':' + width, style: null } : { className: label + ':' + width, style: { height: width, color } } });
+export function SxRaw(props) @{ 'use dom bindings'; <section><p sx={styles.paint(dummy$, props.label, props.color, props.empty)} /><i>{gate$.get() as string}</i></section> }`;
+				const fixture = authoredPresentation(
+					'SxRaw',
+					{ label: 'old', color: left$, empty: '' },
+					dev,
+					source,
+					{
+						state: { dummy$, gate$ },
+						'binding-styles': {
+							create: (value: unknown) => value,
+							props: (value: unknown) => value,
+						},
+					},
+					{
+						knownAttributeSpreads: [
+							{
+								source: 'binding-styles',
+								imported: '*',
+								members: ['props'],
+								fields: ['className', 'style'],
+								style: 'object',
+								jsxAttribute: 'sx',
+							},
+						],
+					},
+				);
+				const handle = fixture.mount({ parent: container }, fixture.state);
+				try {
+					const paragraph = container.querySelector('p')!;
+					selected$.set(true);
+					fixture.publish({ label: 'new', color: left$, empty });
+					dummy$.set(2);
+					expect([paragraph.className, paragraph.style.height]).toEqual(['old:2', '2px']);
+					left$.set('orange');
+					expect([paragraph.className, paragraph.style.height, paragraph.style.color]).toEqual([
+						'old:2',
+						'2px',
+						'orange',
+					]);
+					expect(log).toEqual(['watch left']);
+					await act(() => resolve('ready'));
+					expect([paragraph.className, paragraph.style.height, paragraph.style.color]).toEqual([
+						'new:2',
+						'',
+						'',
+					]);
+					expect(log).toEqual(['watch left', 'unwatch left']);
+				} finally {
+					handle.dispose();
+					scope.dispose();
+				}
+			});
+
+		it(`keeps ambiguous sx selectors quiet while held (${dev ? 'dev' : 'prod'})`, async () => {
+			for (const kind of ['explicit', 'custom', 'overridden descriptor'] as const) {
+				const scope = createScope({ scopeKey: `sx-selector-${kind}-${dev}` });
+				const hold$ = scope.signal$('hold', false);
+				const dummy$ = scope.signal$('dummy', 'fixed');
+				const selected$ = scope.signal$('selected', false);
+				let custom$: unknown;
+				let update = () => selected$.set(true);
+				if (kind === 'custom') custom$ = { [SignalReads.NATIVE_DOM_VALUE]: () => selected$.get() };
+				if (kind === 'overridden descriptor') {
+					const descriptor = __signalAt(`g:sx-override-${dev}`, false);
+					const native = (descriptor as any)[SignalReads.NATIVE_DOM_VALUE];
+					Object.defineProperty(descriptor, SignalReads.NATIVE_DOM_VALUE, {
+						value(this: unknown) {
+							return native.call(this);
+						},
+					});
+					custom$ = descriptor;
+					update = () => runWithSignalOwner(scope, () => descriptor.set(true));
+				}
+				let resolve!: (value: string) => void;
+				const pending = new Promise<string>((done) => (resolve = done));
+				const load = query(`sx-selector-${kind}-${dev}`, (hold: boolean) =>
+					hold ? pending : 'ready',
+				);
+				const gate$ = createResource(scope, 'gate', () => load(hold$.get()));
+				await act(() => {});
+				const expression = kind === 'explicit' ? 'selected$.get()' : 'custom$';
+				const source = `import { dummy$, selected$, custom$, gate$ } from 'state'; import * as stylex from 'binding-styles';
+const styles = stylex.create({ paint: (label, selected) => ({ className: label, style: { color: selected ? 'blue' : 'red' } }) });
+export function SxSelector() @{ 'use dom bindings'; <section><p sx={styles.paint(dummy$, ${expression})} /><i>{gate$.get() as string}</i></section> }`;
+				const fixture = authoredPresentation(
+					'SxSelector',
+					{},
+					dev,
+					source,
+					{
+						state: { dummy$, selected$, custom$, gate$ },
+						'binding-styles': {
+							create: (value: unknown) => value,
+							props: (value: unknown) => value,
+						},
+					},
+					{
+						knownAttributeSpreads: [
+							{
+								source: 'binding-styles',
+								imported: '*',
+								members: ['props'],
+								fields: ['className', 'style'],
+								style: 'object',
+								jsxAttribute: 'sx',
+							},
+						],
+					},
+				);
+				const handle = runWithSignalOwner(scope, () =>
+					fixture.mount({ parent: container }, fixture.state),
+				);
+				try {
+					const paragraph = container.querySelector('p')!;
+					hold$.set(true);
+					fixture.publish({});
+					update();
+					dummy$.set('wide');
+					expect([paragraph.className, paragraph.style.color]).toEqual(['fixed', 'red']);
+					await act(() => resolve('ready'));
+					expect([paragraph.className, paragraph.style.color]).toEqual(['wide', 'blue']);
+				} finally {
+					handle.dispose();
+					scope.dispose();
+					container.replaceChildren();
+				}
+			}
+		});
 
 		for (const [kind, markup, update] of [
 			['control release', '<input value={props.value} />', { value: undefined }],
