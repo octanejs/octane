@@ -1,4 +1,5 @@
-import { bindRendererRegionOwner, memo, use, useContext, useLayoutEffect } from 'octane';
+import { memo, use, useContext, useLayoutEffect } from 'octane';
+import { bindRendererRegionOwner } from 'octane/internal/client';
 import { UniversalTheme } from './universal-boundary.tsrx';
 
 function ReverseThemeLabelBody() @{

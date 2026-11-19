@@ -13,7 +13,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
 import { OctaneCompat } from 'octane/react';
-import { drainPassiveEffects } from '../../src/index.js';
+import { drainPassiveEffects } from '../../src/internal/client.js';
 import { h, mountReactHost, reactAct, SpikeErrorBoundary } from './_react-host.js';
 import { EffectFaultIsland, RefIsland, StatefulSuspendingIsland } from './_fixtures/islands.tsrx';
 

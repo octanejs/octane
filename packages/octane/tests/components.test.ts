@@ -1,16 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
-import {
-	bagOf,
-	createElement,
-	useState,
-	template,
-	clone,
-	flushSync,
-	hydrateRoot,
-	isValidElement,
-	type Scope,
-} from 'octane';
+import { createElement, useState, flushSync, hydrateRoot, isValidElement } from 'octane';
+import { bagOf, template, clone, type Scope } from 'octane/internal/client';
 import { setRenderText } from 'octane/internal/client';
 import { renderToString } from 'octane/server';
 import { prerender } from 'octane/static';

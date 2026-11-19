@@ -67,7 +67,8 @@ try {
 		const outfile = path.join(scratch, `${observed}.mjs`);
 		const bundle = await build({
 			stdin: {
-				contents: 'export { createRoot, flushSync, hostComponent } from "octane";',
+				contents:
+					'export { createRoot, flushSync } from "octane";\nexport { hostComponent } from "octane/internal/client";',
 				resolveDir: repo,
 				loader: 'js',
 			},

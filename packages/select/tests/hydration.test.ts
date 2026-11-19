@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { drainPassiveEffects, flushSync, hydrateRoot } from 'octane';
+import { flushSync, hydrateRoot } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { describe, expect, it, vi } from 'vitest';
 
 import { renderHydrationFixture } from '../../octane/tests/_hydration-ssr';

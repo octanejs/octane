@@ -298,15 +298,13 @@ function write(node: ScopedNode, value: unknown, batch: object): void {
 function rebase(node: ScopedNode, value: unknown): void {
 	const slot = node.pending as PendingSlot;
 	const shadow = slot.shadow!;
+	const previous = graph.strictValue(graph.refreshNode(shadow), node.key);
 	const next =
 		typeof value === 'function'
-			? evaluateUpdater(
-					slot.batch,
-					value as (previous: unknown) => unknown,
-					graph.strictValue(graph.refreshNode(shadow), node.key),
-				)
+			? evaluateUpdater(slot.batch, value as (previous: unknown) => unknown, previous)
 			: value;
-	graph.publishNode(shadow, graph.readyState(next));
+	if (!Object.is(previous, next) && !node.isEqual(previous, next))
+		graph.publishNode(shadow, graph.readyState(next));
 }
 
 function resolve<T>(node: ScopedNode<T>): ScopedNode<T> {

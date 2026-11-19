@@ -13,11 +13,76 @@ import { StyleXLater } from '../_fixtures/style-rebind.tsrx';
 import { StyleOpacity } from '../_fixtures/style-opacity.tsrx';
 import { StyleXY } from '../_fixtures/style-xy.tsrx';
 import { ControllerGroup } from '../_fixtures/controller.tsrx';
+import { RetainedAuthoredValueToggle } from '../_fixtures/retained-presence.tsrx';
 import { frame, type LegacyAnimationControls } from 'motion-dom';
 import { removeTransformFn, patchTransformFn } from '../../src/useMotionValue';
 import { motion } from '../../src/index';
 
 describe('useMotionValue', function useMotionValueSuite() {
+	it.each(['add', 'remove', 'fresh'] as const)(
+		'completes an interrupted retained exit when authored MotionValue ownership changes: %s',
+		async (mode) => {
+			const original = motionValue(1),
+				fresh = motionValue(0.7),
+				record = vi.fn();
+			const props = { original, fresh, mode, record };
+			const r = mount(RetainedAuthoredValueToggle, { ...props, show: true });
+			try {
+				r.update(RetainedAuthoredValueToggle, { ...props, show: false });
+				await new Promise((resolve) => setTimeout(resolve, 45));
+				r.click('#switch-authored-value');
+				await new Promise((resolve) => setTimeout(resolve, 220));
+				expect(fresh.get()).toBe(0.7);
+				expect(original.get()).not.toBe(0);
+				expect(record.mock.calls.map(([event]) => event)).toEqual(['owner']);
+				expect(r.container.querySelector('#authored-exit')).toBeNull();
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
+	it('keeps an unrelated retained exit running when a disjoint authored value is added', async () => {
+		const original = motionValue(1),
+			fresh = motionValue(0.7),
+			record = vi.fn();
+		const props = { original, fresh, mode: 'disjoint' as const, record };
+		const r = mount(RetainedAuthoredValueToggle, { ...props, show: true });
+		try {
+			r.update(RetainedAuthoredValueToggle, { ...props, show: false });
+			await new Promise((resolve) => setTimeout(resolve, 45));
+			r.click('#switch-authored-value');
+			await new Promise((resolve) => setTimeout(resolve, 220));
+			expect(original.get()).toBe(0);
+			expect(fresh.get()).toBe(0.7);
+			expect(record.mock.calls.map(([event]) => event)).toEqual(['host', 'owner']);
+			expect(r.container.querySelector('#authored-exit')).toBeNull();
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('reenters the same retained host on a replacement authored MotionValue without stale exit completion', async () => {
+		const original = motionValue(1),
+			fresh = motionValue(0.7),
+			record = vi.fn();
+		const props = { original, fresh, mode: 'fresh' as const, record };
+		const r = mount(RetainedAuthoredValueToggle, { ...props, show: true });
+		try {
+			const host = r.find('#authored-exit');
+			r.update(RetainedAuthoredValueToggle, { ...props, show: false });
+			await new Promise((resolve) => setTimeout(resolve, 45));
+			r.click('#switch-authored-value');
+			r.update(RetainedAuthoredValueToggle, { ...props, show: true });
+			await new Promise((resolve) => setTimeout(resolve, 220));
+			expect(r.find('#authored-exit')).toBe(host);
+			expect(fresh.get()).toBe(1);
+			expect(record.mock.calls.map(([event]) => event)).toEqual(['host']);
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('drives authored MotionValues through animation and transitionEnd on HTML and SVG hosts', async () => {
 		const x = motionValue(3),
 			cx = motionValue(5),

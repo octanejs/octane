@@ -155,7 +155,7 @@ describe('compileMdxSync', () => {
 
 	it('emits a compiled octane CLIENT module (no JSX, no MDX runtime)', () => {
 		const { code } = compileMdxSync('# hi\n\nsome *text*\n', '/docs/doc.mdx');
-		expect(code).toContain("from 'octane'");
+		expect(code).toContain("from 'octane/internal/client'");
 		expect(code).not.toContain('@mdx-js');
 		// The JSX was fully lowered by octane's compiler.
 		expect(code).not.toMatch(/<_components/);
@@ -211,7 +211,7 @@ describe('compileMdxSync', () => {
 
 	it('emits SERVER codegen with mode: server', () => {
 		const { code } = compileMdxSync('# hi\n', '/docs/doc.mdx', { mode: 'server' });
-		expect(code).toContain("from 'octane/server'");
+		expect(code).toContain("from 'octane/internal/server'");
 	});
 
 	it('wires providerImportSource to @octanejs/mdx by default; null disables it', () => {

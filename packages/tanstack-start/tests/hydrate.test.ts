@@ -3,7 +3,8 @@
 // server-HTML adoption): `useHydrated()` reads `true`, so non-deferred
 // strategies resolve their gate immediately while `visible` waits for its
 // IntersectionObserver and `never` suspends forever.
-import { act, createElement, createRoot, drainPassiveEffects, flushSync } from 'octane';
+import { act, createElement, createRoot, flushSync } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Hydrate } from '@octanejs/tanstack-start';

@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import { createRoot as createReactRoot } from 'react-dom/client';
-import { createRoot, resetFloatResourceState, startTransition } from '../src/index.js';
+import { createRoot, startTransition } from '../src/index.js';
+import { resetFloatResourceState } from '../src/internal/client.js';
 import { act } from './_helpers';
 import {
 	FailingArmApp,

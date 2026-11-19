@@ -1,15 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { act, createContext, hydrateRoot, flushSync, startTransition } from '../../src/index.js';
 import {
 	EXTERNAL_HYDRATION_PROMISE,
-	act,
-	createContext,
-	hydrateRoot,
-	flushSync,
 	setTransitionFallbackTimeout,
-	startTransition,
-} from '../../src/index.js';
+} from '../../src/internal/client.js';
 import * as ServerRT from 'octane/server';
 import { condition } from 'octane/hydration';
 import { prerender } from 'octane/static';

@@ -5,6 +5,7 @@ import { EventEmitter } from 'node:events';
 import { setImmediate as nextHostTurn } from 'node:timers/promises';
 import { act, createRoot, hydrateRoot, flushSync } from '../src/index.js';
 import * as ServerRT from 'octane/server';
+import * as ServerRTInternal from 'octane/internal/server';
 import { prerender } from 'octane/static';
 import { initializeHydrationEventCapture, interaction } from 'octane/hydration';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
@@ -1509,26 +1510,28 @@ describe('renderToPipeableStream — chunk protocol', () => {
 
 	it('defers an inner segment until its outer segment introduces the template', async () => {
 		const NestedInnerFirst = (props: any, scope: any) =>
-			ServerRT.ssrHtml(
-				ServerRT.ssrTry(
+			ServerRTInternal.ssrHtml(
+				ServerRTInternal.ssrTry(
 					scope,
 					'outer-inner-first',
 					() => {
-						const inner = ServerRT.ssrTry(
+						const inner = ServerRTInternal.ssrTry(
 							scope,
 							'inner-first',
 							() =>
-								ServerRT.ssrBlock(
+								ServerRTInternal.ssrBlock(
 									'<span class="inner-value">' +
 										ServerRT.use(props.inner, 'inner-value') +
 										'</span>',
 								),
-							() => ServerRT.ssrBlock('<span class="inner-pending">inner…</span>'),
+							() => ServerRTInternal.ssrBlock('<span class="inner-pending">inner…</span>'),
 						);
 						const outer = ServerRT.use(props.outer, 'outer-value');
-						return inner + ServerRT.ssrBlock('<span class="outer-value">' + outer + '</span>');
+						return (
+							inner + ServerRTInternal.ssrBlock('<span class="outer-value">' + outer + '</span>')
+						);
 					},
-					() => ServerRT.ssrBlock('<span class="outer-pending">outer…</span>'),
+					() => ServerRTInternal.ssrBlock('<span class="outer-pending">outer…</span>'),
 				),
 			);
 		const outer = deferred<string>();

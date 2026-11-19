@@ -10,13 +10,13 @@
 import { describe, expect, it } from 'vitest';
 import * as React from 'react';
 import {
-	bindRendererRegionOwner,
 	createContext,
 	createElement,
 	createRoot,
 	flushSync as octaneFlushSync,
 	use,
 } from '../../src/index.js';
+import { bindRendererRegionOwner } from '../../src/internal/client.js';
 import { createLog } from '../_helpers.js';
 import {
 	h,

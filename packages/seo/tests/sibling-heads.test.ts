@@ -3,7 +3,8 @@
 // would be a trap: the sibling form is how the code reads naturally, and getting
 // it wrong means a page silently keeps someone else's title.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createRoot, drainPassiveEffects, flushSync } from 'octane';
+import { createRoot, flushSync } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { DistantSiblings, NestedHeads, SiblingHeads } from './_fixtures/sibling-heads.tsrx';
 
 function settle(): void {

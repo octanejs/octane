@@ -1,5 +1,6 @@
 import { Document, Outline, Page, Thumbnail, pdfjs } from '@octanejs/pdf';
-import { createRoot, delegateEvents, hydrateRoot, useMemo, useState } from 'octane';
+import { createRoot, hydrateRoot, useMemo, useState } from 'octane';
+import { delegateEvents } from 'octane/internal/client';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import legacyWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import {

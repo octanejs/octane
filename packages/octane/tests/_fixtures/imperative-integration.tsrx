@@ -1,4 +1,5 @@
-import { __useCommittedState, startTransition, useLayoutEffect, useState } from 'octane';
+import { startTransition, useLayoutEffect, useState } from 'octane';
+import { __useCommittedState } from 'octane/internal/client';
 
 const pendingSlot = Symbol('integration.pending');
 

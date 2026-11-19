@@ -1,4 +1,4 @@
-import { escapeAttr } from 'octane/server';
+import { escapeAttr } from 'octane/internal/server';
 
 const ATTRIBUTE_NAME = /^[A-Za-z_:][A-Za-z0-9_.:-]*$/;
 const ABSOLUTE_ASSET = /^(?:[a-z][a-z\d+.-]*:|\/\/|\/|#)/i;

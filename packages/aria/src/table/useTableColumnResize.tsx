@@ -23,7 +23,7 @@ import type { GridNode } from '../upstream-exports/react-stately/private/grid/Gr
 import intlMessages from '../intl/table/index';
 import { mergeProps } from '../utils/mergeProps';
 import type { TableColumnResizeState } from '../upstream-exports/react-stately/useTableState';
-import { withSlot } from 'octane';
+import { withSlot } from 'octane/internal/client';
 import { useDescription } from '../utils/useDescription';
 import { useEffectEvent } from '../utils/useEffectEvent';
 import { useId } from '../utils/useId';

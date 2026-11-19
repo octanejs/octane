@@ -3,13 +3,12 @@ import {
 	createContext,
 	createElement,
 	createRoot,
-	HMR,
-	hmr,
 	lazy,
 	memo,
 	startTransition,
 	useContext,
 } from '../src/index.js';
+import { HMR, hmr } from '../src/internal/client.js';
 import { act, flushEffects, mount } from './_helpers';
 import { compile } from '../src/compiler/compile.js';
 import {

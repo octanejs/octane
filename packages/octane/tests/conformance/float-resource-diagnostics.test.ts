@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createRoot, preload, resetFloatResourceState } from '../../src/index.js';
+import { createRoot, preload } from '../../src/index.js';
+import { resetFloatResourceState } from '../../src/internal/client.js';
 import * as Server from 'octane/server';
 import { loadServerFixture } from '../_server-fixture.js';
 import { collectPipeableStream } from '../_server-stream.js';

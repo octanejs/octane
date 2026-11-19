@@ -1,6 +1,7 @@
 'use strong';
 
-import { HYDRATION_RANGE_BOUNDARY, useEffect } from 'octane';
+import { useEffect } from 'octane';
+import { HYDRATION_RANGE_BOUNDARY } from 'octane/internal/client';
 import { PreconfiguredRouterProvider } from '@octanejs/tanstack-router/compiled';
 import type { AnyRouter } from '@tanstack/router-core';
 

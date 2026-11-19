@@ -124,7 +124,7 @@ export function DirectForms(props) @{
 `;
 const compiled = compile(source, 'descriptor-form-work.tsrx', { dev: false, hmr: false }).code;
 const adapter = `
-import {bag4, clone, template, setFormControlSources} from 'octane';
+import { bag4, clone, template, setFormControlSources } from 'octane/internal/client';
 const controlTemplate = template('<section><input data-control="text"><textarea data-control="textarea"></textarea><input data-control="checked" type="checkbox"><select data-control="select"><option value="a">a</option><option value="b">b</option><option value="c">c</option><option value="d">d</option><option value="e">e</option><option value="f">f</option><option value="g">g</option><option value="h">h</option></select></section>');
 export function CompatibilityForms(props, scope) {
  let b = scope.slots[0];

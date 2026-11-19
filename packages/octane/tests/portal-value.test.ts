@@ -3,7 +3,8 @@ import { describe, it, expect } from 'vitest';
 import { renderToString } from 'octane/server';
 import { mount } from './_helpers';
 import { loadServerFixture } from './_server-fixture.js';
-import { createElement, createPortal, textSlot, flushSync, hydrateRoot } from '../src/index.js';
+import { createElement, createPortal, flushSync, hydrateRoot } from '../src/index.js';
+import { textSlot } from '../src/internal/client.js';
 import { BodyPortalChild, BodyPortalValue } from './_fixtures/body-portal.tsrx';
 import {
 	ReturnPortal,

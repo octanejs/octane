@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { createRoot, hostComponent } from '../src/index.js';
+import { createRoot } from '../src/index.js';
+import { hostComponent } from '../src/internal/client.js';
 
 // `hostComponent` (the primitive behind @octanejs/motion's `motion.<tag>`) applies
 // arbitrary host props, so it installs descriptor form actions itself. This file

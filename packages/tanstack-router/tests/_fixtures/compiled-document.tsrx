@@ -1,4 +1,5 @@
-import { HYDRATION_RANGE_BOUNDARY, useState } from 'octane';
+import { useState } from 'octane';
+import { HYDRATION_RANGE_BOUNDARY } from 'octane/internal/client';
 import * as ordinary from '@octanejs/tanstack-router';
 import * as compiled from '@octanejs/tanstack-router/compiled';
 

@@ -6,13 +6,13 @@ import {
 	Activity,
 	createElement,
 	ErrorBoundary,
-	HYDRATION_RANGE_BOUNDARY,
 	Suspense as CaughtSuspense,
 	use,
 	useEffect,
 	useLayoutEffect,
 	useState,
 } from 'octane';
+import { HYDRATION_RANGE_BOUNDARY } from 'octane/internal/client';
 import type { ComponentBody } from 'octane';
 
 interface CaughtFallbackOptions {

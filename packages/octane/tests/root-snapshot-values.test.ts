@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bagOf, clone, template, type Scope } from '../src/index.js';
+import { bagOf, clone, template, type Scope } from '../src/internal/client.js';
 import { setRenderText } from '../src/runtime.js';
 import { act, mount } from './_helpers.js';
 

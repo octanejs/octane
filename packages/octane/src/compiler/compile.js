@@ -43,6 +43,10 @@ import {
 	withDeferredImports,
 } from '@tsrx/core';
 import { SERVER_RUNTIME_REQUESTS } from './server-runtime-requests.js';
+import {
+	CLIENT_PUBLIC_RUNTIME_EXPORTS,
+	SERVER_PUBLIC_RUNTIME_EXPORTS,
+} from './public-runtime-exports.js';
 import { parseModule } from '#octane/compiler-parser';
 import {
 	collectServerFunctionNodes,
@@ -1759,113 +1763,15 @@ const NATIVE_READ_RUNTIME_HELPERS = new Set([
 	'nativeCreateScopedValue',
 	'nativeCreateScopedElement',
 ]);
-const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
-	'__captureHydrationInput',
-	'__hydrationComponentSlot',
-	'__registerHydrationInputComponent',
-	'__ownedHydrationInputs',
-	'__sameHydrationInput',
-	'__sameHydrationSource',
-	'__sameHydrationOptionalInput',
-	'__observeHydrationOptionalInput',
-	'__createVoidRootDefaultOptions',
-	'__createRootDefaultOptions',
-	'__delegateEvents',
-	'__delegateCaptureEvents',
-	'__createCompiledContext',
-	'ownSlotAnchor',
-	'isContext',
-	'bindPresentationView',
-	'beginPresentationHydration',
-	'endPresentationHydration',
-	'presentationWrite',
-	'presentationFixedWrite',
-	'renderWrite',
-	'presentationHostWrite',
-	'presentationStructure',
-	'presentationFailure',
-	'markBindingChildren',
-	'bindingText',
-	'bindingChildSlot',
-	'setBindingClass',
-	'setBindingClassIfChanged',
-	'enableSignalBindings',
-	'createElementAt',
-	'createElementFromConfig',
-	'createHostElement',
-	'enableDescriptorFormActions',
-	'enableDescriptorFragmentRefs',
-	'enableHostDescriptors',
-	'enableOpaqueTemplates',
-	'isRenderCall',
-	'deferRecord',
-	'bindSignalText',
-	'bindSignalChild',
-	'bindSignalAttribute',
-	'hydrateClaimedBindingCaches',
-	'bindSignalValue',
-	'bindSignalChecked',
-	'bindSignalHostPropSources',
-	'canSplitStyleProperties',
-	'styleObjectPrototype',
-	'setRenderStyle',
-	'setRenderStyleProperty',
-	'replaceRef',
-	'queueOwnRefDetach',
-	'setPlainAttribute',
-	'setPlainAttributeIfChanged',
-	'setURLAttribute',
-	'setURLAttributeIfChanged',
-	'setAttributeIfChanged',
-	'setStringDataIfChanged',
-	'setBooleanAttributeIfChanged',
-	'setAriaAttributeIfChanged',
-	'setClassNameIfChanged',
-	'setClassAttrIfChanged',
-	'updateFreshClassName',
-	'updateFreshClassAttr',
-	'textHoleUpdate',
-	'childTextHoleUpdate',
-	'bagHole',
-	'bagChildHole',
-	'commitHole',
-	'setRenderText',
-	'bagRecord',
-	'bagRecordSignal',
-	'bagRecordHost',
-	'signalOwnerUse',
-	'bagDone',
-	'setEventSlot',
-	'commitEventBundle',
-	'commitHostSources',
-	'hostSourceChildren',
-	...HOOK_MEMO_RUNTIME_HELPERS,
-	...NATIVE_READ_RUNTIME_HELPERS,
-]);
-const INTERNAL_SERVER_RUNTIME_HELPERS = new Set([
-	'isContext',
-	'bindPresentationView',
-	'ssrBindingHtml',
-	'ssrBindingBlock',
-	'ssrBindingChild',
-	'ssrBindingKey',
-	'ssrBindingClass',
-	'enableServerSignalBindings',
-	'createElementAt',
-	'createElementFromConfig',
-	'isRenderCall',
-	'ssrSignalValue',
-	'ssrSignalControlValue',
-	'ssrSignalControlAttrs',
-	'ssrSpreadContent',
-	...NATIVE_READ_RUNTIME_HELPERS,
-]);
 
 function runtimeImportModuleFor(ctx, fallback, imported, local) {
 	for (const route of ctx.runtimeImportRoutes ?? []) {
 		if (route.locals?.has(local) || route.imported?.has(imported)) return route.module;
 	}
-	if (local === (ctx.privateRuntimeAliases?.get(imported) ?? rtAlias(imported))) {
+	if (
+		local === (ctx.privateRuntimeAliases?.get(imported) ?? rtAlias(imported)) ||
+		(imported === 'hookSlots' && local === ctx._hookSlotsHelperName)
+	) {
 		if (fallback === 'octane' && imported === '__hydrationSignalRevision')
 			return 'octane/internal/hydration-signal';
 		if (
@@ -1873,12 +1779,22 @@ function runtimeImportModuleFor(ctx, fallback, imported, local) {
 			(imported === '__beginHydrationQueryRead' || imported === '__readHydrationQueryInput')
 		)
 			return 'octane/internal/hydration-query';
-		if (fallback === 'octane' && imported === '__serverRpcPreload')
+		if (
+			fallback === 'octane' &&
+			(imported === '__serverRpcPreload' ||
+				imported === '__serverRpc' ||
+				imported === '__serverRpcStream')
+		)
 			return 'octane/internal/server-rpc';
-		if (fallback === 'octane' && INTERNAL_CLIENT_RUNTIME_HELPERS.has(imported)) {
-			return 'octane/internal/client';
+		// Compiler-emitted helpers never import from a public DOM entry. Universal
+		// output can run without the DOM runtime (Lynx's main thread), so its one
+		// shared helper comes from a renderer-neutral entry.
+		if (fallback === 'octane' && !CLIENT_PUBLIC_RUNTIME_EXPORTS.has(imported)) {
+			return !ctx.domRuntimeEntries && imported === METHOD_DEP_IMPORT
+				? 'octane/internal/universal-children'
+				: 'octane/internal/client';
 		}
-		if (fallback === 'octane/server' && INTERNAL_SERVER_RUNTIME_HELPERS.has(imported)) {
+		if (fallback === 'octane/server' && !SERVER_PUBLIC_RUNTIME_EXPORTS.has(imported)) {
 			return 'octane/internal/server';
 		}
 	}
@@ -13139,6 +13055,8 @@ function compileInternal(
 		userRuntimeNames: new Set(), // specifiers USER code references — imported verbatim
 		userRuntimeNamespaces: new Set(), // `import * as ns from 'octane'`
 		userRuntimeDefaults: new Set(), // preserved verbatim; package resolution owns validity
+		// Universal renderers resolve bare `octane` to their own runtime.
+		domRuntimeEntries: domSignalTarget(options),
 		runtimeImportRoutes: [
 			...(options?.__runtimeImportRoutes ?? []),
 			...universalUnits.map((unit) => ({
@@ -14821,6 +14739,7 @@ function compileServer(
 		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
 		userRuntimeNames: new Set(), // specifiers USER code references — imported verbatim
 		userRuntimeNamespaces: new Set(), // rewritten to the server runtime module
+		domRuntimeEntries: domSignalTarget(options),
 		userRuntimeDefaults: new Set(),
 		consumedRuntimeLocals,
 		inspect: !!(options && options.inspect),

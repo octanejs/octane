@@ -7,7 +7,7 @@
 // The mirror is exact as long as the flag is toggled through THIS module —
 // which the auto-registering `index.ts` entry and the `pure.ts` asyncWrapper
 // both do, matching RTL's assumption about its own global.
-import { setIsOctaneActEnvironment } from 'octane';
+import { setIsOctaneActEnvironment } from 'octane/internal/client';
 
 let isActEnvironment = false;
 

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createRoot, flushSync, hydrateRoot, resetFloatResourceState } from '../src/index.js';
+import { createRoot, flushSync, hydrateRoot } from '../src/index.js';
+import { resetFloatResourceState } from '../src/internal/client.js';
 import { renderToString } from 'octane/server';
 import { loadCompiledFixtureSource } from './_server-fixture';
 

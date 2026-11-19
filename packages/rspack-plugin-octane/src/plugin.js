@@ -114,6 +114,21 @@ function addRuntimeAliases(compiler, request, root, explicitRuntime, environment
 	const packageRoot = octanePackageRoot(override) ?? octanePackageRoot(selected) ?? root;
 	const aliases = esm.alias === false ? {} : (esm.alias ?? {});
 	const additions = {};
+	// An explicit runtime that selects the package's CommonJS build keeps the
+	// private entries compiled helpers import in that same module graph.
+	let subpathResolver = packageResolver;
+	if (
+		override !== undefined &&
+		override !== resolveRuntimeModule(packageResolver, 'octane', packageRoot)
+	) {
+		const commonjs = compiler.resolverFactory.get('normal', {
+			...compiler.webpack.util.cleverMerge(base, byDependency?.commonjs ?? {}),
+			alias: false,
+			dependencyType: 'commonjs',
+		});
+		if (resolveRuntimeModule(commonjs, 'octane', packageRoot) === override)
+			subpathResolver = commonjs;
+	}
 	for (const subpath of RUNTIME_SUBPATHS) {
 		// Resolve package self-references without a broad `octane` alias. Linked
 		// packages must share the selected runtime's refs, context, and profiler.
@@ -121,7 +136,7 @@ function addRuntimeAliases(compiler, request, root, explicitRuntime, environment
 		additions[`${subpath}$`] =
 			aliases[`${subpath}$`] ??
 			aliases[subpath] ??
-			resolveRuntimeModule(packageResolver, subpath, packageRoot);
+			resolveRuntimeModule(subpathResolver, subpath, packageRoot);
 	}
 	if (environment === 'server') {
 		const serverRequest = 'octane/react/server';

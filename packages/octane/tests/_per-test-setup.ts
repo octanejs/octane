@@ -1,5 +1,5 @@
 import { afterEach, expect } from 'vitest';
-import { drainPassiveEffects } from '../src/index.js';
+import { drainPassiveEffects } from '../src/internal/client.js';
 import './_render-write-guard.js';
 
 const hydrationSuitePath =

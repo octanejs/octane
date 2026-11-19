@@ -17,8 +17,8 @@ import {
 	useTransition,
 	useDeferredValue,
 	useSyncExternalStore,
-	withSlot,
 } from '../src/index.js';
+import { withSlot } from '../src/internal/client.js';
 
 // The `slot: symbol` argument on every hook is COMPILER-INJECTED.
 // octane/compiler appends a `Symbol.for(stableId)` to every hook call so

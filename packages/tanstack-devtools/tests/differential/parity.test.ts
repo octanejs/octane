@@ -1,5 +1,6 @@
 import { act as reactAct } from 'react';
-import { drainPassiveEffects, flushSync as octaneFlushSync } from 'octane';
+import { flushSync as octaneFlushSync } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { describe, expect, it, vi } from 'vitest';
 import {
 	mountDifferential,

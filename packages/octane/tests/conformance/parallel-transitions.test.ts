@@ -1,9 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-	setTransitionFallbackTimeout,
-	getTransitionFallbackTimeout,
-	startTransition,
-} from 'octane';
+import { startTransition } from 'octane';
+import { setTransitionFallbackTimeout, getTransitionFallbackTimeout } from 'octane/internal/client';
 import { act, mount, type MountResult } from '../_helpers.js';
 import { installViewTransitionMocks } from './_helpers/view-transition-mocks.js';
 import {

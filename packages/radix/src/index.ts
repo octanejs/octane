@@ -20,6 +20,7 @@ export * as Collapsible from './Collapsible';
 export * as Accordion from './Accordion';
 export * as Portal from './Portal';
 export * as Dialog from './Dialog';
+export { createEscapeLayerBridge } from './DismissableLayer';
 export * as AlertDialog from './AlertDialog';
 export * as Toggle from './Toggle';
 export * as ToggleGroup from './ToggleGroup';

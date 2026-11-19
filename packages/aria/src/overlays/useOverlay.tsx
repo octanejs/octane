@@ -14,7 +14,7 @@ type DOMAttributes = Record<string, any>;
  */
 
 import type { RefObject } from '@react-types/shared';
-import { withSlot } from 'octane';
+import { withSlot } from 'octane/internal/client';
 import { getEventTarget } from '../utils/shadowdom/DOMFunctions';
 import { isElementInChildOfActiveScope } from '../focus/FocusScope';
 import { useEffect, useRef } from '../compat/react';

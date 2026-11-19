@@ -61,7 +61,7 @@ function createOctaneHmrSplitRouteComponentsPlugin(opts) {
 							t.importSpecifier(hmrIdent, t.identifier('hmr')),
 							t.importSpecifier(hmrSymbolIdent, t.identifier('HMR')),
 						],
-						t.stringLiteral('octane'),
+						t.stringLiteral('octane/internal/client'),
 					),
 				);
 			}

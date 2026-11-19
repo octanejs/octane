@@ -18,7 +18,7 @@ import { focusWithoutScrolling } from '../utils/focusWithoutScrolling';
 import { getEventTarget } from '../utils/shadowdom/DOMFunctions';
 import { getSliderThumbId, sliderData } from './utils';
 import { mergeProps } from '../utils/mergeProps';
-import { withSlot } from 'octane';
+import { withSlot } from 'octane/internal/client';
 import React, {
 	type InputHTMLAttributes,
 	type LabelHTMLAttributes,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { injectStyle } from '../../src/index.js';
+import { injectStyle } from '../../src/internal/client.js';
 
 // Plan S3.6 — the client `injectStyle(id, css)` dedupes by id (a per-runtime
 // Set plus a DOM query for `style[data-octane=id]`). A module re-evaluation

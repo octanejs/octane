@@ -1,6 +1,10 @@
 import path from 'node:path';
 import { compile } from 'octane/compiler';
-import { compileCodeSplitReferenceRoute } from '../src/internal/router-plugin/core/code-splitter/compilers.js';
+import {
+	compileCodeSplitReferenceRoute,
+	compileCodeSplitVirtualRoute,
+} from '../src/internal/router-plugin/core/code-splitter/compilers.js';
+import { getVirtualRouteCompilerPlugins } from '../src/internal/router-plugin/core/code-splitter/plugins/framework-plugins.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createRouterCodeSplitterPlugin } from '../src/internal/router-plugin/core/router-code-splitter-plugin.js';
 import { createRouterPluginContext } from '../src/internal/router-plugin/core/router-plugin-context.js';
@@ -146,6 +150,27 @@ it.each([false, true])(
 		const imports = [...result!.code.matchAll(/from ['"]([^'"]+)['"]/g)].map((match) => match[1]);
 		expect(new Set(imports)).toEqual(new Set([routerPackage]));
 		expect(result!.code).toContain('tsr-split=component');
+	},
+);
+
+// The split module's HMR handoff reads compiler helpers, which `octane` does not export.
+it.each(['vite', 'webpack'] as const)(
+	'imports the %s split-route HMR helpers from the internal client entry',
+	(hmrStyle) => {
+		const result = compileCodeSplitVirtualRoute({
+			code: routeCode.replace('@tanstack/react-router', '@octanejs/tanstack-router'),
+			filename: '/src/routes/route.tsx?tsr-split=component',
+			splitTargets: ['component'],
+			compilerPlugins: getVirtualRouteCompilerPlugins({
+				targetFramework: 'octane',
+				addHmr: true,
+				hmrStyle,
+			}),
+		});
+		const helperImports = [
+			...result.code.matchAll(/import\s*\{([^}]*\bHMR\b[^}]*)\}\s*from\s*['"]([^'"]+)['"]/g),
+		].map((match) => match[2]);
+		expect(helperImports).toEqual(['octane/internal/client']);
 	},
 );
 

@@ -3,6 +3,10 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import * as serverRuntime from 'octane/server';
+import * as ServerInternalRuntime from 'octane/internal/server';
+
+// Server-compiled output imports private helpers from `octane/internal/server`.
+const compiledServerRuntime = { ...ServerInternalRuntime, ...serverRuntime };
 import { prerender } from 'octane/static';
 import { describe, expect, it } from 'vitest';
 
@@ -10,7 +14,7 @@ function evaluateProbe(): Record<string, any> {
 	const file = join(fileURLToPath(new URL('.', import.meta.url)), 'async-component.tsrx');
 	let { code } = compile(readFileSync(file, 'utf8'), file, { mode: 'server' });
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/(?:internal\/)?server['"];?/g,
 		(_match: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __runtime;`,
 	);
 	code = code
@@ -18,7 +22,7 @@ function evaluateProbe(): Record<string, any> {
 		.replace(/export function (\w+)\s*\(/g, 'const $1 = __exports.$1 = function $1(')
 		.replace(/export const (\w+)\s*=/g, 'const $1 = __exports.$1 =');
 	const run = new Function('__runtime', '__exports', `${code}\nreturn __exports;`);
-	return run(serverRuntime, {});
+	return run(compiledServerRuntime, {});
 }
 
 describe('promise-returning mapped component architecture seam', () => {

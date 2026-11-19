@@ -6,8 +6,8 @@ import {
 	preinitModule,
 	preconnect,
 	prefetchDNS,
-	resetFloatResourceState,
 } from '../src/index.js';
+import { resetFloatResourceState } from '../src/internal/client.js';
 import * as Server from 'octane/server';
 
 // React DOM's resource hints: client calls insert deduped tags into

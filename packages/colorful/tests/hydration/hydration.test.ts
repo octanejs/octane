@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { delegateEvents, drainPassiveEffects, flushSync, hydrateRoot } from 'octane';
+import { flushSync, hydrateRoot } from 'octane';
+import { delegateEvents, drainPassiveEffects } from 'octane/internal/client';
 import { HydrationHex } from './_fixtures/HydrationHarness.tsrx';
 
 delegateEvents([

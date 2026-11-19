@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, expect, it } from 'vitest';
-import { act, drainPassiveEffects, flushSync, hydrateRoot } from 'octane';
+import { act, flushSync, hydrateRoot } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { renderHydrationFixture } from '../../octane/tests/_hydration-ssr.js';
 import { HydratedVirtualList, observerLifecycle } from './_fixtures/hydration.tsrx';
 

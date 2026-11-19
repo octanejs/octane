@@ -23,7 +23,11 @@ export function analyzeCompiledOutput(parseModule, code, filename) {
 	let singleRootBinding = null;
 	let markWarmBinding = null;
 	for (const statement of ast.body) {
-		if (statement.type !== 'ImportDeclaration' || statement.source?.value !== 'octane') continue;
+		if (
+			statement.type !== 'ImportDeclaration' ||
+			statement.source?.value !== 'octane/internal/client'
+		)
+			continue;
 		for (const specifier of statement.specifiers || []) {
 			if (specifier.type !== 'ImportSpecifier') continue;
 			if (specifier.imported?.name === 'template') templateBinding = specifier.local.name;

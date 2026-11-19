@@ -1,4 +1,4 @@
-import { escapeHtml, hookSlots } from 'octane/server';
+import { escapeHtml, hookSlots } from 'octane/internal/server';
 
 export function run() {
 	return {

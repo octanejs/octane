@@ -3,7 +3,8 @@
 // document.head holds exactly one tag per identity and converges on the last
 // registration, with no accumulation and no leaks.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createRoot, drainPassiveEffects, flushSync } from 'octane';
+import { createRoot, flushSync } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { Churn, DeeplyNested, SameKeyTwice, Toggling } from './_fixtures/stress.tsrx';
 
 function settle(): void {

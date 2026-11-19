@@ -55,7 +55,8 @@ for (const inline of [false, true]) {
 }
 modules.set('lazy-bodies', { source: lazyBodies, inline: true });
 const entry = `
-export { createContext, createElement, createRoot, createScopedValue, createScopedElement, flushSync, lazy, useContext } from 'octane';
+export { createContext, createElement, createRoot, flushSync, lazy, useContext } from 'octane';
+export { createScopedValue, createScopedElement } from 'octane/internal/client';
 export { Body as FirstMap } from 'first-false';
 export { Body as SecondMap } from 'second-false';
 export { Body as FirstInline } from 'first-true';

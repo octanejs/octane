@@ -18,6 +18,7 @@ import {
 } from './_server-stream.js';
 import { act, hydrateRoot, startTransition, type ViewTransitionInstance } from '../src/index.js';
 import * as ServerRT from '../src/server/index.js';
+import * as ServerRTInternal from '../src/internal/server.js';
 // CLIENT-compiled fixture (for hydration).
 import {
 	AnnotationsApp,
@@ -190,20 +191,20 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 	it('frames compiler HTML children exactly like a compiled children body', () => {
 		const carrier = ServerRT.renderToString(
 			(_props: object, scope: never) =>
-				ServerRT.ssrComponent(
+				ServerRTInternal.ssrComponent(
 					scope,
 					ServerRT.ViewTransition,
-					{ default: 'none', children: ServerRT.ssrHtml('<i id="glyph">x</i>') },
+					{ default: 'none', children: ServerRTInternal.ssrHtml('<i id="glyph">x</i>') },
 					false,
 				),
 			{},
 		).html;
 		const viaBody = ServerRT.renderToString(
 			(_props: object, scope: never) =>
-				ServerRT.ssrComponent(
+				ServerRTInternal.ssrComponent(
 					scope,
 					ServerRT.ViewTransition,
-					{ default: 'none', children: () => ServerRT.ssrHtml('<i id="glyph">x</i>') },
+					{ default: 'none', children: () => ServerRTInternal.ssrHtml('<i id="glyph">x</i>') },
 					false,
 				),
 			{},

@@ -7,6 +7,7 @@ import { createServer } from 'vite';
 import { describe, expect, it, vi } from 'vitest';
 import { mount, nextPaint } from '../_helpers';
 import { ControllerGroup, ExternalController } from '../_fixtures/controller.tsrx';
+import { RetainedControllerToggle } from '../_fixtures/retained-presence.tsrx';
 
 describe('animation controls', () => {
 	it.each(['subscribe', 'unsubscribe'] as const)(
@@ -40,6 +41,115 @@ describe('animation controls', () => {
 			}
 		},
 	);
+
+	it.each([false, true])(
+		'returns an interrupted retained exit to its authored base on controller reentry (swap: %s)',
+		async (swap) => {
+			let controls!: LegacyAnimationControls;
+			const record = () => {},
+				onReady = (value: LegacyAnimationControls) => {
+					controls = value;
+				};
+			const r = mount(RetainedControllerToggle, { show: true, record, onReady });
+			try {
+				controls.set({ opacity: 1 });
+				const host = r.find('#controller-exit') as HTMLElement;
+				r.update(RetainedControllerToggle, { show: false, record, onReady });
+				await new Promise((resolve) => setTimeout(resolve, 50));
+				expect(Number(host.style.opacity)).toBeGreaterThan(0);
+				r.update(RetainedControllerToggle, { show: true, record, onReady, forceSecond: swap });
+				await new Promise((resolve) => setTimeout(resolve, 220));
+				expect(r.find('#controller-exit')).toBe(host);
+				expect(host.style.opacity).toBe('0');
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
+	it('lets a controller command issued at reentry replace the authored-base fallback', async () => {
+		let controls!: LegacyAnimationControls;
+		const record = () => {},
+			onReady = (value: LegacyAnimationControls) => {
+				controls = value;
+			};
+		const r = mount(RetainedControllerToggle, { show: true, record, onReady });
+		try {
+			controls.set({ opacity: 1 });
+			r.update(RetainedControllerToggle, { show: false, record, onReady });
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			r.update(RetainedControllerToggle, { show: true, record, onReady });
+			void controls.start({ opacity: 0.8, transition: { duration: 0.05 } });
+			await new Promise((resolve) => setTimeout(resolve, 220));
+			expect((r.find('#controller-exit') as HTMLElement).style.opacity).toBe('0.8');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('continues an active retained fallback after a later controller replacement', async () => {
+		let controls!: LegacyAnimationControls;
+		const record = () => {},
+			onReady = (value: LegacyAnimationControls) => {
+				controls = value;
+			};
+		const r = mount(RetainedControllerToggle, { show: true, record, onReady });
+		try {
+			controls.set({ opacity: 1 });
+			r.update(RetainedControllerToggle, { show: false, record, onReady });
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			r.update(RetainedControllerToggle, { show: true, record, onReady });
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			r.update(RetainedControllerToggle, { show: true, record, onReady, forceSecond: true });
+			await new Promise((resolve) => setTimeout(resolve, 220));
+			expect((r.find('#controller-exit') as HTMLElement).style.opacity).toBe('0');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('does not revive a fallback superseded by a newer controller animation', async () => {
+		let controls!: LegacyAnimationControls;
+		const record = () => {},
+			onReady = (value: LegacyAnimationControls) => {
+				controls = value;
+			};
+		const r = mount(RetainedControllerToggle, { show: true, record, onReady });
+		try {
+			controls.set({ opacity: 1 });
+			r.update(RetainedControllerToggle, { show: false, record, onReady });
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			r.update(RetainedControllerToggle, { show: true, record, onReady });
+			await controls.start({ opacity: 0.8, transition: { duration: 0.02 } });
+			r.update(RetainedControllerToggle, { show: true, record, onReady, forceSecond: true });
+			await new Promise((resolve) => setTimeout(resolve, 180));
+			expect((r.find('#controller-exit') as HTMLElement).style.opacity).toBe('0.8');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('does not revive a completed fallback after a controller replacement', async () => {
+		let controls!: LegacyAnimationControls;
+		const record = () => {},
+			onReady = (value: LegacyAnimationControls) => {
+				controls = value;
+			};
+		const r = mount(RetainedControllerToggle, { show: true, record, onReady });
+		try {
+			controls.set({ opacity: 1 });
+			r.update(RetainedControllerToggle, { show: false, record, onReady });
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			r.update(RetainedControllerToggle, { show: true, record, onReady });
+			await new Promise((resolve) => setTimeout(resolve, 220));
+			controls.set({ opacity: 0.7 });
+			r.update(RetainedControllerToggle, { show: true, record, onReady, forceSecond: true });
+			await new Promise((resolve) => setTimeout(resolve, 180));
+			expect((r.find('#controller-exit') as HTMLElement).style.opacity).toBe('0.7');
+		} finally {
+			r.unmount();
+		}
+	});
 	it('starts a variant for every committed host using each host’s variants', async () => {
 		let controls!: LegacyAnimationControls;
 		const onReady = (first: LegacyAnimationControls) => {

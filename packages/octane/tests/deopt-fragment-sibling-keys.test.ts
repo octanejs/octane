@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createElement, positionalChildren, useState } from 'octane';
+import { createElement, useState } from 'octane';
+import { positionalChildren } from 'octane/internal/client';
 import { mount } from './_helpers';
 
 // React identity semantics for MIXED fragment children in the de-opt list

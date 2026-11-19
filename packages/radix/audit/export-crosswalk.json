@@ -259,6 +259,11 @@
       "notes": "Utility re-export for composition."
     },
     {
+      "octane": "createEscapeLayerBridge",
+      "disposition": "octane-additional",
+      "notes": "Opt-in cooperative Escape ordering for mixed React and Octane Dialog layers; no unified radix-ui root equivalent."
+    },
+    {
       "octane": "createContextScope",
       "disposition": "octane-additional",
       "notes": "Utility re-export for composition."

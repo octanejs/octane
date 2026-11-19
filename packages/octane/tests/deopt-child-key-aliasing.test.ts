@@ -5,10 +5,10 @@ import {
 	flushSync,
 	Fragment,
 	hydrateRoot,
-	positionalChildren,
 	useState,
 	type OctaneNode,
 } from 'octane';
+import { positionalChildren } from 'octane/internal/client';
 import { renderToString } from 'octane/server';
 import { mount } from './_helpers';
 import { loadServerFixture } from './_server-fixture';

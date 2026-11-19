@@ -2,7 +2,8 @@ import { loadCompiledFixtureSource } from '../_server-fixture.js';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createRoot, hydrateRoot, flushSync, drainPassiveEffects } from '../../src/index.js';
+import { createRoot, hydrateRoot, flushSync } from '../../src/index.js';
+import { drainPassiveEffects } from '../../src/internal/client.js';
 import * as ServerRT from 'octane/server';
 // CLIENT-compiled variants (the normal .tsrx import path, client mode). The
 // onClick handler in Counter makes this module call delegateEvents(['click']) at

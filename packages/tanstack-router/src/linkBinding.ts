@@ -10,7 +10,8 @@
 // IntersectionObserver, 'render' once on mount), the click handler (navigate
 // with replace/resetScroll/hashScrollIntoView/viewTransition/startTransition/
 // ignoreBlocker forwarded), and data-status/data-transitioning reflection.
-import { __useCommittedState, useRef, useEffect, useCallback } from 'octane';
+import { useRef, useEffect, useCallback } from 'octane';
+import { __useCommittedState } from 'octane/internal/client';
 import {
 	deepEqual,
 	exactPathTest,

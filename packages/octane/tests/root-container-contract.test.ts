@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, createRoot, flushSync, hydrateRoot, setIsOctaneActEnvironment } from 'octane';
+import { act, createRoot, flushSync, hydrateRoot } from 'octane';
+import { setIsOctaneActEnvironment } from 'octane/internal/client';
 import { renderToString } from 'octane/server';
 import { loadServerFixture } from './_server-fixture.js';
 import {

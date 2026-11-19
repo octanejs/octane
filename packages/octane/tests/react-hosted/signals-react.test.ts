@@ -10,6 +10,7 @@ import { renderToPipeableStream, renderToString } from 'react-dom/server';
 import { PassThrough } from 'node:stream';
 import { deferred } from '../_fixtures/signals-async-controls.js';
 import {
+	createFamily,
 	createResource,
 	createScope,
 	query,
@@ -206,6 +207,146 @@ describe('octane/signals/react', () => {
 		expect(container.textContent).toBe('retired');
 	});
 
+	it.each(['writable', 'derived'] as const)(
+		'retires an evicted %s family reader without affecting its sibling',
+		async (kind) => {
+			vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+			const scope = createScope({ scopeKey: `react-family-${kind}` });
+			const source$ = scope.signal$('source', 0);
+			const log: string[] = [];
+			const generations = new Map<string, number>();
+			const family = createFamily(
+				scope,
+				(id: string) => {
+					const generation = (generations.get(id) ?? 0) + 1;
+					generations.set(id, generation);
+					const name = `${id}:${generation}`;
+					const options = {
+						watched: () => {
+							log.push(`watch ${name}`);
+							return () => {
+								log.push(`unwatch ${name}`);
+							};
+						},
+					};
+					return kind === 'writable'
+						? scope.signal$(null, `${id}:0`, options)
+						: scope.derived$(null, () => `${id}:${source$.get()}`, options);
+				},
+				{ idle: 25 },
+			);
+			const old$ = family.get('a');
+			const sibling$ = family.get('b');
+			const idle$ = family.get('idle');
+			const errors: unknown[] = [];
+			const tree = (member$: SignalHandle<string>, generation: number) =>
+				h(
+					'div',
+					null,
+					h(Boundary, { key: generation }, h(Value, { handle: member$ })),
+					h(Value, { handle: sibling$ }),
+				);
+			const container = document.createElement('div');
+			const root = createRoot(container, {
+				onCaughtError: (error) => {
+					errors.push(error);
+				},
+			});
+			try {
+				await act(() => root.render(tree(old$, 0)));
+				expect(container.textContent).toBe('a:0b:0');
+				await act(() => {
+					vi.advanceTimersByTime(25);
+				});
+				expect(family.get('a')).toBe(old$);
+				expect(family.get('b')).toBe(sibling$);
+				expect(family.has('idle')).toBe(false);
+				expect(() => idle$.get()).toThrow(ScopeDisposedError);
+
+				await act(() => {
+					family.delete('a');
+				});
+				expect(errors).toHaveLength(1);
+				expect(errors[0]).toBeInstanceOf(ScopeDisposedError);
+				expect(container.textContent).toBe('retiredb:0');
+				expect(log).toEqual(['watch a:1', 'watch b:1', 'unwatch a:1']);
+				await act(() => {
+					if ('set' in sibling$) sibling$.set('b:1');
+					else source$.set(1);
+				});
+				expect(container.textContent).toBe('retiredb:1');
+				const fresh$ = family.get('a');
+				expect(fresh$).not.toBe(old$);
+				expect(() => old$.get()).toThrow(ScopeDisposedError);
+				await act(() => root.render(tree(fresh$, 1)));
+				expect(container.textContent).toBe(kind === 'writable' ? 'a:0b:1' : 'a:1b:1');
+				expect(log).toEqual(['watch a:1', 'watch b:1', 'unwatch a:1', 'watch a:2']);
+
+				await act(() => root.render(null));
+				expect(log.filter((entry) => entry.startsWith('unwatch')).sort()).toEqual([
+					'unwatch a:1',
+					'unwatch a:2',
+					'unwatch b:1',
+				]);
+				await act(() => {
+					vi.advanceTimersByTime(24);
+				});
+				expect([family.has('a'), family.has('b')]).toEqual([true, true]);
+				await act(() => {
+					vi.advanceTimersByTime(1);
+				});
+				expect([family.has('a'), family.has('b')]).toEqual([false, false]);
+			} finally {
+				await act(() => root.unmount());
+				scope.dispose();
+				vi.useRealTimers();
+			}
+		},
+	);
+
+	it.each(['clear', 'scope.dispose'] as const)(
+		'removes mounted writable and derived family readers on %s',
+		async (action) => {
+			const scope = createScope({ scopeKey: `react-family-${action}` });
+			const writable = createFamily(scope, (_id: string) => scope.signal$(null, 'writable live'));
+			const derived = createFamily(scope, (_id: string) =>
+				scope.derived$(null, () => 'derived live'),
+			);
+			const errors: unknown[] = [];
+			const container = document.createElement('div');
+			const root = createRoot(container, {
+				onCaughtError: (error) => {
+					errors.push(error);
+				},
+			});
+			try {
+				await act(() =>
+					root.render(
+						h(
+							'div',
+							null,
+							h(Boundary, null, h(Value, { handle: writable.get('a') })),
+							h(Boundary, null, h(Value, { handle: derived.get('a') })),
+						),
+					),
+				);
+				expect(container.textContent).toBe('writable livederived live');
+				await act(() => {
+					if (action === 'clear') {
+						writable.clear();
+						derived.clear();
+					} else scope.dispose();
+				});
+				expect(errors).toHaveLength(2);
+				for (const error of errors) expect(error).toBeInstanceOf(ScopeDisposedError);
+				expect(container.textContent).toBe('retiredretired');
+			} finally {
+				await act(() => root.unmount());
+				scope.dispose();
+			}
+		},
+	);
+
 	it('isolates separate roots with separate scopes', async () => {
 		const scopes = [labelScope('app', 0), labelScope('app', 0)];
 		const mounted = scopes.map((scope) => mount(h(SignalScopeProvider, { scope }, h(Label))));
@@ -368,6 +509,55 @@ describe('octane/signals/react', () => {
 		expect(container.innerHTML).toBe('<p>Hello Ada</p>');
 		await act(() => names.get(scope)!.set('Lin'));
 		expect(container.innerHTML).toBe('<p>Hello Lin</p>');
+	});
+
+	it('adopts a historical server value before catching up to a pre-hydration write', async () => {
+		const request = createScope({ scopeKey: 'historical-request' });
+		const serverName$ = request.signal$('name', 'Ada');
+		function Greeting(props: {
+			name$: SignalHandle<string>;
+			getServerSnapshot?: () => string;
+			layouts?: string[];
+		}) {
+			const name = useSignalValue(props.name$, props.getServerSnapshot);
+			React.useLayoutEffect(() => {
+				props.layouts?.push(name);
+			}, [name, props.layouts]);
+			return h('p', null, name);
+		}
+		const html = renderToString(h(Greeting, { name$: serverName$ }));
+		const seed = request.serialize();
+		request.dispose();
+
+		const scope = createScope({ scopeKey: 'historical-request', seed });
+		const name$ = scope.signal$('name', '');
+		const frame = scope.beginAdoption(seed);
+		name$.set('Lin');
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		const serverNode = container.firstChild;
+		const errors: unknown[] = [];
+		const layouts: string[] = [];
+		let root!: Root;
+		await act(() => {
+			root = hydrateRoot(
+				container,
+				h(Greeting, { name$, getServerSnapshot: () => frame.run(() => name$.get()), layouts }),
+				{ onRecoverableError: (error) => errors.push(error) },
+			);
+		});
+		roots.push(root);
+		expect(errors).toEqual([]);
+		expect(container.firstChild).toBe(serverNode);
+		expect(layouts[0]).toBe('Ada');
+		expect(container.textContent).toBe('Lin');
+		frame.release();
+		await act(() => name$.set('Grace'));
+		expect(container.textContent).toBe('Grace');
+		await act(() => root.unmount());
+		roots.splice(roots.indexOf(root), 1);
+		expect(scope.inspect().retired).toBe(false);
+		scope.dispose();
 	});
 
 	it('suspends on a pending async handle and throws its failure', async () => {

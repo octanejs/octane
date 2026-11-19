@@ -1,4 +1,5 @@
-import { createRoot, delegateEvents, useContext, useState } from 'octane';
+import { createRoot, useContext, useState } from 'octane';
+import { delegateEvents } from 'octane/internal/client';
 import { OTPInput, OTPInputContext, REGEXP_ONLY_DIGITS } from '@octanejs/input-otp';
 
 delegateEvents(['blur', 'focus', 'input', 'mouseleave', 'mouseover', 'paste']);

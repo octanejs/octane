@@ -1,6 +1,7 @@
 import type { BundledLanguage } from 'shiki';
 import { describe, expect, it, vi } from 'vitest';
-import { createRoot, drainPassiveEffects, flushSync } from 'octane';
+import { createRoot, flushSync } from 'octane';
+import { drainPassiveEffects } from 'octane/internal/client';
 import { Streamdown, type CodeHighlighterPlugin, type HighlightResult } from '@octanejs/streamdown';
 
 const FIRST_CODE = 'const first = 1;';

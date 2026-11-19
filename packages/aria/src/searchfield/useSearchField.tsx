@@ -14,7 +14,7 @@ type DOMAttributes = Record<string, any>;
  */
 
 import type { AriaButtonProps } from '../button/useButton';
-import { withSlot } from 'octane';
+import { withSlot } from 'octane/internal/client';
 import { type AriaTextFieldProps, useTextField } from '../textfield/useTextField';
 import type { RefObject, ValidationResult } from '@react-types/shared';
 import type { InputHTMLAttributes, LabelHTMLAttributes } from '../compat/react';

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { act, createRoot, drainPassiveEffects, flushSync, hydrateRoot } from '../../src/index.js';
+import { act, createRoot, flushSync, hydrateRoot } from '../../src/index.js';
+import { drainPassiveEffects } from '../../src/internal/client.js';
 import * as ServerRuntime from 'octane/server';
 import { flushEffects, mount } from '../_helpers.js';
 import { loadServerFixture } from '../_server-fixture.js';

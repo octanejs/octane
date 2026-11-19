@@ -5,6 +5,9 @@ import {
 	type UseInViewOptions,
 	domMax,
 	useInView,
+	useIsPresent,
+	RetainedPresence,
+	type RetainedPresenceProps,
 	useAnimationControls,
 } from '@octanejs/motion';
 import * as m from '@octanejs/motion/react-m';
@@ -20,6 +23,9 @@ type SpanIsTyped = Assert<IsAny<typeof m.span> extends false ? true : false>;
 
 expectType<MotionComponent>(m.div);
 expectType<MotionComponent>(m.span);
+expectType<boolean>(useIsPresent());
+type RetainedPresenceIsTyped = Assert<IsAny<typeof RetainedPresence> extends false ? true : false>;
+expectType<RetainedPresenceProps>({ children: null });
 expectType<LegacyAnimationControls>(useAnimationControls());
 expectType<boolean>(domMax.animation);
 expectType<boolean>(domMax.layout);
@@ -47,4 +53,4 @@ const target = {
 expectType<Transition>(transition);
 expectType<TargetAndTransition>(target);
 
-export type { DivIsTyped, SpanIsTyped };
+export type { DivIsTyped, SpanIsTyped, RetainedPresenceIsTyped };
