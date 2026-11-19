@@ -107,6 +107,44 @@ coverage for the overlay/portal components and Phase-5 polish. The port surfaced
 and fixed, in octane itself — fourteen runtime/compiler parity bugs along the way;
 each is pinned by an octane regression test and a changeset.
 
+## Escape across React and Octane dialogs
+
+React Radix and this port maintain separate dismissable-layer stacks. For nested,
+in-place dialogs that cross `OctaneCompat` or `ReactCompat`, opt each participating
+React `Dialog.Content` into the cooperative Escape bridge:
+
+```tsx
+import { createEscapeLayerBridge } from '@octanejs/radix';
+import { useMemo } from 'react';
+
+function MixedContent({ onEscapeKeyDown, ...props }) {
+  const escapeLayer = useMemo(createEscapeLayerBridge, []);
+  return (
+    <ReactDialog.Content
+      {...props}
+      ref={escapeLayer.ref}
+      onEscapeKeyDown={(event) => escapeLayer.onEscapeKeyDown(event, onEscapeKeyDown)}
+    />
+  );
+}
+```
+
+Compose `escapeLayer.ref` with an existing content ref if needed. Native dialogs
+join automatically while a React content ref is registered. For supported mixed ordering,
+the top dialog receives the original cancelable Escape event once; `preventDefault()`
+vetoes dismissal, and ordinary keyboard propagation continues. If a React parent's capture
+listener runs first, it routes the native child's callback immediately, so ordering relative
+to independent document capture listeners can differ.
+
+This opt-in supports cancelable Dialog Escape events with a native dismissal action
+and nested in-place content. React retains its own ordering between React layers. If its
+private stack chooses a React parent while a native layer separates it from the top React
+layer, the bridge suppresses that parent rather than dismissing the mixed subtree; that
+topology requires additional cooperation to dismiss. The bridge does not establish ordering
+for simultaneously mounted mixed portals, noncancelable events, pointer/focus dismissal,
+or modal pointer policy.
+Without the two React content props, the renderers retain their independent stacks.
+
 ## Status
 
 Current scope, known divergences, and verification status are tracked in the
