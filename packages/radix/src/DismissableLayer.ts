@@ -17,11 +17,17 @@ const POINTER_DOWN_OUTSIDE = 'dismissableLayer.pointerDownOutside';
 const FOCUS_OUTSIDE = 'dismissableLayer.focusOutside';
 
 let originalBodyPointerEvents: string;
+type EscapeAction = (event: KeyboardEvent) => void;
+type NativeEscapeAction = (event: KeyboardEvent, routed?: boolean) => void;
+type EscapeLayer = { node: HTMLElement; action: NativeEscapeAction | null };
+type EscapeRegistry = { layers: EscapeLayer[]; reactLayers: number };
+const escapeRegistries = new WeakMap<Document, EscapeRegistry>();
+let handledEscapes: WeakSet<KeyboardEvent> | undefined;
 
 // Radix models this as React context but never renders a Provider — every consumer sees
 // the module-level default. Port it as a plain singleton.
 const layerContext = {
-	layers: new Set<HTMLElement>(),
+	layers: new Map<HTMLElement, NativeEscapeAction>(),
 	layersWithOutsidePointerEventsDisabled: new Set<HTMLElement>(),
 	branches: new Set<HTMLElement>(),
 	// Outside elements that belong to a layer's own dismiss affordance (eg, a dialog
@@ -29,6 +35,92 @@ const layerContext = {
 	// stop propagation.
 	dismissableSurfaces: new Set<HTMLElement>(),
 };
+
+function escapeLayer(node: HTMLElement, action: NativeEscapeAction | null): EscapeLayer {
+	return { node, action };
+}
+
+function insertEscapeLayer(registry: EscapeRegistry, layer: EscapeLayer): void {
+	// Ref attachment can run child-first on an initial in-place mount.
+	const descendant = registry.layers.findIndex((other) => layer.node.contains(other.node));
+	if (descendant < 0) registry.layers.push(layer);
+	else registry.layers.splice(descendant, 0, layer);
+}
+
+function removeEscapeLayer(registry: EscapeRegistry, node: HTMLElement): void {
+	const index = registry.layers.findIndex((layer) => layer.node === node);
+	if (index >= 0) registry.layers.splice(index, 1);
+}
+
+/** Opt a React Radix Dialog.Content into Escape ordering with native Dialog layers. */
+export function createEscapeLayerBridge(): {
+	ref: (node: HTMLElement | null) => void;
+	onEscapeKeyDown: (event: KeyboardEvent, handler?: EscapeAction) => void;
+} {
+	let current: EscapeLayer | undefined;
+	return {
+		ref(node) {
+			if (current?.node === node) return;
+			if (current) {
+				const document = current.node.ownerDocument;
+				const registry = escapeRegistries.get(document);
+				if (registry) {
+					removeEscapeLayer(registry, current.node);
+					if (--registry.reactLayers === 0) escapeRegistries.delete(document);
+				}
+				current = undefined;
+			}
+			if (!node) return;
+			const document = node.ownerDocument;
+			let registry = escapeRegistries.get(document);
+			if (!registry) {
+				registry = { layers: [], reactLayers: 0 };
+				for (const [nativeNode, action] of layerContext.layers) {
+					if (nativeNode.ownerDocument === document)
+						insertEscapeLayer(registry, escapeLayer(nativeNode, action));
+				}
+				escapeRegistries.set(document, registry);
+			}
+			current = escapeLayer(node, null);
+			registry.reactLayers++;
+			insertEscapeLayer(registry, current);
+		},
+		onEscapeKeyDown(event, handler) {
+			if (event.key !== 'Escape') {
+				handler?.(event);
+				return;
+			}
+			if (handledEscapes?.has(event)) {
+				event.preventDefault();
+				return;
+			}
+			const registry = current && escapeRegistries.get(current.node.ownerDocument);
+			const top = registry?.layers.at(-1);
+			if (!current || !registry || !top || top === current || !event.cancelable) {
+				handler?.(event);
+				return;
+			}
+			if (top.action) {
+				(handledEscapes ??= new WeakSet()).add(event);
+				try {
+					top.action(event, true);
+				} finally {
+					event.preventDefault();
+				}
+			} else {
+				// React owns dismissal for React layers. Preserve its private stack decision
+				// unless doing so would cross a native layer and dismiss a mixed subtree.
+				for (let i = registry.layers.indexOf(current) + 1; i < registry.layers.length; i++) {
+					if (registry.layers[i].action) {
+						event.preventDefault();
+						return;
+					}
+				}
+				handler?.(event);
+			}
+		},
+	};
+}
 
 export function DismissableLayer(props: any): any {
 	const slot = S('DismissableLayer');
@@ -49,7 +141,7 @@ export function DismissableLayer(props: any): any {
 	const [, force] = useState({}, subSlot(slot, 'force'));
 	const composedRefs = useComposedRefs(forwardedRef, setNode, subSlot(slot, 'refs'));
 
-	const layers = Array.from(context.layers);
+	const layers = Array.from(context.layers.keys());
 	const [highestLayerWithOutsidePointerEventsDisabled] = [
 		...context.layersWithOutsidePointerEventsDisabled,
 	].slice(-1);
@@ -102,8 +194,14 @@ export function DismissableLayer(props: any): any {
 
 	const isHighestLayer = node ? index === layers.length - 1 : false;
 	const handleKeyDown = useEffectEvent(
-		(event: KeyboardEvent) => {
+		(event: KeyboardEvent, routed = false) => {
 			if (event.key !== 'Escape') return;
+			if (!routed) {
+				if (handledEscapes?.has(event)) return;
+				const registry = escapeRegistries.get(ownerDocument);
+				if (registry && registry.layers.at(-1)?.node !== node) return;
+				if (registry) (handledEscapes ??= new WeakSet()).add(event);
+			}
 			onEscapeKeyDown?.(event);
 			if (!event.defaultPrevented && onDismiss) {
 				event.preventDefault();
@@ -133,7 +231,13 @@ export function DismissableLayer(props: any): any {
 				}
 				context.layersWithOutsidePointerEventsDisabled.add(node);
 			}
-			context.layers.add(node);
+			context.layers.set(node, handleKeyDown);
+			const registry = escapeRegistries.get(ownerDocument);
+			if (registry) {
+				const existing = registry.layers.find((layer) => layer.node === node);
+				if (existing) existing.action = handleKeyDown;
+				else insertEscapeLayer(registry, escapeLayer(node, handleKeyDown));
+			}
 			dispatchUpdate();
 			return () => {
 				if (disableOutsidePointerEvents) {
@@ -153,6 +257,8 @@ export function DismissableLayer(props: any): any {
 			return () => {
 				if (!node) return;
 				context.layers.delete(node);
+				const registry = escapeRegistries.get(ownerDocument);
+				if (registry) removeEscapeLayer(registry, node);
 				context.layersWithOutsidePointerEventsDisabled.delete(node);
 				dispatchUpdate();
 			};
