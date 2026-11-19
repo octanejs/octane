@@ -348,13 +348,19 @@ describe('bare-left @for row bindings', () => {
 		expect(errors).toEqual([]);
 	});
 
-	it('keeps an indexed row pattern outside the row body scope on the server', () => {
+	it.each([
+		['prefix', "const prefix = 'row';"],
+		['prefix', 'class prefix {}'],
+		['prefix', 'function prefix() {}'],
+		['prefix', 'enum prefix { Row }'],
+		["eval('prefix')", "const prefix = 'row';"],
+	])('keeps a server row default reading %s out of a body with %s', (read, declaration) => {
 		// As in a for…of, a header default never sees the row body's declarations.
 		const source = `
 			const prefix = 'outer';
 			export function List({ rows }) @{
-				<ul>@for (const { read = () => prefix + index } of rows; index index) {
-					const prefix = 'row';
+				<ul>@for (const { read = () => ${read} + index } of rows; index index) {
+					${declaration}
 					<li>{read() as string}</li>
 				}</ul>
 			}

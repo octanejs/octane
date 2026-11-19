@@ -18079,14 +18079,16 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		itemSub.fn = { ...itemSub.fn, params: [snapshot.binding, ...itemSub.fn.params.slice(1)] };
 	} else if (mapCall === null && node.index && itemId.type !== 'Identifier') {
 		// Bind the index before preparing an authored row that reads it, like the
-		// client. The pattern then shares the row body's scope, where a default
-		// would see the body's own declarations, so a pattern that reads a name the
-		// body declares stays a parameter.
+		// client. The pattern then shares the row body's scope, so it stays a
+		// parameter when it reads a name the body declares, or calls `eval`, which
+		// can read any of them.
 		const fn = itemSub.fn;
 		const reads = collectFreeIdentifiers(node.left, []);
-		const declared = new Set();
-		for (const statement of fn.body.body) collectStatementBindings(statement, declared);
-		if (reads.has(node.index.name) && ![...reads].some((name) => declared.has(name))) {
+		const declared = collectModuleTopLevelBindings(fn.body.body, new Set()).all;
+		if (
+			reads.has(node.index.name) &&
+			![...reads].some((name) => name === 'eval' || declared.has(name))
+		) {
 			const input = b.id(allocCompilerName(ctx, '__rowInput'));
 			const ordinal = b.id(allocCompilerName(ctx, '__rowIndex'));
 			itemSub.fn = {
