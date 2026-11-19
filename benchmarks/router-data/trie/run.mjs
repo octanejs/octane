@@ -60,6 +60,8 @@ function urls(size) {
 		['/blog/new', 'blog-new', {}],
 		['/blog/hello-world', 'blog-post', { slug: 'hello-world' }],
 		['/docs/guide/routing/loaders', 'docs', { _splat: 'guide/routing/loaders' }],
+		['/docs', 'docs', { _splat: '' }],
+		['/docs/', 'docs', { _splat: '' }],
 		['/fr/help', 'help', { lang: 'fr' }],
 		['/help', 'help', {}],
 		['/help/install', 'help-topic', { topic: 'install' }],
@@ -123,7 +125,8 @@ function createRegexMatcher(routes) {
 			if (!m) continue;
 			const params = {};
 			for (let i = 0; i < r.names.length; i++) {
-				const v = m[i + 1];
+				// An absent optional is left out; an empty splat is ''.
+				const v = m[i + 1] ?? (r.names[i] === '_splat' ? '' : undefined);
 				if (v !== undefined) params[r.names[i]] = v.indexOf('%') === -1 ? v : decodeURIComponent(v);
 			}
 			return { id: r.id, params };

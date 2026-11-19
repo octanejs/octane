@@ -10,7 +10,7 @@
 // Ranking, at every depth: static > required param > optional param > splat,
 // with backtracking, so /blog/new beats /blog/$slug and a dead end under a
 // static branch falls back to a parameter branch. An absent optional param is
-// left out of params. Matching walks the pathname by index and allocates only
+// left out of params; an empty splat is `_splat: ''`. Matching walks the pathname by index and allocates only
 // the segment strings it captures and the params record of a hit.
 
 /**
@@ -103,6 +103,11 @@ export function createMatcher(routes) {
 				values[depth] = undefined;
 				const hit = walk(n.optional, path, at, depth + 1);
 				if (hit) return hit;
+			}
+			// A splat matches an empty rest: /docs/$ matches /docs and /docs/.
+			if (n.splat) {
+				values[depth] = '';
+				return n.splat;
 			}
 			return null;
 		}
