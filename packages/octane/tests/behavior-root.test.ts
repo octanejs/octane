@@ -9863,6 +9863,13 @@ export function WatchedTry(props) @{ 'use dom bindings';
 				(section: HTMLElement) => section.querySelector('b')!.textContent,
 			],
 			[
+				'@if arm with signal text',
+				`@if (props.selected ? right$.get() : left$.get()) { <b>{label$ as string}</b> } @else { <b>{'hidden' + props.suffix}</b> }`,
+				[false, false, true],
+				'label',
+				(section: HTMLElement) => section.querySelector('b')!.textContent,
+			],
+			[
 				'@for collection',
 				`@for (const row of (props.selected ? right$.get() : left$.get()); key row.id) { <b>{row.label + props.suffix as string}</b> }`,
 				[[{ id: 'a', label: 'a' }], [{ id: 'z', label: 'z' }], [{ id: 'b', label: 'b' }]],
@@ -9891,6 +9898,7 @@ export function WatchedTry(props) @{ 'use dom bindings';
 					const left$ = scope.signal$('left', initial[0] as unknown);
 					const right$ = scope.signal$('right', initial[1] as unknown);
 					const selectedGate$ = scope.signal$('selected-gate', false);
+					const label$ = scope.signal$('label', 'label');
 					let resolve!: (value: string) => void;
 					const pending = new Promise<string>((done) => (resolve = done));
 					const load = query(`held-accepted-${shape}-${outcome}-${dev}`, (selected: boolean) =>
@@ -9898,7 +9906,7 @@ export function WatchedTry(props) @{ 'use dom bindings';
 					);
 					const gate$ = createResource(scope, 'gate', () => load(selectedGate$.get()));
 					await act(() => {});
-					const source = `import { left$, right$, gate$ } from 'state';
+					const source = `import { left$, right$, gate$, label$ } from 'state';
 export function Held(props) @{ 'use dom bindings';
   <section>${markup}<i>{gate$.get() as string}</i></section>
 }`;
@@ -9907,7 +9915,7 @@ export function Held(props) @{ 'use dom bindings';
 						{ selected: false, suffix: ':old' },
 						dev,
 						source,
-						{ state: { left$, right$, gate$ } },
+						{ state: { left$, right$, gate$, label$ } },
 					);
 					const handle = fixture.mount({ parent: container }, fixture.state);
 					try {
@@ -9931,7 +9939,7 @@ export function Held(props) @{ 'use dom bindings';
 								: { selected: false, suffix: ':old' },
 							dev,
 							source,
-							{ state: { left$, right$, gate$ } },
+							{ state: { left$, right$, gate$, label$ } },
 						);
 						const expected = document.createElement('div');
 						expected.innerHTML = replacement.html;

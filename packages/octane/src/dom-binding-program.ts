@@ -1288,6 +1288,7 @@ function prepareFragment(
 				let value = descriptor.read(environment);
 				if (descriptor.signal && transaction.signals) {
 					let connection = region.signal;
+					const connected = transaction.accepting && connection !== undefined;
 					if (!connection && transaction.signals.isSignal(value)) {
 						const prepareChannel = (committed = false): (() => void) => {
 							if (
@@ -1314,7 +1315,7 @@ function prepareFragment(
 							transaction.notifySignal!(committed ? committedPrepare : prepare),
 						);
 					}
-					if (connection && transaction.accepting) candidate.keep = true;
+					if (connected) candidate.keep = true;
 					else if (connection) {
 						region.signalPlan = candidate;
 						region.signalFrame = transaction.frame;
