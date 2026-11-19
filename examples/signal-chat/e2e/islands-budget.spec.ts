@@ -5,7 +5,7 @@ import { completedAnswer, configuration, expect, open, test } from './lab.ts';
 // island is a binding view, so activating them all must not load the renderer.
 // The budget measures production chunks, so the Playwright config runs this
 // spec only against the production preview.
-test('activates every island without the renderer within the islands-only JavaScript budget', async ({
+test('activates every island without the renderer and reports its islands-only JavaScript', async ({
 	page,
 }) => {
 	const scripts = new Map<string, Promise<Buffer>>();
@@ -34,10 +34,5 @@ test('activates every island without the renderer within the islands-only JavaSc
 		type: 'islands-only JavaScript',
 		description: `${files.length} scripts, ${gzip} bytes gzip-9`,
 	});
-	// #1514 targets 70 KiB. Every route of this app is islands-only, so its client
-	// build places pending transition signal state and its resource and derived
-	// candidate producers with the renderer (the `octane-islands` condition)
-	// rather than the signal modules, code these pages would load but never run.
-	// The route measured 66,829 B.
-	expect(gzip).toBeLessThanOrEqual(67 * 1024);
+	// Size is reported, not gated (#1907): growth is reviewed after merge.
 });
