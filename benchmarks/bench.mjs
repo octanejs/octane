@@ -950,7 +950,11 @@ const SUITES = [
 			{ filter: 'sveltekit-router-data-bench', port: 5346 },
 		],
 		iter: { normal: 10, quick: 2 },
-		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+		runs: [
+			{ script: 'run.mjs', args: (n) => [String(n)] },
+			// Node-only: the RFC's route trie against a ranked RegExp list.
+			{ script: 'trie/run.mjs', args: (n) => [String(n)] },
+		],
 	},
 	{
 		// Realistic async composition: adjacent panels under one route boundary,

@@ -6894,5 +6894,21 @@
     "reference": "tanstack-router",
     "maxRatio": 0.75,
     "note": "Time to the confirmed rename. Observed about 0.5x, one request wave against two."
+  },
+  {
+    "suite": "router-data",
+    "op": "match_ns_1000",
+    "target": "octane-trie",
+    "reference": "ranked-regex",
+    "maxRatio": 0.05,
+    "note": "Route matching must not scale with the route count. Observed about 0.004x at 1,000 routes (~100 ns against ~27 µs); a linear scan would land near 1x."
+  },
+  {
+    "suite": "router-data",
+    "op": "match_ns_50",
+    "target": "octane-trie",
+    "reference": "ranked-regex",
+    "maxRatio": 0.5,
+    "note": "Even a small table matches faster than a ranked RegExp list. Observed about 0.22x (~100 ns against ~440 ns)."
   }
 ]

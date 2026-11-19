@@ -54,6 +54,24 @@ The journey runs in two passes:
 
 `js_gzip_kb` is every built JavaScript file, gzipped.
 
+## Route matching
+
+[`trie/run.mjs`](trie/run.mjs) is a Node-only run in the same suite. It times the RFC's route
+matcher, [`trie/trie.js`](trie/trie.js), against a ranked RegExp list on route tables of 50, 200
+and 1,000 routes. The URL mix covers static and parameter hits, a static that wins over a
+parameter, optional and splat segments, encoded params and misses. Its op is `match_ns_<size>`,
+in nanoseconds per match. Its gate is fatal: both matchers must return the expected route and
+params for every URL.
+
+| routes | octane-trie | ranked-regex |
+| --- | --- | --- |
+| 50 | 98 ns | 438 ns |
+| 200 | 100 ns | 2,126 ns |
+| 1,000 | 101 ns | 26,667 ns |
+
+The RFC's Phase 0 bar is under 1 µs per match. The trie stays near 100 ns at every size, while
+the RegExp list grows with the table.
+
 ## Gates
 
 These are fatal and checked on every iteration, in both passes:
@@ -111,8 +129,19 @@ CPU pass, 4× throttle (ms):
   - `cold_nested` is 16.1 ms ±3% against TanStack's 11.5 ms. Both Octane ports also land at
     16–18 ms, which points at Octane's first transition and suspend path rather than at
     router logic.
-  - The `mutation` CPU cost includes two renders, one optimistic and one confirmed.
   - Bytes trail SvelteKit's 41.5 KB.
+
+- **The CPU gaps are first-use cost, not steady-state cost** (2026-11-19, 4× throttle, 10
+  pages):
+  - `cold_nested` is the page's first transition, first suspend and first resource. It runs
+    311 runtime functions for the first time, 67 KB minified, where TanStack Router runs 141
+    functions and 36 KB. A trace charges 10.7 ms to `V8.CompileCode` against TanStack's 6.7 ms.
+    A second, equally fresh nested navigation in the same page takes 3.0 ms, against 15.0 ms
+    for the first.
+  - `mutation` is the page's first action and optimistic write. A first rename takes 4.4 ms;
+    the second and third take 1.2 and 1.3 ms. TanStack Router takes 4.5, 3.0 and 2.3 ms, and
+    SvelteKit 2.9, 1.6 and 1.4 ms. The optimistic render and the confirmed render are both
+    needed, because the form reads the confirmed title, so the steady state already leads.
 
   The RFC's Phase 0 carries each of these as a work item.
 
