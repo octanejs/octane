@@ -31,6 +31,7 @@ import {
 	REACTIVE_KEYLESS_CELL,
 	REACTIVE_LISTED,
 	REACTIVE_CUSTOM_EQUALS,
+	REACTIVE_SPECULATIVE,
 	REACTIVE_RECURSED,
 	REACTIVE_RECURSED_CHECK,
 	REACTIVE_WATCHING,
@@ -55,6 +56,7 @@ import {
 	setNativeReadObserver,
 	type NativeReadInspection,
 	type NativeReadSource,
+	type NativeReadSubscription,
 	type NativeSerializedScope,
 } from './read-protocol.js';
 import {
@@ -1128,7 +1130,11 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 		return readSignalBinding(this);
 	}
 
-	[SIGNAL_BINDING_SUBSCRIBE](notify: () => void, onRetire?: () => void): () => void {
+	[SIGNAL_BINDING_SUBSCRIBE](
+		notify: () => void,
+		onRetire?: () => void,
+		speculative?: boolean,
+	): NativeReadSubscription {
 		assertAlive(this.owner);
 		// An optional native lease can end when its exact owner retires. A live
 		// computation throwing ScopeDisposedError still uses normal invalidation.
@@ -1140,6 +1146,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 						this.owner.retired ? onRetire() : notify(),
 					),
 			true,
+			speculative,
 		);
 	}
 
@@ -1316,6 +1323,16 @@ class GraphReadSource implements NativeReadSource {
 		readonly view: DeclarationView | undefined,
 	) {}
 
+	/** Private proof used only by an opted native projection observer. */
+	__matchesNativeDomHandle(handle: unknown): boolean {
+		return (
+			this.read === 'value' &&
+			this.view === undefined &&
+			handle === this.node &&
+			this.node[NATIVE_DOM_VALUE] === ScopedNode.prototype[NATIVE_DOM_VALUE]
+		);
+	}
+
 	/** The promoted view's canonical channel, or undefined while this one is live. */
 	canonicalSource(): NativeReadSource | undefined {
 		const view = this.view;
@@ -1339,11 +1356,11 @@ class GraphReadSource implements NativeReadSource {
 		return pendingWorld && pendingWorld.hides(node) ? NaN : node.revision;
 	}
 
-	subscribe(notify: () => void): () => void {
+	subscribe(notify: () => void, speculative?: boolean): NativeReadSubscription {
 		const canonical = this.canonicalSource();
-		if (canonical) return canonical.subscribe(notify);
+		if (canonical) return canonical.subscribe(notify, speculative);
 		assertAlive(this.node.owner);
-		return attachObserver(this.node, notify, true);
+		return attachObserver(this.node, notify, true, speculative);
 	}
 
 	serialize(revision: number): readonly NativeSerializedScope[] | undefined {
@@ -2057,6 +2074,17 @@ export class SignalObserver implements ReactiveNode {
 		readonly native: boolean,
 		public previous: NodeState | undefined,
 	) {}
+
+	setObserved(observed: boolean): void {
+		if (!this.node || !this.flags || observed === !(this.flags & REACTIVE_SPECULATIVE)) return;
+		if (observed) {
+			this.flags &= ~REACTIVE_SPECULATIVE;
+			if (watchDriver) watchDriver.link(this.node, this);
+		} else {
+			if (watchDriver) watchDriver.unlink(this.node, this);
+			this.flags |= REACTIVE_SPECULATIVE;
+		}
+	}
 }
 
 /** Whether `state` is the plain ready state of `value`, as a value-only node's is. */
@@ -2120,8 +2148,14 @@ function observeCurrent(observer: SignalObserver, observed: ScopedNode): boolean
 	return false;
 }
 
-export function attachObserver(node: ScopedNode, notify: () => void, native: boolean): () => void {
+export function attachObserver(
+	node: ScopedNode,
+	notify: () => void,
+	native: boolean,
+	speculative = false,
+): NativeReadSubscription {
 	const observer = new SignalObserver(node, notify, native, undefined);
+	if (speculative) observer.flags |= REACTIVE_SPECULATIVE;
 	// A public subscriber hears of changes from what its node presents now.
 	if (!native) observeCurrent(observer, node);
 	// Link last: no call follows it, so an exhausted native stack cannot leave
@@ -2129,7 +2163,9 @@ export function attachObserver(node: ScopedNode, notify: () => void, native: boo
 	// A keyless derived value has no owner to stop its subscribers.
 	node.owner?.observers.add(observer);
 	linkDependency(node, observer, ++trackingCycle);
-	return () => stopObserver(observer);
+	const dispose: NativeReadSubscription = () => stopObserver(observer);
+	if (speculative) dispose.observation = observer;
+	return dispose;
 }
 
 /** Internal attempt dependency subscription; callers already hold a graph lease. */
@@ -2141,7 +2177,7 @@ export function subscribeNode(node: ScopedNode, notify: () => void): () => void 
 function runObserver(observer: SignalObserver): void {
 	const node = observer.node;
 	if (!node || !observer.flags) return;
-	observer.flags = REACTIVE_WATCHING;
+	observer.flags = REACTIVE_WATCHING | (observer.flags & REACTIVE_SPECULATIVE);
 	if (!observer.native) {
 		// The common case: a subscriber that last heard of a plain value, of a node
 		// that still holds one once brought up to date.
@@ -2272,12 +2308,17 @@ export class PlainCell<T = any> implements ReactiveNode {
 		return this.last;
 	}
 
-	[SIGNAL_BINDING_SUBSCRIBE](notify: () => void, onRetire?: () => void): () => void {
+	[SIGNAL_BINDING_SUBSCRIBE](
+		notify: () => void,
+		onRetire?: () => void,
+		speculative?: boolean,
+	): NativeReadSubscription {
 		assertAlive(this.owner);
 		return attachObserver(
 			this as unknown as ScopedNode,
 			onRetire === undefined ? notify : () => (this.owner.retired ? onRetire() : notify()),
 			true,
+			speculative,
 		);
 	}
 
@@ -2445,6 +2486,16 @@ interface CellChannel {
 	revision: number;
 	readonly source: NativeReadSource;
 }
+function matchesKeylessNativeDomHandle(this: NativeReadSource, handle: unknown): boolean {
+	return (
+		(handle instanceof PlainCell &&
+			handle[NATIVE_DOM_VALUE] === PlainCell.prototype[NATIVE_DOM_VALUE] &&
+			cellChannels.get(handle)?.source === this) ||
+		(handle instanceof PlainComputed &&
+			handle[NATIVE_DOM_VALUE] === PlainComputed.prototype[NATIVE_DOM_VALUE] &&
+			leanChannels.get(handle)?.source === this)
+	);
+}
 const cellChannels = new WeakMap<PlainCell, CellChannel>();
 
 function cellChannel(cell: PlainCell): CellChannel {
@@ -2453,13 +2504,14 @@ function cellChannel(cell: PlainCell): CellChannel {
 		channel = {
 			revision: 0,
 			source: {
+				__matchesNativeDomHandle: matchesKeylessNativeDomHandle,
 				getVersion: () => channel!.revision,
-				subscribe(notify) {
+				subscribe(notify, speculative) {
 					assertAlive(cell.owner);
-					return attachObserver(cell as unknown as ScopedNode, notify, true);
+					return attachObserver(cell as unknown as ScopedNode, notify, true, speculative);
 				},
 				retired: () => cell.owner.retired,
-			},
+			} as NativeReadSource & { __matchesNativeDomHandle: typeof matchesKeylessNativeDomHandle },
 		};
 		cellChannels.set(cell, channel);
 		cell.flags |= REACTIVE_TRACKED_CELL;
@@ -2577,6 +2629,7 @@ let watchHooks: WeakMap<ReactiveNode, WatchHook>;
 interface WatchHook {
 	watched: () => void | (() => void);
 	cleanup: void | (() => void);
+	generation: number;
 }
 
 export function setWatched(
@@ -2600,7 +2653,7 @@ export function setWatched(
 			},
 		};
 	}
-	watchHooks.set(node, { watched, cleanup: undefined });
+	watchHooks.set(node, { watched, cleanup: undefined, generation: 0 });
 	countObservers(node);
 }
 
@@ -2608,7 +2661,8 @@ function observing(sub: ReactiveNode): boolean {
 	const count = observerCounts.get(sub);
 	return count !== undefined
 		? count > 0
-		: (sub.flags & (REACTIVE_MUTABLE | REACTIVE_WATCHING)) === REACTIVE_WATCHING;
+		: (sub.flags & (REACTIVE_MUTABLE | REACTIVE_WATCHING | REACTIVE_SPECULATIVE)) ===
+				REACTIVE_WATCHING;
 }
 
 /** Starts counting a node's observers; none of its own dependencies is counted yet. */
@@ -2649,16 +2703,20 @@ function unwatch(node: ReactiveNode): void {
 
 function startWatch(node: ReactiveNode): void {
 	const hook = watchHooks.get(node);
-	if (hook !== undefined) hook.cleanup = runHook(hook.watched);
+	if (hook === undefined) return;
+	const generation = ++hook.generation;
+	const cleanup = runHook(hook.watched);
+	if (hook.generation === generation && watchHooks.get(node) === hook) hook.cleanup = cleanup;
+	else if (typeof cleanup === 'function') runHook(cleanup);
 }
 
 function stopWatch(node: ReactiveNode): void {
 	const hook = watchHooks.get(node);
-	const cleanup = hook?.cleanup;
-	if (typeof cleanup === 'function') {
-		hook!.cleanup = undefined;
-		runHook(cleanup);
-	}
+	if (hook === undefined) return;
+	hook.generation++;
+	const cleanup = hook.cleanup;
+	hook.cleanup = undefined;
+	if (typeof cleanup === 'function') runHook(cleanup);
 }
 
 /**
@@ -2778,8 +2836,12 @@ export class PlainComputed<T = any> implements ReactiveNode {
 		}
 	}
 
-	[SIGNAL_BINDING_SUBSCRIBE](notify: () => void): () => void {
-		return attachObserver(this as unknown as ScopedNode, notify, true);
+	[SIGNAL_BINDING_SUBSCRIBE](
+		notify: () => void,
+		_onRetire?: () => void,
+		speculative?: boolean,
+	): NativeReadSubscription {
+		return attachObserver(this as unknown as ScopedNode, notify, true, speculative);
 	}
 
 	[SIGNAL_BINDING_IDENTITY]() {
@@ -2806,11 +2868,13 @@ function leanChannel(node: PlainComputed): CellChannel {
 		channel = {
 			revision: 0,
 			source: {
+				__matchesNativeDomHandle: matchesKeylessNativeDomHandle,
 				// Not told of a change, so while one may have reached it no earlier read is reusable.
 				getVersion: () =>
 					node.flags & (REACTIVE_DIRTY | REACTIVE_PENDING) ? NaN : channel!.revision,
-				subscribe: (notify) => attachObserver(node as unknown as ScopedNode, notify, true),
-			},
+				subscribe: (notify, speculative) =>
+					attachObserver(node as unknown as ScopedNode, notify, true, speculative),
+			} as NativeReadSource & { __matchesNativeDomHandle: typeof matchesKeylessNativeDomHandle },
 		};
 		leanChannels.set(node, channel);
 		node.flags |= REACTIVE_TRACKED_CELL;

@@ -1,3 +1,4 @@
+import type { BindingObservationFactory } from './dom-binding-observations.js';
 import { formatClientError } from './error-codes.client.generated.js';
 import { normalizeClass } from './class-names.js';
 import { domBindingClaims } from './dom-binding-claims.js';
@@ -145,13 +146,13 @@ export interface CompiledBindings<Props> {
 	readonly nodes: readonly BindingNode[];
 	readonly bindings: readonly BindingOperation[];
 	readonly createClassGroup?: typeof createBindingClassGroup;
-	readonly connectSignal?: typeof __createBindingSignals;
+	readonly connectSignal?: BindingObservationFactory<typeof __createBindingSignals>;
 	readonly signalIndices?: readonly number[];
-	readonly connectStyle?: typeof __createBindingStyles;
+	readonly connectStyle?: BindingObservationFactory<typeof __createBindingStyles>;
 	readonly styleIndices?: readonly number[];
-	readonly connectProjection?: typeof __createBindingProjections;
+	readonly connectProjection?: BindingObservationFactory<typeof __createBindingProjections>;
 	readonly projectionGroups?: readonly BindingProjectionGroup[];
-	readonly createControls?: typeof __createBindingControls;
+	readonly createControls?: BindingObservationFactory<typeof __createBindingControls>;
 	/** Present when a scalar artifact binds a URL; the general adopter sanitizes itself. */
 	readonly url?: BindingScalarChannels;
 	project(props: Props): readonly unknown[];
@@ -759,13 +760,19 @@ export function __adoptBindings<Props>(
 	const previous: Array<BindingValue | undefined> = [];
 	let groups: Map<number, ReturnType<typeof createBindingClassGroup>> | undefined;
 	let styles: Map<number, ReturnType<typeof __createBindingStyleRestoration>> | undefined;
-	const signalFactory = descriptor.connectSignal?.();
-	const styleFactory = descriptor.connectStyle?.();
-	const projectionFactory = descriptor.connectProjection?.();
+	const createObservations =
+		descriptor.connectSignal?.observations ??
+		descriptor.connectStyle?.observations ??
+		descriptor.connectProjection?.observations ??
+		descriptor.createControls?.observations;
+	const observations = createObservations?.(() => refresh());
+	const signalFactory = descriptor.connectSignal?.(observations);
+	const styleFactory = descriptor.connectStyle?.(observations);
+	const projectionFactory = descriptor.connectProjection?.(observations);
 	const projections = projectionFactory
 		? new Map<number, BindingProjectionConnection>()
 		: undefined;
-	const controlFactory = descriptor.createControls?.();
+	const controlFactory = descriptor.createControls?.(undefined, observations);
 	const controls = controlFactory ? new Map<number, BindingControlLease>() : undefined;
 	const signalConnections =
 		signalFactory || styleFactory ? new Map<number, BindingSignalConnection>() : undefined;
@@ -835,6 +842,14 @@ export function __adoptBindings<Props>(
 			}
 		}
 		controls?.clear();
+		try {
+			observations?.dispose();
+		} catch (error) {
+			if (!failed) {
+				failed = true;
+				failure = error;
+			}
+		}
 		signalConnections?.clear();
 		signalUpdates?.clear();
 		for (let i = 0; i < owned.length; i++) {
@@ -901,6 +916,7 @@ export function __adoptBindings<Props>(
 				preparedControls!.get(i)!.commit();
 				continue;
 			}
+			(projections?.get(i) ?? signalConnections?.get(i))?.accept();
 			const prepared = next[i]!;
 			const last = previous[i];
 			if (prepared === last) continue;
@@ -969,6 +985,7 @@ export function __adoptBindings<Props>(
 		}
 		try {
 			while ((dirty || signalUpdates?.size) && !disposed) {
+				observations?.clear();
 				let next: BindingValue[];
 				let indices: number[] | undefined;
 				const preparedControls = controls ? new Map<number, BindingControlPrepared>() : undefined;
@@ -1141,6 +1158,7 @@ export function __adoptBindings<Props>(
 				// Never publish an obsolete prepared snapshot or mutate after disposal.
 				if (dirty || disposed) continue;
 				writePrepared(next, indices, preparedControls, preparedGroups);
+				if (!dirty && !disposed) observations?.publish();
 			}
 		} catch (error) {
 			try {
@@ -1290,7 +1308,8 @@ export function __adoptScalarBindings<Props>(
 	const bindings = descriptor.bindings;
 	const owned: Array<readonly [Element, string]> = [];
 	const previous: Array<string | null | undefined> = [];
-	const signalFactory = descriptor.connectSignal?.();
+	const observations = descriptor.connectSignal?.observations?.(() => refresh());
+	const signalFactory = descriptor.connectSignal?.(observations);
 	const signalConnections = signalFactory ? new Map<number, BindingSignalConnection>() : undefined;
 	const signalUpdates = signalFactory ? new Set<number>() : undefined;
 	let disposed = false;
@@ -1327,6 +1346,14 @@ export function __adoptScalarBindings<Props>(
 				}
 			}
 		}
+		try {
+			observations?.dispose();
+		} catch (error) {
+			if (!failed) {
+				failed = true;
+				failure = error;
+			}
+		}
 		signalConnections?.clear();
 		signalUpdates?.clear();
 		for (let i = 0; i < owned.length; i++) __releaseBinding(owned[i]![0], owned[i]![1]);
@@ -1347,6 +1374,7 @@ export function __adoptScalarBindings<Props>(
 			position++
 		) {
 			const i = indices ? indices[position]! : position;
+			signalConnections?.get(i)?.accept();
 			const value = next[i]!;
 			const last = previous[i];
 			if (value === last) continue;
@@ -1372,6 +1400,7 @@ export function __adoptScalarBindings<Props>(
 		}
 		try {
 			while ((dirty || signalUpdates?.size) && !disposed) {
+				observations?.clear();
 				let next: Array<string | null>;
 				let indices: number[] | undefined;
 				if (dirty) {
@@ -1435,6 +1464,7 @@ export function __adoptScalarBindings<Props>(
 				// Never publish an obsolete prepared snapshot or mutate after disposal.
 				if (dirty || disposed) continue;
 				writePrepared(next, indices);
+				if (!dirty && !disposed) observations?.publish();
 			}
 		} catch (error) {
 			try {

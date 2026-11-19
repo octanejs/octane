@@ -7,6 +7,7 @@ import {
 	type DerivedCompute,
 	type DerivedContext,
 	type QueryContext,
+	type WritableSignal,
 } from 'octane/signals';
 import { deferred } from './_fixtures/signals-async-controls.js';
 import {
@@ -16,6 +17,87 @@ import {
 } from './_fixtures/signals-resource-transition.tsrx';
 
 describe('pending presentation in signal transitions', () => {
+	it('catches up when the first committed watcher writes synchronously', async () => {
+		const scope = createScope({ scopeKey: 'watched-commit-write' });
+		const selected$ = scope.signal$('selected', 'A');
+		const log: string[] = [];
+		let value$!: WritableSignal<string>;
+		value$ = scope.signal$('value', 'Ada', {
+			watched: () => {
+				log.push('watch');
+				value$.set('Lin');
+				return () => log.push('unwatch');
+			},
+		});
+		const host = document.createElement('div');
+		const root = createRoot(host);
+		try {
+			await act(() => root.render(Presentation, { selected$, value$, read: 'get' }));
+			expect(host.querySelector('output')?.textContent).toBe('Lin');
+			expect(log).toEqual(['watch']);
+		} finally {
+			root.unmount();
+			scope.dispose();
+		}
+		expect(log).toEqual(['watch', 'unwatch']);
+	});
+
+	it.each(['commit', 'cancel'] as const)(
+		'keeps watched dependencies connected until a suspended transition can %s',
+		async (outcome) => {
+			const pending = deferred<string>();
+			const scope = createScope({ scopeKey: `watched-transition-${outcome}` });
+			const log: string[] = [];
+			const watched = (name: string) => () => {
+				log.push(`watch ${name}`);
+				return () => log.push(`unwatch ${name}`);
+			};
+			const selected$ = scope.signal$('selected', 'A');
+			const left$ = scope.signal$('left', 'left', { watched: watched('left') });
+			const right$ = scope.signal$('right', 'right', { watched: watched('right') });
+			const lookup = query(`watched-transition-${outcome}`, (key: string) =>
+				key === 'A' ? 'ready' : pending.promise,
+			);
+			const barrier$ = createResource(scope, 'barrier', () => lookup(selected$.get()));
+			const value$ = scope.derived$('picked', () => {
+				const value = (selected$.get() === 'A' ? left$ : right$).get();
+				barrier$.get();
+				return value;
+			});
+			const host = document.createElement('div');
+			const root = createRoot(host);
+			try {
+				await act(() => {});
+				await act(() => root.render(Presentation, { selected$, value$, read: 'get' }));
+				expect(host.querySelector('output')?.textContent).toBe('left');
+				expect([...log]).toEqual(['watch left']);
+				await act(() => startTransition(() => selected$.set('B')));
+				expect(host.querySelector('output')?.textContent).toBe('left');
+				expect([...log]).toEqual(['watch left']);
+
+				if (outcome === 'commit') {
+					await act(() => pending.resolve('ready'));
+					expect(host.querySelector('output')?.textContent).toBe('right');
+					expect([...log].sort()).toEqual(['unwatch left', 'watch left', 'watch right'].sort());
+				} else {
+					await act(() => startTransition(() => selected$.set('A')));
+					await act(() => pending.resolve('ready'));
+					expect(host.querySelector('output')?.textContent).toBe('left');
+					expect([...log]).toEqual(['watch left']);
+				}
+			} finally {
+				root.unmount();
+				scope.dispose();
+			}
+			expect([...log].sort()).toEqual(
+				(outcome === 'commit'
+					? ['watch left', 'unwatch left', 'watch right', 'unwatch right']
+					: ['watch left', 'unwatch left']
+				).sort(),
+			);
+		},
+	);
+
 	it('preserves a newer accepted selection when an older Action settles', async () => {
 		const gate = deferred<void>();
 		const pendingB = deferred<string>();

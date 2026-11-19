@@ -1,3 +1,8 @@
+import {
+	__withBindingObservations,
+	type BindingObservationOwner,
+	type BindingObservations,
+} from './dom-binding-observations.js';
 import { formatClientError } from './error-codes.client.generated.js';
 import { cssStyleValue, hyphenateStyleName } from './style-values.js';
 import { __writeBinding, type BindingValue } from './dom-bindings.js';
@@ -9,11 +14,16 @@ import {
 	readNativeDomStyle,
 	setNativeReadObserver,
 	type NativeReadSource,
+	type NativeReadSubscription,
 } from './signals/read-protocol.js';
 
 /** Error path only: whether a subscribed source's owner retired. */
-export function __retiredBindingSource(subscriptions: Map<NativeReadSource, unknown>): boolean {
-	for (const source of subscriptions.keys()) if (source.retired?.()) return true;
+export function __retiredBindingSource(
+	subscriptions: Map<NativeReadSource, unknown>,
+	committed?: (stop: unknown) => boolean,
+): boolean {
+	for (const [source, stop] of subscriptions)
+		if (source.retired?.() && (!committed || committed(stop))) return true;
 	return false;
 }
 
@@ -40,14 +50,27 @@ export function __normalizeBindingStyle(value: unknown): BindingValue {
  * this binding lifetime; the existing graph and canonical style reader own all
  * signal semantics. Fixed-property artifacts never import this module.
  */
-export function __createBindingStyles() {
+const createBindingStyles = function __createBindingStyles(observations?: BindingObservations) {
 	const owner = currentSignalOwner();
 	const run = owner === null ? <T>(callback: () => T): T => callback() : captureSignalOwner(owner);
 	return {
-		connect(node: Element, notify: () => void, restoreStyles = false): BindingSignalConnection {
+		connect(
+			node: Element,
+			notify: (committed?: boolean) => void,
+			restoreStyles = false,
+			sharedObservation?: BindingObservationOwner,
+		): BindingSignalConnection {
 			let raw: unknown;
+			let acceptedRaw: unknown;
+			let currentSources: Map<NativeReadSource, number> | undefined;
+			let acceptedSources: Map<NativeReadSource, number> | undefined;
+			const publishAccepted = (): void => {
+				acceptedRaw = raw;
+				acceptedSources = currentSources;
+			};
+			const observation = sharedObservation ?? observations?.owner(publishAccepted);
 			let disposed = false;
-			const subscriptions = new Map<NativeReadSource, () => void>();
+			const subscriptions = new Map<NativeReadSource, (inspect?: boolean) => boolean | void>();
 			let previous: BindingValue = null;
 			let firstWrite = true;
 			const style = (node as HTMLElement | SVGElement).style;
@@ -65,8 +88,34 @@ export function __createBindingStyles() {
 				return result;
 			};
 			previous = snapshotDOM();
-			const get = (): BindingValue => {
+			const sampleAccepted = (value: unknown, sources?: Set<NativeReadSource>): BindingValue => {
+				const previousObserver = setNativeReadObserver(
+					sources ? (source) => sources.add(source) : null,
+				);
+				const guard = beginNativeWriteGuard();
+				try {
+					return run(() => __normalizeBindingStyle(readNativeDomStyle(value)));
+				} finally {
+					endNativeWriteGuard(guard);
+					setNativeReadObserver(previousObserver);
+				}
+			};
+			const readAccepted = (value: unknown): { valid: boolean; value: BindingValue } => {
+				const sources = new Set<NativeReadSource>();
+				const sampled = sampleAccepted(value, sources);
+				return {
+					valid:
+						sources.size === (acceptedSources?.size ?? 0) &&
+						[...sources].every((source) => acceptedSources?.has(source)),
+					value: sampled,
+				};
+			};
+			const get = (committed = false): BindingValue => {
 				if (disposed) return null;
+				if (committed) {
+					const sampled = readAccepted(acceptedRaw);
+					return sampled.valid ? sampled.value : previous;
+				}
 				const reads = new Map<NativeReadSource, number>();
 				const previousObserver = setNativeReadObserver((source, version) =>
 					reads.set(source, version),
@@ -90,21 +139,35 @@ export function __createBindingStyles() {
 						// A callback retained by an old source cannot publish after its
 						// subscription was removed or replaced by a newer generation.
 						let active = true;
-						const stop = run(() =>
+						let stop: NativeReadSubscription | undefined;
+						stop = run(() =>
 							source.subscribe(() => {
-								if (active && !disposed) notify();
-							}),
+								if (!disposed) {
+									if (active)
+										observations
+											? observations.notify(observation!, stop, notify, raw !== acceptedRaw)
+											: notify();
+									else if (observations) {
+										if (source.retired?.()) observations.retire(observation!, stop);
+										else observations.notify(observation!, stop, notify);
+									}
+								}
+							}, !!observations),
 						);
 						if (typeof stop !== 'function') throw new TypeError(formatClientError(312));
-						const disposeSource = (): void => {
+						if (observations && !observations.add(observation!, stop)) break;
+						const disposeSource = (inspect = false): boolean | void => {
+							if (inspect) return !observation?.pending?.has(stop!);
 							active = false;
-							stop();
+							observations ? observations.release(observation!, stop!) : stop!();
 						};
 						if (disposed) disposeSource();
 						else subscriptions.set(source, disposeSource);
 					}
-					if (!disposed && source.getVersion() !== version) notify();
+					if (!disposed && source.getVersion() !== version)
+						observations ? observations.notify(observation!, undefined, notify) : notify();
 				}
+				currentSources = reads;
 				return value;
 			};
 			const writeProperty = (name: string, value: string | null): void => {
@@ -152,7 +215,23 @@ export function __createBindingStyles() {
 			};
 			return {
 				get,
-				retired: () => __retiredBindingSource(subscriptions),
+				readAccepted,
+				publishAccepted,
+				publishAcceptedValue(value) {
+					acceptedRaw = value;
+				},
+				accept: () => {
+					if (
+						observation &&
+						(raw !== acceptedRaw || observation.pending?.size || observation.retired?.size)
+					)
+						observations!.accept(observation);
+				},
+				retired: () =>
+					__retiredBindingSource(
+						subscriptions,
+						observations ? (stop) => (stop as (inspect: boolean) => boolean)(true) : undefined,
+					),
 				read(value) {
 					raw = value;
 					return get();
@@ -219,9 +298,12 @@ export function __createBindingStyles() {
 					subscriptions.clear();
 					restorations?.clear();
 					probe = baseline = expected = undefined;
+					if (observation) observations!.accept(observation);
 					if (failed) throw failure;
 				},
 			};
 		},
 	};
-}
+};
+
+export const __createBindingStyles = /* @__PURE__ */ __withBindingObservations(createBindingStyles);

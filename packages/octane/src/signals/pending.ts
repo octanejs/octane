@@ -123,8 +123,13 @@ class PendingSource implements NativeReadSource {
 		return slot.node.revision === this.committed ? this.presented : NaN;
 	}
 
-	subscribe(notify: () => void): () => void {
-		return graph.attachObserver(this.slot.dead ? this.slot.node : this.shadow, notify, true);
+	subscribe(notify: () => void, speculative?: boolean) {
+		return graph.attachObserver(
+			this.slot.dead ? this.slot.node : this.shadow,
+			notify,
+			true,
+			speculative,
+		);
 	}
 
 	retired(): boolean {
@@ -573,9 +578,12 @@ function promoteSlots(slots: readonly PendingSlot[]): void {
 		const { node, shadow } = slot as { node: ScopedNode; shadow: ScopedNode };
 		if (receipt !== undefined) releases.push(receipt.publish());
 		if (node.kind !== 'signal') {
-			while (node.deps) graph.graph.unlink(node.deps, node);
+			node.depsTail = undefined;
 			for (let link = shadow.deps; link !== undefined; link = link.nextDep)
 				graph.link(canonical(link.dep as ScopedNode), node);
+			const tail = (node as ScopedNode).depsTail;
+			let obsolete = tail ? tail.nextDep : node.deps;
+			while (obsolete) obsolete = graph.graph.unlink(obsolete, node);
 		}
 		const { last, lastState, hasLast } = shadow;
 		const currentChanged =

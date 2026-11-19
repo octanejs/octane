@@ -11,6 +11,7 @@ import {
 	type NativeTransitionNotify,
 	type NativeReadRelease,
 	type NativeReadSource,
+	type NativeReadSubscription,
 } from './read-protocol.js';
 import { inspectNativeReadWitness } from './native-read-inspection.js';
 
@@ -29,7 +30,7 @@ interface NativeReadHost {
 
 interface Subscription {
 	leases: number;
-	dispose: () => void;
+	dispose: NativeReadSubscription;
 }
 
 interface Consumer {
@@ -148,9 +149,10 @@ export function rebaseNativeRead(notify: () => void, release: NativeReadRelease)
 		committed.reads.set(live, version);
 		let current = consumer.subscriptions.get(live);
 		if (current === undefined) {
-			current = { leases: 0, dispose: live.subscribe(consumer.notify) };
+			current = { leases: 0, dispose: live.subscribe(consumer.notify, true) };
 			consumer.subscriptions.set(live, current);
 		}
+		current.dispose.observation?.setObserved(true);
 		current.leases++;
 	}
 	committed.reads.delete(historical);
@@ -320,7 +322,7 @@ export function createNativeReadDriver(host: NativeReadHost) {
 			// an exhausted native stack left, never an observer it cannot stop.
 			const leased = { leases: 1, dispose: noop };
 			consumer.subscriptions.set(source, leased);
-			leased.dispose = source.subscribe(consumer.notify);
+			leased.dispose = source.subscribe(consumer.notify, true);
 		} else subscription.leases++;
 	});
 
@@ -385,7 +387,15 @@ export function createNativeReadDriver(host: NativeReadHost) {
 				}
 				lease(candidate);
 			}
-			if (previous !== null) release(previous);
+			for (const source of candidate.reads.keys())
+				if (!previous?.reads.has(source))
+					consumer.subscriptions.get(source)?.dispose.observation?.setObserved(true);
+			if (previous !== null) {
+				for (const source of previous.reads.keys())
+					if (!candidate.reads.has(source))
+						consumer.subscriptions.get(source)?.dispose.observation?.setObserved(false);
+				release(previous);
+			}
 		}
 	}
 

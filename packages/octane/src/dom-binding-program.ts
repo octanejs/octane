@@ -1,3 +1,4 @@
+import type { BindingObservationFactory, BindingObservations } from './dom-binding-observations.js';
 import { formatClientError } from './error-codes.client.generated.js';
 import { FRAMEWORK_POLICY } from './trusted-types.js';
 import {
@@ -115,6 +116,89 @@ type BindingActivationCleanup = (() => void) & {
 	prepare?(environment: readonly unknown[]): () => void;
 };
 
+function drainAdapters(callbacks: Array<() => void>): void {
+	let failed = false;
+	let failure: unknown;
+	for (const cleanup of callbacks) {
+		try {
+			cleanup();
+		} catch (error) {
+			if (!failed) {
+				failed = true;
+				failure = error;
+			}
+		}
+	}
+	callbacks.length = 0;
+	if (failed) throw failure;
+}
+
+function attachBindingEvent(
+	node: Node,
+	context: BindingActivationContext,
+	definition: Extract<BindingAdapter, { kind: 'event' }>,
+	isDisposed: () => boolean,
+	own: (cleanup: () => void) => void,
+): void {
+	const listener = (event: Event): void => {
+		if (isDisposed()) return;
+		const handler = definition.read(context.getEnvironment());
+		if (handler == null || handler === false) return;
+		if (typeof handler !== 'function') throw new TypeError(formatClientError(279));
+		markBindingEvent(event, node, !!definition.capture);
+		handler.call(node, event);
+	};
+	node.addEventListener(definition.name, listener, !!definition.capture);
+	own(registerBindingEvent(node, definition.name));
+	own(() => node.removeEventListener(definition.name, listener, !!definition.capture));
+}
+
+/** @internal Event-only fragments do not retain ref lifecycle machinery. */
+export function __activateBindingEvents(
+	nodes: readonly Node[],
+	context: BindingActivationContext,
+	definitions: readonly Extract<BindingAdapter, { kind: 'event' }>[],
+): BindingActivationCleanup {
+	const cleanups: Array<() => void> = [];
+	let disposed = false;
+	let cleaned = false;
+	const abort = (): void => {
+		disposed = true;
+	};
+	const dispose = (): void => {
+		if (cleaned) return;
+		cleaned = disposed = true;
+		context.signal.removeEventListener('abort', abort);
+		drainAdapters(cleanups);
+	};
+	if (context.signal.aborted) {
+		dispose();
+		return dispose;
+	}
+	context.signal.addEventListener('abort', abort, { once: true });
+	const isDisposed = (): boolean => disposed;
+	const own = (cleanup: () => void): void => {
+		if (disposed) cleanup();
+		else cleanups.push(cleanup);
+	};
+	try {
+		for (const definition of definitions) {
+			if (disposed) break;
+			const node = nodes[definition.node];
+			if (node?.nodeType !== 1) mismatch();
+			attachBindingEvent(node, context, definition, isDisposed, own);
+		}
+		return dispose;
+	} catch (error) {
+		try {
+			dispose();
+		} catch {
+			/* The failed attachment remains primary. */
+		}
+		throw error;
+	}
+}
+
 /** @internal Native adapters are installed once for an authored fragment lifetime. */
 export function __activateBindingAdapters(
 	nodes: readonly Node[],
@@ -131,22 +215,6 @@ export function __activateBindingAdapters(
 	}> = [];
 	let disposed = false;
 	let cleaned = false;
-	const drain = (callbacks: Array<() => void>): void => {
-		let failed = false;
-		let failure: unknown;
-		for (const cleanup of callbacks) {
-			try {
-				cleanup();
-			} catch (error) {
-				if (!failed) {
-					failed = true;
-					failure = error;
-				}
-			}
-		}
-		callbacks.length = 0;
-		if (failed) throw failure;
-	};
 	// The fragment aborts first, then invokes the returned cleanup directly.
 	// Close event delivery immediately, but run fallible application ref cleanup
 	// through that direct call rather than through EventTarget error reporting.
@@ -162,7 +230,7 @@ export function __activateBindingAdapters(
 			if (ref.cleanup) cleanups.push(ref.cleanup);
 			ref.cleanup = undefined;
 		}
-		drain(cleanups);
+		drainAdapters(cleanups);
 	};
 	const own = (cleanup: () => void): void => {
 		if (disposed) cleanup();
@@ -198,7 +266,7 @@ export function __activateBindingAdapters(
 		ref.cleanup = () => {
 			if (detached) return;
 			detached = true;
-			drain(attached);
+			drainAdapters(attached);
 		};
 		attachRef(value, ref.node, (stop) => {
 			if (disposed || detached) stop();
@@ -211,6 +279,7 @@ export function __activateBindingAdapters(
 		return handle;
 	}
 	context.signal.addEventListener('abort', abort, { once: true });
+	const isDisposed = (): boolean => disposed;
 	try {
 		for (const definition of definitions) {
 			if (disposed) break;
@@ -225,19 +294,7 @@ export function __activateBindingAdapters(
 				};
 				refs.push(ref);
 				replaceRef(ref, definition.read(context.getEnvironment()));
-			} else {
-				const listener = (event: Event): void => {
-					if (disposed) return;
-					const handler = definition.read(context.getEnvironment());
-					if (handler == null || handler === false) return;
-					if (typeof handler !== 'function') throw new TypeError(formatClientError(279));
-					markBindingEvent(event, node, !!definition.capture);
-					handler.call(node, event);
-				};
-				node.addEventListener(definition.name, listener, !!definition.capture);
-				own(registerBindingEvent(node, definition.name));
-				own(() => node.removeEventListener(definition.name, listener, !!definition.capture));
-			}
+			} else attachBindingEvent(node, context, definition, isDisposed, own);
 		}
 		if (refs.some((ref) => !ref.definition.stable))
 			handle.prepare = (environment) => {
@@ -384,11 +441,11 @@ export interface CompiledBindingProgram<Props> {
 	prepareProps?(props: Props): readonly unknown[];
 	readonly scalar?: CompiledBindings<Props>;
 	readonly adoptScalar?: typeof __adoptBindings | typeof __adoptScalarBindings;
-	readonly connectSignal?: typeof __createBindingSignals;
+	readonly connectSignal?: BindingObservationFactory<typeof __createBindingSignals>;
 	readonly trackReads?: typeof __createBindingReads;
-	readonly connectStyle?: typeof __createBindingStyles;
-	readonly connectProjection?: typeof __createBindingProjections;
-	readonly createControls?: typeof __createBindingControls;
+	readonly connectStyle?: BindingObservationFactory<typeof __createBindingStyles>;
+	readonly connectProjection?: BindingObservationFactory<typeof __createBindingProjections>;
+	readonly createControls?: BindingObservationFactory<typeof __createBindingControls>;
 	readonly list?: BindingListCapability;
 	readonly tryRegions?: BindingTryCapability;
 	readonly effects?: BindingEffectsCapability;
@@ -476,6 +533,8 @@ interface RegionPlan {
 	keep?: boolean;
 }
 
+type SignalPrepare = (() => () => void) & { committed?: true };
+
 interface Transaction {
 	disposed: boolean;
 	all: Set<FragmentInstance>;
@@ -493,8 +552,9 @@ interface Transaction {
 	list?: BindingListCapability | undefined;
 	tryRegions?: BindingTryCapability | undefined;
 	effects?: BindingEffectsCapability | undefined;
-	notifySignal?(prepare: () => () => void): void;
+	notifySignal?(prepare: SignalPrepare): void;
 	reads?: BindingReadTracker | undefined;
+	observations?: BindingObservations | undefined;
 	refresh?: () => void;
 	run?: <T>(callback: () => T) => T;
 	waits?: WeakSet<object>;
@@ -1060,22 +1120,26 @@ function projectValues(
 			let connection = instance.signals?.get(index);
 			const style = operations[index]![1] === 'styleObject';
 			if (!connection && (style || transaction.signals?.isSignal(values[index]))) {
-				const prepare = (): (() => void) => {
+				const prepareChannel = (committed = false): (() => void) => {
 					if (
 						instance.disposed ||
-						(transaction.preparing && instance.signalFrame !== transaction.frame)
+						(!committed && transaction.preparing && instance.signalFrame !== transaction.frame)
 					)
 						return () => {};
-					const value = __normalizeBinding(operations[index]!, connection!.get());
+					const value = __normalizeBinding(operations[index]!, connection!.get(committed));
 					const group = instance.groups.get(index)?.prepare((value as string | null) ?? '');
-					if (transaction.preparing && instance.signalPlan) {
+					if (!committed && transaction.preparing && instance.signalPlan) {
 						instance.signalPlan.values[index] = value;
 						if (group) instance.signalPlan.groups.set(index, group);
 						return () => {};
 					}
-					return () => writeOperation(instance, index, value, group, transaction);
+					return () => writeOperation(instance, index, value, group, transaction, !committed);
 				};
-				const notify = (): void => transaction.notifySignal!(prepare);
+				const prepare = (): (() => void) => prepareChannel();
+				const committedPrepare: SignalPrepare = () => prepareChannel(true);
+				committedPrepare.committed = true;
+				const notify = (committed?: boolean): void =>
+					transaction.notifySignal!(committed ? committedPrepare : prepare);
 				connection = style
 					? transaction.styles!.connect(
 							instance.nodes[operations[index]![0]] as Element,
@@ -1199,23 +1263,29 @@ function prepareFragment(
 			if (descriptor.signal && transaction.signals) {
 				let connection = region.signal;
 				if (!connection && transaction.signals.isSignal(value)) {
-					const prepare = (): (() => void) => {
+					const prepareChannel = (committed = false): (() => void) => {
 						if (
 							instance.disposed ||
-							(transaction.preparing && region.signalFrame !== transaction.frame)
+							(!committed && transaction.preparing && region.signalFrame !== transaction.frame)
 						)
 							return () => {};
-						const next = textValue(region.signal!.get(), descriptor.generic);
-						if (transaction.preparing && region.signalPlan) {
+						const next = textValue(region.signal!.get(committed), descriptor.generic);
+						if (!committed && transaction.preparing && region.signalPlan) {
 							region.signalPlan.text = next;
 							return () => {};
 						}
 						return () => {
-							if (!instance.disposed && !transaction.disposed) writeText(region, next);
+							if (!instance.disposed && !transaction.disposed) {
+								writeText(region, next);
+								if (!committed) region.signal?.accept();
+							}
 						};
 					};
-					connection = region.signal = transaction.signals.connect(() =>
-						transaction.notifySignal!(prepare),
+					const prepare = (): (() => void) => prepareChannel();
+					const committedPrepare: SignalPrepare = () => prepareChannel(true);
+					committedPrepare.committed = true;
+					connection = region.signal = transaction.signals.connect((committed) =>
+						transaction.notifySignal!(committed ? committedPrepare : prepare),
 					);
 				}
 				if (connection) {
@@ -1481,6 +1551,7 @@ function commitRegion(plan: RegionPlan, id: string, transaction: Transaction): v
 	if (definition.kind === 'text') {
 		region.signalPlan = undefined;
 		writeText(region, plan.text!);
+		region.signal?.accept();
 		return;
 	}
 	if (definition.kind === 'for') {
@@ -1543,8 +1614,10 @@ function writeOperation(
 	value: BindingValue,
 	group: { commit(): void } | undefined,
 	transaction: Transaction,
+	accept = true,
 ): void {
 	if (transaction.disposed || instance.disposed) return;
+	if (accept) (instance.projections?.get(index) ?? instance.signals?.get(index))?.accept();
 	const previous = instance.previous[index];
 	if (value === previous) return;
 	const operation = instance.definition.bindings[index]!;
@@ -1675,6 +1748,7 @@ function releaseEffects(instance: FragmentInstance, attempt: (callback: () => vo
  */
 function observesRetiredSource(transaction: Transaction): boolean {
 	if (transaction.reads?.retired()) return true;
+	if (transaction.observations?.retired()) return true;
 	for (const instance of transaction.all) {
 		for (const region of instance.regions) if (region.signal?.retired()) return true;
 		for (const connections of [instance.signals, instance.projections, instance.controls])
@@ -1700,6 +1774,12 @@ function bindProgram<Props>(
 		(!target.parent || (target.before != null && target.before.parentNode !== target.parent))
 	)
 		throw new TypeError(formatClientError(295));
+	const createObservations =
+		descriptor.connectSignal?.observations ??
+		descriptor.connectStyle?.observations ??
+		descriptor.connectProjection?.observations ??
+		descriptor.createControls?.observations;
+	const observations = createObservations?.(() => transaction.refresh?.());
 	const transaction: Transaction = {
 		disposed: false,
 		all: new Set(),
@@ -1707,20 +1787,21 @@ function bindProgram<Props>(
 		focused: null,
 		contentEditable: false,
 		restoreStyles: options?.restoreStyles === true,
-		signals: descriptor.connectSignal?.(),
-		styles: descriptor.connectStyle?.(),
-		projections: descriptor.connectProjection?.(),
-		controls: descriptor.createControls?.(),
+		signals: descriptor.connectSignal?.(observations),
+		styles: descriptor.connectStyle?.(observations),
+		projections: descriptor.connectProjection?.(observations),
+		controls: descriptor.createControls?.(undefined, observations),
 		list,
 		tryRegions: descriptor.tryRegions,
 		effects: descriptor.effects,
 		hostOperations,
 		initialOperations: descriptor.initialOperations ?? hostOperations,
 		frame: 0,
+		observations,
 	};
 	const signalUpdates =
 		transaction.signals || transaction.styles || transaction.projections || transaction.controls
-			? new Set<() => () => void>()
+			? new Set<SignalPrepare>()
 			: undefined;
 	let instance: FragmentInstance | undefined;
 	let ownedRoot: Comment | undefined;
@@ -1781,6 +1862,14 @@ function bindProgram<Props>(
 			}
 		}
 		try {
+			observations?.dispose();
+		} catch (error) {
+			if (!failed) {
+				failed = true;
+				failure = error;
+			}
+		}
+		try {
 			transaction.reads?.dispose();
 		} catch (error) {
 			if (!failed) {
@@ -1814,6 +1903,27 @@ function bindProgram<Props>(
 		}
 		try {
 			while ((dirty || signalUpdates?.size) && !transaction.disposed) {
+				observations?.clear();
+				if (committed && observations?.retired()) {
+					dispose();
+					return;
+				}
+				// A shared source can both update the displayed channel and invalidate
+				// a suspended candidate. Write the accepted channel before retrying it.
+				if (dirty && committed && signalUpdates?.size) {
+					const accepted = [...signalUpdates].filter((prepare) => prepare.committed);
+					if (accepted.length) {
+						for (const prepare of accepted) signalUpdates.delete(prepare);
+						dirty = false;
+						const writes = accepted.map((prepare) => prepare());
+						if (!dirty && !transaction.disposed) {
+							for (const write of writes) write();
+							transaction.published?.();
+						} else for (const prepare of accepted) signalUpdates.add(prepare);
+						dirty = true;
+						continue;
+					}
+				}
 				if (!dirty) {
 					if (transaction.projections) {
 						// A group may invalidate while another field coerces. Replace its
@@ -1826,6 +1936,7 @@ function bindProgram<Props>(
 						}
 						if (!dirty && !transaction.disposed) {
 							for (const write of writes.values()) write();
+							if (!dirty && !transaction.disposed) observations?.publish();
 							transaction.published?.();
 						}
 						continue;
@@ -1835,6 +1946,7 @@ function bindProgram<Props>(
 					const writes = pending.map((prepare) => prepare());
 					if (!dirty && !transaction.disposed) {
 						for (const write of writes) write();
+						if (!dirty && !transaction.disposed) observations?.publish();
 						transaction.published?.();
 					}
 					continue;
@@ -1907,6 +2019,7 @@ function bindProgram<Props>(
 					moveRange(instance!.range, target!.parent, target!.before ?? null, transaction);
 					mounted = true;
 				}
+				if (!transaction.disposed) observations?.publish();
 				transaction.candidates.clear();
 				activateInstance(instance!, transaction);
 				settleFirstCommit(true);
@@ -2317,23 +2430,30 @@ function claimProgramControl(
 	transaction: Transaction,
 ): void {
 	if (!transaction.controls) throw new TypeError(formatClientError(302));
-	const prepare = (): (() => void) => {
-		if (instance.disposed || (transaction.preparing && instance.signalFrame !== transaction.frame))
+	const prepareChannel = (committed = false): (() => void) => {
+		if (
+			instance.disposed ||
+			(!committed && transaction.preparing && instance.signalFrame !== transaction.frame)
+		)
 			return () => {};
-		const prepared = instance.controls!.get(index)!.prepareCurrent();
-		prepared.publish();
-		if (transaction.preparing && instance.signalPlan) {
+		const lease = instance.controls!.get(index)!;
+		const prepared = committed ? lease.prepareCommitted() : lease.prepareCurrent();
+		if (!committed) prepared.publish();
+		if (!committed && transaction.preparing && instance.signalPlan) {
 			instance.signalPlan.controls!.set(index, prepared);
 			return () => {};
 		}
 		return prepared.commit;
 	};
+	const prepare = (): (() => void) => prepareChannel();
+	const committedPrepare: SignalPrepare = () => prepareChannel(true);
+	committedPrepare.committed = true;
 	(instance.controls ??= new Map()).set(
 		index,
 		transaction.controls.claim(
 			node,
 			instance.definition.bindings[index]![2] as 'value' | 'checked',
-			() => transaction.notifySignal!(prepare),
+			(committed) => transaction.notifySignal!(committed ? committedPrepare : prepare),
 		),
 	);
 }
@@ -2351,13 +2471,24 @@ function projectHostValues(
 			const first = group[0]![0];
 			let connection = instance.projections?.get(first);
 			if (!connection) {
-				const prepare = (): (() => void) => {
+				const prepareChannel = (committed = false): (() => void) => {
 					if (
 						instance.disposed ||
-						(transaction.preparing && instance.signalFrame !== transaction.frame)
+						(!committed && transaction.preparing && instance.signalFrame !== transaction.frame)
 					)
 						return () => {};
-					const projected = connection!.get();
+					let projected: BindingValue[];
+					try {
+						projected = connection!.get(committed);
+					} catch (error) {
+						if (
+							committed &&
+							!observesRetiredSource(transaction) &&
+							transaction.reads?.fail(error, true)
+						)
+							return () => {};
+						throw error;
+					}
 					const groups = new Map<number, { commit(): void }>();
 					for (const [index] of group) {
 						const classGroup = instance.groups
@@ -2365,7 +2496,7 @@ function projectHostValues(
 							?.prepare((projected[index] as string | null) ?? '');
 						if (classGroup) groups.set(index, classGroup);
 					}
-					if (transaction.preparing && instance.signalPlan) {
+					if (!committed && transaction.preparing && instance.signalPlan) {
 						for (const [index] of group) {
 							instance.signalPlan.values[index] = projected[index]!;
 							const classGroup = groups.get(index);
@@ -2375,14 +2506,26 @@ function projectHostValues(
 					}
 					return () => {
 						for (const [index] of group)
-							writeOperation(instance, index, projected[index]!, groups.get(index), transaction);
+							writeOperation(
+								instance,
+								index,
+								projected[index]!,
+								groups.get(index),
+								transaction,
+								!committed,
+							);
+						if (committed && !transaction.disposed && !instance.disposed)
+							connection!.publishCommitted();
 					};
 				};
+				const prepare = (): (() => void) => prepareChannel();
+				const committedPrepare: SignalPrepare = () => prepareChannel(true);
+				committedPrepare.committed = true;
 				connection = transaction.projections.connect(
 					group,
 					operations,
 					instance.nodes,
-					() => transaction.notifySignal!(prepare),
+					(committed) => transaction.notifySignal!(committed ? committedPrepare : prepare),
 					transaction.restoreStyles,
 				);
 				instance.projections ??= new Map();
