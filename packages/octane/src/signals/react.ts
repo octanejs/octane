@@ -6,7 +6,16 @@
  * once the handle's scope retires its next read throws `ScopeDisposedError` to
  * the nearest error boundary instead of showing the retired value.
  */
-import { createContext, createElement, use, useCallback, useSyncExternalStore } from 'react';
+import {
+	createContext,
+	createElement,
+	use,
+	useCallback,
+	useInsertionEffect,
+	useLayoutEffect,
+	useMemo,
+	useSyncExternalStore,
+} from 'react';
 import type { ReactNode } from 'react';
 import { formatClientError } from '../error-codes.client.generated.js';
 import { SIGNAL_BINDING_READ, SIGNAL_BINDING_SUBSCRIBE } from './types.js';
@@ -44,4 +53,96 @@ export function useSignalValue<T>(handle$: SignalHandle<T>, getServerSnapshot?: 
 	);
 	const read = useCallback(() => handle$[SIGNAL_BINDING_READ](), [handle$]);
 	return useSyncExternalStore(subscribe, read, getServerSnapshot ?? read);
+}
+
+/**
+ * Reads a handle with the same snapshot contract as useSignalValue. Once
+ * subscribed, the reader keeps its observation while React Activity hides it.
+ * Pass false when the surrounding view should disconnect on hide.
+ */
+export function useRetainedSignalValue<T>(
+	handle$: SignalHandle<T>,
+	getServerSnapshot?: () => T,
+	retainOnHide = true,
+): T {
+	const subscribe = useSignalSubscription(handle$, retainOnHide);
+	const read = useCallback(() => handle$[SIGNAL_BINDING_READ](), [handle$]);
+	return useSyncExternalStore(subscribe, read, getServerSnapshot ?? read);
+}
+
+type Subscribe = (notify: () => void) => () => void;
+const noop = () => {};
+const subscribeToNothing: Subscribe = () => noop;
+
+/**
+ * The Activity-aware subscription for a useSyncExternalStore reader that
+ * supplies its own snapshot. Pass a native handle, a stable subscribe
+ * function, or null for a reader with no current source. The returned
+ * subscription belongs to one useSyncExternalStore call in this component.
+ */
+export function useSignalSubscription<T>(
+	source: SignalHandle<T> | Subscribe | null,
+	retainOnHide = true,
+): Subscribe {
+	const binding = useMemo(() => {
+		if (source === null) return null;
+		return activityBinding(
+			typeof source === 'function' ? source : (notify) => source[SIGNAL_BINDING_SUBSCRIBE](notify),
+		);
+	}, [source]);
+	useInsertionEffect(() => {
+		if (retainOnHide) return binding?.retain();
+	}, [binding, retainOnHide]);
+	useLayoutEffect(binding?.prepare ?? noop, [binding]);
+	return binding?.subscribe ?? subscribeToNothing;
+}
+
+function activityBinding(subscribe: Subscribe) {
+	let release: (() => void) | undefined;
+	let notify: (() => void) | undefined;
+	let retained = false;
+	let needsSnapshotCheck = false;
+	const invalidate = () => {
+		if (notify) notify();
+		else needsSnapshotCheck = true;
+	};
+	const releaseIfIdle = () => {
+		if (release && !notify && !retained) {
+			const stop = release;
+			release = undefined;
+			needsSnapshotCheck = true;
+			stop();
+		}
+	};
+	return {
+		// Insertion effects survive an Activity hide.
+		retain() {
+			retained = true;
+			return () => {
+				retained = false;
+				// A watched cleanup can update React. Finish the insertion phase first.
+				if (release && !notify) queueMicrotask(releaseIfIdle);
+			};
+		},
+		prepare() {
+			// On reveal, connect before React disconnects outgoing passive readers.
+			// Initial observation still starts in the passive subscription.
+			if (needsSnapshotCheck && !release) {
+				release = subscribe(invalidate);
+				return releaseIfIdle;
+			}
+		},
+		subscribe(listener: () => void) {
+			notify = listener;
+			release ??= subscribe(invalidate);
+			if (needsSnapshotCheck) {
+				needsSnapshotCheck = false;
+				listener();
+			}
+			return () => {
+				notify = undefined;
+				releaseIfIdle();
+			};
+		},
+	};
 }
