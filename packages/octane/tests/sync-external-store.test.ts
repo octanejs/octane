@@ -184,6 +184,27 @@ describe('useSyncExternalStore', () => {
 		r.unmount();
 	});
 
+	it('rechecks the snapshot after a replacement cleanup silently changes the store', async () => {
+		let value = 0;
+		let changed = false;
+		const store = {
+			get: () => value,
+			subscribe: () => () => {
+				if (!changed) {
+					changed = true;
+					value = 1;
+				}
+			},
+		};
+		const r = mount(InlineSubscribedReader, { store });
+		await nextPaint();
+
+		r.click('button');
+		await nextPaint();
+		expect(r.find('.value').textContent).toBe('1');
+		r.unmount();
+	});
+
 	it('does not reconnect when old cleanup unmounts the reader', async () => {
 		let subscriptions = 0;
 		let listeners = 0;

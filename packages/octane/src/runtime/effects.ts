@@ -677,6 +677,8 @@ export function drainQueuedStoreSyncs(passives: PendingEffect[] = effectQueues[P
 				}
 				inst.early = release;
 				inst.connected = inst.subscribe;
+				// The old cleanup may have changed the snapshot without notifying.
+				if (effect !== undefined && checkStoreChanged(inst)) inst.forceUpdate();
 			}
 		}
 	} finally {
