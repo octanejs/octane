@@ -227,6 +227,11 @@ export interface AdoptionFrame {
 	release(): void;
 }
 
+export type SignalChangeObserver = (
+	signal: SignalHandle<unknown>,
+	phase: 'write' | 'change',
+) => void;
+
 export interface SignalTraceEvent {
 	readonly sequence: number;
 	readonly type: 'write' | 'invalidate' | 'select' | 'publish' | 'retry' | 'retire' | 'frame';

@@ -40,6 +40,7 @@ import {
 	NATIVE_DOM_VALUE,
 	forwardNativeTransitionConsumer,
 	getNativeReadObserver,
+	CHANGE_OBSERVED,
 	READ_HISTORICAL,
 	READ_OBSERVED,
 	READS_SPECIAL,
@@ -69,6 +70,7 @@ import {
 	type ConnectionState,
 	type ScopeSeed,
 	type SignalChange,
+	type SignalChangeObserver,
 	type SignalEquals,
 	type SignalHandle,
 	type SignalSnapshot,
@@ -77,6 +79,40 @@ import {
 	type WritableSignal,
 } from './types.js';
 import { isThenable } from './handle-protocol.js';
+
+let changeObservers: Set<{ observer: SignalChangeObserver }> | undefined;
+let reportingChange = false;
+
+/** Observe metadata-only writes and committed changes without subscribing to or activating a signal. */
+export function observeSignalChanges(observer: SignalChangeObserver): () => void {
+	if (typeof observer !== 'function') throw new TypeError(formatClientError(165));
+	const subscription = { observer };
+	(changeObservers ??= new Set()).add(subscription);
+	setSignalMode(CHANGE_OBSERVED, true);
+	return () => {
+		changeObservers?.delete(subscription);
+		if (changeObservers?.size === 0) {
+			changeObservers = undefined;
+			setSignalMode(CHANGE_OBSERVED, false);
+		}
+	};
+}
+
+function reportChange(signal: SignalHandle<unknown>, phase: 'write' | 'change'): void {
+	if (reportingChange || changeObservers === undefined) return;
+	reportingChange = true;
+	try {
+		for (const { observer } of changeObservers) {
+			try {
+				untrack(() => pure(() => observer(signal, phase)));
+			} catch {
+				// Diagnostics cannot interrupt signal evaluation or delivery.
+			}
+		}
+	} finally {
+		reportingChange = false;
+	}
+}
 
 export interface GraphOwner {
 	readonly scopeKey: string;
@@ -1176,7 +1212,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 		// for a current cell of a live, untraced owner, outside any computation, guard
 		// or transition. It changes nothing but the value and what depends on it.
 		if (
-			(signalMode & (WRITE_GUARDED | WRITE_JOURNALED)) === 0 &&
+			(signalMode & (WRITE_GUARDED | WRITE_JOURNALED | CHANGE_OBSERVED)) === 0 &&
 			pureDepth === 0 &&
 			!(activeNode instanceof PlainComputed) &&
 			this.valueOnly &&
@@ -1209,6 +1245,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 		assertAlive(this.owner);
 		assertWritable();
 		if (this.kind !== 'signal') throw new TypeError(formatClientError(164));
+		if (signalMode & CHANGE_OBSERVED) reportChange(this, 'write');
 		const pending = pendingSignals;
 		if (pending) {
 			const batch = pending.batch();
@@ -1228,6 +1265,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 			if (!Object.is(previous, next) && !this.isEqual(previous, next)) {
 				if (journal !== undefined && !journal.has(this)) journal.set(this, previous);
 				writeValue(this, next);
+				if (signalMode & CHANGE_OBSERVED) reportChange(this, 'change');
 				this.owner.trace('write', this);
 			}
 			// A pending transition value re-applies the update on top, even an
@@ -1434,7 +1472,7 @@ export function readValue<T>(node: ScopedNode<T>): T {
 	// here; anything else (a node being computed, a re-entered or retired one) goes on.
 	if (
 		node.valueOnly &&
-		(signalMode & READS_SPECIAL) === 0 &&
+		(signalMode & (READS_SPECIAL | CHANGE_OBSERVED)) === 0 &&
 		!(node.flags & (REACTIVE_RECURSED | REACTIVE_RECURSED_CHECK | REACTIVE_SLOW)) &&
 		fresh(node)
 	) {
@@ -1835,7 +1873,16 @@ function settlePlain(
 /** evaluate(node), by the plain steps when the node and the moment allow them. */
 function update(node: ScopedNode | PlainComputed): boolean {
 	if (node instanceof PlainComputed) return updateLean(node);
-	if (node.plain !== undefined && (signalMode & READS_SPECIAL) === 0) return updatePlain(node);
+	if (node.plain !== undefined && (signalMode & (READS_SPECIAL | CHANGE_OBSERVED)) === 0)
+		return updatePlain(node);
+	if (signalMode & CHANGE_OBSERVED) {
+		const changed =
+			node.plain !== undefined && (signalMode & READS_SPECIAL) === 0
+				? updatePlain(node)
+				: evaluate(node);
+		if (changed && node.kind !== 'signal') reportChange(node, 'change');
+		return changed;
+	}
 	return evaluate(node);
 }
 
@@ -2134,7 +2181,7 @@ function observeCurrent(observer: SignalObserver, observed: ScopedNode): boolean
 	// Bringing a node up to date tracks no read, so it needs no untracking.
 	if (!(
 		node.valueOnly &&
-		(signalMode & READS_SPECIAL) === 0 &&
+		(signalMode & (READS_SPECIAL | CHANGE_OBSERVED)) === 0 &&
 		!(node.flags & (REACTIVE_RECURSED | REACTIVE_RECURSED_CHECK | REACTIVE_SLOW)) &&
 		fresh(node)
 	))
@@ -2198,7 +2245,7 @@ function runObserver(observer: SignalObserver): void {
 		if (
 			observer.plain &&
 			node.valueOnly &&
-			(signalMode & READS_SPECIAL) === 0 &&
+			(signalMode & (READS_SPECIAL | CHANGE_OBSERVED)) === 0 &&
 			!(node.flags & (REACTIVE_RECURSED | REACTIVE_RECURSED_CHECK | REACTIVE_SLOW)) &&
 			fresh(node)
 		) {
@@ -2360,6 +2407,7 @@ function writeCell<T>(cell: PlainCell<T>, value: T | ((previous: T) => T)): void
 			throw new SignalWriteError();
 	}
 	assertAlive(cell.owner);
+	if (signalMode & CHANGE_OBSERVED) reportChange(cell as unknown as SignalHandle<unknown>, 'write');
 	const next =
 		typeof value === 'function'
 			? untrack(() => pure(() => (value as (previous: T) => T)(cell.last)))
@@ -2374,6 +2422,8 @@ function writeCell<T>(cell: PlainCell<T>, value: T | ((previous: T) => T)): void
 	) {
 		if (journal !== undefined && !journal.has(cell)) journal.set(cell, cell.last);
 		cell.last = next;
+		if (signalMode & CHANGE_OBSERVED)
+			reportChange(cell as unknown as SignalHandle<unknown>, 'change');
 		if (cell.flags & REACTIVE_TRACKED_CELL) cellChannels.get(cell)!.revision++;
 		const subs = cell.subs;
 		if (subs !== undefined) {
@@ -3009,7 +3059,8 @@ function stabilizeLean(node: PlainComputed, previous: unknown): boolean {
 function updateLean(node: PlainComputed): boolean {
 	// A tracked channel, an earlier failure or a render collecting reads takes the
 	// wrapper, which keeps this common recomputation small enough to inline.
-	return node.flags & (REACTIVE_FAILED | REACTIVE_TRACKED_CELL) || signalMode & READ_OBSERVED
+	return node.flags & (REACTIVE_FAILED | REACTIVE_TRACKED_CELL) ||
+		signalMode & (READ_OBSERVED | CHANGE_OBSERVED)
 		? updateLeanTracked(node)
 		: recomputeLean(node);
 }
@@ -3062,6 +3113,8 @@ function updateLeanTracked(node: PlainComputed): boolean {
 		node.flags |= kept & REACTIVE_TRACKED_CELL;
 	}
 	if (changed && kept & REACTIVE_TRACKED_CELL) leanChannels.get(node)!.revision++;
+	if (changed && signalMode & CHANGE_OBSERVED)
+		reportChange(node as unknown as SignalHandle<unknown>, 'change');
 	return changed;
 }
 
