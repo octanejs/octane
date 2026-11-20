@@ -11,7 +11,10 @@
     "integrity": "sha256:ddc546dd19395818001f51431a8fc33a91915c13dbe2dc66b4299b4816feaf7a",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/react-map-gl/src"],
@@ -416,7 +419,7 @@
         {
           "path": "packages/react-map-gl/tests/_mocks/mapbox-gl.ts",
           "role": "support",
-          "sha256": "d87f5eef872955a2c8e3ac823d68274738fe590059c88a292ff7175c3e5c8a84"
+          "sha256": "0b717fb770a45f539fccbaaaa2901156eed36d72728c4af7d83ba00282a61821"
         },
         {
           "path": "packages/react-map-gl/tests/_fixtures/upstream-apps.tsrx",
@@ -519,7 +522,7 @@
         {
           "path": "packages/react-map-gl/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "2b23b967ca83fa2bc314bf973730e7e65913c1491550b9bb93b056432609f0a4",
+          "sha256": "3e042df2db1b1fee429511f2777bbcdff08d9cc51b8c78431ef9f40b13da09f2",
           "cases": [
             {
               "id": "differential:1",
@@ -550,6 +553,11 @@
               "id": "differential:6",
               "testName": "picks the default pin or a custom element the same way as upstream",
               "fullName": "differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2 picks the default pin or a custom element the same way as upstream"
+            },
+            {
+              "id": "differential:7",
+              "testName": "keeps a layer drawn when the layer it is anchored beneath is added later",
+              "fullName": "differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2 keeps a layer drawn when the layer it is anchored beneath is added later"
             }
           ]
         },
@@ -591,7 +599,7 @@
         {
           "path": "packages/react-map-gl/tests/_mocks/mapbox-gl.ts",
           "role": "support",
-          "sha256": "d87f5eef872955a2c8e3ac823d68274738fe590059c88a292ff7175c3e5c8a84"
+          "sha256": "0b717fb770a45f539fccbaaaa2901156eed36d72728c4af7d83ba00282a61821"
         }
       ]
     }
@@ -620,6 +628,18 @@
       "migrationGuidance": "Pass ref as a normal prop and drop any forwardRef wrapper.",
       "owner": "@octanejs/react-map-gl",
       "reviewCondition": "Review if Octane adds a forwardRef compatibility shim."
+    },
+    {
+      "id": "react-map-gl-layer-missing-anchor",
+      "caseIds": ["differential:7"],
+      "upstreamResult": "<Layer> passes beforeId straight to addLayer and moveLayer. An anchor the style does not hold yet makes Mapbox report an error, and moveLayer has already taken the layer out of the draw order, so it stops drawing.",
+      "octaneResult": "<Layer> stays where it is, or is added on top, until its anchor exists, then moves beneath it on the styledata that follows.",
+      "rationale": "Layers anchored each beneath the next re-anchor before a layer added on top of them exists, and upstream never repairs the dropped layer because getLayer still returns it.",
+      "classification": "upstream-bugfix",
+      "consumerImpact": "A layer whose anchor arrives later draws on top until the anchor is added, instead of disappearing.",
+      "migrationGuidance": "None: code that never names a missing anchor behaves as upstream.",
+      "owner": "@octanejs/react-map-gl",
+      "reviewCondition": "Review when upstream checks the anchor before moving or adding a layer."
     }
   ]
 }

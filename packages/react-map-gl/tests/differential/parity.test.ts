@@ -25,6 +25,7 @@ const MARKER_CHILDREN_FIXTURE = resolve(
 	__dirname,
 	'../_fixtures/differential/marker-children-diff.tsrx',
 );
+const LAYER_STACK_FIXTURE = resolve(__dirname, '../_fixtures/differential/layer-stack-diff.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
 
 async function settle(): Promise<void> {
@@ -64,6 +65,7 @@ await Promise.all([
 	preloadDifferentialFixture(USE_MAP_FIXTURE, CACHE),
 	preloadDifferentialFixture(USE_CONTROL_FIXTURE, CACHE),
 	preloadDifferentialFixture(MARKER_CHILDREN_FIXTURE, CACHE),
+	preloadDifferentialFixture(LAYER_STACK_FIXTURE, CACHE),
 ]);
 
 describe('differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2', () => {
@@ -397,6 +399,47 @@ describe('differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2', (
 			// And the custom one actually carries the content.
 			expect(o.find('.mapboxgl-marker.filled-block')!.textContent).toContain('just text');
 			expect(r.find('.mapboxgl-marker.filled-block')!.textContent).toContain('just text');
+		});
+
+		differential.unmount();
+	});
+
+	/**
+	 * OCTANE DIVERGENCE[react-map-gl-layer-missing-anchor][differential:7]: each
+	 * layer in the fixture is anchored beneath the next. Adding one on top makes
+	 * the lower layer re-anchor before the new layer exists. Upstream hands
+	 * Mapbox the missing anchor, and `Style#moveLayer` drops the lower layer from
+	 * the draw order for good. The binding waits for the anchor instead.
+	 */
+	// @parity-case differential:7
+	it('keeps a layer drawn when the layer it is anchored beneath is added later', async () => {
+		const differential = await mountDifferential(
+			LAYER_STACK_FIXTURE,
+			'LayerStackDiff',
+			{ mapLib: Promise.resolve(mapboxgl) },
+			CACHE,
+		);
+
+		/** The style's layer ids, bottom to top, as text from the page. */
+		async function order(mount: DiffMount): Promise<string> {
+			await mount.click('#snap');
+			await settle();
+			return mount.find('#order')!.textContent ?? '';
+		}
+
+		await differential.observe('one layer before the stack grows', async (o, r) => {
+			await settle();
+			await settle();
+			expect(await order(o)).toBe('lower');
+			expect(await order(r)).toBe('lower');
+		});
+
+		await differential.observe('a layer added on top of it', async (o, r) => {
+			for (const mount of [o, r]) await mount.click('#add-upper');
+			await settle();
+			await settle();
+			expect(await order(o)).toBe('lower,upper');
+			expect(await order(r)).toBe('upper');
 		});
 
 		differential.unmount();
