@@ -153,12 +153,33 @@ describe('useSyncExternalStore', () => {
 	it('subscribes during the microtask commit of a dispatched click', async () => {
 		const store = makeStore(0);
 		const r = mount(ClickMountedReader, { store });
+		// A user event arrives in its own task, after the mount's flush.
+		await nextPaint();
 		(r.find('button') as HTMLElement).click();
 		expect(store.listenerCount()).toBe(0);
 		await Promise.resolve();
 		expect(r.find('.value').textContent).toBe('0');
 		expect(store.listenerCount()).toBe(1);
 		r.unmount();
+		expect(store.listenerCount()).toBe(0);
+	});
+
+	it('subscribes during the commit of a click delegated inside a shadow root', async () => {
+		// A listener in a shadow tree sees no window.event.
+		const host = document.createElement('div');
+		document.body.appendChild(host);
+		const container = document.createElement('div');
+		host.attachShadow({ mode: 'open' }).appendChild(container);
+		const store = makeStore(0);
+		const root = createRoot(container);
+		flushSync(() => root.render(ClickMountedReader, { store }));
+		await nextPaint();
+		(container.querySelector('button') as HTMLElement).click();
+		await Promise.resolve();
+		expect(container.querySelector('.value')?.textContent).toBe('0');
+		expect(store.listenerCount()).toBe(1);
+		root.unmount();
+		host.remove();
 		expect(store.listenerCount()).toBe(0);
 	});
 

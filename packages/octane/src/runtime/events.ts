@@ -47,7 +47,6 @@ import {
 } from './drivers.js';
 import {
 	inFlush,
-	markDiscreteFlush,
 	journalRootProperty,
 	retiringHostsSince,
 	retireEventHostTree,
@@ -770,6 +769,10 @@ export function unregisterDelegationTarget(target: Node, root = false): void {
  * independently of whether this event type flushes synchronously.
  */
 export let _dispatchDepth = 0;
+// Delegated discrete dispatches on the stack. Updates scheduled under one commit
+// with React's discrete priority (DISCRETE_FLUSH in the engine, #3095). A shadow
+// root's listener sees no `window.event`, so this does not rely on it.
+export let DISCRETE_DISPATCH_DEPTH = 0;
 
 // Both native phases share the same record, including late registrations.
 function createDelegatedEventType(name: string, flags: number): DelegatedEventType {
@@ -1335,6 +1338,7 @@ function dispatchDelegated(this: Node, event: Event): void {
 		// never closes; bundles without the engine fold both calls away.
 		nativeBatch = nativeBatchHooks ? beginNativeEventBatch(event) : null;
 		_dispatchDepth++;
+		if ((type.flags & EVENT_DISCRETE) !== 0) DISCRETE_DISPATCH_DEPTH++;
 		(event as any)[DELEGATED_BUBBLE_VERSION] = ((event as any)[DELEGATED_BUBBLE_VERSION] || 0) + 1;
 		if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.enqueue(event, type);
 		if (event.type === 'submit' && node != null && node.nodeName === 'FORM') {
@@ -1407,7 +1411,7 @@ function dispatchDelegated(this: Node, event: Event): void {
 		if (nativeBatch !== undefined) {
 			if (nativeBatchHooks) closeNativeEventBatch(event, nativeBatch, false);
 			_dispatchDepth--;
-			if (_dispatchDepth === 0 && (type.flags & EVENT_DISCRETE) !== 0) markDiscreteFlush();
+			if ((type.flags & EVENT_DISCRETE) !== 0) DISCRETE_DISPATCH_DEPTH--;
 			if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.finish(type);
 		}
 	}
@@ -1443,6 +1447,7 @@ function dispatchDelegatedCapture(
 	const wasCancelled = event.cancelBubble;
 	let stopped = false;
 	_dispatchDepth++;
+	if ((type.flags & EVENT_DISCRETE) !== 0) DISCRETE_DISPATCH_DEPTH++;
 	const nativeBatch = nativeBatchHooks ? beginNativeEventBatch(event) : null;
 	let frame: DelegatedEventFrame | undefined;
 	try {
@@ -1475,7 +1480,7 @@ function dispatchDelegatedCapture(
 				event.bubbles && !event.cancelBubble && (type.flags & EVENT_BUBBLE) !== 0,
 			);
 		_dispatchDepth--;
-		if (_dispatchDepth === 0 && (type.flags & EVENT_DISCRETE) !== 0) markDiscreteFlush();
+		if ((type.flags & EVENT_DISCRETE) !== 0) DISCRETE_DISPATCH_DEPTH--;
 		CAPTURE_FINISH(event, type);
 	}
 	return stopped;

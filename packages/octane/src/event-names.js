@@ -127,7 +127,7 @@ const TARGET_ONLY_DELEGATED = /* @__PURE__ */ new Set([
  * ReactDOMEventListener.js — getEventPriority. React's priority classification
  * is separate from its sync-lane microtask flush boundary.
  */
-const DISCRETE_EVENTS = /* @__PURE__ */ new Set([
+export const DISCRETE_EVENTS = /* @__PURE__ */ new Set([
 	'auxclick',
 	'beforeblur',
 	'beforeinput',
@@ -181,11 +181,6 @@ const DISCRETE_EVENTS = /* @__PURE__ */ new Set([
 	'touchstart',
 	'volumechange',
 ]);
-
-/** Whether React gives an update dispatched during this event discrete priority. */
-export function isDiscreteEvent(name) {
-	return DISCRETE_EVENTS.has(name);
-}
 
 /**
  * Events whose dispatch can carry a user edit to a form control — React's

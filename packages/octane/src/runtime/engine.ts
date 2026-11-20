@@ -6,7 +6,7 @@
 // which only the declaring module may do, so they share this module. It
 // evaluates after the drivers it reads.
 
-import { isDiscreteEvent } from '../event-names.js';
+import { DISCRETE_EVENTS } from '../event-names.js';
 import {
 	drainRefDetaches,
 	storeSyncQueue,
@@ -370,6 +370,7 @@ import {
 	_eventRoots,
 	unregisterDelegationTarget,
 	_dispatchDepth,
+	DISCRETE_DISPATCH_DEPTH,
 	CAPTURE_SLOTS,
 	type PortalEventBoundary,
 	ACTIVE_SUBMIT_DISPATCH,
@@ -652,20 +653,18 @@ export function requestFlush(): void {
 	queueMicrotask(flush);
 }
 export let syncFlush = false; // flushSync sets this to drain the queue synchronously
-// True from the end of a discrete delegated event that left a flush scheduled until
-// that flush ends, and during a flushSync drain whose callback queued work. React
-// commits such updates in its sync lane and flushes their passive effects in the
-// commit; here only useSyncExternalStore follows it, by subscribing in the commit
-// (drainQueuedStoreSyncs, #3095).
+// True while the scheduled flush commits discrete work, until that flush ends: an
+// update that armed it during a discrete event, delegated or native (React reads
+// `window.event`), or a flushSync drain whose callback queued work. React commits
+// such updates in its sync lane and flushes their passive effects in the commit;
+// here only useSyncExternalStore follows it, by subscribing in the commit
+// (drainQueuedStoreSyncs, #3095). scheduleRender inlines this check so an update
+// adds no call; the colder arm sites share markDiscreteFlush.
 export let DISCRETE_FLUSH = false;
-export function markDiscreteFlush(): void {
-	if (scheduled) DISCRETE_FLUSH = true;
-}
-// An update that arms the flush from any native discrete listener, delegated or
-// not, marks it too, as React classifies updates by `window.event` (#3095).
-function markNativeDiscreteFlush(): void {
+function markDiscreteFlush(): void {
 	const event = typeof window === 'undefined' ? undefined : window.event;
-	if (event !== undefined && isDiscreteEvent(event.type)) DISCRETE_FLUSH = true;
+	if (DISCRETE_DISPATCH_DEPTH !== 0 || (event !== undefined && DISCRETE_EVENTS.has(event.type)))
+		DISCRETE_FLUSH = true;
 }
 // True while a flush (drainQueue/commitEffects) is on the stack. A flushSync
 // that lands during it — a handler's own flushSync, or maybeFlushDiscrete when a
@@ -2199,7 +2198,9 @@ export function scheduleRender(
 	if (!scheduled) {
 		scheduled = true;
 		queueMicrotask(flush);
-		markNativeDiscreteFlush();
+		const event = typeof window === 'undefined' ? undefined : window.event;
+		if (DISCRETE_DISPATCH_DEPTH !== 0 || (event !== undefined && DISCRETE_EVENTS.has(event.type)))
+			DISCRETE_FLUSH = true;
 	}
 }
 
@@ -2268,7 +2269,7 @@ export function upgradeTransitionBlock(
 	if (!scheduled) {
 		scheduled = true;
 		queueMicrotask(flush);
-		markNativeDiscreteFlush();
+		markDiscreteFlush();
 	}
 	// Nothing is left for the task: retire it. Waiting completions keep a task.
 	if (TRANSITION_QUEUE.length === 0) adoptTransitionQueue();
@@ -5897,7 +5898,7 @@ export function makeRoot(
 				if (!syncFlush && !scheduled) {
 					scheduled = true;
 					queueMicrotask(flush);
-					markNativeDiscreteFlush();
+					markDiscreteFlush();
 				}
 				return;
 			}
@@ -5954,7 +5955,7 @@ export function makeRoot(
 			if (!syncFlush && !scheduled) {
 				scheduled = true;
 				queueMicrotask(flush);
-				markNativeDiscreteFlush();
+				markDiscreteFlush();
 			}
 		} finally {
 			endRootRender(frame);

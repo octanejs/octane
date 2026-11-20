@@ -11,4 +11,4 @@ export const EVENT_DISABLED_ENTER: 128;
 export const EVENT_CUSTOM_NATIVE_ONLY: 256;
 export const RESTORE_EVENT_LIST: string[];
 export function delegatedEventFlags(name: string): number;
-export function isDiscreteEvent(name: string): boolean;
+export const DISCRETE_EVENTS: ReadonlySet<string>;
