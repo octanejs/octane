@@ -39,6 +39,42 @@ export function NestedReturnedActivity(props: ActivityProps) {
 	);
 }
 
+// #3093: a mode-only Activity's children read the owner's locals, with no
+// parameter named `props` for the hoisted body to capture by accident.
+export function ReturnedModeActivity({ mode, label }: ActivityProps) {
+	return (
+		<Activity mode={mode}>
+			<Stateful label={label} />
+			<span data-activity-text>{label}</span>
+		</Activity>
+	);
+}
+
+export function NestedReturnedModeActivity({ mode, label }: ActivityProps) {
+	return (
+		<section>
+			<Activity mode={mode}>
+				<Stateful label={label} />
+				<span data-activity-text>{label}</span>
+			</Activity>
+			<i data-activity-tail>tail</i>
+		</section>
+	);
+}
+
+// A body that writes an owner local stays a closure in the owner (no env tuple).
+export function ReturnedWritingModeActivity({ mode, label }: ActivityProps) {
+	let clicks = 0;
+	return (
+		<Activity mode={mode}>
+			<Stateful label={label} />
+			<span data-activity-text onClick={() => clicks++}>
+				{label}
+			</span>
+		</Activity>
+	);
+}
+
 export function ReturnedDynamicSpreadWinsActivity(props: ActivityProps) {
 	const Boundary = props.boundary ?? Activity;
 	return (
