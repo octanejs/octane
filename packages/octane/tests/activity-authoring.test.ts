@@ -378,6 +378,39 @@ describe('<Activity> returned JSX', () => {
 		});
 	}
 
+	for (const name of ['ReturnedModeActivity', 'NestedReturnedModeActivity'] as const) {
+		it(`${name} renders children that read setup locals (#3093)`, () => {
+			const Component = ReturnedFixture[name];
+			const props = { mode: 'visible' as const, label: 'local' };
+			const host = container();
+			host.innerHTML = Server.renderToString(returnedServer[name], props).html;
+			const original = child(host, 'local');
+			const text = host.querySelector('[data-activity-text]');
+			expect(original.textContent).toBe('local:0');
+			expect(text?.textContent).toBe('local');
+			const root = hydrateRoot(host, Component, props);
+			roots.push(root);
+			flushSync(() => {});
+			expect(child(host, 'local')).toBe(original);
+			expect(host.querySelector('[data-activity-text]')).toBe(text);
+			flushSync(() => original.click());
+			root.render(Component, { mode: 'hidden', label: 'next' });
+			flushSync(() => {});
+			expect(original.style.display).toBe('none');
+			expect(text?.textContent).toBe('next');
+			root.render(Component, { mode: 'visible', label: 'next' });
+			flushSync(() => {});
+			expect(child(host, 'next')).toBe(original);
+			expect(original.textContent).toBe('next:1');
+			expect(original.style.display).toBe('');
+
+			const view = mount(Component, props);
+			roots.push(view);
+			expect(child(view.container, 'local').textContent).toBe('local:0');
+			expect(view.container.querySelector('[data-activity-text]')?.textContent).toBe('local');
+		});
+	}
+
 	it('evaluates spread getters and explicit props in authored order', () => {
 		function propsFor(events: string[]) {
 			return {

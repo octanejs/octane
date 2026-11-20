@@ -25331,6 +25331,8 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html', inDescriptor =
 		} else if (t === 'Element' || t === 'JSXElement') {
 			if (descriptor && !isComponentTag(child)) {
 				newChildren.push(extractFragment(child, ctx, holeProps, childNs, true));
+			} else if (!descriptor && ctx._foldCtx && isDirectActivityLongForm(child, ctx)) {
+				newChildren.push(foldActivity(child, ctx, holeProps));
 			} else if (!descriptor && isLongFormTemplateSentinel(child, childNs, true, ctx)) {
 				newChildren.push(extractFragment(child, ctx, holeProps, childNs));
 			} else if (
@@ -25786,7 +25788,40 @@ function extractFragmentComponent(node, ctx, holeProps, parentNs = 'html') {
 	return out;
 }
 
+// FOLD a mode-only `<Activity>` like an `@if` (see extractFragment): its body is
+// compiled component-side, so it closes over setup locals, and the mode, body
+// helper, and env tuple thread into the renderer as `props.hN` holes.
+function foldActivity(node, ctx, holeProps) {
+	const fc = ctx._foldCtx;
+	const ac = makeActivityCall(
+		activityStatement(node),
+		ctx,
+		fc.compInlinedSubs,
+		fc.parentNs,
+		fc.cssHash,
+	);
+	if (ac.modeExpr.type !== 'Literal') {
+		const modeHole = `h${holeProps.length}`;
+		holeProps.push(objectProp(modeHole, rewriteJsxValues(ac.modeExpr, ctx)));
+		ac.modeExpr = memberProps(modeHole, ac.modeExpr);
+	}
+	const bodyHole = `h${holeProps.length}`;
+	holeProps.push(objectProp(bodyHole, b.id(ac.thenHelper)));
+	ac.thenHelper = `props.${bodyHole}`;
+	if (ac.envNames.length) {
+		const envHole = `h${holeProps.length}`;
+		holeProps.push(objectProp(envHole, b.array(ac.envNames.map((n) => b.id(n)))));
+		ac.envExpr = `props.${envHole}`;
+	}
+	fc.directiveCalls.ifCalls.push(ac);
+	return { type: 'FoldedDirective', kind: 'if', recordIndex: fc.directiveCalls.ifCalls.length - 1 };
+}
+
 function extractFragmentRoot(node, ctx, holeProps, parentNs = 'html') {
+	if (ctx._foldCtx && isDirectActivityLongForm(node, ctx)) {
+		// The renderer's root is a fragment around the folded boundary.
+		return inheritOriginLoc(b.jsx_fragment([foldActivity(node, ctx, holeProps)]), node);
+	}
 	if (
 		(node.type === 'Element' || node.type === 'JSXElement') &&
 		isComponentTag(node) &&
@@ -28541,18 +28576,7 @@ function normalizeChildren(
 			// configs retain the ordinary element descriptor path below, where keys,
 			// spreads, children props, and authored evaluation order are preserved.
 			if (isDirectActivityLongForm(n, ctx)) {
-				const modeAttr = (n.openingElement.attributes || []).find(
-					(a) =>
-						(a.type === 'Attribute' || a.type === 'JSXAttribute') &&
-						a.name &&
-						(a.name.name || a.name) === 'mode',
-				);
-				let mode = null;
-				if (modeAttr) {
-					const v = modeAttr.value;
-					mode = v && v.type === 'JSXExpressionContainer' ? v.expression : v;
-				}
-				out.push({ type: 'ActivityStatement', mode, children: n.children || [] });
+				out.push(activityStatement(n));
 				continue;
 			}
 			// Keys need a reconciliation boundary. Parser-sensitive host trees need
@@ -36939,6 +36963,19 @@ function makeActivityCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = n
 		elseHelper: null,
 		hostPath: null,
 	};
+}
+
+// A mode-only `<Activity>` element as the ActivityStatement makeActivityCall lowers.
+function activityStatement(node) {
+	const modeAttr = (node.openingElement.attributes || []).find(
+		(a) =>
+			(a.type === 'Attribute' || a.type === 'JSXAttribute') &&
+			a.name &&
+			(a.name.name || a.name) === 'mode',
+	);
+	const v = modeAttr?.value ?? null;
+	const mode = v?.type === 'JSXExpressionContainer' ? v.expression : v;
+	return { type: 'ActivityStatement', mode, children: node.children || [] };
 }
 
 function isActivityName(value) {
