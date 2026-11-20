@@ -3,7 +3,10 @@
 import { useSyncExternalStore } from 'react';
 import { createScope, type Scope, type SignalHandle } from 'octane/signals';
 import {
+	RetainedSignalProvider,
+	useOptionalRetainedSignalValue,
 	SignalScopeProvider,
+	type SignalFallback,
 	useRetainedSignalValue,
 	useSignalSubscription,
 	useSignalScope,
@@ -35,7 +38,12 @@ function Count() {
 
 export const tree = (
 	<SignalScopeProvider scope={scope}>
-		<Count />
+		<RetainedSignalProvider
+			getServerSnapshot={<T,>(handle: SignalHandle<T>): T => handle.get()}
+			retainOnHide={false}
+		>
+			<Count />
+		</RetainedSignalProvider>
 	</SignalScopeProvider>
 );
 
@@ -51,5 +59,25 @@ export function useCount(handle: SignalHandle<readonly string[]> | null): number
 		subscribe,
 		() => handle?.get().length ?? 0,
 		() => 0,
+	);
+}
+
+export const narrow = (
+	// @ts-expect-error The resolver must work for every handle value type.
+	<RetainedSignalProvider getServerSnapshot={(handle: SignalHandle<number>) => handle.get()} />
+);
+
+export function Optional({ active }: { active: boolean }) {
+	const value: number | 'loading' = useOptionalRetainedSignalValue(active ? count$ : 'loading');
+	const inactive: false = useOptionalRetainedSignalValue(false);
+	const fallback: SignalFallback = inactive;
+	void fallback;
+	// @ts-expect-error Resolve application-specific objects to native handles first.
+	useOptionalRetainedSignalValue({ unresolved: true });
+	return (
+		<output>
+			{String(value)}
+			{String(inactive)}
+		</output>
 	);
 }

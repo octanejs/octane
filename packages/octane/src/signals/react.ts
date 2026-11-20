@@ -18,10 +18,37 @@ import {
 } from 'react';
 import type { ReactNode } from 'react';
 import { formatClientError } from '../error-codes.client.generated.js';
+import { isSignalHandle } from './handle-protocol.js';
 import { SIGNAL_BINDING_READ, SIGNAL_BINDING_SUBSCRIBE } from './types.js';
 import type { Scope, SignalHandle } from './types.js';
 
 const ScopeContext = createContext<Scope | null>(null);
+
+type RetainedSignalDefaults = {
+	getServerSnapshot: (<T>(handle: SignalHandle<T>) => T) | undefined;
+	retainOnHide: boolean;
+};
+const RetainedSignalContext = createContext<RetainedSignalDefaults>({
+	getServerSnapshot: undefined,
+	retainOnHide: true,
+});
+
+/** Defaults for retained signal readers below this provider. Omitted fields inherit. */
+export function RetainedSignalProvider(props: {
+	getServerSnapshot?: (<T>(handle: SignalHandle<T>) => T) | undefined;
+	retainOnHide?: boolean | undefined;
+	children?: ReactNode;
+}) {
+	const outer = use(RetainedSignalContext);
+	const value = useMemo(
+		() => ({
+			getServerSnapshot: props.getServerSnapshot ?? outer.getServerSnapshot,
+			retainOnHide: props.retainOnHide ?? outer.retainOnHide,
+		}),
+		[outer, props.getServerSnapshot, props.retainOnHide],
+	);
+	return createElement(RetainedSignalContext, { value }, props.children);
+}
 
 /**
  * Make `scope` the one `useSignalScope` returns below. The provider borrows the
@@ -63,11 +90,39 @@ export function useSignalValue<T>(handle$: SignalHandle<T>, getServerSnapshot?: 
 export function useRetainedSignalValue<T>(
 	handle$: SignalHandle<T>,
 	getServerSnapshot?: () => T,
-	retainOnHide = true,
+	retainOnHide?: boolean,
 ): T {
-	const subscribe = useSignalSubscription(handle$, retainOnHide);
+	const defaults = use(RetainedSignalContext);
+	const subscribe = useActivitySubscription(handle$, retainOnHide ?? defaults.retainOnHide);
 	const read = useCallback(() => handle$[SIGNAL_BINDING_READ](), [handle$]);
-	return useSyncExternalStore(subscribe, read, getServerSnapshot ?? read);
+	const resolve = defaults.getServerSnapshot;
+	return useSyncExternalStore(
+		subscribe,
+		read,
+		getServerSnapshot ?? (resolve ? () => resolve(handle$) : read),
+	);
+}
+
+export type SignalFallback = string | number | boolean | bigint | symbol | null | undefined;
+type OptionalSignalValue<Source> = Source extends SignalHandle<infer T> ? T : Source;
+
+/** Read a retained handle, or return an inactive primitive without subscribing. */
+export function useOptionalRetainedSignalValue<
+	Source extends SignalHandle<unknown> | SignalFallback,
+>(source: Source): OptionalSignalValue<Source> {
+	const defaults = use(RetainedSignalContext);
+	const handle = isSignalHandle(source) ? source : null;
+	const subscribe = useActivitySubscription(handle, defaults.retainOnHide);
+	const read = useCallback(
+		() => (handle ? handle[SIGNAL_BINDING_READ]() : source) as OptionalSignalValue<Source>,
+		[handle, source],
+	);
+	const resolve = defaults.getServerSnapshot;
+	return useSyncExternalStore(
+		subscribe,
+		read,
+		handle && resolve ? () => resolve(handle) as OptionalSignalValue<Source> : read,
+	);
 }
 
 type Subscribe = (notify: () => void) => () => void;
@@ -82,7 +137,15 @@ const subscribeToNothing: Subscribe = () => noop;
  */
 export function useSignalSubscription<T>(
 	source: SignalHandle<T> | Subscribe | null,
-	retainOnHide = true,
+	retainOnHide?: boolean,
+): Subscribe {
+	const defaults = use(RetainedSignalContext);
+	return useActivitySubscription(source, retainOnHide ?? defaults.retainOnHide);
+}
+
+function useActivitySubscription<T>(
+	source: SignalHandle<T> | Subscribe | null,
+	retainOnHide: boolean,
 ): Subscribe {
 	const binding = useMemo(() => {
 		if (source === null) return null;
