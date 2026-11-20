@@ -97,3 +97,19 @@ export function Nested(props: Props) @{
 		</Hydrate>
 	</main>
 }
+
+export function Arms(props: Props) @{
+	<main>
+		<Hydrate when={props.when}>
+			@if (props.outer !== 'else') {
+				<Theme value={props.value}>
+					<Reader />
+				</Theme>
+			} @else {
+				<Theme value="else">
+					<Reader />
+				</Theme>
+			}
+		</Hydrate>
+	</main>
+}

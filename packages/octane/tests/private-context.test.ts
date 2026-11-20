@@ -307,6 +307,8 @@ function Value() @{ <span class="value">{useContext(Message) as string}</span> }
 		'Suspense under descriptorChildren': `export function App(props) @{ <Frame><Suspense fallback={<i>wait</i>}>${provider}</Suspense></Frame> }`,
 		'ViewTransition under descriptorChildren': `export function App(props) @{ <Frame><ViewTransition>${provider}</ViewTransition></Frame> }`,
 		'Activity under descriptorChildren': `export function App(props) @{ <Frame><Activity mode="visible">${provider}</Activity></Frame> }`,
+		'an @if arm under descriptorChildren': `export function App(props) @{ <Frame>@if (props.v) { ${provider} }</Frame> }`,
+		'an @for arm under descriptorChildren': `export function App(props) @{ <Frame>@for (const v of [props.v]; key v) { <Message value={v}><Value /></Message> }</Frame> }`,
 		'a directly called @{} function': `function Helper(props) @{ ${provider} }
 export function App(props) @{ <div>{Helper(props)}</div> }`,
 		'a directly called arrow component': `const Helper = (props) => @{ ${provider} };
@@ -399,5 +401,120 @@ export function Reader() @{ <span>{useContext(Theme) as string}</span> }`,
 		} finally {
 			root.unmount();
 		}
+	});
+	// Directive arms render template output, so a provider there takes the
+	// compiled provider path exactly as one directly in the template does.
+	const armsSource = `import {createContext,useContext,useState} from 'octane';
+const Theme=createContext('default');
+function Value(props) @{
+	const [count, update] = useState(0);
+	<p class={props.arm}><span class="value">{useContext(Theme) as string}</span><button onClick={() => update(count + 1)}>{String(count) as string}</button></p>
+}
+export function App(props) @{
+	<main>
+		@if (props.on) {
+			<Theme value={props.v + ':if'}><Value arm="if" /></Theme>
+		} @else {
+			<Theme value={props.v + ':else'}><Value arm="else" /></Theme>
+		}
+		@for (const item of props.items; key item) {
+			<Theme value={props.v + ':' + item}><Value arm={'for-' + item} /></Theme>
+		} @empty {
+			<Theme value={props.v + ':empty'}><Value arm="empty" /></Theme>
+		}
+		@switch (props.on) {
+			@case true: {
+				<Theme value={props.v + ':case'}><Value arm="case" /></Theme>
+			}
+			@default: {
+				<Theme value={props.v + ':default'}><Value arm="default" /></Theme>
+			}
+		}
+		@try {
+			<Theme value={props.v + ':try'}><Value arm="try" /></Theme>
+		} @catch (error) {
+			<Theme value={props.v + ':catch'}><Value arm="catch" /></Theme>
+		}
+	</main>
+}`;
+	const armValues = (host: HTMLElement) =>
+		Array.from(
+			host.querySelectorAll('p'),
+			(p) => `${p.className}=${p.querySelector('.value')!.textContent}`,
+		);
+
+	for (const options of [{ dev: false }, { dev: true }, { strong: true }]) {
+		it(`provides through every directive arm (${JSON.stringify(options)})`, () => {
+			const module = loadCompiledFixtureSource(armsSource, {
+				id: 'private-context-arms.tsrx',
+				mode: 'client',
+				compileOptions: { ...compileOptions, ...options },
+			});
+			const host = container();
+			const root = createRoot(host);
+			try {
+				root.render(module.App, { v: 'a', on: true, items: ['x', 'y'] });
+				expect(armValues(host)).toEqual([
+					'if=a:if',
+					'for-x=a:x',
+					'for-y=a:y',
+					'case=a:case',
+					'try=a:try',
+				]);
+				const kept = host.querySelector('.for-y button') as HTMLButtonElement;
+				flushSync(() => kept.click());
+				flushSync(() => root.render(module.App, { v: 'b', on: true, items: ['y', 'x'] }));
+				expect(armValues(host)).toEqual([
+					'if=b:if',
+					'for-y=b:y',
+					'for-x=b:x',
+					'case=b:case',
+					'try=b:try',
+				]);
+				expect(host.querySelector('.for-y button')).toBe(kept);
+				expect(kept.textContent).toBe('1');
+				flushSync(() => root.render(module.App, { v: 'c', on: false, items: [] }));
+				expect(armValues(host)).toEqual([
+					'else=c:else',
+					'empty=c:empty',
+					'default=c:default',
+					'try=c:try',
+				]);
+			} finally {
+				root.unmount();
+			}
+			expect(host.childNodes.length).toBe(0);
+		});
+	}
+
+	it('hydrates providers in directive arms and keeps them live', () => {
+		const props = { v: 'server', on: true, items: ['x'] };
+		const module = loadCompiledFixtureSource(armsSource, {
+			id: 'private-context-arms.tsrx',
+			mode: 'client',
+			compileOptions,
+		});
+		const server = loadCompiledFixtureSource(armsSource, {
+			id: 'private-context-arms.tsrx',
+			mode: 'server',
+			compileOptions,
+		});
+		const host = container();
+		host.innerHTML = Server.renderToString(server.App, props).html;
+		const labels = Array.from(host.querySelectorAll('.value'));
+		const root = hydrateRoot(host, module.App, props);
+		try {
+			flushSync(() => root.render(module.App, { ...props, v: 'client' }));
+			expect(Array.from(host.querySelectorAll('.value'))).toEqual(labels);
+			expect(armValues(host)).toEqual([
+				'if=client:if',
+				'for-x=client:x',
+				'case=client:case',
+				'try=client:try',
+			]);
+		} finally {
+			root.unmount();
+		}
+		expect(host.childNodes.length).toBe(0);
 	});
 });

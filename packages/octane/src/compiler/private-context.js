@@ -8,6 +8,19 @@ import {
 	findReturnedJsxTemplateBodies,
 } from './descriptor-lowering.js';
 
+// Directive arms render template output exactly as their parent position does.
+// Only the arms: tests, iterables and keys stay ordinary expressions, and an
+// arm's setup statements other than its rendered nodes are not template.
+const DIRECTIVE_ARMS = {
+	JSXIfExpression: ['consequent', 'alternate'],
+	JSXForExpression: ['body', 'empty'],
+	JSXSwitchExpression: ['cases'],
+	SwitchCase: ['consequent'],
+	JSXTryExpression: ['block', 'pending', 'handler'],
+	CatchClause: ['body'],
+	BlockStatement: ['body'],
+};
+
 /**
  * Only private contexts whose complete authored lifetime stays in template
  * bodies. `isDescriptorChildrenImport` is the bundler's proof that an imported
@@ -184,7 +197,8 @@ export function findPrivateCompiledContextProofs(ast, isDescriptorChildrenImport
 								(childKey === 'children' && !keepsDescriptorChildren(node)))) ||
 							(node.type === 'JSXFragment' && childKey === 'children') ||
 							((node.type === 'JSXOpeningElement' || node.type === 'JSXClosingElement') &&
-								childKey === 'name'));
+								childKey === 'name') ||
+							DIRECTIVE_ARMS[node.type]?.includes(childKey) === true);
 			inspect(child, node, childKey, parent, childDirect);
 		});
 	};

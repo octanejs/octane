@@ -80,6 +80,11 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		after: 'dark',
 		cleaned: true,
 	},
+	'context-arms': {
+		before: 'light,light,light,light',
+		after: 'dark,dark,dark,dark',
+		cleaned: true,
+	},
 	'memo-context': {
 		before: 'light',
 		after: 'dark',
