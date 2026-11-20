@@ -92,7 +92,7 @@ it('shares one journal and dependency graph when full scopes load later', async 
 		edit.undo();
 		edit.redo();
 		expect(() =>
-			full.transaction(() => {
+			full.transaction<void>(() => {
 				left$.set(0);
 				right$.set(0);
 				throw new Error('cancel');
