@@ -17995,16 +17995,14 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		itemSub.fn = { ...itemSub.fn, params: [snapshot.binding, ...itemSub.fn.params.slice(1)] };
 	} else if (mapCall === null && node.index && itemId.type !== 'Identifier') {
 		// Bind the index before preparing an authored row that reads it, like the
-		// client. The pattern then shares the row body's scope, so it stays a
-		// parameter when it reads a name the body declares, or calls `eval`, which
-		// can read any of them.
+		// client. As in a for...of, the pattern must not see the row body's
+		// declarations, so the body moves into its own block when the pattern
+		// reads a name the body declares, or calls `eval`, which can read any.
 		const fn = itemSub.fn;
 		const reads = collectFreeIdentifiers(node.left, []);
-		const declared = collectModuleTopLevelBindings(fn.body.body, new Set()).all;
-		if (
-			reads.has(node.index.name) &&
-			![...reads].some((name) => name === 'eval' || declared.has(name))
-		) {
+		if (reads.has(node.index.name) || reads.has('eval')) {
+			const declared = collectModuleTopLevelBindings(fn.body.body, new Set()).all;
+			const shadowed = [...reads].some((name) => name === 'eval' || declared.has(name));
 			const input = b.id(allocCompilerName(ctx, '__rowInput'));
 			const ordinal = b.id(allocCompilerName(ctx, '__rowIndex'));
 			itemSub.fn = {
@@ -18015,7 +18013,7 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 					body: [
 						inheritOriginLoc(b.const(node.index, ordinal), node.index),
 						inheritOriginLoc(b[node.left.kind](itemId, input), itemId),
-						...fn.body.body,
+						...(shadowed ? [b.block(fn.body.body)] : fn.body.body),
 					],
 				},
 			};

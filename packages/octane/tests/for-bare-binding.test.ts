@@ -391,6 +391,32 @@ describe('bare-left @for row bindings', () => {
 	});
 
 	it.each([
+		['prefix + index', "const prefix = 'row';", 'outer'],
+		['prefix + index', 'class prefix {}', 'outer'],
+		['prefix + index', 'function prefix() {}', 'outer'],
+		['prefix + index', 'enum prefix { Row }', 'outer'],
+		["eval('prefix') + index", "const prefix = 'row';", 'outer'],
+		["eval('prefix + index')", '', 'outer'],
+	])('initializes the index before an eager default %s beside a body %s', (read, body, prefix) => {
+		// The default runs before the row body, so it never sees the body's names.
+		const source = `
+			const prefix = 'outer';
+			export function List({ rows }) @{
+				<ul>@for (const { value = ${read} } of rows; index index) {
+					${body}
+					<li>{String(value)}</li>
+				}</ul>
+			}
+		`;
+		const { List } = loadCompiledFixtureSource(source, {
+			id: 'indexed-row-eager-scope.tsrx',
+			mode: 'server',
+		});
+		const host = container(renderToString(List, { rows: [{}, {}] }).html);
+		expect(text([...host.querySelectorAll('li')])).toEqual([`${prefix}0`, `${prefix}1`]);
+	});
+
+	it.each([
 		['index', 'index'],
 		['id', 'index'],
 		['index', 'id + index'],
