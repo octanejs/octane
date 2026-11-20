@@ -5,6 +5,7 @@ import {
 	ClickMountedReader,
 	ConditionalReader,
 	LayoutCascadeReader,
+	NativeListenerMountedReader,
 	TwoClickMountedReaders,
 	makeRetainedCallbackStore,
 	makeStore,
@@ -159,6 +160,33 @@ describe('useSyncExternalStore', () => {
 		expect(store.listenerCount()).toBe(1);
 		r.unmount();
 		expect(store.listenerCount()).toBe(0);
+	});
+
+	it('subscribes during the commit of an update from a native click listener', async () => {
+		const store = makeStore(0);
+		const r = mount(NativeListenerMountedReader, { store, type: 'click' });
+		// A user event arrives in its own task, after the mount's flush.
+		await nextPaint();
+		r.find('button').dispatchEvent(new MouseEvent('click'));
+		await Promise.resolve();
+		expect(r.find('.value').textContent).toBe('0');
+		expect(store.listenerCount()).toBe(1);
+		r.unmount();
+		expect(store.listenerCount()).toBe(0);
+	});
+
+	it('keeps an update from a native non-discrete listener subscribing in its passive effect', async () => {
+		const store = makeStore(0);
+		const r = mount(NativeListenerMountedReader, { store, type: 'mousemove' });
+		// A user event arrives in its own task, after the mount's flush.
+		await nextPaint();
+		r.find('button').dispatchEvent(new MouseEvent('mousemove'));
+		await Promise.resolve();
+		expect(r.find('.value').textContent).toBe('0');
+		expect(store.listenerCount()).toBe(0);
+		await nextPaint();
+		expect(store.listenerCount()).toBe(1);
+		r.unmount();
 	});
 
 	it('keeps a non-discrete mount subscribing in its passive effect', async () => {

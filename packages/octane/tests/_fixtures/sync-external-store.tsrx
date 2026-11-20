@@ -1,4 +1,11 @@
-import { Activity, useSyncExternalStore, useCallback, useLayoutEffect, useState } from 'octane';
+import {
+	Activity,
+	useSyncExternalStore,
+	useCallback,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from 'octane';
 
 type StoreListener = () => void;
 type StoreLike = {
@@ -149,6 +156,24 @@ export function TwoClickMountedReaders(props: { first: StoreLike; second: StoreL
 				<Reader store={props.first} />
 				<Reader store={props.second} />
 			</>
+		}
+	</div>
+}
+
+// Mounts a reader from a native listener that Octane does not delegate.
+export function NativeListenerMountedReader(props: { store: StoreLike; type: string }) @{
+	const [shown, setShown] = useState(false);
+	const button = useRef<HTMLButtonElement | null>(null);
+	useLayoutEffect(() => {
+		const node = button.current!;
+		const show = () => setShown(true);
+		node.addEventListener(props.type, show);
+		return () => node.removeEventListener(props.type, show);
+	}, [props.type]);
+	<div>
+		<button ref={button}>{'Show'}</button>
+		@if (shown) {
+			<Reader store={props.store} />
 		}
 	</div>
 }

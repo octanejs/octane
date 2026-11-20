@@ -182,6 +182,11 @@ const DISCRETE_EVENTS = /* @__PURE__ */ new Set([
 	'volumechange',
 ]);
 
+/** Whether React gives an update dispatched during this event discrete priority. */
+export function isDiscreteEvent(name) {
+	return DISCRETE_EVENTS.has(name);
+}
+
 /**
  * Events whose dispatch can carry a user edit to a form control — React's
  * ChangeEventPlugin extraction set. Armed elements targeted by one of these

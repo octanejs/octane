@@ -1699,15 +1699,17 @@ that drain. Use `useLayoutEffect` when the subscription must be installed by
 the end of the commit. Passive timing is not
 React's synchronous discrete-event effect timing.
 
-`useSyncExternalStore` follows React's timing for discrete updates instead. When
-a commit comes from a discrete delegated event (such as `click` or `keydown`) or
-from work queued inside a `flushSync` callback, a newly mounted reader, or one
-whose `subscribe` changed, subscribes during that commit, after layout effects
-and before paint. Its passive effect adopts that subscription, so a Suspense hide
-keeps it connected as in React. A swapped store's old subscription is released
-with the passive cleanup. Other commits subscribe in the passive effect. Unlike
-React, an update from a native listener that Octane does not delegate is not
-treated as discrete.
+`useSyncExternalStore` follows React's timing for discrete updates instead. A
+commit is discrete when it comes from work queued inside a `flushSync` callback,
+or from an update made during a discrete event (such as `click` or `keydown`),
+whether the listener is a delegated prop or a native `addEventListener`
+callback. In a discrete commit, a newly mounted reader, or one whose `subscribe`
+changed, subscribes after layout effects and before paint. Its passive effect
+adopts that subscription, so a Suspense hide keeps it connected as in React. A
+swapped store's old subscription is released with the passive cleanup. Other
+commits subscribe in the passive effect. A native listener's update counts as
+discrete only when it is the first to schedule the commit; an update that joins
+a commit already scheduled in the same task keeps that commit's priority.
 
 `root.unmount()` drains pending passive work and its passive cleanups before
 returning, so root-owned subscriptions cannot outlive the unmount call.

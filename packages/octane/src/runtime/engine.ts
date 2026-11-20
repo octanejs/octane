@@ -6,6 +6,7 @@
 // which only the declaring module may do, so they share this module. It
 // evaluates after the drivers it reads.
 
+import { isDiscreteEvent } from '../event-names.js';
 import {
 	drainRefDetaches,
 	storeSyncQueue,
@@ -659,6 +660,12 @@ export let syncFlush = false; // flushSync sets this to drain the queue synchron
 export let DISCRETE_FLUSH = false;
 export function markDiscreteFlush(): void {
 	if (scheduled) DISCRETE_FLUSH = true;
+}
+// An update that arms the flush from any native discrete listener, delegated or
+// not, marks it too, as React classifies updates by `window.event` (#3095).
+function markNativeDiscreteFlush(): void {
+	const event = typeof window === 'undefined' ? undefined : window.event;
+	if (event !== undefined && isDiscreteEvent(event.type)) DISCRETE_FLUSH = true;
 }
 // True while a flush (drainQueue/commitEffects) is on the stack. A flushSync
 // that lands during it — a handler's own flushSync, or maybeFlushDiscrete when a
@@ -2192,6 +2199,7 @@ export function scheduleRender(
 	if (!scheduled) {
 		scheduled = true;
 		queueMicrotask(flush);
+		markNativeDiscreteFlush();
 	}
 }
 
@@ -2260,6 +2268,7 @@ export function upgradeTransitionBlock(
 	if (!scheduled) {
 		scheduled = true;
 		queueMicrotask(flush);
+		markNativeDiscreteFlush();
 	}
 	// Nothing is left for the task: retire it. Waiting completions keep a task.
 	if (TRANSITION_QUEUE.length === 0) adoptTransitionQueue();
@@ -5888,6 +5897,7 @@ export function makeRoot(
 				if (!syncFlush && !scheduled) {
 					scheduled = true;
 					queueMicrotask(flush);
+					markNativeDiscreteFlush();
 				}
 				return;
 			}
@@ -5944,6 +5954,7 @@ export function makeRoot(
 			if (!syncFlush && !scheduled) {
 				scheduled = true;
 				queueMicrotask(flush);
+				markNativeDiscreteFlush();
 			}
 		} finally {
 			endRootRender(frame);
