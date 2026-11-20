@@ -447,6 +447,25 @@ describe('bare-left @for row bindings', () => {
 	});
 
 	it.each([
+		['if (true) { var prefix = 1; } <li>{value as string}</li>'],
+		['for (;;) { var prefix = 1; break; } <li>{value as string}</li>'],
+		['<li>@{ var prefix = 1; <b>{value as string}</b> }</li>'],
+	])('rejects a nested var that could shadow a header default: %s', (body) => {
+		// A `var` would hoist past the row body's own scope and shadow the header.
+		const source = `
+			const prefix = 'outer';
+			export function List({ rows }) @{
+				<ul>@for (const { value = prefix } of rows) { ${body} }</ul>
+			}
+		`;
+		for (const mode of ['client', 'server'] as const) {
+			expect(() =>
+				loadCompiledFixtureSource(source, { id: 'row-pattern-nested-var.tsrx', mode }),
+			).toThrow(/`var` declarations/);
+		}
+	});
+
+	it.each([
 		['prefix + index', "const prefix = 'row';", 'outer'],
 		['prefix + index', 'class prefix {}', 'outer'],
 		['prefix + index', 'function prefix() {}', 'outer'],
