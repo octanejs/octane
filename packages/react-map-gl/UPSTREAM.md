@@ -218,7 +218,9 @@ Five, three of them recorded in `audit/react-parity.json` and bound to a case:
    it on top) until its anchor exists, keeps the anchor it last applied, and
    moves it on the `styledata` that follows. `differential:7` runs the same
    stack through both bindings: upstream loses the lower layer, the port keeps
-   it beneath the new one. The double models Mapbox's missing-anchor behavior
+   it beneath the new one. `tests/runtime/layer-anchor.test.ts` covers a custom
+   layer, which `updateLayer` never moves, so it waits to be added until its
+   anchor exists. The double models Mapbox's missing-anchor behavior
    (mapbox-gl 3.9.0 `Style#addLayer` and `Style#moveLayer`) and the `styledata`
    a layer change fires on the next frame.
 

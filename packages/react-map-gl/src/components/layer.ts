@@ -99,9 +99,13 @@ function updateLayer(
 function createLayer(map: MapInstance, id: string, props: LayerProps): string | undefined {
 	// @ts-ignore
 	if (map.style && map.style._loaded && (!('source' in props) || map.getSource(props.source))) {
+		const anchored = anchorReady(map, props.beforeId);
+		// `updateLayer` never moves a custom layer, so one waits to be added
+		// until its anchor exists rather than being added on top.
+		if (!anchored && props.type === 'custom') return props.beforeId;
 		const options: LayerProps = { ...props, id };
 		delete options.beforeId;
-		const beforeId = anchorReady(map, props.beforeId) ? props.beforeId : undefined;
+		const beforeId = anchored ? props.beforeId : undefined;
 
 		// @ts-ignore
 		map.addLayer(options, beforeId);

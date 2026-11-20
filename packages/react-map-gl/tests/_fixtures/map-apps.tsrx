@@ -1,5 +1,5 @@
-import { Map, Marker } from '@octanejs/react-map-gl';
-import type { MapProps } from '@octanejs/react-map-gl';
+import { Layer, Map, Marker } from '@octanejs/react-map-gl';
+import type { LayerProps, MapProps } from '@octanejs/react-map-gl';
 import { useEffect, useState } from 'octane';
 
 export function PlainMap(props: MapProps) @{
@@ -44,5 +44,14 @@ export function LateMarkerMap(props: MapProps & Record<string, any>) @{
 		<Marker longitude={-122} latitude={38} ref={props.markerRef} onClick={props.onMarkerClick}>
 			<LateContent />
 		</Marker>
+	</Map>
+}
+
+/** Layers in the order the props list them, each anchored by its own `beforeId`. */
+export function LayerListMap(props: MapProps & { layers: (LayerProps & { id: string })[] }) @{
+	<Map {...props}>
+		@for (const layer of props.layers; key layer.id) {
+			<Layer {...layer} />
+		}
 	</Map>
 }
