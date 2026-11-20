@@ -67,6 +67,7 @@ const existingScenarios = [
 	['component-owned-effects', 'ts'],
 	['descriptor-children', 'ts'],
 	['renderable-holes', 'tsrx'],
+	['reexported-components', 'tsrx'],
 	['binding-vanilla', 'ts'],
 	['binding-hooks', 'tsrx'],
 ];
@@ -350,6 +351,12 @@ const featureControls = {
 	'renderable-holes': {
 		dropped: hostDescriptorRenderer,
 		kept: ['childSlot', 'renderPreparedChildList'],
+	},
+	// Components imported through a plain `.ts` re-export index keep their void
+	// proof, so no generic component slot can resolve a host string tag.
+	'reexported-components': {
+		dropped: ['hostStringTagBody', ...hostDescriptorRenderer],
+		kept: ['componentSlotLite', 'componentSlotVoid'],
 	},
 	context: {
 		dropped: [

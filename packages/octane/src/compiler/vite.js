@@ -30,6 +30,7 @@ import {
 	discoverOctaneSourceDependencies,
 	findDescriptorChildrenExports,
 	findDescriptorChildrenImports,
+	findNamedReexports,
 	findVoidComponentImports,
 	formatDataDiagnostic,
 	packageReachesCommonJs,
@@ -335,7 +336,8 @@ function verifyCssModuleProofs(context, state) {
 function createProofWaitGraph() {
 	// `structures` caches a loaded module's structural fingerprint by its byte
 	// fingerprint, so a component imported from many modules is parsed once.
-	return { waits: new Map(), cut: new Set(), structures: new Map() };
+	// `reexports` caches a loaded module's exact named re-exports the same way.
+	return { waits: new Map(), cut: new Set(), structures: new Map(), reexports: new Map() };
 }
 
 // Whether a void-export proof still describes the module's final code: the
@@ -476,37 +478,134 @@ async function loadImportMetadata(
 				}
 			}
 			const metadata = moduleInfo?.meta?.[metadataKey];
-			if (metadata == null) return;
-			const valid =
-				metadata !== null &&
-				typeof metadata === 'object' &&
-				Array.isArray(metadata.exports) &&
-				metadata.exports.every((value) => typeof value === 'string');
-			if (!valid) {
-				if (failLoud)
-					throw new Error(`Invalid descriptor-children metadata for ${request} from ${importer}`);
+			if (metadataKey === VOID_EXPORTS_META) {
+				// A void proof also follows exact re-exports, such as a plain `.ts`
+				// index over `.tsrx` components, to the module that compiled them.
+				const direct =
+					isExportsMetadata(metadata) &&
+					voidExportsProofHolds(context, proofWaits, metadata, loadedModuleInfo?.code)
+						? metadata
+						: null;
+				await Promise.all(
+					candidates.map(async (candidate) => {
+						const provider = direct?.exports.includes(candidate.imported)
+							? { metadata: direct, imported: candidate.imported }
+							: await followVoidReexport(
+									context,
+									proofWaits,
+									importer,
+									resolved.id,
+									loadedModuleInfo?.code,
+									candidate.imported,
+								);
+						if (provider !== null) addVoidProof(proven, candidate, provider);
+					}),
+				);
 				return;
 			}
-			if (
-				metadataKey === VOID_EXPORTS_META &&
-				!voidExportsProofHolds(context, proofWaits, metadata, loadedModuleInfo?.code)
-			) {
+			if (metadata == null) return;
+			if (!isExportsMetadata(metadata)) {
+				if (failLoud)
+					throw new Error(`Invalid descriptor-children metadata for ${request} from ${importer}`);
 				return;
 			}
 			for (const { imported, exported } of candidates) {
 				if (!metadata.exports.includes(imported)) continue;
 				proven.add(voidImportKey(request, imported));
-				if (Array.isArray(metadata.lite) && metadata.lite.includes(imported))
-					proven.add(liteImportKey(request, imported));
-				if (Array.isArray(metadata.strongLite) && metadata.strongLite.includes(imported))
-					proven.add(strongLiteImportKey(request, imported));
-				if (Array.isArray(metadata.anchorless) && metadata.anchorless.includes(imported))
-					proven.add(anchorlessImportKey(request, imported));
 				if (exported !== undefined) proven.add(`export\0${exported}`);
 			}
 		}),
 	);
 	return proven;
+}
+
+function isExportsMetadata(metadata) {
+	return (
+		metadata !== null &&
+		typeof metadata === 'object' &&
+		Array.isArray(metadata.exports) &&
+		metadata.exports.every((value) => typeof value === 'string')
+	);
+}
+
+// Record an importer candidate's void proof, and the lite lists the provider's
+// fingerprinted metadata vouches for, under the importer's own request.
+function addVoidProof(proven, { request, imported, exported }, provider) {
+	const { metadata, imported: provided } = provider;
+	proven.add(voidImportKey(request, imported));
+	if (Array.isArray(metadata.lite) && metadata.lite.includes(provided))
+		proven.add(liteImportKey(request, imported));
+	if (Array.isArray(metadata.strongLite) && metadata.strongLite.includes(provided))
+		proven.add(strongLiteImportKey(request, imported));
+	if (Array.isArray(metadata.anchorless) && metadata.anchorless.includes(provided))
+		proven.add(anchorlessImportKey(request, imported));
+	if (exported !== undefined) proven.add(`export\0${exported}`);
+}
+
+const NAMED_REEXPORT = /\bexport\s*\{[^}]*\}\s*from\b/;
+
+/**
+ * The void proof behind `imported` of the loaded module `id` when its final
+ * `code` re-exports it exactly (`export { a as imported } from '...'`), or
+ * null. Each hop reads the next module's own fingerprinted metadata, so only a
+ * provider whose final code still holds its proof can satisfy the chain. Every
+ * hop's load is a wait of `importer`, whose transform is the one blocked, so a
+ * cycle through the chain is cut by the same proof-wait graph as a direct one.
+ */
+async function followVoidReexport(
+	context,
+	graph,
+	importer,
+	id,
+	code,
+	imported,
+	visited = new Set(),
+) {
+	if (typeof code !== 'string' || !NAMED_REEXPORT.test(code)) return null;
+	const visit = `${cleanModuleId(id)}\0${imported}`;
+	if (visited.has(visit)) return null;
+	visited.add(visit);
+	const fingerprint = compiledCodeFingerprint(code);
+	let reexports = graph.reexports.get(fingerprint);
+	if (reexports === undefined)
+		graph.reexports.set(fingerprint, (reexports = findNamedReexports(code, id)));
+	// A module exports each name once, so at most one re-export matches.
+	const candidate = reexports.find((entry) => entry.exported === imported);
+	if (candidate === undefined) return null;
+	let resolved;
+	let loaded;
+	try {
+		resolved = await context.resolve(candidate.request, id, { skipSelf: true });
+		if (
+			resolved == null ||
+			resolved.external === true ||
+			resolved.external === 'absolute' ||
+			cleanModuleId(resolved.id) === cleanModuleId(id) ||
+			cleanModuleId(resolved.id) === cleanModuleId(importer)
+		)
+			return null;
+		loaded = await loadProofModule(context, graph, importer, resolved.id);
+	} catch {
+		return null;
+	}
+	if (loaded === null) return null;
+	const metadata = (context.getModuleInfo?.(resolved.id) ?? loaded)?.meta?.[VOID_EXPORTS_META];
+	if (
+		isExportsMetadata(metadata) &&
+		metadata.exports.includes(candidate.imported) &&
+		voidExportsProofHolds(context, graph, metadata, loaded?.code)
+	) {
+		return { metadata, imported: candidate.imported };
+	}
+	return followVoidReexport(
+		context,
+		graph,
+		importer,
+		resolved.id,
+		loaded?.code,
+		candidate.imported,
+		visited,
+	);
 }
 
 async function loadVoidComponentImports(context, imports, importer, proofWaits, memoExports) {

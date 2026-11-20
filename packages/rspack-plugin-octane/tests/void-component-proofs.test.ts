@@ -16,7 +16,7 @@ const EXPECTED_HTML = '<main><p>Hello</p><b>value</b></main>';
 
 // Greeting is a void `@{}` export; Loud and Value return JSX, so a void call
 // would drop their output. App is both an importer and a proven provider.
-function voidFixture() {
+function voidFixture(files: Record<string, string> = {}) {
 	const root = createFixture({
 		'Greeting.tsrx': `export function Greeting() @{ <p>Hello</p>; }
 export function Loud() { return <p>loud</p>; }`,
@@ -38,6 +38,7 @@ export function renderValue(container: HTMLElement) {
 	root.render(Value);
 	return () => root.unmount();
 }`,
+		...files,
 	});
 	roots.push(root);
 	return root;
@@ -220,6 +221,37 @@ describe.each(parallelModes)('imported void components on %s', (_name, parallel)
 		},
 		60_000,
 	);
+
+	// A plain `.ts` index that re-exports `.tsrx` components carries their proofs.
+	const reexportFixture = () =>
+		voidFixture({
+			'index.ts': `export { Greeting, Loud } from './Greeting.tsrx';
+export { Value } from './Value.tsrx';`,
+			'App.tsrx': `import { Greeting, Value } from './index.ts';
+export function App() @{ <main><Greeting /><Value /></main>; }`,
+		});
+
+	it('proves components imported through a re-exporting index', async () => {
+		const root = reexportFixture();
+		const { directory, sources } = await build(root, { parallel });
+		expectSpecialized(sources);
+		expect(render(directory)).toBe(EXPECTED_HTML);
+	}, 60_000);
+
+	it('keeps a re-exported import generic when a later loader changes the index', async () => {
+		const root = reexportFixture();
+		const rules = [
+			postLoader(
+				root,
+				/index\.ts$/,
+				`return source.replace('export { Greeting, Loud }', 'export { Loud as Greeting, Loud }');`,
+			),
+		];
+		const { directory, sources } = await build(root, { parallel, rules });
+		expect(sources.get('index.ts')).toContain('Loud as Greeting');
+		expect(render(directory)).toBe('<main><p>loud</p><b>value</b></main>');
+		expect(sources.get('App.tsrx')).not.toMatch(SPECIALIZED_CALL);
+	}, 60_000);
 
 	it('keeps an import generic when a later loader changes the provider export', async () => {
 		const root = voidFixture();

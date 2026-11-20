@@ -792,8 +792,9 @@ export function App(props: { label: Label }) @{ <p>{props.label}</p> }`;
 			)) as { code: string };
 			expect(barrelLoad).toHaveBeenCalledTimes(1);
 			// Descriptor metadata is loaded once per resolved virtual module and is
-			// retained across transforms. The client pass also loads void-component metadata.
-			expect(consumerLoad).toHaveBeenCalledTimes(ssr ? 2 : 5);
+			// retained across transforms. The client pass also loads void-component
+			// metadata, following the barrel's exact re-export to the child.
+			expect(consumerLoad).toHaveBeenCalledTimes(ssr ? 2 : 6);
 			for (const component of ['Alias', 'DefaultSlot', 'BarrelSlot', 'BarrelDefault']) {
 				const children = componentChildren(consumer.code, component);
 				expect(children, component).toBeDefined();

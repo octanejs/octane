@@ -8,6 +8,7 @@ import {
 	rebuildModules,
 	sameStrings,
 	sourceHash,
+	targetForRequest,
 	targetsFor,
 } from './module-graph.js';
 import {
@@ -87,6 +88,7 @@ function finalFacts(module, id, analyses) {
 				analysis === null
 					? null
 					: new Map(analysis.importBindings.map((binding) => [binding.local, binding])),
+			reexports: analysis?.reexports ?? [],
 		};
 		analyses.set(id, facts);
 	}
@@ -105,15 +107,52 @@ function finalFacts(module, id, analyses) {
  * `anchorless` proof (`list`) also needs the build behind that final code to
  * have listed the export there.
  */
-function provenProvider(target, imported, analyses, deferred = false, list = undefined) {
+function provenProvider(
+	compilation,
+	target,
+	imported,
+	analyses,
+	deferred = false,
+	list = undefined,
+) {
+	const resolved = resolveReexport(compilation, target, imported, analyses);
+	if (resolved === null) return null;
+	({ target, imported } = resolved);
 	const id = identifier(target);
-	if (id === null || !JAVASCRIPT_TYPES.has(target.type)) return null;
 	const info = candidateInfo(target);
-	if (!info?.exports.includes(imported) || (list !== undefined && !info[list].includes(imported)))
-		return null;
-	if (deferred && info.imports.length > 0) return { id };
+	if (list !== undefined && !info[list].includes(imported)) return null;
+	const { chain } = resolved;
+	if (deferred && info.imports.length > 0) return { id, chain };
 	const facts = finalFacts(target, id, analyses);
-	return facts?.exports.has(imported) ? { id, fingerprint: facts.fingerprint } : null;
+	return facts?.exports.has(imported) ? { id, fingerprint: facts.fingerprint, chain } : null;
+}
+
+/**
+ * The module whose Octane build listed `imported` as a void export, reached
+ * from `target` through exact `export { a as b } from '...'` re-exports in each
+ * intermediate module's final code, such as a plain `.ts` index over `.tsrx`
+ * components. An ESM re-export is a live binding its module cannot reassign.
+ * `chain` records each intermediate hop's request, identity and final source
+ * so the receipt fails closed if any hop changes later.
+ */
+function resolveReexport(compilation, target, imported, analyses) {
+	const chain = [];
+	const visited = new Set();
+	for (;;) {
+		const id = identifier(target);
+		if (id === null || !JAVASCRIPT_TYPES.has(target.type) || visited.has(id)) return null;
+		visited.add(id);
+		if (candidateInfo(target)?.exports.includes(imported)) return { target, imported, chain };
+		const facts = finalFacts(target, id, analyses);
+		// A module exports each name once, so at most one re-export matches.
+		const reexport = facts?.reexports.find((entry) => entry.exported === imported);
+		if (reexport === undefined) return null;
+		const next = targetForRequest(compilation, target, reexport.request);
+		if (next == null) return null;
+		chain.push({ request: reexport.request, from: id, fingerprint: facts.fingerprint });
+		target = next;
+		imported = reexport.imported;
+	}
 }
 
 /**
@@ -170,7 +209,14 @@ function receiptRebuilt(compilation, state, analyses) {
 		const targets = targetsFor(compilation, importer, requestsOf(consumed));
 		const imports = [];
 		for (const { request, imported, list } of consumed) {
-			const provider = provenProvider(targets.get(request), imported, analyses, false, list);
+			const provider = provenProvider(
+				compilation,
+				targets.get(request),
+				imported,
+				analyses,
+				false,
+				list,
+			);
 			if (provider === null) break;
 			imports.push({ request, imported, ...provider });
 		}
@@ -209,7 +255,15 @@ function verifyGraph(compilation, state) {
 		}
 		const targets = targetsFor(compilation, importer, requestsOf(receipt.imports));
 		for (const entry of receipt.imports) {
-			const target = targets.get(entry.request);
+			let target = targets.get(entry.request);
+			for (const hop of entry.chain) {
+				if (identifier(target) !== hop.from)
+					changed(id, entry.request, 'the effective module identity differs');
+				const reexported = moduleSource(target);
+				if (reexported === null || sourceHash(reexported) !== hop.fingerprint)
+					changed(id, entry.request, 'the final re-exporting source differs');
+				target = targetForRequest(compilation, target, hop.request);
+			}
 			if (identifier(target) !== entry.id)
 				changed(id, entry.request, 'the effective module identity differs');
 			const provided = moduleSource(target);
@@ -225,7 +279,10 @@ function verifyFinalSources(compilation, state) {
 	const expected = new Map();
 	for (const [id, receipt] of state.receipts) {
 		expected.set(id, receipt.fingerprint);
-		for (const entry of receipt.imports) expected.set(entry.id, entry.fingerprint);
+		for (const entry of receipt.imports) {
+			expected.set(entry.id, entry.fingerprint);
+			for (const hop of entry.chain) expected.set(hop.from, hop.fingerprint);
+		}
 	}
 	for (const [id, fingerprint] of expected) {
 		const module = modules.get(id);
@@ -250,7 +307,7 @@ function verifyFinalSources(compilation, state) {
  * runtime witness, so a stale hint costs only a miss. A consumed lite proof is
  * receipted like a void one. Returns the importers that gained either.
  */
-function collectHints(compilation, state) {
+function collectHints(compilation, state, analyses) {
 	const grown = [];
 	for (const [id, importer] of currentModules(compilation.modules)) {
 		const info = candidateInfo(importer);
@@ -266,10 +323,15 @@ function collectHints(compilation, state) {
 		const size = hints.size + lite.size + anchorless.size;
 		for (const { request, imported } of info.imports) {
 			const key = voidImportKey(request, imported);
-			const target = candidateInfo(targets.get(request));
-			if (target?.memoExports.includes(imported)) hints.add(key);
-			if (proven.has(key) && target?.lite.includes(imported)) lite.add(key);
-			if (proven.has(key) && target?.anchorless.includes(imported)) anchorless.add(key);
+			const target = targets.get(request);
+			if (candidateInfo(target)?.memoExports.includes(imported)) hints.add(key);
+			if (!proven.has(key)) continue;
+			// Lite lists belong to the module that compiled the export, which a
+			// proven import may reach through re-exports.
+			const provider = resolveReexport(compilation, target, imported, analyses);
+			const listed = provider === null ? null : candidateInfo(provider.target);
+			if (listed?.lite.includes(provider.imported)) lite.add(key);
+			if (listed?.anchorless.includes(provider.imported)) anchorless.add(key);
 		}
 		if (hints.size + lite.size + anchorless.size === size) continue;
 		state.memo.set(id, [...hints]);
@@ -301,16 +363,18 @@ async function collectAndRebuild(compilation, state) {
 			const imports = info.imports.filter(
 				({ request, imported }) =>
 					targets.get(request) != null &&
-					provenProvider(targets.get(request), imported, analyses, true) !== null,
+					provenProvider(compilation, targets.get(request), imported, analyses, true) !== null,
 			);
 			if (imports.length > 0)
 				state.proofs.set(id, { sourceHash: info.sourceHash, imports, lite: [], anchorless: [] });
 		}
 	}
-	let rebuild = [...new Set([...state.proofs.keys(), ...collectHints(compilation, state)])];
+	let rebuild = [
+		...new Set([...state.proofs.keys(), ...collectHints(compilation, state, analyses)]),
+	];
 	if (rebuild.length === 0) return;
 	do await rebuildModules(compilation, rebuild, changed);
-	while ((rebuild = collectHints(compilation, state)).length > 0);
+	while ((rebuild = collectHints(compilation, state, analyses)).length > 0);
 	// Every consumed provider is proven on its final code here, including one
 	// rebuilt as an importer in these rounds. A later loader can also rewrite
 	// what Octane specialized; an importer whose proof does not hold is rebuilt
