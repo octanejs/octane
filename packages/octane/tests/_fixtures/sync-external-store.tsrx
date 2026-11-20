@@ -59,6 +59,29 @@ export function RenderObservedReader(props: {
 	<p class="value">{value as string}</p>
 }
 
+// Recreates subscribe on each render while keeping the same backing store.
+export function InlineSubscribedReader(props: { store: StoreLike }) @{
+	const [count, setCount] = useState(0);
+	const value = useSyncExternalStore((notify) => props.store.subscribe(notify), props.store.get);
+	<div>
+		<button onClick={() => setCount(count + 1)}>{String(count)}</button>
+		<p class="value">{String(value)}</p>
+	</div>
+}
+
+// Both readers replace their inline subscriptions in the same discrete commit.
+export function TwoInlineSubscribedReaders(props: { first: StoreLike; second: StoreLike }) @{
+	const [count, setCount] = useState(0);
+	const first = useSyncExternalStore((notify) => props.first.subscribe(notify), props.first.get);
+	const second = useSyncExternalStore((notify) => props.second.subscribe(notify), props.second.get);
+	<div>
+		<button onClick={() => setCount(count + 1)}>{String(count)}</button>
+		<p>
+			{String(first)}:{String(second)}
+		</p>
+	</div>
+}
+
 // Same component bound to a different store identity — exercises the
 // re-subscribe-on-store-swap path.
 export function SwappableReader(props) @{

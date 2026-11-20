@@ -5,9 +5,11 @@ import {
 	ClickMountedReader,
 	ConditionalReader,
 	ControlledInputMountedReader,
+	InlineSubscribedReader,
 	LayoutCascadeReader,
 	NativeListenerMountedReader,
 	TwoClickMountedReaders,
+	TwoInlineSubscribedReaders,
 	makeRetainedCallbackStore,
 	makeStore,
 	Reader,
@@ -110,6 +112,7 @@ describe('useSyncExternalStore', () => {
 		expect(store.listenerCount()).toBe(1);
 
 		r.update(ConditionalReader, { store, show: false });
+		expect(store.listenerCount()).toBe(1); // Adopted cleanup stays passive.
 		await nextPaint();
 		expect(store.listenerCount()).toBe(0);
 		expect(r.findAll('.value')).toHaveLength(0);
@@ -124,6 +127,7 @@ describe('useSyncExternalStore', () => {
 		const survivor = r.find('#conditional-survivor');
 
 		r.update(ConditionalReader, { store, show: false });
+		expect(store.listenerCount()).toBe(1); // Adopted cleanup stays passive.
 		await nextPaint();
 		expect(store.listenerCount()).toBe(0);
 		expect(r.findAll('.value')).toHaveLength(0);
@@ -134,6 +138,123 @@ describe('useSyncExternalStore', () => {
 		expect(r.find('#conditional-survivor')).toBe(survivor);
 		expect(r.findAll('.value')).toHaveLength(0);
 		r.unmount();
+	});
+
+	it('keeps an inline subscription live after a discrete re-render', async () => {
+		const store = makeStore(0);
+		const r = mount(InlineSubscribedReader, { store });
+		await nextPaint();
+
+		r.click('button');
+		await nextPaint();
+		store.set(1);
+		await nextPaint();
+		expect(r.find('.value').textContent).toBe('1');
+
+		r.unmount();
+		expect(store.listenerCount()).toBe(0);
+	});
+
+	it('releases a single-handler store before installing its replacement', async () => {
+		let value = 0;
+		let handler: (() => void) | null = null;
+		const calls: string[] = [];
+		const store = {
+			get: () => value,
+			subscribe(notify: () => void) {
+				calls.push('subscribe');
+				handler = notify;
+				return () => {
+					calls.push('release');
+					handler = null;
+				};
+			},
+		};
+		const r = mount(InlineSubscribedReader, { store });
+		await nextPaint();
+		calls.length = 0;
+
+		r.click('button');
+		expect(calls).toEqual(['release', 'subscribe']);
+		await nextPaint();
+		value = 1;
+		handler?.();
+		await nextPaint();
+		expect(r.find('.value').textContent).toBe('1');
+		r.unmount();
+	});
+
+	it('rechecks the snapshot after a replacement cleanup silently changes the store', async () => {
+		let value = 0;
+		let changed = false;
+		const store = {
+			get: () => value,
+			subscribe: () => () => {
+				if (!changed) {
+					changed = true;
+					value = 1;
+				}
+			},
+		};
+		const r = mount(InlineSubscribedReader, { store });
+		await nextPaint();
+
+		r.click('button');
+		await nextPaint();
+		expect(r.find('.value').textContent).toBe('1');
+		r.unmount();
+	});
+
+	it('does not reconnect when old cleanup unmounts the reader', async () => {
+		let subscriptions = 0;
+		let listeners = 0;
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const root = createRoot(container);
+		const store = {
+			get: () => 0,
+			subscribe: () => {
+				subscriptions++;
+				listeners++;
+				return () => {
+					listeners--;
+					root.unmount();
+				};
+			},
+		};
+		root.render(InlineSubscribedReader, { store });
+		flushSync(() => {});
+		await nextPaint();
+		flushSync(() => (container.querySelector('button') as HTMLElement).click());
+		expect(subscriptions).toBe(1);
+		expect(listeners).toBe(0);
+		container.remove();
+	});
+
+	it('releases a replacement that unmounts before subscribe returns', async () => {
+		let subscriptions = 0;
+		let listeners = 0;
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const root = createRoot(container);
+		const store = {
+			get: () => 0,
+			subscribe: () => {
+				subscriptions++;
+				listeners++;
+				if (subscriptions === 2) root.unmount();
+				return () => {
+					listeners--;
+				};
+			},
+		};
+		root.render(InlineSubscribedReader, { store });
+		flushSync(() => {});
+		await nextPaint();
+		flushSync(() => (container.querySelector('button') as HTMLElement).click());
+		expect(subscriptions).toBe(2);
+		expect(listeners).toBe(0);
+		container.remove();
 	});
 
 	it('subscribes a click-mounted reader during the commit, before passive effects', () => {
@@ -263,11 +384,12 @@ describe('useSyncExternalStore', () => {
 		r.unmount();
 	});
 
-	it('subscribes a swapped store during the commit and releases the old one after it', async () => {
+	it('releases the old store before subscribing a swapped store during the commit', async () => {
 		const a = makeStore(10);
 		const b = makeStore(20);
 		const r = mount(SwappableReader, { store: a, alt: b });
 		r.update(SwappableReader, { store: b, alt: b });
+		expect(a.listenerCount()).toBe(0);
 		expect(b.listenerCount()).toBe(1);
 		b.set(21);
 		flushSync(() => {});
@@ -331,6 +453,67 @@ describe('useSyncExternalStore', () => {
 		root.unmount();
 		container.remove();
 		expect(second.listenerCount()).toBe(0);
+	});
+
+	it('retries a failed replacement in the passive effect after releasing the old store', async () => {
+		let value = 0;
+		let subscriptions = 0;
+		let handler: (() => void) | null = null;
+		const store = {
+			get: () => value,
+			subscribe(notify: () => void) {
+				if (++subscriptions === 2) throw new Error('transient subscribe failure');
+				handler = notify;
+				return () => {
+					handler = null;
+				};
+			},
+		};
+		const r = mount(InlineSubscribedReader, { store });
+		await nextPaint();
+		r.click('button');
+		expect(handler).toBeNull();
+		await nextPaint();
+		expect(subscriptions).toBe(3);
+		value = 1;
+		handler?.();
+		await nextPaint();
+		expect(r.find('.value').textContent).toBe('1');
+		r.unmount();
+	});
+
+	it('reports a replacement cleanup error without stranding a later reader', async () => {
+		const failure = new Error('release failed');
+		let firstSubscriptions = 0;
+		let secondSubscriptions = 0;
+		const first = {
+			get: () => 0,
+			subscribe: () => {
+				const initial = ++firstSubscriptions === 1;
+				return () => {
+					if (initial) throw failure;
+				};
+			},
+		};
+		const second = {
+			get: () => 0,
+			subscribe: () => {
+				secondSubscriptions++;
+				return () => {};
+			},
+		};
+		const errors: unknown[] = [];
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const root = createRoot(container, { onUncaughtError: (error) => errors.push(error) });
+		root.render(TwoInlineSubscribedReaders, { first, second });
+		flushSync(() => {});
+		await nextPaint();
+		flushSync(() => (container.querySelector('button') as HTMLElement).click());
+		expect(secondSubscriptions).toBe(2);
+		expect(errors).toContain(failure);
+		root.unmount();
+		container.remove();
 	});
 
 	it('swapping the store unsubscribes from the old and subscribes to the new', async () => {
