@@ -651,6 +651,15 @@ export function requestFlush(): void {
 	queueMicrotask(flush);
 }
 export let syncFlush = false; // flushSync sets this to drain the queue synchronously
+// True from the end of a discrete delegated event that left a flush scheduled until
+// that flush ends, and during a flushSync drain whose callback queued work. React
+// commits such updates in its sync lane and flushes their passive effects in the
+// commit; here only useSyncExternalStore follows it, by subscribing in the commit
+// (drainQueuedStoreSyncs, #3095).
+export let DISCRETE_FLUSH = false;
+export function markDiscreteFlush(): void {
+	if (scheduled) DISCRETE_FLUSH = true;
+}
 // True while a flush (drainQueue/commitEffects) is on the stack. A flushSync
 // that lands during it — a handler's own flushSync, or maybeFlushDiscrete when a
 // controlled restore is pending for a DISCRETE event the browser dispatches
@@ -2760,6 +2769,7 @@ export function flush(): void {
 		FLUSHED_TRANSITION_BATCHES.length === 0 &&
 		!VIEW_TRANSITION_DRIVER
 	) {
+		DISCRETE_FLUSH = false;
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__devtoolsNotifyFlush();
 		return;
@@ -3032,6 +3042,7 @@ function flushWork(): void {
 			if (pendingError !== null) throw pendingError.err;
 		} finally {
 			inFlush = false;
+			DISCRETE_FLUSH = false;
 			if (
 				(flushedTransitions || FLUSHED_TRANSITION_BATCHES.length > 0) &&
 				TRANSITION_QUEUE.length === 0
@@ -3743,11 +3754,15 @@ export function flushSync<T>(fn?: (() => T) | null): T | void {
 	// A running animation survives; the urgent update changes the live DOM under it.
 	if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.interrupt();
 	const prevSync = syncFlush;
+	const prevDiscrete = DISCRETE_FLUSH;
+	const queuedBefore = QUEUE.length + ROOT_RENDER_TRANSACTIONS.length;
 	syncFlush = true;
 	let result: T | void;
 	try {
 		try {
 			result = nativeBatchHooks ? runNativeBatch(callback) : callback();
+			// Work the callback queued is sync, as in React; work already waiting is not.
+			if (QUEUE.length + ROOT_RENDER_TRANSACTIONS.length > queuedBefore) DISCRETE_FLUSH = true;
 			// flushSync drains both priorities, including transitions waiting for their task.
 			if (TRANSITION_TASK_DRIVER) TRANSITION_TASK_DRIVER.adopt(true);
 			// `inFlush` guards only the DRAIN below, not fn(): a nested flushSync
@@ -3805,6 +3820,7 @@ export function flushSync<T>(fn?: (() => T) | null): T | void {
 			if (pendingError !== null) throw pendingError.err;
 		} finally {
 			syncFlush = prevSync;
+			DISCRETE_FLUSH = prevDiscrete;
 		}
 	} catch (error) {
 		rethrowAfterControlledRestore(error);

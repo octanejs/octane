@@ -149,6 +149,30 @@ describe('useSyncExternalStore', () => {
 		expect(store.listenerCount()).toBe(0);
 	});
 
+	it('subscribes during the microtask commit of a dispatched click', async () => {
+		const store = makeStore(0);
+		const r = mount(ClickMountedReader, { store });
+		(r.find('button') as HTMLElement).click();
+		expect(store.listenerCount()).toBe(0);
+		await Promise.resolve();
+		expect(r.find('.value').textContent).toBe('0');
+		expect(store.listenerCount()).toBe(1);
+		r.unmount();
+		expect(store.listenerCount()).toBe(0);
+	});
+
+	it('keeps a non-discrete mount subscribing in its passive effect', async () => {
+		const store = makeStore(0);
+		const r = mount(ConditionalReader, { store, show: false });
+		r.root.render(ConditionalReader, { store, show: true });
+		await Promise.resolve();
+		expect(r.find('.value').textContent).toBe('0');
+		expect(store.listenerCount()).toBe(0);
+		await nextPaint();
+		expect(store.listenerCount()).toBe(1);
+		r.unmount();
+	});
+
 	it('subscribes a swapped store during the commit and releases the old one after it', async () => {
 		const a = makeStore(10);
 		const b = makeStore(20);

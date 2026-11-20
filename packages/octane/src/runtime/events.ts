@@ -47,6 +47,7 @@ import {
 } from './drivers.js';
 import {
 	inFlush,
+	markDiscreteFlush,
 	journalRootProperty,
 	retiringHostsSince,
 	retireEventHostTree,
@@ -1406,6 +1407,7 @@ function dispatchDelegated(this: Node, event: Event): void {
 		if (nativeBatch !== undefined) {
 			if (nativeBatchHooks) closeNativeEventBatch(event, nativeBatch, false);
 			_dispatchDepth--;
+			if (_dispatchDepth === 0 && (type.flags & EVENT_DISCRETE) !== 0) markDiscreteFlush();
 			if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.finish(type);
 		}
 	}
@@ -1473,6 +1475,7 @@ function dispatchDelegatedCapture(
 				event.bubbles && !event.cancelBubble && (type.flags & EVENT_BUBBLE) !== 0,
 			);
 		_dispatchDepth--;
+		if (_dispatchDepth === 0 && (type.flags & EVENT_DISCRETE) !== 0) markDiscreteFlush();
 		CAPTURE_FINISH(event, type);
 	}
 	return stopped;
