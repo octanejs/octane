@@ -62,6 +62,19 @@ export function NestedReturnedModeActivity({ mode, label }: ActivityProps) {
 	);
 }
 
+// A body that writes an owner local stays a closure in the owner (no env tuple).
+export function ReturnedWritingModeActivity({ mode, label }: ActivityProps) {
+	let clicks = 0;
+	return (
+		<Activity mode={mode}>
+			<Stateful label={label} />
+			<span data-activity-text onClick={() => clicks++}>
+				{label}
+			</span>
+		</Activity>
+	);
+}
+
 export function ReturnedDynamicSpreadWinsActivity(props: ActivityProps) {
 	const Boundary = props.boundary ?? Activity;
 	return (

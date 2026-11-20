@@ -378,7 +378,11 @@ describe('<Activity> returned JSX', () => {
 		});
 	}
 
-	for (const name of ['ReturnedModeActivity', 'NestedReturnedModeActivity'] as const) {
+	for (const name of [
+		'ReturnedModeActivity',
+		'NestedReturnedModeActivity',
+		'ReturnedWritingModeActivity',
+	] as const) {
 		it(`${name} renders children that read setup locals (#3093)`, () => {
 			const Component = ReturnedFixture[name];
 			const props = { mode: 'visible' as const, label: 'local' };

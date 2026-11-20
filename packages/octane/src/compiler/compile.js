@@ -25808,7 +25808,7 @@ function foldActivity(node, ctx, holeProps) {
 	const bodyHole = `h${holeProps.length}`;
 	holeProps.push(objectProp(bodyHole, b.id(ac.thenHelper)));
 	ac.thenHelper = `props.${bodyHole}`;
-	if (ac.envNames.length) {
+	if (ac.envNames?.length) {
 		const envHole = `h${holeProps.length}`;
 		holeProps.push(objectProp(envHole, b.array(ac.envNames.map((n) => b.id(n)))));
 		ac.envExpr = `props.${envHole}`;
