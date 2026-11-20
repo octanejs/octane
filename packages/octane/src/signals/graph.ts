@@ -2947,17 +2947,47 @@ function refreshLean(node: PlainComputed, trackFailure = false): void {
 			if (activeNode !== undefined) linkDependency(node, activeNode, trackingCycle);
 			if ((signalMode & READ_OBSERVED) !== 0) reportLeanRead(node);
 		}
-		throw node.last;
+		if (node.flags & REACTIVE_FAILED) throw node.last;
 	}
+}
+
+/** A watched setup invalidated a dependency already consumed by this computation. */
+function stabilizeLean(node: PlainComputed, changed: boolean): boolean {
+	let rounds = 0;
+	do {
+		if (++rounds > 100) throw new SignalCycleError('');
+		const flags = node.flags;
+		let dirty = (flags & REACTIVE_DIRTY) !== 0;
+		if (!dirty) {
+			pureDepth++;
+			try {
+				dirty = checkDirty(node.deps!, node);
+			} finally {
+				pureDepth--;
+			}
+			if (!dirty) {
+				node.flags &= ~(REACTIVE_PENDING | REACTIVE_RECURSED);
+				break;
+			}
+		}
+		const next =
+			node.flags & (REACTIVE_FAILED | REACTIVE_TRACKED_CELL) || signalMode & READ_OBSERVED
+				? updateLeanTracked(node)
+				: recomputeLean(node);
+		changed = next || changed;
+	} while (node.flags & REACTIVE_RECURSED);
+	return changed;
 }
 
 /** Compute a keyless derived value, in the shape of alien-signals' update. */
 function updateLean(node: PlainComputed): boolean {
 	// A tracked channel, an earlier failure or a render collecting reads takes the
 	// wrapper, which keeps this common recomputation small enough to inline.
-	if (node.flags & (REACTIVE_FAILED | REACTIVE_TRACKED_CELL) || signalMode & READ_OBSERVED)
-		return updateLeanTracked(node);
-	return recomputeLean(node);
+	const changed =
+		node.flags & (REACTIVE_FAILED | REACTIVE_TRACKED_CELL) || signalMode & READ_OBSERVED
+			? updateLeanTracked(node)
+			: recomputeLean(node);
+	return node.flags & REACTIVE_RECURSED ? stabilizeLean(node, changed) : changed;
 }
 
 /** Recompute; a throw is held as the value, flagged REACTIVE_FAILED. */
