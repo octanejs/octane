@@ -17,20 +17,44 @@ export type LayerProps = (OptionalSource<OptionalId<LayerSpecification>> | Custo
 	beforeId?: string;
 };
 
+/**
+ * OCTANE DIVERGENCE[react-map-gl-layer-missing-anchor][differential:7]: upstream
+ * passes `beforeId` straight to `addLayer` and `moveLayer`. When it names a layer
+ * the style does not hold yet, `Style#moveLayer` has already taken the layer out
+ * of the draw order before it reports the missing anchor, so the layer stops
+ * drawing while `getLayer` still returns it, and no later render repairs it.
+ * Sibling layers anchored beneath the next one hit this whenever a layer is
+ * added on top: the lower layer re-anchors before the new one is added. Here a
+ * layer waits where it is (or is added on top) and keeps the anchor it last
+ * applied; the `styledata` that follows the anchor's arrival re-renders it and
+ * the move goes through.
+ */
+function anchorReady(map: MapInstance, beforeId: string | undefined): boolean {
+	return beforeId === undefined || Boolean(map.getLayer(beforeId));
+}
+
 /* eslint-disable complexity, max-statements */
-function updateLayer(map: MapInstance, id: string, props: LayerProps, prevProps: LayerProps) {
+// Returns the `beforeId` the style now reflects.
+function updateLayer(
+	map: MapInstance,
+	id: string,
+	props: LayerProps,
+	prevProps: LayerProps,
+): string | undefined {
 	assert(props.id === prevProps.id, 'layer id changed');
 	assert(props.type === prevProps.type, 'layer type changed');
 
 	if (props.type === 'custom' || prevProps.type === 'custom') {
-		return;
+		return prevProps.beforeId;
 	}
 
 	// @ts-ignore filter does not exist in some Layer types
 	const { layout = {}, paint = {}, filter, minzoom, maxzoom, beforeId } = props;
 
-	if (beforeId !== prevProps.beforeId) {
+	let appliedBeforeId = prevProps.beforeId;
+	if (beforeId !== prevProps.beforeId && anchorReady(map, beforeId)) {
 		map.moveLayer(id, beforeId!);
+		appliedBeforeId = beforeId;
 	}
 	if (layout !== prevProps.layout) {
 		const nextLayout = layout as Record<string, unknown>;
@@ -68,17 +92,26 @@ function updateLayer(map: MapInstance, id: string, props: LayerProps, prevProps:
 	if (minzoom !== prevProps.minzoom || maxzoom !== prevProps.maxzoom) {
 		map.setLayerZoomRange(id, minzoom!, maxzoom!);
 	}
+	return appliedBeforeId;
 }
 
-function createLayer(map: MapInstance, id: string, props: LayerProps) {
+// Returns the `beforeId` the new layer was added with.
+function createLayer(map: MapInstance, id: string, props: LayerProps): string | undefined {
 	// @ts-ignore
 	if (map.style && map.style._loaded && (!('source' in props) || map.getSource(props.source))) {
+		const anchored = anchorReady(map, props.beforeId);
+		// `updateLayer` never moves a custom layer, so one waits to be added
+		// until its anchor exists rather than being added on top.
+		if (!anchored && props.type === 'custom') return props.beforeId;
 		const options: LayerProps = { ...props, id };
 		delete options.beforeId;
+		const beforeId = anchored ? props.beforeId : undefined;
 
 		// @ts-ignore
-		map.addLayer(options, props.beforeId);
+		map.addLayer(options, beforeId);
+		return beforeId;
 	}
+	return props.beforeId;
 }
 
 /* eslint-enable complexity, max-statements */
@@ -118,18 +151,22 @@ export function Layer(props: LayerProps) {
 
 	// @ts-ignore
 	const layer = map && map.style && map.getLayer(id);
+	let appliedBeforeId = layerProps.beforeId;
 	if (layer) {
 		try {
-			updateLayer(map, id, layerProps, propsRef.current);
+			appliedBeforeId = updateLayer(map, id, layerProps, propsRef.current);
 		} catch (error) {
 			console.warn(error); // eslint-disable-line
 		}
 	} else {
-		createLayer(map, id, layerProps);
+		appliedBeforeId = createLayer(map, id, layerProps);
 	}
 
-	// Store last rendered props
-	propsRef.current = layerProps;
+	// Store last rendered props, with the anchor the style holds.
+	propsRef.current =
+		appliedBeforeId === layerProps.beforeId
+			? layerProps
+			: ({ ...layerProps, beforeId: appliedBeforeId } as LayerProps);
 
 	return null;
 }

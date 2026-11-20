@@ -215,6 +215,83 @@ afterEach(() => {
 });
 
 describe('octane/data persistent cache', () => {
+	it.each([
+		{ name: 'stale', contract: count },
+		{ name: 'concurrent', contract: { ...count, restore: 'concurrent' as const, fresh: Infinity } },
+	])('shows a saved $name read while paused and fetches on resume', async ({ contract }) => {
+		const persist = cache(memoryStorage(), 'ada');
+		const before = createDataStore({ transport: server(books()).transport, persist });
+		await before.prefetch(count, undefined);
+		await before.dispose();
+
+		const live = Promise.withResolvers<DataReply>();
+		const transport = vi.fn(() => live.promise);
+		const after = createDataStore({ transport, persist });
+		const handle = after.read(contract);
+		const stopPaused = handle.subscribe(() => {}, { fetch: false });
+		await vi.waitFor(() => expect(handle.getSnapshot().value).toBe(3));
+		expect(handle.getSnapshot().refreshing).toBe(false);
+		expect(transport).not.toHaveBeenCalled();
+
+		stopPaused();
+		const stop = handle.subscribe(() => {});
+		await vi.waitFor(() => expect(transport).toHaveBeenCalledTimes(1));
+		expect(handle.getSnapshot()).toMatchObject({ value: 3, refreshing: true });
+		live.resolve({ ok: true, value: 4 });
+		await vi.waitFor(() => expect(handle.getSnapshot().value).toBe(4));
+		stop();
+		await after.dispose();
+	});
+
+	it.each(['resume', 'refresh'])(
+		'starts a required live read on %s before storage unlocks',
+		async (action) => {
+			const key = Promise.withResolvers<string>();
+			const remote = server(books());
+			const store = createDataStore({
+				transport: remote.transport,
+				persist: cache(memoryStorage(), 'ada', { key: () => key.promise }),
+			});
+			const handle = store.read({
+				...count,
+				cancel: true,
+				restore: action === 'resume' ? 'concurrent' : undefined,
+			});
+			const stopPaused = handle.subscribe(() => {}, { fetch: false });
+			await saved();
+			expect(remote.log).toEqual([]);
+			const stop = action === 'resume' ? handle.subscribe(() => {}) : undefined;
+			const refreshing = action === 'refresh' ? handle.refresh() : undefined;
+			stopPaused();
+			await vi.waitFor(() => expect(handle.getSnapshot().value).toBe(3));
+			await refreshing;
+			key.resolve(KEY);
+			stop?.();
+			await store.dispose();
+		},
+	);
+
+	it.each([false, true])(
+		'invalidation fetches an active read before storage unlocks (paused reader: %s)',
+		async (paused) => {
+			const key = Promise.withResolvers<string>();
+			const remote = server(books());
+			const store = createDataStore({
+				transport: remote.transport,
+				persist: cache(memoryStorage(), 'ada', { key: () => key.promise }),
+			});
+			const handle = store.read({ ...count, tags: ['books'] });
+			handle.subscribe(() => {});
+			if (paused) handle.subscribe(() => {}, { fetch: false });
+			await saved();
+			expect(remote.log).toEqual([]);
+			store.invalidate(['books']);
+			await vi.waitFor(() => expect(handle.getSnapshot().value).toBe(3));
+			key.resolve(KEY);
+			await store.dispose();
+		},
+	);
+
 	it('can restore a cached value while a required live read is already running', async () => {
 		const storage = memoryStorage();
 		const before = createDataStore({
@@ -1871,7 +1948,7 @@ describe('octane/data live updates and cache lifecycle', () => {
 		expect(remote.log).toEqual([]);
 	});
 
-	it.each(['restore', 'fetch'])(
+	it.each(['restore', 'paused restore', 'fetch'])(
 		'erases a read while its %s is in flight, and keeps the others',
 		async (pending) => {
 			const storage = memoryStorage();
@@ -1889,11 +1966,19 @@ describe('octane/data live updates and cache lifecycle', () => {
 				persist: cache(storage, 'ada'),
 			});
 			const handle = store.read(shelf, undefined);
+			const restored = Promise.withResolvers<{ value: Book[] }>();
 			if (pending === 'fetch') await value(store, shelf);
-			else handle.subscribe(() => {});
+			else {
+				const validate = vi
+					.spyOn(shelf.output['~standard'], 'validate')
+					.mockReturnValueOnce(restored.promise);
+				handle.subscribe(() => {}, { fetch: pending === 'restore' });
+				await vi.waitFor(() => expect(validate).toHaveBeenCalledWith(books()));
+			}
 			const release = remote.hold();
 			if (pending === 'fetch') void handle.refresh();
 			await store.forget(shelf, undefined);
+			restored.resolve({ value: books() });
 			release();
 			await saved();
 			expect(handle.getSnapshot().status).toBe('pending');

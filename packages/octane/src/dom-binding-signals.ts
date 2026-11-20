@@ -83,8 +83,25 @@ export interface BindingReadTracker {
 	prepare<T>(run: () => T): T;
 	/** Sources the current preparation has observed so far. */
 	size(): number;
-	/** A committed preparation owns exactly the sources it read. */
-	publish(): void;
+	/**
+	 * A committed preparation owns exactly the sources it read. An accepted
+	 * refresh committed under a `held` replacement adds its sources and keeps
+	 * the ones the replacement still waits on.
+	 */
+	publish(held?: boolean): void;
+	/**
+	 * The replacement just prepared suspended. Whether a source the accepted
+	 * commit observes, and the replacement does not read, has changed since:
+	 * only then can an accepted refresh present anything new.
+	 */
+	hold(): boolean;
+	/** An accepted refresh kept a pending part: drop the reads made after `from`. */
+	keep(from: number): void;
+	/**
+	 * Whether an accepted refresh preserved the accepted selection: it read
+	 * only sources the accepted commit observes, none the replacement reads.
+	 */
+	accepts(): boolean;
 	/**
 	 * A preparation threw. Keep the last DOM and wait on every source it reached,
 	 * plus the published ones: a pending value retries when it settles, and a
@@ -108,6 +125,8 @@ export function __createBindingReads(notify: () => void): BindingReadTracker {
 	const subscriptions = new Map<NativeReadSource, NativeReadSubscription>();
 	const waits = new WeakSet<object>();
 	let reads = new Map<NativeReadSource, number>();
+	let published = new Map<NativeReadSource, number>();
+	let staged = reads;
 	let disposed = false;
 	const acquire = (source: NativeReadSource): void => {
 		let live = true;
@@ -147,13 +166,32 @@ export function __createBindingReads(notify: () => void): BindingReadTracker {
 			}
 		},
 		size: () => reads.size,
-		publish() {
-			for (const [source, stop] of subscriptions) {
-				if (reads.has(source)) continue;
-				subscriptions.delete(source);
-				stop();
+		publish(held) {
+			if (held) for (const [source, version] of reads) published.set(source, version);
+			else {
+				published = reads;
+				for (const [source, stop] of subscriptions) {
+					if (reads.has(source)) continue;
+					subscriptions.delete(source);
+					stop();
+				}
 			}
-			if (add(true)) notify();
+			if (add(!held)) notify();
+		},
+		hold() {
+			staged = reads;
+			for (const [source, version] of published)
+				if (!staged.has(source) && source.getVersion() !== version) return true;
+			return false;
+		},
+		keep(from) {
+			let index = 0;
+			for (const source of [...reads.keys()]) if (index++ >= from) reads.delete(source);
+		},
+		accepts() {
+			for (const source of reads.keys())
+				if (!published.has(source) || staged.has(source)) return false;
+			return true;
 		},
 		fail(error, committed) {
 			if (add(false)) notify();

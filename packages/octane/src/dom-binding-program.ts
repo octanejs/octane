@@ -519,6 +519,8 @@ interface FragmentPlan {
 	groups: Map<number, { commit(): void }>;
 	controls?: Map<number, BindingControlPrepared> | undefined;
 	adapters?: (() => void) | undefined;
+	/** An accepted refresh keeps these committed values: their projection is pending. */
+	kept: boolean;
 }
 
 interface RegionPlan {
@@ -529,7 +531,7 @@ interface RegionPlan {
 	text: string | null;
 	slot?: string;
 	caught?: { readonly error: unknown };
-	/** Leave an adopted `@try` body in place, uncommitted and inactive. */
+	/** Leave the committed region in place: an adopted `@try` body, or a pending accepted refresh. */
 	keep?: boolean;
 }
 
@@ -559,6 +561,8 @@ interface Transaction {
 	run?: <T>(callback: () => T) => T;
 	waits?: WeakSet<object>;
 	preparing?: boolean;
+	/** Re-preparing the accepted snapshot while a newer replacement suspends. */
+	accepting?: boolean;
 	frame: number;
 	published?: (() => void) | undefined;
 }
@@ -738,6 +742,11 @@ export function __createStructuralBindingHandoff(
 }
 
 const stopped = {};
+/**
+ * An accepted refresh never re-reads a connected binding: its own committed
+ * channel keeps it accepted, and a live read could select a staged source.
+ */
+const connectedValue = {} as BindingValue;
 const programRoots = /* @__PURE__ */ new WeakSet<Comment>();
 
 /**
@@ -1118,6 +1127,7 @@ function projectValues(
 		for (const index of indices) {
 			requireActive(transaction);
 			let connection = instance.signals?.get(index);
+			const connected = transaction.accepting && connection !== undefined;
 			const style = operations[index]![1] === 'styleObject';
 			if (!connection && (style || transaction.signals?.isSignal(values[index]))) {
 				const prepareChannel = (committed = false): (() => void) => {
@@ -1154,11 +1164,12 @@ function projectValues(
 					values = [...values];
 					copied = true;
 				}
-				(values as unknown[])[index] = connection.read(values[index]);
+				(values as unknown[])[index] = connected ? connectedValue : connection.read(values[index]);
 			}
 		}
 	}
 	return values.map((value, index) => {
+		if (value === connectedValue) return connectedValue;
 		if (operations[index]![1] === 'control') {
 			controls!.set(index, instance.controls!.get(index)!.prepare(value));
 			return null;
@@ -1230,22 +1241,34 @@ function prepareFragment(
 	// region and committed adapter of this fragment sees the same values.
 	if (definition.scope) environment = environment.concat(definition.scope(environment));
 	const controls = instance.controls && new Map<number, BindingControlPrepared>();
+	let values: BindingValue[];
+	let kept = false;
+	let observed = transaction.accepting ? transaction.reads!.size() : 0;
+	try {
+		values = projectValues(definition.project(environment), instance, transaction, controls);
+	} catch (error) {
+		if (!keepsAccepted(instance, error, transaction, observed)) throw error;
+		values = [];
+		controls?.clear();
+		kept = true;
+	}
 	const plan: FragmentPlan = {
 		instance,
 		environment,
-		values: projectValues(definition.project(environment), instance, transaction, controls),
+		values,
 		initial: transaction.initialOperations?.initial(instance, environment) ?? null,
 		regions: [],
 		groups: new Map(),
 		controls,
 		adapters: instance.cleanup?.prepare?.(environment),
+		kept,
 	};
-	if (instance.signals || instance.controls || instance.projections) {
+	if (!transaction.accepting && (instance.signals || instance.controls || instance.projections)) {
 		instance.signalPlan = plan;
 		instance.signalFrame = transaction.frame;
 	}
 	requireActive(transaction);
-	transaction.hostOperations?.groups(plan);
+	if (!kept) transaction.hostOperations?.groups(plan);
 	const document = instance.range.start.ownerDocument;
 	requireActive(transaction);
 	for (const region of instance.regions) {
@@ -1258,103 +1281,145 @@ function prepareFragment(
 			text: null,
 		};
 		plan.regions.push(candidate);
-		if (descriptor.kind === 'text') {
-			let value = descriptor.read(environment);
-			if (descriptor.signal && transaction.signals) {
-				let connection = region.signal;
-				if (!connection && transaction.signals.isSignal(value)) {
-					const prepareChannel = (committed = false): (() => void) => {
-						if (
-							instance.disposed ||
-							(!committed && transaction.preparing && region.signalFrame !== transaction.frame)
-						)
-							return () => {};
-						const next = textValue(region.signal!.get(committed), descriptor.generic);
-						if (!committed && transaction.preparing && region.signalPlan) {
-							region.signalPlan.text = next;
-							return () => {};
-						}
-						return () => {
-							if (!instance.disposed && !transaction.disposed) {
-								writeText(region, next);
-								if (!committed) region.signal?.accept();
+		const created = transaction.candidates.size;
+		observed = transaction.accepting ? transaction.reads!.size() : 0;
+		try {
+			if (descriptor.kind === 'text') {
+				let value = descriptor.read(environment);
+				if (descriptor.signal && transaction.signals) {
+					let connection = region.signal;
+					const connected = transaction.accepting && connection !== undefined;
+					if (!connection && transaction.signals.isSignal(value)) {
+						const prepareChannel = (committed = false): (() => void) => {
+							if (
+								instance.disposed ||
+								(!committed && transaction.preparing && region.signalFrame !== transaction.frame)
+							)
+								return () => {};
+							const next = textValue(region.signal!.get(committed), descriptor.generic);
+							if (!committed && transaction.preparing && region.signalPlan) {
+								region.signalPlan.text = next;
+								return () => {};
 							}
+							return () => {
+								if (!instance.disposed && !transaction.disposed) {
+									writeText(region, next);
+									if (!committed) region.signal?.accept();
+								}
+							};
 						};
-					};
-					const prepare = (): (() => void) => prepareChannel();
-					const committedPrepare: SignalPrepare = () => prepareChannel(true);
-					committedPrepare.committed = true;
-					connection = region.signal = transaction.signals.connect((committed) =>
-						transaction.notifySignal!(committed ? committedPrepare : prepare),
+						const prepare = (): (() => void) => prepareChannel();
+						const committedPrepare: SignalPrepare = () => prepareChannel(true);
+						committedPrepare.committed = true;
+						connection = region.signal = transaction.signals.connect((committed) =>
+							transaction.notifySignal!(committed ? committedPrepare : prepare),
+						);
+					}
+					if (connected) candidate.keep = true;
+					else if (connection) {
+						region.signalPlan = candidate;
+						region.signalFrame = transaction.frame;
+						value = connection.read(value);
+					}
+				}
+				if (!candidate.keep) candidate.text = textValue(value, descriptor.generic);
+			} else if (descriptor.kind === 'if') {
+				const arm = descriptor.select(environment);
+				if (!Number.isSafeInteger(arm) || arm < -1 || arm >= descriptor.arms.length)
+					throw new TypeError(formatClientError(291));
+				candidate.arm = arm;
+				if (arm !== -1)
+					candidate.child = prepareFragment(
+						region.arm === arm && region.child
+							? region.child
+							: createFragment(descriptor.arms[arm]!, instance.id, document, transaction),
+						environment,
+						transaction,
 					);
-				}
-				if (connection) {
-					region.signalPlan = candidate;
-					region.signalFrame = transaction.frame;
-					value = connection.read(value);
-				}
-			}
-			candidate.text = textValue(value, descriptor.generic);
-		} else if (descriptor.kind === 'if') {
-			const arm = descriptor.select(environment);
-			if (!Number.isSafeInteger(arm) || arm < -1 || arm >= descriptor.arms.length)
-				throw new TypeError(formatClientError(291));
-			candidate.arm = arm;
-			if (arm !== -1)
+			} else if (descriptor.kind === 'for') {
+				transaction.list!.prepare(instance, region, candidate, environment, document, transaction);
+			} else if (descriptor.kind === 'view') {
 				candidate.child = prepareFragment(
-					region.arm === arm && region.child
-						? region.child
-						: createFragment(descriptor.arms[arm]!, instance.id, document, transaction),
+					region.child ??
+						createFragment(descriptor.view.root, descriptor.view.id, document, transaction),
+					descriptor.view.prepareProps
+						? descriptor.view.prepareProps(descriptor.props(environment))
+						: [descriptor.props(environment)],
+					transaction,
+				);
+			} else if (descriptor.kind === 'try') {
+				transaction.tryRegions!.prepare(
+					instance,
+					region,
+					candidate,
 					environment,
+					document,
 					transaction,
 				);
-		} else if (descriptor.kind === 'for') {
-			transaction.list!.prepare(instance, region, candidate, environment, document, transaction);
-		} else if (descriptor.kind === 'view') {
-			candidate.child = prepareFragment(
-				region.child ??
-					createFragment(descriptor.view.root, descriptor.view.id, document, transaction),
-				descriptor.view.prepareProps
-					? descriptor.view.prepareProps(descriptor.props(environment))
-					: [descriptor.props(environment)],
-				transaction,
-			);
-		} else if (descriptor.kind === 'try') {
-			transaction.tryRegions!.prepare(
-				instance,
-				region,
-				candidate,
-				environment,
-				document,
-				transaction,
-			);
-		} else if (descriptor.kind === 'slot') {
-			const value = descriptor.read(environment);
-			if (
-				value != null &&
-				(typeof value !== 'object' || (value as BindingSlot)[bindingSlot] !== true)
-			)
-				throw new TypeError(formatClientError(292));
-			const slot = value as BindingSlot | null | undefined;
-			if (slot?.site !== undefined) candidate.slot = slot.id + ';' + slot.site;
-			if (region.unresolvedSlot) {
+			} else if (descriptor.kind === 'slot') {
+				const value = descriptor.read(environment);
+				if (
+					value != null &&
+					(typeof value !== 'object' || (value as BindingSlot)[bindingSlot] !== true)
+				)
+					throw new TypeError(formatClientError(292));
+				const slot = value as BindingSlot | null | undefined;
+				if (slot?.site !== undefined) candidate.slot = slot.id + ';' + slot.site;
+				if (region.unresolvedSlot) {
+					if (slot)
+						region.child = resolveFragment(
+							slot.fragment,
+							slot.id,
+							region.range,
+							false,
+							transaction,
+						);
+					else if (region.range.start.nextSibling !== region.range.end) mismatch();
+					region.unresolvedSlot = false;
+				}
 				if (slot)
-					region.child = resolveFragment(slot.fragment, slot.id, region.range, false, transaction);
-				else if (region.range.start.nextSibling !== region.range.end) mismatch();
-				region.unresolvedSlot = false;
+					candidate.child = prepareFragment(
+						region.child?.definition === slot.fragment && region.child.id === slot.id
+							? region.child
+							: createFragment(slot.fragment, slot.id, document, transaction),
+						slot.environment,
+						transaction,
+					);
 			}
-			if (slot)
-				candidate.child = prepareFragment(
-					region.child?.definition === slot.fragment && region.child.id === slot.id
-						? region.child
-						: createFragment(slot.fragment, slot.id, document, transaction),
-					slot.environment,
-					transaction,
-				);
+		} catch (error) {
+			if (!keepsAccepted(instance, error, transaction, observed)) throw error;
+			releaseCandidates(transaction, created);
+			candidate.keep = true;
+			candidate.child = null;
+			candidate.items = null;
 		}
 	}
 	requireActive(transaction);
 	return plan;
+}
+
+/**
+ * While a newer replacement suspends, an accepted refresh re-prepares the
+ * committed snapshot. A part of it that is itself pending keeps its committed
+ * DOM, as the held replacement does, so its accepted siblings still update.
+ */
+function keepsAccepted(
+	instance: FragmentInstance,
+	error: unknown,
+	transaction: Transaction,
+	observed: number,
+): boolean {
+	if (!transaction.accepting || instance.fresh || !isThenable(error)) return false;
+	// The kept part presents nothing new, so its reads select nothing either.
+	transaction.reads!.keep(observed);
+	return true;
+}
+
+/** Release the instances an abandoned preparation created after `created`. */
+function releaseCandidates(transaction: Transaction, created: number): void {
+	if (transaction.candidates.size > created)
+		for (const fresh of [...transaction.candidates].slice(created))
+			releaseInstance(fresh, transaction);
 }
 
 /**
@@ -1388,9 +1453,7 @@ function prepareTry(
 		} catch (thrown) {
 			if (thrown === stopped) throw thrown;
 			// Release what the abandoned body constructed; its committed DOM is untouched.
-			if (transaction.candidates.size > created)
-				for (const fresh of [...transaction.candidates].slice(created))
-					releaseInstance(fresh, transaction);
+			releaseCandidates(transaction, created);
 			if (isThenable(thrown)) {
 				// Tracked reads already reported their source before throwing. Only an
 				// opaque thenable needs its own wake-up.
@@ -1547,7 +1610,7 @@ function initializeProperties(
 function commitRegion(plan: RegionPlan, id: string, transaction: Transaction): void {
 	const region = plan.instance;
 	const definition = region.definition;
-	if (definition.kind === 'opaque') return;
+	if (definition.kind === 'opaque' || plan.keep) return;
 	if (definition.kind === 'text') {
 		region.signalPlan = undefined;
 		writeText(region, plan.text!);
@@ -1558,7 +1621,6 @@ function commitRegion(plan: RegionPlan, id: string, transaction: Transaction): v
 		transaction.list!.commit(plan, id, transaction);
 		return;
 	}
-	if (plan.keep) return;
 	const oldChild = region.child;
 	const child = plan.child?.instance ?? null;
 	region.child = child;
@@ -1657,9 +1719,10 @@ function commitFragment(plan: FragmentPlan, transaction: Transaction): void {
 	instance.environment = plan.environment;
 	instance.updateAdapters = plan.adapters;
 	transaction.initialOperations?.initialize(plan, false, transaction);
-	for (let index = 0; index < plan.values.length && !transaction.disposed; index++) {
-		if (instance.definition.bindings[index]![1] === 'control') continue;
-		writeOperation(instance, index, plan.values[index]!, plan.groups.get(index), transaction);
+	for (let index = 0; !plan.kept && index < plan.values.length && !transaction.disposed; index++) {
+		const value = plan.values[index]!;
+		if (value === connectedValue || instance.definition.bindings[index]![1] === 'control') continue;
+		writeOperation(instance, index, value, plan.groups.get(index), transaction);
 	}
 	for (const region of plan.regions) {
 		if (transaction.disposed) return;
@@ -1810,6 +1873,9 @@ function bindProgram<Props>(
 	let revision = 0;
 	let mounted = !mount;
 	let committed = false;
+	// The last committed snapshot, and whether a newer one suspends behind it.
+	let acceptedSnapshot: Props | undefined;
+	let holding = false;
 	let firstCommit: ((activated: boolean) => void) | undefined;
 	const settleFirstCommit = (activated: boolean): void => {
 		const settled = firstCommit;
@@ -1953,7 +2019,11 @@ function bindProgram<Props>(
 				}
 				dirty = false;
 				signalUpdates?.clear();
-				const snapshot = source.getSnapshot();
+				// A held replacement keeps the accepted snapshot presented. When a
+				// source it reads changes, refresh that snapshot rather than leave it stale.
+				const accepting = holding;
+				holding = false;
+				const snapshot = accepting ? acceptedSnapshot! : source.getSnapshot();
 				if (dirty || transaction.disposed) continue;
 				if (
 					snapshot !== null &&
@@ -1967,6 +2037,7 @@ function bindProgram<Props>(
 					? descriptor.prepareProps(snapshot)
 					: [snapshot];
 				let plan: FragmentPlan | undefined;
+				transaction.accepting = accepting;
 				try {
 					plan = transaction.reads
 						? transaction.reads.prepare(() => prepareFragment(instance!, environment, transaction))
@@ -1982,7 +2053,17 @@ function bindProgram<Props>(
 						!transaction.reads?.fail(error, committed)
 					)
 						throw error;
+					holding =
+						!accepting &&
+						committed &&
+						snapshot !== acceptedSnapshot &&
+						isThenable(error) &&
+						transaction.reads!.hold();
+				} finally {
+					transaction.accepting = false;
 				}
+				// An accepted refresh that would select anything new stays quiet.
+				if (accepting && plan && !transaction.reads!.accepts()) plan = undefined;
 				if (plan && !dirty && !transaction.disposed && transaction.controls)
 					transaction.hostOperations!.publish(plan, transaction);
 				while (plan && signalUpdates?.size && !dirty && !transaction.disposed) {
@@ -1998,6 +2079,8 @@ function bindProgram<Props>(
 						for (const group of instance!.groups.values()) group.dispose();
 						instance!.groups.clear();
 					}
+					if (holding && !dirty && !transaction.disposed) dirty = true;
+					else holding = false;
 					continue;
 				}
 				const document = instance!.range.start.ownerDocument;
@@ -2013,8 +2096,9 @@ function bindProgram<Props>(
 				commitFragment(plan, transaction);
 				if (transaction.disposed) break;
 				committed = true;
+				if (!accepting) acceptedSnapshot = snapshot;
 				transaction.published?.();
-				transaction.reads?.publish();
+				transaction.reads?.publish(accepting);
 				if (!mounted) {
 					moveRange(instance!.range, target!.parent, target!.before ?? null, transaction);
 					mounted = true;
@@ -2470,6 +2554,7 @@ function projectHostValues(
 			requireActive(transaction);
 			const first = group[0]![0];
 			let connection = instance.projections?.get(first);
+			const connected = transaction.accepting && connection !== undefined;
 			if (!connection) {
 				const prepareChannel = (committed = false): (() => void) => {
 					if (
@@ -2531,8 +2616,9 @@ function projectHostValues(
 				instance.projections ??= new Map();
 				for (const [index] of group) instance.projections.set(index, connection);
 			}
-			const projected = connection.read(values[first]);
-			for (const [index] of group) (values as unknown[])[index] = projected[index];
+			const projected = connected ? null : connection.read(values[first]);
+			for (const [index] of group)
+				(values as unknown[])[index] = projected ? projected[index] : connectedValue;
 		}
 	}
 
@@ -2544,7 +2630,7 @@ function prepareHostGroups(plan: FragmentPlan): void {
 	const definition = instance.definition;
 	for (let index = 0; index < definition.bindings.length; index++) {
 		const operation = definition.bindings[index]!;
-		if (operation[1] !== 'classGroup') continue;
+		if (operation[1] !== 'classGroup' || plan.values[index] === connectedValue) continue;
 		let group = instance.groups.get(index);
 		if (!group) {
 			const receipt = definition.initializers?.findIndex(

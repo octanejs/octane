@@ -100,13 +100,14 @@ the disposition of every upstream test file. The short version:
 - upstream's seven component specs need a live Mapbox token and real WebGL under
   puppeteer, so they are ported against a test double — weaker evidence than a
   pristine run, and recorded as such;
-- a differential lane runs six fixtures through this binding and through the
+- a differential lane runs seven fixtures through this binding and through the
   published `@vis.gl/react-mapbox@8.1.2` on React with that same double, which is
   what makes the double trustworthy: the map shell and its overlays,
   `<Source>`/`<Layer>` add-update-remove, in-place popup option edits alongside
   control add and remove, reaching the map by id from outside it to fly the
-  camera, `useControl` called straight from a consumer module, and a marker
-  choosing between the default pin and a custom element.
+  camera, `useControl` called straight from a consumer module, a marker
+  choosing between the default pin and a custom element, and a layer added on
+  top of a layer anchored beneath it.
 
 Not covered: real WebGL, tile loading, pointer interaction, `reuseMaps`,
 external `gl` contexts, and RTL text plugin loading.

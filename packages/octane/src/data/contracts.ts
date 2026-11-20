@@ -520,9 +520,9 @@ interface ReadOptions<Input, Output> {
 	/** Restore a cached value while starting a required live read, rather than waiting for storage. */
 	restore?: 'concurrent';
 	/**
-	 * Abort a load in flight when its last observer leaves, unless a `prefetch`
-	 * or a `refresh` is waiting on it. The value already confirmed stays, and a
-	 * later observer loads again. For a read that follows what a user types.
+	 * Abort a load when its last fetching subscriber leaves or pauses, unless a
+	 * `prefetch` or `refresh` is waiting on it. The confirmed value stays.
+	 * For a read that follows what a user types.
 	 */
 	cancel?: boolean;
 	/** Saved values from another version are discarded. */

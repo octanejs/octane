@@ -444,6 +444,22 @@ const manifest = {
 			owner: '@octanejs/react-map-gl',
 			reviewCondition: 'Review if Octane adds a forwardRef compatibility shim.',
 		},
+		{
+			id: 'react-map-gl-layer-missing-anchor',
+			caseIds: ['differential:7'],
+			upstreamResult:
+				'<Layer> passes beforeId straight to addLayer and moveLayer. An anchor the style does not hold yet makes Mapbox report an error, and moveLayer has already taken the layer out of the draw order, so it stops drawing.',
+			octaneResult:
+				'<Layer> stays where it is, or is added on top, until its anchor exists, then moves beneath it on the styledata that follows.',
+			rationale:
+				'Layers anchored each beneath the next re-anchor before a layer added on top of them exists, and upstream never repairs the dropped layer because getLayer still returns it.',
+			classification: 'upstream-bugfix',
+			consumerImpact:
+				'A layer whose anchor arrives later draws on top until the anchor is added, instead of disappearing.',
+			migrationGuidance: 'None: code that never names a missing anchor behaves as upstream.',
+			owner: '@octanejs/react-map-gl',
+			reviewCondition: 'Review when upstream checks the anchor before moving or adding a layer.',
+		},
 	],
 };
 

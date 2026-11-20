@@ -31,7 +31,7 @@ the same task as the event that caused it.
 
 | Contract | Options | Notes |
 | --- | --- | --- |
-| `read` | `name`, `input?`, `output`, `entities?`, `tags?`, `fresh = 0`, `keep = 300000`, `expire = Infinity`, `persist = true`, `cancel = false`, `version = ''` | Times are milliseconds; a `keep` of 2³¹ ms or more (such as `Infinity`) keeps the value for the session. `entities(output)` returns `Entity.from(...)` selections. `tags` is a list, or `tags(input)` for each input. `cancel` aborts a load once nothing observes the read or waits on it. |
+| `read` | `name`, `input?`, `output`, `entities?`, `tags?`, `fresh = 0`, `keep = 300000`, `expire = Infinity`, `persist = true`, `cancel = false`, `version = ''` | Times are milliseconds; a `keep` of 2³¹ ms or more (such as `Infinity`) keeps the value for the session. `entities(output)` returns `Entity.from(...)` selections. `tags` is a list, or `tags(input)` for each input. `cancel` aborts a load when its last fetching subscriber leaves and nothing else needs the result. |
 | `write` | `name`, `input`, `output?`, one of `creates`/`patches`/`removes`, `draft?`, `serverId?`, `record?`, `form?`, `invalidates?` | `draft(input, id)` defaults to the input plus the new ID. `record(output)` locates the saved record so views take it without reloading. `invalidates` is a list, or `invalidates(input)` from the validated input. |
 | `entity` | `name`, `schema`, `key = 'id'` | `id(value)` is `String(value[key])`. `one` and `list` are output schemas of one record and of a list, validated by `schema`: a read whose `output` is one of them selects the entity without `entities`, and a `creates` or `patches` write to the entity whose `output` is `one` takes its reply as the saved record without `record`. An output of `schema` itself selects nothing. |
 | `view` | `name`, `of`, `order`, `where?`, `with?`, `input?`, `limit = 20`, `max = 500`, plus the read options | A read whose input is `{ ...params, offset, limit }` and whose value is that window's rows. `view.view.where` and `view.view.compare` are exposed for handlers. `with: { name: [Entity, key] }` joins each row to the record its `key` points at. |
@@ -81,9 +81,16 @@ its own entity's schema. `where` and `order` see the view's own record only.
 
 `createDataStore({ transport, seed?, seedAge?, form?, persist?, listen?, feeds? })`.
 
-- Describing or snapshotting a read does no network work. Subscribing,
-  prefetching and refreshing start a load; readers of one entry share it.
-  Inputs are compared by value.
+- Describing or snapshotting a read does no network work. By default,
+  subscribing, prefetching and refreshing can start a load. Readers of one
+  entry share it. Inputs are compared by value.
+- `handle.subscribe(notify, { fetch: false })` observes the same entry while
+  pausing automatic fetches for that subscriber. The store can restore a saved
+  value and deliver updates from other subscribers, writes, feeds, `publish()`,
+  `prefetch()` and `refresh()`. Expiry and account checks still apply.
+  Resubscribe with `fetch: true` or omit the option to resume normal loading.
+  In either binding, use `useRead(handle, { suspend: false, fetch: canFetch })`
+  and change `canFetch` on render.
 - `getSnapshot()` is stable between changes. A snapshot is
   `{ status, value, error, refreshing, stale, more, preview }`; `value` is the
   newest confirmed value with pending edits applied, or, while `preview` is
@@ -96,9 +103,9 @@ its own entity's schema. `where` and `order` see the view's own record only.
   stays failed until it is refreshed. A read with a confirmed value keeps
   showing that value. A preview takes no pending edit, shares no record, and
   is never saved or dehydrated. Previews of a superseded load are ignored.
-- A read with `cancel: true` aborts its load when its last subscriber leaves,
-  unless a `prefetch()` or `refresh()` joined that load, which then runs to
-  its end. The confirmed value stays, and the next subscriber loads again.
+- A read with `cancel: true` aborts its load when its last fetching subscriber
+  leaves or pauses, unless a `prefetch()` or `refresh()` joined that load,
+  which then runs to its end. The confirmed value stays available.
 - A write is sent once. A transport rejection after dispatch leaves it
   uncertain (`DataUncertainError`), with its edit shown, until
   `settle(operationId, confirmed, value?)` names the outcome.

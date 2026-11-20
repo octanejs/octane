@@ -318,12 +318,13 @@ describe('octane/data previews', () => {
 });
 
 describe('octane/data reads that cancel', () => {
-	it('stops a load when its last observer leaves, and not before', async () => {
+	it('stops a load when its last fetching observer leaves, and not before', async () => {
 		const server = catalog();
 		const store = createDataStore({ transport: server.transport });
 		const fern = store.read(search, { q: 'fern' });
 		const stopFirst = fern.subscribe(() => {});
 		const stopSecond = fern.subscribe(() => {});
+		const stopPaused = fern.subscribe(() => {}, { fetch: false });
 		const request = await server.call(0);
 		request.preview(shelf(['Fern Atlas']));
 
@@ -332,6 +333,7 @@ describe('octane/data reads that cancel', () => {
 		stopSecond();
 		expect(request.signal.aborted).toBe(true);
 		expect(fern.getSnapshot()).toMatchObject({ status: 'pending', preview: false });
+		stopPaused();
 
 		// What arrives late changes nothing, here or for a later reader.
 		request.preview(shelf(['Late']));

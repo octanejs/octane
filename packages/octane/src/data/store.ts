@@ -4,8 +4,8 @@
  * drive the same object.
  *
  * Invariants:
- * - Describing or snapshotting a read does no network work. Subscribing,
- *   prefetching and refreshing start a load; readers of one entry share it.
+ * - A fetching subscriber, prefetch or refresh can start a shared load.
+ *   A paused subscriber observes the same entry and can restore it from storage.
  * - A write is sent once. A transport failure after dispatch leaves the write
  *   uncertain, with its edit still shown, until `settle` names the outcome.
  * - Only a reply for the entry's current attempt, in a store that has not been
@@ -14,8 +14,8 @@
  *   has no confirmed value to show, the newest emitted replaces the one before,
  *   and the attempt's reply, failure or end removes it. It is never saved,
  *   seeded, or shared with another read.
- * - A read that cancels stops its load when its last observer leaves, unless a
- *   `prefetch` or a `refresh` joined that load. What it confirmed stays.
+ * - A cancellable load stops when its last fetching subscriber leaves, unless
+ *   a `prefetch` or `refresh` joined that load. What it confirmed stays.
  * - Writes to a record its own create has not confirmed wait for that create.
  *   They are refused unsent if it is refused, and they carry the server's ID
  *   if the server assigned one.
@@ -97,9 +97,32 @@ export interface ReadSnapshot<T> {
 export interface ReadHandle<T> {
 	/** Stable between changes, so it can back `useSyncExternalStore`. */
 	getSnapshot(): ReadSnapshot<T>;
-	/** Observe the read. The first observer starts a load when the value is missing or stale. */
-	subscribe(notify: () => void): () => void;
+	/**
+	 * Observe the read. With `fetch: false`, restore and observe cached data
+	 * without requesting a live value. Other subscribers and explicit requests
+	 * can still fetch. Resubscribe to change the option.
+	 */
+	subscribe(notify: () => void, options?: { readonly fetch?: boolean }): () => void;
 	refresh(): Promise<void>;
+}
+
+export interface ReadSnapshotOptions {
+	readonly suspend: false;
+	readonly fetch?: boolean;
+}
+
+const pausedSubscriptions = new WeakMap<ReadHandle<unknown>, ReadHandle<unknown>['subscribe']>();
+
+/** Keep useSyncExternalStore subscribed across renders until the handle or fetch option changes. */
+export function pausedSubscription(handle: ReadHandle<unknown>, options: ReadSnapshotOptions) {
+	if (options.suspend !== false)
+		throw new TypeError('octane/data: useRead with fetch: false requires suspend: false');
+	let subscribe = pausedSubscriptions.get(handle);
+	if (!subscribe) {
+		subscribe = (notify) => handle.subscribe(notify, { fetch: false });
+		pausedSubscriptions.set(handle, subscribe);
+	}
+	return subscribe;
 }
 
 /**
@@ -352,6 +375,8 @@ export interface Entry {
 	readonly input: unknown;
 	readonly key: string;
 	readonly subscribers: Set<() => void>;
+	/** Subscribers that retain the entry and receive updates without requesting a load. */
+	paused: number;
 	readonly handle: ReadHandle<any>;
 	/** The read's tags for this input. */
 	readonly tags: readonly string[];
@@ -380,8 +405,8 @@ export interface Entry {
 	snapshot: ReadSnapshot<any> | null;
 	/** A view entry's span; null for a read and for a view with no value. */
 	span: Span | null;
-	/** Whether persistent storage has been asked for this entry's value. */
-	checkedStorage: boolean;
+	/** A promise identifies the current restore, including when a live reader joins it. */
+	storage: 'unchecked' | 'checked' | Promise<void>;
 	/** A concurrent first read waits for availability while refresh still joins its live request. */
 	startup: Startup | null;
 	/** The last projection of a read's value, so an unchanged one keeps its identity. */
@@ -1406,7 +1431,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		if (entry.read.expire < 2 ** 31) {
 			entry.expireTimer = setHostTimeout(() => {
 				forget(entry);
-				if (entry.subscribers.size > 0) void load(entry);
+				if (hasDemand(entry)) void load(entry);
 				touch(entry);
 			}, entry.read.expire - age);
 		}
@@ -1498,25 +1523,25 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		return transport(payload, signal, preview);
 	}
 
-	/** Whether a load of `entry` would serve no one: it cancels, nothing observes it, and no caller waits on it. */
+	function hasDemand(entry: Entry): boolean {
+		return entry.subscribers.size > entry.paused;
+	}
+
+	/** Whether a cancellable load has lost its last fetching subscriber and waiter. */
 	function unwanted(entry: Entry): boolean {
 		const waiting = entry.inflight ?? (entry.startup?.pending ? entry.startup.promise : null);
-		return (
-			entry.read.cancel &&
-			entry.subscribers.size === 0 &&
-			waiting !== null &&
-			entry.wanted !== waiting
-		);
+		return entry.read.cancel && !hasDemand(entry) && waiting !== null && entry.wanted !== waiting;
 	}
 
 	/**
 	 * Start an entry from persistent storage, as from a seed. A fresh value
 	 * needs no load; a stale one shows while its load runs.
 	 */
-	function restoreValue(entry: Entry, attempt: number): Promise<void> {
+	function restoreValue(entry: Entry): Promise<void> {
+		if (typeof entry.storage === 'object') return entry.storage;
 		const current = () =>
-			!retired && entries.get(entry.key) === entry && entry.attempt === attempt && !entry.hasBase;
-		return persisted!.restore(entry.key, persistedRead(entry.read)).then(async (stored) => {
+			!retired && entries.get(entry.key) === entry && entry.storage === disk && !entry.hasBase;
+		const disk = persisted!.restore(entry.key, persistedRead(entry.read)).then(async (stored) => {
 			if (!stored || !current()) return;
 			const age = Math.max(0, hostDateNow() - stored.savedAt);
 			let value: unknown;
@@ -1543,34 +1568,69 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				};
 				index(entry);
 			}
-			entry.stale = stale || stored.stale;
+			// A concurrent contract still owes its first live read when fetching resumes.
+			entry.stale =
+				stale || stored.stale || (entry.read.restore === 'concurrent' && restoringCache(entry));
 			// The saved contract may have used different tags, so its durable tag
 			// marks need not describe an invalidation of the current contract.
 			if (stale && !stored.stale) persisted!.mark(entry.key);
 			reloadAll(reload);
 		});
+		entry.storage = disk;
+		return disk;
 	}
 
-	function restore(entry: Entry): Promise<void> {
-		entry.checkedStorage = true;
-		const done = restoreValue(entry, entry.attempt).then(() => {
-			if (retired || entry.inflight !== done) return;
+	function needsStorage(entry: Entry): boolean {
+		return !!persisted && !entry.hasBase && entry.storage === 'unchecked' && entry.read.persist;
+	}
+
+	/** Storage alone is in flight. A live reader can take over and share the same restore. */
+	function restoringCache(entry: Entry): boolean {
+		return entry.inflight === entry.storage;
+	}
+
+	function restoreCached(entry: Entry): void {
+		if (entry.paused && !entry.inflight && needsStorage(entry)) void restore(entry, false);
+	}
+
+	function subscribePaused(entry: Entry, notify: () => void): () => void {
+		// Each registration counts separately, even when a live reader shares its callback.
+		const reader = () => notify();
+		entry.subscribers.add(reader);
+		entry.paused++;
+		entry.served = true;
+		restoreCached(entry);
+		return () => {
+			if (!entry.subscribers.delete(reader)) return;
+			entry.paused--;
+			if (!retired) idle(entry);
+		};
+	}
+
+	function restore(entry: Entry, fetch = true): Promise<void> {
+		const attempt = entry.attempt;
+		const disk = restoreValue(entry);
+		const done = disk.then(() => {
+			if (retired || entry.inflight !== flight) return;
+			entry.storage = 'checked';
 			const pinned = entry.wanted === done;
 			const dropped = unwanted(entry);
 			fly(entry, null);
 			commitReached([entry]);
-			if (!entry.hasBase && !dropped) {
+			if (retired || entry.attempt !== attempt) return;
+			if (fetch && !entry.hasBase && !dropped) {
 				const loading = load(entry);
 				// A caller that waited on the restore waits on the load it led to.
 				if (pinned) entry.wanted = loading;
 				return loading;
 			}
-			if (entry.subscribers.size > 0 && isStale(entry)) void load(entry);
+			if (hasDemand(entry) && isStale(entry)) void load(entry);
 			else idle(entry);
 		});
-		fly(entry, done);
+		const flight = fetch ? done : disk;
+		fly(entry, flight);
 		touch(entry);
-		return done;
+		return flight;
 	}
 
 	/** Wake first readers as soon as a confirmed value is available, or both startup paths have settled. */
@@ -1579,7 +1639,10 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const usable = entry.hasBase && hostDateNow() - entry.fetchedAt < entry.read.expire;
 		const wake = startup.pending && (usable || (startup.live && startup.restored));
 		if (wake) startup.pending = false;
-		if (startup.live && !startup.pending) entry.startup = null;
+		if (startup.live && !startup.pending) {
+			entry.storage = 'checked';
+			entry.startup = null;
+		}
 		commitReached([entry]);
 		if (wake) startup.wake();
 	}
@@ -1594,13 +1657,13 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		}
 	}
 
-	function load(entry: Entry): Promise<void> {
-		if (entry.inflight) return entry.inflight;
+	function load(entry: Entry, refresh = false): Promise<void> {
+		if (entry.inflight && !refresh && !restoringCache(entry)) return entry.inflight;
 		if (entry.startup?.pending) return entry.startup.promise;
-		const fromStorage = persisted && !entry.hasBase && !entry.checkedStorage && entry.read.persist;
-		if (fromStorage) {
-			if (entry.read.restore !== 'concurrent') return restore(entry);
-			entry.checkedStorage = true;
+		let disk: Promise<void> | undefined;
+		if (needsStorage(entry) || typeof entry.storage === 'object') {
+			if (!refresh && entry.read.restore !== 'concurrent') return restore(entry);
+			disk = restoreValue(entry);
 			let wake!: () => void;
 			const promise = new Promise<void>((resolve) => (wake = resolve));
 			entry.startup = { promise, wake, pending: true, live: false, restored: false };
@@ -1686,13 +1749,19 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				finishStartup(entry, startup);
 				idle(entry);
 			};
-			void restoreValue(entry, attempt).then(restored, restored);
+			void disk!.then(restored, restored);
 		}
 		return done;
 	}
 
 	/** Discard any load or restore in flight; returns the attempt that supersedes it. */
 	function supersede(entry: Entry): number {
+		if (typeof entry.storage === 'object') {
+			const retry =
+				!entry.hasBase &&
+				(entry.startup || restoringCache(entry) || (entry.paused && !hasDemand(entry)));
+			entry.storage = retry ? 'unchecked' : 'checked';
+		}
 		stopStartup(entry);
 		entry.abort?.abort();
 		entry.abort = null;
@@ -1704,15 +1773,15 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	/** Discard any load in flight, since it may predate the change, and reload if observed. */
 	function invalidateEntry(entry: Entry): void {
 		entry.stale = true;
-		if (entry.startup?.pending && !entry.hasBase) {
-			// Marking an unread entry would persist a deletion. Retry its restore
-			// after superseding; tag invalidation independently records staleness.
-			entry.checkedStorage = false;
-		} else persisted?.mark(entry.key);
+		if (restoringCache(entry)) return;
 		supersede(entry);
-		if (entry.subscribers.size > 0) {
+		// Marking an unread entry would persist a deletion. Tag invalidation
+		// independently records staleness while its restore is outstanding.
+		if (!needsStorage(entry)) persisted?.mark(entry.key);
+		if (hasDemand(entry)) {
 			void load(entry);
 		} else {
+			restoreCached(entry);
 			touch(entry);
 			idle(entry);
 		}
@@ -1770,32 +1839,36 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			input,
 			key,
 			subscribers: new Set(),
+			paused: 0,
 			handle: {
 				getSnapshot() {
 					if (retired || fenced) return PENDING;
 					const current = entries.get(key) ?? created;
 					return (current.snapshot ??= buildSnapshot(current));
 				},
-				subscribe(notify) {
+				subscribe(notify, options) {
 					if (retired) return () => {};
 					// A handle outlives its entry's retention; observing it again restores the entry.
 					const current = entries.get(key);
-					if (current && current !== created) return current.handle.subscribe(notify);
-					if (!current) entries.set(key, created);
+					if (current && current !== created) return current.handle.subscribe(notify, options);
+					if (!current) {
+						created.storage = 'unchecked';
+						entries.set(key, created);
+					}
 					clearHostTimeout(created.keepTimer);
 					created.keepTimer = undefined;
-					// Age reloads a value only for the first observer of a value already served.
-					const aged = created.subscribers.size === 0 && created.served && isStale(created);
+					if (options?.fetch === false) return subscribePaused(created, notify);
+					// Age reloads a value only for the first fetching observer of a value already served.
+					const aged = !hasDemand(created) && created.served && isStale(created);
 					created.subscribers.add(notify);
 					created.served = true;
 					if (!created.hasBase || created.stale || aged) void load(created);
 					return () => {
-						created.subscribers.delete(notify);
+						if (!created.subscribers.delete(notify)) return;
 						if (retired) return;
 						if ((created.abort || created.startup?.pending) && unwanted(created)) {
-							// Abort listeners may synchronously forget this entry.
-							if (created.startup && !created.hasBase) created.checkedStorage = false;
 							supersede(created);
+							restoreCached(created);
 							touch(created);
 						}
 						idle(created);
@@ -1805,6 +1878,10 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 					if (retired) return NEVER;
 					const current = entryFor(read, input);
 					if (current.startup && current.inflight) return (current.wanted = current.inflight);
+					if (!current.startup && typeof current.storage === 'object') {
+						current.stale = true;
+						return (current.wanted = load(current, true));
+					}
 					invalidateEntry(current);
 					return (current.wanted = load(current));
 				},
@@ -1828,7 +1905,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			wanted: null,
 			snapshot: null,
 			span: null,
-			checkedStorage: false,
+			storage: 'unchecked',
 			startup: null,
 			projected: null,
 			related: EMPTY as string[],
@@ -2148,7 +2225,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			for (const entry of entries.values()) {
 				if (refresh.length === MAX_REFRESH) break;
 				const viewed = viewTags(entry, own, tags, settlesLocally(write));
-				if (entry.subscribers.size > 0 && affects(entry, viewed)) {
+				if (hasDemand(entry) && affects(entry, viewed)) {
 					refresh.push({ name: entry.read.name, input: wireInput(entry) });
 				}
 			}
@@ -2347,8 +2424,11 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 					fly(entry, null);
 					commitReached([entry]);
 					// A refused value leaves an observer the load it superseded.
-					if (entry.subscribers.size > 0 && (!entry.hasBase || entry.stale)) void load(entry);
-					else idle(entry);
+					if (hasDemand(entry) && (!entry.hasBase || entry.stale)) void load(entry);
+					else {
+						restoreCached(entry);
+						idle(entry);
+					}
 				});
 			fly(entry, done);
 			touch(entry);
@@ -2363,7 +2443,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			const entry = entries.get(key);
 			if (entry) {
 				supersede(entry);
-				entry.checkedStorage = true;
+				entry.storage = 'checked';
 				forget(entry);
 				entry.error = undefined;
 				touch(entry);
