@@ -394,6 +394,19 @@ function unlink(link: Link, sub = link.sub): Link | undefined {
 	return nextDep;
 }
 
+/** Finish obsolete dependencies while the computation still rejects recursive reads. */
+function unlinkObsolete(node: ReactiveNode, first: Link): void {
+	let obsolete: Link | undefined = first;
+	try {
+		do {
+			obsolete = unlink(obsolete, node);
+		} while (obsolete !== undefined);
+	} catch (error) {
+		node.flags &= ~REACTIVE_RECURSED_CHECK;
+		throw error;
+	}
+}
+
 function propagate(link: Link, innerWrite: boolean): void {
 	const origin = link.dep;
 	let next = link.nextSub;
@@ -1707,12 +1720,12 @@ function refresh(node: ScopedNode): void {
 	}
 }
 
-function evaluate(node: ScopedNode): boolean {
+function evaluate(node: ScopedNode, stabilizing?: boolean): boolean {
 	if (!node.compute) {
 		node.flags = REACTIVE_MUTABLE | REACTIVE_WATCHING | (node.flags & REACTIVE_SLOW);
 		return true;
 	}
-	if (historicalReader || getNativeAdoptionResolver()) return evaluateLiveNode(node);
+	if (historicalReader || getNativeAdoptionResolver()) return evaluateLiveNode(node, stabilizing);
 	const pending = pendingWorld;
 	const world = pending ? pending.enter(node) : undefined;
 	const previousNode = activeNode;
@@ -1725,12 +1738,13 @@ function evaluate(node: ScopedNode): boolean {
 	activeOwners = undefined;
 	trackingCycle++;
 	executionDepth++;
-	let next: NodeState;
+	let next: NodeState | undefined;
+	let failure = NO_FAILURE;
 	let owners: Set<GraphOwner> | undefined;
 	try {
 		next = node.compute(node);
 	} catch (error) {
-		next = thrownState(node, error);
+		failure = error;
 	} finally {
 		executionDepth--;
 		// compute() reassigned activeOwners, which this function narrowed to undefined.
@@ -1738,13 +1752,17 @@ function evaluate(node: ScopedNode): boolean {
 		activeOwners = previousOwners;
 		activeNode = previousNode;
 		setNativeReadObserver(previousObserver);
-		node.flags &= ~REACTIVE_RECURSED_CHECK;
 		const tail = (node as ReactiveNode).depsTail;
-		let obsolete = tail ? tail.nextDep : node.deps;
-		while (obsolete) obsolete = unlink(obsolete, node);
+		const obsolete = tail ? tail.nextDep : node.deps;
+		if (obsolete) unlinkObsolete(node, obsolete);
+		node.flags &= ~REACTIVE_RECURSED_CHECK;
 		if (pending) pending.leave(world, node);
 	}
-	return settle(node, next, owners);
+	if (node.flags & REACTIVE_RECURSED) {
+		if (next === PLAIN_RESULT) plainValue = undefined;
+		return stabilizing ? false : stabilizeScoped(node);
+	}
+	return settle(node, failure === NO_FAILURE ? next! : thrownState(node, failure), owners);
 }
 
 /** What a computation that threw leaves: pending on a thenable, failed on anything else. */
@@ -1781,15 +1799,23 @@ export function computeEqual<T>(
 	// A keyless node holds its value or error in `last`; until its first result,
 	// and from a failure until its next, `last` is NO_FAILURE.
 	if (node instanceof PlainComputed) node.last = NO_FAILURE;
-	return () => {
-		const next = compute();
-		const previous = node instanceof PlainComputed ? node.last : readyValueOf(node);
-		return previous !== NO_FAILURE &&
-			!same(previous, next) &&
-			untrack(() => equals(previous as T, next))
-			? (previous as T)
-			: next;
-	};
+	return () => equalComputedValue(node, compute(), equals);
+}
+
+/** Compare only after obsolete watched dependencies have finished their cleanup. */
+export function equalComputedValue<T>(
+	node: ScopedNode<T> | PlainComputed<T>,
+	next: T,
+	equals: SignalEquals<T>,
+): T {
+	if (node.flags & REACTIVE_RECURSED) return next;
+	const previous = node instanceof PlainComputed ? node.last : readyValueOf(node);
+	if (previous === NO_FAILURE || same(previous, next)) return next;
+	const tail = node.depsTail;
+	const obsolete = tail ? tail.nextDep : node.deps;
+	if (obsolete) unlinkObsolete(node, obsolete);
+	if (node.flags & REACTIVE_RECURSED) return next;
+	return untrack(() => equals(previous as T, next)) ? (previous as T) : next;
 }
 
 /** A keyed node's ready value, or NO_FAILURE when it has none. */
@@ -1807,7 +1833,7 @@ function readyValueOf(node: ScopedNode): unknown {
  * a read that presented a state or a foreign owner settles as evaluate() does.
  * Writes are rejected (pureDepth); a cycle is caught by the RECURSED_CHECK flag.
  */
-function updatePlain(node: ScopedNode): boolean {
+function updatePlain(node: ScopedNode, stabilizing?: boolean): boolean {
 	node.depsTail = undefined;
 	node.flags =
 		REACTIVE_MUTABLE | REACTIVE_RECURSED_CHECK | (node.flags & (REACTIVE_WATCHING | REACTIVE_SLOW));
@@ -1829,11 +1855,12 @@ function updatePlain(node: ScopedNode): boolean {
 		owners = activeOwners as Set<GraphOwner> | undefined;
 		activeNode = previousNode;
 		activeOwners = previousOwners;
-		node.flags &= ~REACTIVE_RECURSED_CHECK;
 		const tail = (node as ReactiveNode).depsTail;
-		let obsolete = tail ? tail.nextDep : node.deps;
-		while (obsolete) obsolete = unlink(obsolete, node);
+		const obsolete = tail ? tail.nextDep : node.deps;
+		if (obsolete) unlinkObsolete(node, obsolete);
+		node.flags &= ~REACTIVE_RECURSED_CHECK;
 	}
+	if (node.flags & REACTIVE_RECURSED) return stabilizing ? false : stabilizeScoped(node);
 	if (failure === NO_FAILURE && owners === undefined && node.valueOnly && !isThenable(value)) {
 		if (
 			node.last === value
@@ -1845,6 +1872,19 @@ function updatePlain(node: ScopedNode): boolean {
 		return true;
 	}
 	return settlePlain(node, failure, value, owners);
+}
+
+/** Discard watched-setup rounds before publishing; every retry compares with the committed state. */
+function stabilizeScoped(node: ScopedNode): boolean {
+	let rounds = 0;
+	while (true) {
+		if (++rounds > 100) throw new SignalCycleError(node.key);
+		const changed =
+			node.plain !== undefined && (signalMode & READS_SPECIAL) === 0
+				? updatePlain(node, true)
+				: evaluate(node, true);
+		if (!(node.flags & REACTIVE_RECURSED)) return changed;
+	}
 }
 
 /** updatePlain() for anything but a plain result; the node may stay quiet only with one. */
@@ -1923,14 +1963,14 @@ function settle(node: ScopedNode, next: NodeState, owners: Set<GraphOwner> | und
 	return true;
 }
 
-function evaluateLiveNode(node: ScopedNode): boolean {
+function evaluateLiveNode(node: ScopedNode, stabilizing?: boolean): boolean {
 	// First-use declarations can create live graph nodes while the renderer is
 	// presenting a historical seed. Their computations still need live inputs
 	// and dependency edges; the enclosing read retains its historical channel.
 	const previousReader = setHistoricalReader(undefined);
 	const previousAdoption = setNativeAdoptionResolver(null);
 	try {
-		return evaluate(node);
+		return evaluate(node, stabilizing);
 	} finally {
 		setNativeAdoptionResolver(previousAdoption);
 		setHistoricalReader(previousReader);
@@ -3035,21 +3075,7 @@ function stabilizeLean(node: PlainComputed, previous: unknown): boolean {
 	let rounds = 0;
 	do {
 		if (++rounds > 100) throw new SignalCycleError('');
-		const flags = node.flags;
-		let dirty = (flags & REACTIVE_DIRTY) !== 0;
-		if (!dirty) {
-			pureDepth++;
-			try {
-				dirty = checkDirty(node.deps!, node);
-			} finally {
-				pureDepth--;
-			}
-			if (!dirty) {
-				node.flags &= ~(REACTIVE_PENDING | REACTIVE_RECURSED);
-				break;
-			}
-		}
-		if (node.flags & REACTIVE_FAILED) node.last = previous;
+		node.last = previous;
 		recomputeLean(node, true);
 	} while (node.flags & REACTIVE_RECURSED);
 	return (node.flags & REACTIVE_FAILED) !== 0 || !same(previous, node.last);
@@ -3082,10 +3108,10 @@ function recomputeLean(node: PlainComputed, inStabilization?: boolean): boolean 
 		node.flags |= isThenable(error) ? REACTIVE_FAILED | REACTIVE_DIRTY : REACTIVE_FAILED;
 	} finally {
 		activeNode = previousNode;
-		node.flags &= ~REACTIVE_RECURSED_CHECK;
 		const tail = node.depsTail as Link | undefined;
-		let obsolete = tail ? tail.nextDep : node.deps;
-		while (obsolete) obsolete = unlink(obsolete, node);
+		const obsolete = tail ? tail.nextDep : node.deps;
+		if (obsolete) unlinkObsolete(node, obsolete);
+		node.flags &= ~REACTIVE_RECURSED_CHECK;
 	}
 	const previous = node.last;
 	const changed =
