@@ -374,6 +374,7 @@ function propagate(link: Link, innerWrite: boolean): void {
 				sub.flags |= REACTIVE_RECURSED;
 			}
 		} else if (!(flags & (REACTIVE_RECURSED_CHECK | REACTIVE_RECURSED))) {
+			if (runningWatchHook && flags & REACTIVE_PENDING) sub.flags = flags | REACTIVE_DIRTY;
 			flags = REACTIVE_NONE;
 		} else if (!(flags & REACTIVE_RECURSED_CHECK)) {
 			sub.flags = (flags & ~REACTIVE_RECURSED) | REACTIVE_PENDING;
@@ -484,7 +485,7 @@ function checkDirty(link: Link, sub: ReactiveNode): boolean {
 			}
 		}
 
-		return dirty && !!sub.flags;
+		return !!((dirty || sub.flags & REACTIVE_DIRTY) && sub.flags);
 	} while (true);
 }
 

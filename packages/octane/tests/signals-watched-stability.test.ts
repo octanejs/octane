@@ -38,4 +38,18 @@ describe('watched keyless stabilization', () => {
 		stop();
 		scope.dispose();
 	});
+	it('notifies a pending subscriber when a later equal dependency starts a watched source', () => {
+		const scope = createScope({ scopeKey: 'pending-subscriber-watch' });
+		const enabled = scope.signal$(null, false);
+		const earlier = scope.signal$(null, 0);
+		const watched = scope.signal$(null, 0, { watched: () => earlier.set(1) });
+		const inner = scope.derived$(null, () => (enabled.get() ? watched.get() : 0));
+		const outer = scope.derived$(null, () => earlier.get() + inner.get());
+		const seen: number[] = [];
+		const stop = outer.subscribe(() => seen.push(outer.get()));
+		enabled.set(true);
+		expect(seen).toEqual([1]);
+		stop();
+		scope.dispose();
+	});
 });
