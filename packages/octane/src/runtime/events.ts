@@ -47,6 +47,7 @@ import {
 } from './drivers.js';
 import {
 	inFlush,
+	scheduled,
 	journalRootProperty,
 	retiringHostsSince,
 	retireEventHostTree,
@@ -769,6 +770,11 @@ export function unregisterDelegationTarget(target: Node, root = false): void {
  * independently of whether this event type flushes synchronously.
  */
 export let _dispatchDepth = 0;
+// Outermost discrete delegated dispatches that ended with a flush scheduled. The
+// next flush commits with React's discrete priority (DISCRETE_FLUSH in the engine,
+// #3095). This also covers listeners in a shadow tree, which see no `window.event`,
+// including a native one whose event reaches a delegation root.
+export let DISCRETE_DISPATCH_COUNT = 0;
 
 // Both native phases share the same record, including late registrations.
 function createDelegatedEventType(name: string, flags: number): DelegatedEventType {
@@ -1406,6 +1412,8 @@ function dispatchDelegated(this: Node, event: Event): void {
 		if (nativeBatch !== undefined) {
 			if (nativeBatchHooks) closeNativeEventBatch(event, nativeBatch, false);
 			_dispatchDepth--;
+			if (_dispatchDepth === 0 && scheduled && (type.flags & EVENT_DISCRETE) !== 0)
+				DISCRETE_DISPATCH_COUNT++;
 			if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.finish(type);
 		}
 	}
@@ -1473,6 +1481,8 @@ function dispatchDelegatedCapture(
 				event.bubbles && !event.cancelBubble && (type.flags & EVENT_BUBBLE) !== 0,
 			);
 		_dispatchDepth--;
+		if (_dispatchDepth === 0 && scheduled && (type.flags & EVENT_DISCRETE) !== 0)
+			DISCRETE_DISPATCH_COUNT++;
 		CAPTURE_FINISH(event, type);
 	}
 	return stopped;

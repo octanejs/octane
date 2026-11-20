@@ -18,6 +18,7 @@ import {
 	attachRef,
 	type FragmentInstance,
 } from './refs.js';
+import { DISCRETE_EVENTS } from '../event-names.js';
 import { hydrationStarted, hydrating } from '../hydration-flag.js';
 import { renderSlice } from '../render-slice.js';
 import { type BindingHandoff, releaseBindingHandoff } from '../dom-binding-handoff.js';
@@ -369,6 +370,7 @@ import {
 	_eventRoots,
 	unregisterDelegationTarget,
 	_dispatchDepth,
+	DISCRETE_DISPATCH_COUNT,
 	CAPTURE_SLOTS,
 	type PortalEventBoundary,
 	ACTIVE_SUBMIT_DISPATCH,
@@ -651,6 +653,21 @@ export function requestFlush(): void {
 	queueMicrotask(flush);
 }
 export let syncFlush = false; // flushSync sets this to drain the queue synchronously
+// True while a flush commits discrete work, until it ends: work a discrete
+// delegated dispatch left scheduled (DISCRETE_DISPATCH_COUNT moved since the last
+// flush or flushSync drain), an update that armed the flush during a native
+// discrete event (React reads `window.event`), or a flushSync drain whose
+// callback queued work. React commits such updates in its sync lane and flushes
+// their passive effects in the commit; here only useSyncExternalStore follows it,
+// by subscribing in the commit (drainQueuedStoreSyncs, #3095). scheduleRender
+// inlines its check so an update adds no call; the colder arm sites share
+// markDiscreteFlush.
+export let DISCRETE_FLUSH = false;
+let SEEN_DISCRETE_DISPATCHES = 0;
+function markDiscreteFlush(): void {
+	const event = typeof window === 'undefined' ? undefined : window.event;
+	if (event !== undefined && DISCRETE_EVENTS.has(event.type)) DISCRETE_FLUSH = true;
+}
 // True while a flush (drainQueue/commitEffects) is on the stack. A flushSync
 // that lands during it — a handler's own flushSync, or maybeFlushDiscrete when a
 // controlled restore is pending for a DISCRETE event the browser dispatches
@@ -2183,6 +2200,8 @@ export function scheduleRender(
 	if (!scheduled) {
 		scheduled = true;
 		queueMicrotask(flush);
+		const event = typeof window === 'undefined' ? undefined : window.event;
+		if (event !== undefined && DISCRETE_EVENTS.has(event.type)) DISCRETE_FLUSH = true;
 	}
 }
 
@@ -2251,6 +2270,7 @@ export function upgradeTransitionBlock(
 	if (!scheduled) {
 		scheduled = true;
 		queueMicrotask(flush);
+		markDiscreteFlush();
 	}
 	// Nothing is left for the task: retire it. Waiting completions keep a task.
 	if (TRANSITION_QUEUE.length === 0) adoptTransitionQueue();
@@ -2760,6 +2780,8 @@ export function flush(): void {
 		FLUSHED_TRANSITION_BATCHES.length === 0 &&
 		!VIEW_TRANSITION_DRIVER
 	) {
+		DISCRETE_FLUSH = false;
+		SEEN_DISCRETE_DISPATCHES = DISCRETE_DISPATCH_COUNT;
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__devtoolsNotifyFlush();
 		return;
@@ -2997,6 +3019,10 @@ function rethrowAfterControlledRestore(error: unknown): never {
 function flushWork(): void {
 	try {
 		inFlush = true;
+		if (SEEN_DISCRETE_DISPATCHES !== DISCRETE_DISPATCH_COUNT) {
+			SEEN_DISCRETE_DISPATCHES = DISCRETE_DISPATCH_COUNT;
+			DISCRETE_FLUSH = true;
+		}
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileFlush();
 		// Batches flushed so far belong to the drain below, unless their renders
@@ -3032,6 +3058,7 @@ function flushWork(): void {
 			if (pendingError !== null) throw pendingError.err;
 		} finally {
 			inFlush = false;
+			DISCRETE_FLUSH = false;
 			if (
 				(flushedTransitions || FLUSHED_TRANSITION_BATCHES.length > 0) &&
 				TRANSITION_QUEUE.length === 0
@@ -3743,11 +3770,22 @@ export function flushSync<T>(fn?: (() => T) | null): T | void {
 	// A running animation survives; the urgent update changes the live DOM under it.
 	if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.interrupt();
 	const prevSync = syncFlush;
+	const prevDiscrete = DISCRETE_FLUSH;
+	const queuedBefore = QUEUE.length + ROOT_RENDER_TRANSACTIONS.length;
 	syncFlush = true;
 	let result: T | void;
 	try {
 		try {
 			result = nativeBatchHooks ? runNativeBatch(callback) : callback();
+			// Work the callback queued is sync, as in React; work already waiting is
+			// not, unless a discrete dispatch left it (maybeFlushDiscrete drains here).
+			if (
+				QUEUE.length + ROOT_RENDER_TRANSACTIONS.length > queuedBefore ||
+				SEEN_DISCRETE_DISPATCHES !== DISCRETE_DISPATCH_COUNT
+			) {
+				SEEN_DISCRETE_DISPATCHES = DISCRETE_DISPATCH_COUNT;
+				DISCRETE_FLUSH = true;
+			}
 			// flushSync drains both priorities, including transitions waiting for their task.
 			if (TRANSITION_TASK_DRIVER) TRANSITION_TASK_DRIVER.adopt(true);
 			// `inFlush` guards only the DRAIN below, not fn(): a nested flushSync
@@ -3805,6 +3843,7 @@ export function flushSync<T>(fn?: (() => T) | null): T | void {
 			if (pendingError !== null) throw pendingError.err;
 		} finally {
 			syncFlush = prevSync;
+			DISCRETE_FLUSH = prevDiscrete;
 		}
 	} catch (error) {
 		rethrowAfterControlledRestore(error);
@@ -5086,10 +5125,19 @@ export function useSyncExternalStore<T>(
 			},
 			block,
 			queued: false,
+			connected: null,
+			early: null,
 		};
 		inst = created;
 		created.effectDeps = [created, subscribe];
 		ensureHooks(scope).set(subs.inst, inst);
+		// An owner removed before its passive effect runs never adopts the
+		// commit-time subscription, so its unmount releases that subscription.
+		registerHookCleanup(scope, () => {
+			const early = created.early;
+			created.early = null;
+			if (typeof early === 'function') early();
+		});
 		// Always enqueue on mount: the first commit must run the tear check — for
 		// hydrate-then-sync, and for any store mutation in the render→commit window.
 		enqueueStoreSync(inst, value, subscribe);
@@ -5111,7 +5159,8 @@ export function useSyncExternalStore<T>(
 
 	// Subscription lifecycle stays a real passive effect — it owns the unsubscribe
 	// cleanup (re-subscribe on store swap, unsubscribe on unmount) a bare queue
-	// entry can't carry. inst is identity-stable, so the deps `[inst, subscribe]`
+	// entry can't carry. A new or swapped store is subscribed earlier, by the
+	// commit-time store sync, and this effect adopts that subscription (#3095). inst is identity-stable, so the deps `[inst, subscribe]`
 	// fire exactly when the old `[subscribe]` deps did. Body is the module-level
 	// deps-as-args fn (cast: EffectFn is nominally zero-arg, but the effect drain applies
 	// the deps positionally — see subscribeToStore). Keep the pair immutable once
@@ -5862,6 +5911,7 @@ export function makeRoot(
 				if (!syncFlush && !scheduled) {
 					scheduled = true;
 					queueMicrotask(flush);
+					markDiscreteFlush();
 				}
 				return;
 			}
@@ -5918,6 +5968,7 @@ export function makeRoot(
 			if (!syncFlush && !scheduled) {
 				scheduled = true;
 				queueMicrotask(flush);
+				markDiscreteFlush();
 			}
 		} finally {
 			endRootRender(frame);

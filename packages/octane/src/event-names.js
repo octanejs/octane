@@ -127,7 +127,7 @@ const TARGET_ONLY_DELEGATED = /* @__PURE__ */ new Set([
  * ReactDOMEventListener.js — getEventPriority. React's priority classification
  * is separate from its sync-lane microtask flush boundary.
  */
-const DISCRETE_EVENTS = /* @__PURE__ */ new Set([
+export const DISCRETE_EVENTS = /* @__PURE__ */ new Set([
 	'auxclick',
 	'beforeblur',
 	'beforeinput',

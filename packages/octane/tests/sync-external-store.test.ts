@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
+import { createRoot, flushSync } from '../src/index.js';
 import { mount, nextPaint } from './_helpers';
 import {
+	ClickMountedReader,
 	ConditionalReader,
+	ControlledInputMountedReader,
+	LayoutCascadeReader,
+	NativeListenerMountedReader,
+	TwoClickMountedReaders,
 	makeRetainedCallbackStore,
 	makeStore,
 	Reader,
@@ -128,6 +134,203 @@ describe('useSyncExternalStore', () => {
 		expect(r.find('#conditional-survivor')).toBe(survivor);
 		expect(r.findAll('.value')).toHaveLength(0);
 		r.unmount();
+	});
+
+	it('subscribes a click-mounted reader during the commit, before passive effects', () => {
+		// #3095: a store change between the commit and the next paint must reach a
+		// reader that a discrete event just mounted.
+		const store = makeStore(0);
+		const r = mount(ClickMountedReader, { store });
+		r.click('button');
+		expect(store.listenerCount()).toBe(1);
+
+		store.set(5);
+		flushSync(() => {});
+		expect(r.find('.value').textContent).toBe('5');
+		r.unmount();
+		expect(store.listenerCount()).toBe(0);
+	});
+
+	it('subscribes during the microtask commit of a dispatched click', async () => {
+		const store = makeStore(0);
+		const r = mount(ClickMountedReader, { store });
+		// A user event arrives in its own task, after the mount's flush.
+		await nextPaint();
+		(r.find('button') as HTMLElement).click();
+		expect(store.listenerCount()).toBe(0);
+		await Promise.resolve();
+		expect(r.find('.value').textContent).toBe('0');
+		expect(store.listenerCount()).toBe(1);
+		r.unmount();
+		expect(store.listenerCount()).toBe(0);
+	});
+
+	it('subscribes during the commit of a click delegated inside a shadow root', async () => {
+		// A listener in a shadow tree sees no window.event.
+		const host = document.createElement('div');
+		document.body.appendChild(host);
+		const container = document.createElement('div');
+		host.attachShadow({ mode: 'open' }).appendChild(container);
+		const store = makeStore(0);
+		const root = createRoot(container);
+		flushSync(() => root.render(ClickMountedReader, { store }));
+		await nextPaint();
+		(container.querySelector('button') as HTMLElement).click();
+		await Promise.resolve();
+		expect(container.querySelector('.value')?.textContent).toBe('0');
+		expect(store.listenerCount()).toBe(1);
+		root.unmount();
+		host.remove();
+		expect(store.listenerCount()).toBe(0);
+	});
+
+	it('subscribes during the commit of a native click listener inside a shadow root', async () => {
+		// The listener sees no window.event; the event's delegated dispatch marks the commit.
+		const host = document.createElement('div');
+		document.body.appendChild(host);
+		const container = document.createElement('div');
+		host.attachShadow({ mode: 'open' }).appendChild(container);
+		const store = makeStore(0);
+		const root = createRoot(container);
+		flushSync(() => root.render(NativeListenerMountedReader, { store, type: 'click' }));
+		await nextPaint();
+		container
+			.querySelector('button')!
+			.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+		await Promise.resolve();
+		expect(container.querySelector('.value')?.textContent).toBe('0');
+		expect(store.listenerCount()).toBe(1);
+		root.unmount();
+		host.remove();
+		expect(store.listenerCount()).toBe(0);
+	});
+
+	it('subscribes during the synchronous commit of a controlled input inside a shadow root', async () => {
+		const host = document.createElement('div');
+		document.body.appendChild(host);
+		const container = document.createElement('div');
+		host.attachShadow({ mode: 'open' }).appendChild(container);
+		const store = makeStore(0);
+		const root = createRoot(container);
+		flushSync(() => root.render(ControlledInputMountedReader, { store }));
+		await nextPaint();
+		const input = container.querySelector('input')!;
+		input.value = 'a';
+		input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+		expect(container.querySelector('.value')?.textContent).toBe('0');
+		expect(store.listenerCount()).toBe(1);
+		root.unmount();
+		host.remove();
+		expect(store.listenerCount()).toBe(0);
+	});
+
+	it('subscribes during the commit of an update from a native click listener', async () => {
+		const store = makeStore(0);
+		const r = mount(NativeListenerMountedReader, { store, type: 'click' });
+		// A user event arrives in its own task, after the mount's flush.
+		await nextPaint();
+		r.find('button').dispatchEvent(new MouseEvent('click'));
+		await Promise.resolve();
+		expect(r.find('.value').textContent).toBe('0');
+		expect(store.listenerCount()).toBe(1);
+		r.unmount();
+		expect(store.listenerCount()).toBe(0);
+	});
+
+	it('keeps an update from a native non-discrete listener subscribing in its passive effect', async () => {
+		const store = makeStore(0);
+		const r = mount(NativeListenerMountedReader, { store, type: 'mousemove' });
+		// A user event arrives in its own task, after the mount's flush.
+		await nextPaint();
+		r.find('button').dispatchEvent(new MouseEvent('mousemove'));
+		await Promise.resolve();
+		expect(r.find('.value').textContent).toBe('0');
+		expect(store.listenerCount()).toBe(0);
+		await nextPaint();
+		expect(store.listenerCount()).toBe(1);
+		r.unmount();
+	});
+
+	it('keeps a non-discrete mount subscribing in its passive effect', async () => {
+		const store = makeStore(0);
+		const r = mount(ConditionalReader, { store, show: false });
+		r.root.render(ConditionalReader, { store, show: true });
+		await Promise.resolve();
+		expect(r.find('.value').textContent).toBe('0');
+		expect(store.listenerCount()).toBe(0);
+		await nextPaint();
+		expect(store.listenerCount()).toBe(1);
+		r.unmount();
+	});
+
+	it('subscribes a swapped store during the commit and releases the old one after it', async () => {
+		const a = makeStore(10);
+		const b = makeStore(20);
+		const r = mount(SwappableReader, { store: a, alt: b });
+		r.update(SwappableReader, { store: b, alt: b });
+		expect(b.listenerCount()).toBe(1);
+		b.set(21);
+		flushSync(() => {});
+		expect(r.find('.value').textContent).toBe('21');
+
+		await nextPaint();
+		expect(a.listenerCount()).toBe(0);
+		expect(b.listenerCount()).toBe(1);
+		r.unmount();
+		expect(b.listenerCount()).toBe(0);
+	});
+
+	it('releases a click-mounted subscription when the root unmounts before paint', () => {
+		const store = makeStore(0);
+		const r = mount(ClickMountedReader, { store });
+		r.click('button');
+		r.unmount();
+		expect(store.listenerCount()).toBe(0);
+	});
+
+	it('releases a commit-time subscription that a layout cascade swaps before paint', async () => {
+		const a = makeStore(1);
+		const b = makeStore(2);
+		const r = mount(LayoutCascadeReader, { store: a, next: b, mode: 'swap' });
+		r.click('button');
+		await nextPaint();
+		expect(r.find('.value').textContent).toBe('2');
+		expect(a.listenerCount()).toBe(0);
+		expect(b.listenerCount()).toBe(1);
+		r.unmount();
+		expect(b.listenerCount()).toBe(0);
+	});
+
+	it('disconnects a commit-time subscription that a layout cascade hides before paint', async () => {
+		const a = makeStore(1);
+		const r = mount(LayoutCascadeReader, { store: a, next: a, mode: 'hide' });
+		r.click('button');
+		await nextPaint();
+		expect(a.listenerCount()).toBe(0);
+		r.unmount();
+		expect(a.listenerCount()).toBe(0);
+	});
+
+	it('keeps subscribing later readers when an earlier subscribe throws', async () => {
+		const failing = makeStore(0);
+		const failure = new Error('subscribe failed');
+		failing.subscribe = () => {
+			throw failure;
+		};
+		const second = makeStore(0);
+		const errors: unknown[] = [];
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const root = createRoot(container, { onUncaughtError: (error) => errors.push(error) });
+		root.render(TwoClickMountedReaders, { first: failing, second });
+		flushSync(() => {});
+		flushSync(() => (container.querySelector('button') as HTMLElement).click());
+		expect(second.listenerCount()).toBe(1);
+		await nextPaint();
+		expect(errors).toContain(failure);
+		root.unmount();
+		container.remove();
+		expect(second.listenerCount()).toBe(0);
 	});
 
 	it('swapping the store unsubscribes from the old and subscribes to the new', async () => {

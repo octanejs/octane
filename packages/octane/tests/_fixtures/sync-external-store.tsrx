@@ -1,4 +1,11 @@
-import { useSyncExternalStore, useCallback } from 'octane';
+import {
+	Activity,
+	useSyncExternalStore,
+	useCallback,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from 'octane';
 
 type StoreListener = () => void;
 type StoreLike = {
@@ -101,4 +108,84 @@ export function makeRetainedCallbackStore(initial = 0): StoreLike & {
 		},
 		listenerCount: () => listeners.size,
 	};
+}
+
+// Mounts a reader from a click, as a submenu opened by one key press would.
+export function ClickMountedReader(props: { store: StoreLike }) @{
+	const [shown, setShown] = useState(false);
+	<div>
+		<button onClick={() => setShown(true)}>{'Show'}</button>
+		@if (shown) {
+			<Reader store={props.store} />
+		}
+	</div>
+}
+
+// A click mounts the reader, then a layout effect in the same commit swaps its
+// store or hides it before the reader's passive effect has run.
+export function LayoutCascadeReader(props: {
+	store: StoreLike;
+	next: StoreLike;
+	mode: 'swap' | 'hide';
+}) @{
+	const [shown, setShown] = useState(false);
+	const [swapped, setSwapped] = useState(false);
+	const [hidden, setHidden] = useState(false);
+	useLayoutEffect(() => {
+		if (!shown) return;
+		if (props.mode === 'swap') setSwapped(true);
+		else setHidden(true);
+	}, [shown]);
+	<div>
+		<button onClick={() => setShown(true)}>{'Show'}</button>
+		@if (shown) {
+			<Activity mode={hidden ? 'hidden' : 'visible'}>
+				<Reader store={swapped ? props.next : props.store} />
+			</Activity>
+		}
+	</div>
+}
+
+// Two readers mounted by one click; the first store's subscribe can throw.
+export function TwoClickMountedReaders(props: { first: StoreLike; second: StoreLike }) @{
+	const [shown, setShown] = useState(false);
+	<div>
+		<button onClick={() => setShown(true)}>{'Show'}</button>
+		@if (shown) {
+			<>
+				<Reader store={props.first} />
+				<Reader store={props.second} />
+			</>
+		}
+	</div>
+}
+
+// Mounts a reader from a native listener that Octane does not delegate.
+export function NativeListenerMountedReader(props: { store: StoreLike; type: string }) @{
+	const [shown, setShown] = useState(false);
+	const button = useRef<HTMLButtonElement | null>(null);
+	useLayoutEffect(() => {
+		const node = button.current!;
+		const show = () => setShown(true);
+		node.addEventListener(props.type, show);
+		return () => node.removeEventListener(props.type, show);
+	}, [props.type]);
+	<div>
+		<button ref={button}>{'Show'}</button>
+		@if (shown) {
+			<Reader store={props.store} />
+		}
+	</div>
+}
+
+// A controlled input whose first edit mounts the reader; its discrete dispatch
+// commits synchronously before the controlled restore.
+export function ControlledInputMountedReader(props: { store: StoreLike }) @{
+	const [text, setText] = useState('');
+	<div>
+		<input value={text} onInput={(event) => setText((event.target as HTMLInputElement).value)} />
+		@if (text !== '') {
+			<Reader store={props.store} />
+		}
+	</div>
 }

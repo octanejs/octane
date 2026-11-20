@@ -22,6 +22,7 @@ import {
 	runEffectBody,
 	LAYOUT_SNAPSHOT_DRIVER,
 	FRAME_SNAPSHOT_DRIVER,
+	DISCRETE_FLUSH,
 } from './engine.js';
 import { nodeProto } from '../dom-focused-move.js';
 import { hydrationStarted } from '../hydration-flag.js';
@@ -601,6 +602,17 @@ export function drainQueuedStoreSyncs(): void {
 			if (inst.block.disposed || inInactiveSubtree(inst.block)) continue;
 			inst.value = inst.pending;
 			if (checkStoreChanged(inst)) inst.forceUpdate();
+			// A discrete event's or flushSync's commit subscribes a new or swapped
+			// store now, before paint, as React does by flushing that commit's passive
+			// effects (#3095). The passive effect adopts this subscription, so it still
+			// owns the release and stays connected through a Suspense hide. If
+			// subscribe throws, that effect subscribes again and reports the error.
+			if (DISCRETE_FLUSH && inst.connected !== inst.subscribe) {
+				try {
+					inst.early = inst.subscribe(inst.onStoreChange);
+					inst.connected = inst.subscribe;
+				} catch {}
+			}
 		}
 	} finally {
 		STORE_SYNC_DEPTH--;
