@@ -512,9 +512,13 @@ function isValidLink(checkLink: Link, sub: ReactiveNode): boolean {
 	return false;
 }
 
+/** Whether a signal write in the current synchronous context would be rejected. */
+export function isSignalReadOnly(): boolean {
+	return pureDepth !== 0 || activeNode instanceof PlainComputed || isNativeWriteGuarded();
+}
+
 export function assertWritable(): void {
-	if (pureDepth || activeNode instanceof PlainComputed || isNativeWriteGuarded())
-		throw new SignalWriteError();
+	if (isSignalReadOnly()) throw new SignalWriteError();
 }
 
 export function setHistoricalReader(
