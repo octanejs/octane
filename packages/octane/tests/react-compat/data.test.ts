@@ -17,7 +17,7 @@ import {
 } from '../../src/data/index.js';
 import { mount } from '../_helpers.js';
 import { createServer, setDone, todos } from '../_data-todos.js';
-import { DataPage } from './data.tsrx';
+import { DataPage, SharedTitles } from './data.tsrx';
 import { PagesPage } from './data-pages.tsrx';
 import { FeedPage } from './data-feed.tsrx';
 
@@ -142,6 +142,30 @@ describe('octane/data/octane writes in a transition', () => {
 });
 
 describe('one store across a ReactCompat boundary', () => {
+	it.each(['Octane', 'React'] as const)(
+		'shows a cached title in both renderers while paused and refreshes both when %s resumes',
+		async (active) => {
+			const server = createServer();
+			const store = createDataStore({ transport: server.transport });
+			await store.publish(todos, undefined, [{ id: 'a', title: 'Saved', done: false }]);
+			store.invalidate(['todo']);
+			let mounted!: ReturnType<typeof mount>;
+			await run(() => {
+				mounted = mount(SharedTitles, { store, active: null });
+				dispose.push(() => mounted.unmount());
+			});
+			const titles = () =>
+				Array.from(mounted.container.querySelectorAll('output'), (output) => output.textContent);
+			expect(titles()).toEqual(['Saved', 'Saved']);
+			expect(server.log).toEqual([]);
+
+			await run(() => mounted.update(SharedTitles, { store, active }));
+			await settle();
+			expect(titles()).toEqual(['Tides', 'Tides']);
+			expect(server.log).toEqual(['list']);
+		},
+	);
+
 	it('shares one load between the Octane page and the React island', async () => {
 		const page = setup(true);
 		const container = await page.mount();

@@ -3,7 +3,20 @@ import type { DataStore } from 'octane/data';
 import { useTransition } from 'octane';
 import { DataProvider, useDataStore, useRead } from 'octane/data/octane';
 import { setDone, todos } from '../_data-todos.js';
-import { ReactTodoPanel } from './data.react.js';
+import { ReactTitle, ReactTodoPanel } from './data.react.js';
+
+export function SharedTitles(props: { store: DataStore; active: 'React' | 'Octane' | null }) @{
+	const { value } = useRead(props.store.read(todos), {
+		suspend: false,
+		fetch: props.active === 'Octane',
+	});
+	<>
+		<output>{(value?.[0]?.title ?? '') as string}</output>
+		<ReactCompat>
+			<ReactTitle store={props.store} fetch={props.active === 'React'} />
+		</ReactCompat>
+	</>
+}
 
 function OctaneDoneCount() @{
 	const state = useRead(useDataStore().read(todos), { suspend: false });

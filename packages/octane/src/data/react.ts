@@ -11,7 +11,14 @@ import type { Write } from './contracts.js';
 import type { FeedHandle, FeedSnapshot } from './feeds.js';
 import { formViews, type FormView } from './form.js';
 import type { PagesHandle, PagesSnapshot } from './pages.js';
-import { loading, type DataStore, type ReadHandle, type ReadSnapshot } from './store.js';
+import {
+	loading,
+	pausedSubscription,
+	type DataStore,
+	type ReadHandle,
+	type ReadSnapshot,
+	type ReadSnapshotOptions,
+} from './store.js';
 
 const StoreContext = createContext<DataStore | null>(null);
 
@@ -30,19 +37,18 @@ export function useDataStore(): DataStore {
  * is mounted. It suspends under the nearest `<Suspense>` until the first value
  * arrives, and throws a failed first load to the nearest error boundary; later
  * reloads keep the last value on screen. With `{ suspend: false }` it returns
- * the live snapshot instead. Equal arguments resolve to one handle, so its
- * methods are stable across renders.
+ * the live snapshot instead. Add `fetch: false` to restore and follow cached
+ * values while pausing this reader's automatic fetches.
  */
 export function useRead<T>(handle: ReadHandle<T>): T;
+export function useRead<T>(handle: ReadHandle<T>, options: ReadSnapshotOptions): ReadSnapshot<T>;
 export function useRead<T>(
 	handle: ReadHandle<T>,
-	options: { readonly suspend: false },
-): ReadSnapshot<T>;
-export function useRead<T>(
-	handle: ReadHandle<T>,
-	options?: { readonly suspend: false },
+	options?: ReadSnapshotOptions,
 ): T | ReadSnapshot<T> {
-	const snapshot = useSyncExternalStore(handle.subscribe, handle.getSnapshot, handle.getSnapshot);
+	const subscribe =
+		options?.fetch === false ? pausedSubscription(handle, options) : handle.subscribe;
+	const snapshot = useSyncExternalStore(subscribe, handle.getSnapshot, handle.getSnapshot);
 	if (options?.suspend === false) return snapshot;
 	if (snapshot.status === 'error') throw snapshot.error;
 	if (snapshot.status === 'pending') use(loading(useDataStore(), handle));

@@ -22,7 +22,14 @@ import type { Write } from './contracts.js';
 import type { FeedHandle, FeedSnapshot } from './feeds.js';
 import { formViews, type FormView } from './form.js';
 import type { PagesHandle, PagesSnapshot } from './pages.js';
-import { loading, type DataStore, type ReadHandle, type ReadSnapshot } from './store.js';
+import {
+	loading,
+	pausedSubscription,
+	type DataStore,
+	type ReadHandle,
+	type ReadSnapshot,
+	type ReadSnapshotOptions,
+} from './store.js';
 
 type Runtime = Pick<
 	typeof Client,
@@ -37,11 +44,13 @@ export interface OctaneDataBinding {
 	 * is mounted. It suspends under the nearest `@pending` or `<Suspense>` until
 	 * the first value arrives, and throws a failed first load to the nearest
 	 * `@catch` or error boundary; later reloads keep the last value on screen.
-	 * With `{ suspend: false }` it returns the live snapshot instead.
+	 * With `{ suspend: false }` it returns the live snapshot instead. Add
+	 * `fetch: false` to restore and follow cached values while pausing this
+	 * reader's automatic fetches.
 	 */
 	useRead: {
 		<T>(handle: ReadHandle<T>): T;
-		<T>(handle: ReadHandle<T>, options: { readonly suspend: false }): ReadSnapshot<T>;
+		<T>(handle: ReadHandle<T>, options: ReadSnapshotOptions): ReadSnapshot<T>;
 	};
 	/**
 	 * Show a list a page at a time, from a handle: `pages(store, view, params)`,
@@ -65,7 +74,10 @@ export interface OctaneDataBinding {
 }
 
 /** A read whose input is omitted receives the slot in the input position. */
-function split(input: unknown, slot: symbol | undefined): [unknown, symbol | undefined] {
+function split<T>(
+	input: T | symbol | undefined,
+	slot: symbol | undefined,
+): [T | undefined, symbol | undefined] {
 	return typeof input === 'symbol' ? [undefined, input] : [input, slot];
 }
 
@@ -80,15 +92,16 @@ export function createOctaneDataBinding(runtime: Runtime): OctaneDataBinding {
 	}
 
 	// Equal arguments resolve to one handle, so a handle's methods are stable across renders.
-	function useRead(handle: ReadHandle<any>, options?: unknown, slot?: symbol) {
+	function useRead(handle: ReadHandle<any>, options?: ReadSnapshotOptions | symbol, slot?: symbol) {
 		const [given, hookSlot] = split(options, slot);
+		const subscribe = given?.fetch === false ? pausedSubscription(handle, given) : handle.subscribe;
 		const snapshot = useSyncExternalStore(
-			handle.subscribe,
+			subscribe,
 			handle.getSnapshot,
 			handle.getSnapshot,
 			hookSlot,
 		);
-		if ((given as { suspend?: boolean } | undefined)?.suspend === false) return snapshot;
+		if (given?.suspend === false) return snapshot;
 		if (snapshot.status === 'error') throw snapshot.error;
 		if (snapshot.status === 'pending') use(loading(useDataStore(), handle));
 		return snapshot.value;
