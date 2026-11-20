@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/zustand",
-  "version": "0.1.75",
+  "version": "0.1.76",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -50,7 +50,7 @@
     "zustand": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.22.0"
+    "octane": "workspace:^0.23.0"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",
