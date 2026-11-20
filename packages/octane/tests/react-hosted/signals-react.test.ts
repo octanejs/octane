@@ -18,7 +18,12 @@ import {
 	type Scope,
 	type SignalHandle,
 } from '../../src/signals/index.js';
-import { SignalScopeProvider, useSignalScope, useSignalValue } from '../../src/signals/react.js';
+import {
+	useRetainedSignalValue,
+	SignalScopeProvider,
+	useSignalScope,
+	useSignalValue,
+} from '../../src/signals/react.js';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 const act: <T>(scope: () => T | Promise<T>) => Promise<T> = (React as any).act;
@@ -153,6 +158,85 @@ describe('octane/signals/react', () => {
 		await act(() => root.render(tree('visible')));
 		expect(subscribers(scope, 'value')).toBe(1);
 		expect(container.textContent).toBe('b');
+	});
+
+	it('keeps a watched handle observed through Activity and releases it after hidden deletion', async () => {
+		const scope = createScope({ scopeKey: 'retained-activity' });
+		const stop = vi.fn();
+		const watch = vi.fn(() => stop);
+		const value$ = scope.signal$('value', 'first', { watched: watch });
+		function Reader() {
+			return h('output', null, useRetainedSignalValue(value$));
+		}
+		const child = h(Reader);
+		const tree = (mode: 'visible' | 'hidden') => h((React as any).Activity, { mode }, child);
+		const { root, container } = mount(tree('visible'));
+		await act(() => {
+			value$.set('queued');
+			root.render(tree('hidden'));
+		});
+		expect(stop).not.toHaveBeenCalled();
+		await act(() => root.render(tree('visible')));
+		expect(container.textContent).toBe('queued');
+		await act(() => root.render(tree('hidden')));
+		await act(() => value$.set('hidden'));
+		await act(() => root.render(tree('visible')));
+		expect(container.textContent).toBe('hidden');
+		expect(watch).toHaveBeenCalledOnce();
+		await act(() => root.render(tree('hidden')));
+		await act(() => root.render(null));
+		expect(stop).toHaveBeenCalledOnce();
+		expect(subscribers(scope, 'value')).toBe(0);
+	});
+
+	it('hands a watched source between returning Activities with hidden retention disabled', async () => {
+		const scope = createScope({ scopeKey: 'activity-handoff' });
+		const stop = vi.fn();
+		const value$ = scope.signal$('value', 0, { watched: () => stop });
+		function Reader() {
+			return h('output', null, useRetainedSignalValue(value$, undefined, false));
+		}
+		const activity = (visible: boolean) =>
+			h((React as any).Activity, { mode: visible ? 'visible' : 'hidden' }, h(Reader));
+		const tree = (first: boolean) => h(React.Fragment, null, activity(first), activity(!first));
+		const { root } = mount(tree(true));
+		await act(() => root.render(tree(false)));
+		stop.mockClear();
+
+		await act(() => root.render(tree(true)));
+		expect(stop).not.toHaveBeenCalled();
+		expect(subscribers(scope, 'value')).toBe(1);
+		await act(() => root.render(null));
+		expect(stop).toHaveBeenCalledOnce();
+	});
+
+	it('releases a replaced retained handle and follows changes to the retention policy', async () => {
+		const scope = createScope({ scopeKey: 'retention-policy' });
+		const first = scope.signal$('first', 'first');
+		const second = scope.signal$('second', 'second');
+		function Reader({ handle, retain }: { handle: SignalHandle<string>; retain: boolean }) {
+			return h('output', null, useRetainedSignalValue(handle, undefined, retain));
+		}
+		const tree = (mode: 'visible' | 'hidden', handle: SignalHandle<string>, retain: boolean) =>
+			h(
+				React.StrictMode,
+				null,
+				h((React as any).Activity, { mode }, h(Reader, { handle, retain })),
+			);
+		const { root, container } = mount(tree('visible', first, true));
+		await act(() => root.render(tree('hidden', first, true)));
+		expect(subscribers(scope, 'first')).toBe(1);
+		await act(() => root.render(tree('hidden', second, true)));
+		await act(() => root.render(tree('visible', second, true)));
+		expect(container.textContent).toBe('second');
+		expect(subscribers(scope, 'first')).toBe(0);
+		expect(subscribers(scope, 'second')).toBe(1);
+		await act(() => root.render(tree('visible', second, false)));
+		await act(() => root.render(tree('hidden', second, false)));
+		expect(subscribers(scope, 'second')).toBe(0);
+		await act(() => second.set('new'));
+		await act(() => root.render(tree('visible', second, false)));
+		expect(container.textContent).toBe('new');
 	});
 
 	it('moves its subscription when the handle or the provided scope changes', async () => {
