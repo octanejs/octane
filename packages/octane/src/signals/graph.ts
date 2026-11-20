@@ -394,6 +394,19 @@ function unlink(link: Link, sub = link.sub): Link | undefined {
 	return nextDep;
 }
 
+/** Finish obsolete dependencies while the computation still rejects recursive reads. */
+function unlinkObsolete(node: ReactiveNode, first: Link): void {
+	let obsolete: Link | undefined = first;
+	try {
+		do {
+			obsolete = unlink(obsolete, node);
+		} while (obsolete !== undefined);
+	} catch (error) {
+		node.flags &= ~REACTIVE_RECURSED_CHECK;
+		throw error;
+	}
+}
+
 function propagate(link: Link, innerWrite: boolean): void {
 	const origin = link.dep;
 	let next = link.nextSub;
@@ -1739,10 +1752,10 @@ function evaluate(node: ScopedNode, stabilizing?: boolean): boolean {
 		activeOwners = previousOwners;
 		activeNode = previousNode;
 		setNativeReadObserver(previousObserver);
-		node.flags &= ~REACTIVE_RECURSED_CHECK;
 		const tail = (node as ReactiveNode).depsTail;
-		let obsolete = tail ? tail.nextDep : node.deps;
-		while (obsolete) obsolete = unlink(obsolete, node);
+		const obsolete = tail ? tail.nextDep : node.deps;
+		if (obsolete) unlinkObsolete(node, obsolete);
+		node.flags &= ~REACTIVE_RECURSED_CHECK;
 		if (pending) pending.leave(world, node);
 	}
 	if (node.flags & REACTIVE_RECURSED) {
@@ -1786,16 +1799,23 @@ export function computeEqual<T>(
 	// A keyless node holds its value or error in `last`; until its first result,
 	// and from a failure until its next, `last` is NO_FAILURE.
 	if (node instanceof PlainComputed) node.last = NO_FAILURE;
-	return () => {
-		const next = compute();
-		if (node.flags & REACTIVE_RECURSED) return next;
-		const previous = node instanceof PlainComputed ? node.last : readyValueOf(node);
-		return previous !== NO_FAILURE &&
-			!same(previous, next) &&
-			untrack(() => equals(previous as T, next))
-			? (previous as T)
-			: next;
-	};
+	return () => equalComputedValue(node, compute(), equals);
+}
+
+/** Compare only after obsolete watched dependencies have finished their cleanup. */
+export function equalComputedValue<T>(
+	node: ScopedNode<T> | PlainComputed<T>,
+	next: T,
+	equals: SignalEquals<T>,
+): T {
+	if (node.flags & REACTIVE_RECURSED) return next;
+	const previous = node instanceof PlainComputed ? node.last : readyValueOf(node);
+	if (previous === NO_FAILURE || same(previous, next)) return next;
+	const tail = node.depsTail;
+	const obsolete = tail ? tail.nextDep : node.deps;
+	if (obsolete) unlinkObsolete(node, obsolete);
+	if (node.flags & REACTIVE_RECURSED) return next;
+	return untrack(() => equals(previous as T, next)) ? (previous as T) : next;
 }
 
 /** A keyed node's ready value, or NO_FAILURE when it has none. */
@@ -1835,10 +1855,10 @@ function updatePlain(node: ScopedNode, stabilizing?: boolean): boolean {
 		owners = activeOwners as Set<GraphOwner> | undefined;
 		activeNode = previousNode;
 		activeOwners = previousOwners;
-		node.flags &= ~REACTIVE_RECURSED_CHECK;
 		const tail = (node as ReactiveNode).depsTail;
-		let obsolete = tail ? tail.nextDep : node.deps;
-		while (obsolete) obsolete = unlink(obsolete, node);
+		const obsolete = tail ? tail.nextDep : node.deps;
+		if (obsolete) unlinkObsolete(node, obsolete);
+		node.flags &= ~REACTIVE_RECURSED_CHECK;
 	}
 	if (node.flags & REACTIVE_RECURSED) return stabilizing ? false : stabilizeScoped(node);
 	if (failure === NO_FAILURE && owners === undefined && node.valueOnly && !isThenable(value)) {
@@ -3088,10 +3108,10 @@ function recomputeLean(node: PlainComputed, inStabilization?: boolean): boolean 
 		node.flags |= isThenable(error) ? REACTIVE_FAILED | REACTIVE_DIRTY : REACTIVE_FAILED;
 	} finally {
 		activeNode = previousNode;
-		node.flags &= ~REACTIVE_RECURSED_CHECK;
 		const tail = node.depsTail as Link | undefined;
-		let obsolete = tail ? tail.nextDep : node.deps;
-		while (obsolete) obsolete = unlink(obsolete, node);
+		const obsolete = tail ? tail.nextDep : node.deps;
+		if (obsolete) unlinkObsolete(node, obsolete);
+		node.flags &= ~REACTIVE_RECURSED_CHECK;
 	}
 	const previous = node.last;
 	const changed =

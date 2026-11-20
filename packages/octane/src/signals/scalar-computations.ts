@@ -4,6 +4,7 @@ import {
 	CandidateUnsupportedError,
 	createDeclarationView,
 	derivedResult,
+	equalComputedValue,
 	errorState,
 	invalidateNode,
 	linkReads,
@@ -27,20 +28,7 @@ import type {
 	DerivedSignal,
 	OwnerScope,
 	ScopeSignalOptions,
-	SignalEquals,
 } from './types.js';
-
-/** Compare only an existing ready result, including a transition shadow's own result. */
-function equalScalarValue<T>(node: ScopedNode<T>, next: T, equals: SignalEquals<T>): T {
-	let previous: T;
-	if (node.valueOnly) previous = node.last as T;
-	else {
-		const snapshot = node.state?.snapshot;
-		if (snapshot?.status !== 'ready') return next;
-		previous = snapshot.value;
-	}
-	return !Object.is(previous, next) && untrack(() => equals(previous, next)) ? previous : next;
-}
 
 /**
  * The compiler selects this only for a zero-context callback whose result is
@@ -98,7 +86,7 @@ class ScalarBinding<T>
 				return errorState(error);
 			}
 			// sync:true retains its existing thenable-as-value assertion semantics.
-			return derivedResult(target, equals ? equalScalarValue(target, result, equals) : result);
+			return derivedResult(target, equals ? equalComputedValue(target, result, equals) : result);
 		};
 	}
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createScope, type WritableSignal } from 'octane/signals';
+import { createScope, derived$, runWithSignalOwner, type WritableSignal } from 'octane/signals';
 
 describe('watched derived stabilization', () => {
 	it.each([null, 'selected'] as const)('compares only the stabilized value (%s)', (key) => {
@@ -68,6 +68,109 @@ describe('watched derived stabilization', () => {
 			scope.dispose();
 		},
 	);
+
+	it.each([null, 'selected'] as const)(
+		'keeps setup invalidation through watched cleanup (%s)',
+		(key) => {
+			const scope = createScope({ scopeKey: 'setup-and-cleanup' });
+			const enabled$ = scope.signal$(null, false);
+			const value$ = scope.signal$(null, 0);
+			const cleanup$ = scope.signal$(null, 0);
+			const old$ = scope.signal$(null, 0, { watched: () => () => cleanup$.set(1) });
+			const fresh$ = scope.signal$(null, 0, { watched: () => value$.set(2) });
+			const comparisons: Array<readonly [{ v: number }, { v: number }]> = [];
+			const selected$ = scope.derived$(
+				key,
+				() => {
+					const v = value$.get();
+					cleanup$.get();
+					(enabled$.get() ? fresh$ : old$).get();
+					return { v };
+				},
+				{
+					equals(previous, next) {
+						comparisons.push([previous, next]);
+						return previous.v === next.v;
+					},
+				},
+			);
+			const committed = selected$.get();
+			let notices = 0;
+			const stop = selected$.subscribe(() => notices++);
+			enabled$.set(true);
+			expect(selected$.get()).toEqual({ v: 2 });
+			expect(notices).toBe(1);
+			expect(comparisons).toHaveLength(1);
+			expect(comparisons[0]?.[0]).toBe(committed);
+			stop();
+			scope.dispose();
+		},
+	);
+
+	it.each([null, 'selected'] as const)(
+		'compares after watched cleanup has finished (%s)',
+		(key) => {
+			const scope = createScope({ scopeKey: 'cleanup-comparison' });
+			const enabled$ = scope.signal$(null, false);
+			const value$ = scope.signal$(null, 0);
+			const old$ = scope.signal$(null, 0, { watched: () => () => value$.set(2) });
+			const comparisons: Array<readonly [number, number]> = [];
+			const selected$ = scope.derived$(
+				key,
+				() => {
+					const v = value$.get();
+					if (!enabled$.get()) old$.get();
+					return { v };
+				},
+				{
+					equals(previous, next) {
+						comparisons.push([previous.v, next.v]);
+						if (next.v === 0) throw new Error('provisional comparison');
+						return previous.v === next.v;
+					},
+				},
+			);
+			selected$.get();
+			const stop = selected$.subscribe(() => {});
+			enabled$.set(true);
+			expect(selected$.get()).toEqual({ v: 2 });
+			expect(comparisons).toEqual([[0, 2]]);
+			stop();
+			scope.dispose();
+		},
+	);
+
+	it('stabilizes configured authored derived equality through watched cleanup', () => {
+		const scope = createScope({ scopeKey: 'authored-cleanup' });
+		const enabled$ = scope.signal$(null, false);
+		const value$ = scope.signal$(null, 0);
+		const old$ = scope.signal$(null, 0, { watched: () => () => value$.set(2) });
+		const comparisons: Array<readonly [number, number]> = [];
+		const selected$ = derived$(
+			() => {
+				const v = value$.get();
+				if (!enabled$.get()) old$.get();
+				return { v };
+			},
+			{
+				key: 'selected',
+				sync: true,
+				equals(previous, next) {
+					comparisons.push([previous.v, next.v]);
+					return previous.v === next.v;
+				},
+			},
+		);
+		runWithSignalOwner(scope, () => {
+			selected$.get();
+			const stop = selected$.subscribe(() => {});
+			enabled$.set(true);
+			expect(selected$.get()).toEqual({ v: 2 });
+			expect(comparisons).toEqual([[0, 2]]);
+			stop();
+		});
+		scope.dispose();
+	});
 
 	it.each([null, 'parent'] as const)('filters a net-equal watched change (%s)', (key) => {
 		const scope = createScope({ scopeKey: 'net-equal-watch' });
