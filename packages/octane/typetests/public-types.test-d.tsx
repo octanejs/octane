@@ -3,6 +3,7 @@ import { createElement, memo } from 'octane';
 import type * as React from 'react';
 import type { Octane } from 'octane/jsx-runtime';
 import type {
+	AriaRole,
 	ComponentProps,
 	ComponentPropsWithoutRef,
 	ComponentRef,
@@ -10,7 +11,10 @@ import type {
 	CSSProperties,
 	Dispatch,
 	FC,
+	HTMLAttributeAnchorTarget,
+	HTMLAttributeReferrerPolicy,
 	HTMLAttributes,
+	HTMLInputTypeAttribute,
 	InputHTMLAttributes,
 	JSX,
 	MouseEventHandler,
@@ -127,3 +131,26 @@ const reusableIntrinsicValue: React.InputHTMLAttributes<HTMLInputElement>['value
 declare const namespaceIntrinsicValue: Octane.JSX.IntrinsicElements['input']['value'];
 const reusableNamespaceValue: React.InputHTMLAttributes<HTMLInputElement>['value'] =
 	namespaceIntrinsicValue;
+
+// Octane declares these unions so a library's emitted declarations name them
+// from `octane`; each stays exactly React's, as do the host props that use them.
+type Equal<A, B> =
+	(<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+declare function expectType<T extends true>(): void;
+expectType<Equal<AriaRole, React.AriaRole>>();
+expectType<Equal<HTMLAttributeAnchorTarget, React.HTMLAttributeAnchorTarget>>();
+expectType<Equal<HTMLAttributeReferrerPolicy, React.HTMLAttributeReferrerPolicy>>();
+expectType<Equal<HTMLInputTypeAttribute, React.HTMLInputTypeAttribute>>();
+expectType<Equal<ComponentProps<'svg'>['role'], React.SVGAttributes<SVGSVGElement>['role']>>();
+expectType<
+	Equal<ComponentProps<'a'>['target'], React.AnchorHTMLAttributes<HTMLAnchorElement>['target']>
+>();
+expectType<
+	Equal<
+		ComponentProps<'img'>['referrerpolicy'],
+		React.ImgHTMLAttributes<HTMLImageElement>['referrerPolicy']
+	>
+>();
+expectType<
+	Equal<ComponentProps<'input'>['type'], React.InputHTMLAttributes<HTMLInputElement>['type']>
+>();

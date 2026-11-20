@@ -42,7 +42,14 @@
  */
 import type * as React from 'react';
 import type * as CSS from 'csstype';
-import type { ElementDescriptor, FragmentInstance } from './index.js';
+import type {
+	AriaRole,
+	ElementDescriptor,
+	FragmentInstance,
+	HTMLAttributeAnchorTarget,
+	HTMLAttributeReferrerPolicy,
+	HTMLInputTypeAttribute,
+} from './index.js';
 import type { SignalHandle } from './signals/types.js';
 
 /**
@@ -182,7 +189,10 @@ type UnboundProps =
 	| 'children';
 
 /** Octane's attribute transform over one React attribute interface. */
-type Transformed<P, T> = Omit<P, ReactSyntheticProps | 'className' | 'style' | 'children'> &
+type Transformed<P, T> = Omit<
+	P,
+	ReactSyntheticProps | 'className' | 'style' | 'children' | 'role'
+> &
 	NativeEventHandlers<P, T & EventTarget> & {
 		class?: ClassValue;
 		className?: ClassValue;
@@ -190,6 +200,7 @@ type Transformed<P, T> = Omit<P, ReactSyntheticProps | 'className' | 'style' | '
 		xmlns?: string | undefined;
 		style?: string | CSSProperties | undefined;
 		children?: unknown;
+		role?: AriaRole | undefined;
 	};
 
 type BoundStyle<S> = S | SignalCSSProperties | null | SignalHandle<S | SignalCSSProperties | null>;
@@ -229,8 +240,13 @@ declare namespace Octane {
 
 	type DetailedHTMLProps<E, T> = RefAttributes<T> & E & NativeLowercaseAttributes<E>;
 
-	interface AnchorHTMLAttributes<T> extends Transformed<React.AnchorHTMLAttributes<T>, T> {}
-	interface AreaHTMLAttributes<T> extends Transformed<React.AreaHTMLAttributes<T>, T> {}
+	interface AnchorHTMLAttributes<T> extends Transformed<React.AnchorHTMLAttributes<T>, T> {
+		target?: HTMLAttributeAnchorTarget | undefined;
+		referrerPolicy?: HTMLAttributeReferrerPolicy | undefined;
+	}
+	interface AreaHTMLAttributes<T> extends Transformed<React.AreaHTMLAttributes<T>, T> {
+		referrerPolicy?: HTMLAttributeReferrerPolicy | undefined;
+	}
 	interface AudioHTMLAttributes<T> extends Transformed<React.AudioHTMLAttributes<T>, T> {}
 	interface BaseHTMLAttributes<T> extends Transformed<React.BaseHTMLAttributes<T>, T> {}
 	interface BlockquoteHTMLAttributes<T> extends Transformed<React.BlockquoteHTMLAttributes<T>, T> {}
@@ -254,14 +270,22 @@ declare namespace Octane {
 	interface HTMLAttributes<T> extends Transformed<React.HTMLAttributes<T>, T> {}
 	interface AllHTMLAttributes<T> extends Transformed<React.AllHTMLAttributes<T>, T> {}
 	interface HtmlHTMLAttributes<T> extends Transformed<React.HtmlHTMLAttributes<T>, T> {}
-	interface IframeHTMLAttributes<T> extends Transformed<React.IframeHTMLAttributes<T>, T> {}
-	interface ImgHTMLAttributes<T> extends Transformed<React.ImgHTMLAttributes<T>, T> {}
-	interface InputHTMLAttributes<T> extends Transformed<React.InputHTMLAttributes<T>, T> {}
+	interface IframeHTMLAttributes<T> extends Transformed<React.IframeHTMLAttributes<T>, T> {
+		referrerPolicy?: HTMLAttributeReferrerPolicy | undefined;
+	}
+	interface ImgHTMLAttributes<T> extends Transformed<React.ImgHTMLAttributes<T>, T> {
+		referrerPolicy?: HTMLAttributeReferrerPolicy | undefined;
+	}
+	interface InputHTMLAttributes<T> extends Transformed<React.InputHTMLAttributes<T>, T> {
+		type?: HTMLInputTypeAttribute | undefined;
+	}
 	interface InsHTMLAttributes<T> extends Transformed<React.InsHTMLAttributes<T>, T> {}
 	interface KeygenHTMLAttributes<T> extends Transformed<React.KeygenHTMLAttributes<T>, T> {}
 	interface LabelHTMLAttributes<T> extends Transformed<React.LabelHTMLAttributes<T>, T> {}
 	interface LiHTMLAttributes<T> extends Transformed<React.LiHTMLAttributes<T>, T> {}
-	interface LinkHTMLAttributes<T> extends Transformed<React.LinkHTMLAttributes<T>, T> {}
+	interface LinkHTMLAttributes<T> extends Transformed<React.LinkHTMLAttributes<T>, T> {
+		referrerPolicy?: HTMLAttributeReferrerPolicy | undefined;
+	}
 	interface MapHTMLAttributes<T> extends Transformed<React.MapHTMLAttributes<T>, T> {}
 	interface MenuHTMLAttributes<T> extends Transformed<React.MenuHTMLAttributes<T>, T> {}
 	interface MetaHTMLAttributes<T> extends Transformed<React.MetaHTMLAttributes<T>, T> {}
@@ -278,7 +302,9 @@ declare namespace Octane {
 		hidden?: React.HTMLAttributes<T>['hidden'];
 		tabindex?: NativeAttributeValue<React.SVGAttributes<T>['tabIndex']>;
 	}
-	interface ScriptHTMLAttributes<T> extends Transformed<React.ScriptHTMLAttributes<T>, T> {}
+	interface ScriptHTMLAttributes<T> extends Transformed<React.ScriptHTMLAttributes<T>, T> {
+		referrerPolicy?: HTMLAttributeReferrerPolicy | undefined;
+	}
 	interface SelectHTMLAttributes<T> extends Transformed<React.SelectHTMLAttributes<T>, T> {}
 	interface SlotHTMLAttributes<T> extends Transformed<React.SlotHTMLAttributes<T>, T> {}
 	interface SourceHTMLAttributes<T> extends Transformed<React.SourceHTMLAttributes<T>, T> {}

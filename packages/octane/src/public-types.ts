@@ -122,10 +122,13 @@ export interface StrictModeProps {
 	children?: OctaneNode;
 }
 export type AriaAttributes = React.AriaAttributes;
-export type AriaRole = React.AriaRole;
-export type HTMLInputTypeAttribute = React.HTMLInputTypeAttribute;
-export type HTMLAttributeReferrerPolicy = React.HTMLAttributeReferrerPolicy;
-export type HTMLAttributeAnchorTarget = React.HTMLAttributeAnchorTarget;
+// Exactly React's unions, but `Extract` makes each a new type declared here: a
+// library's emitted declarations then name it from `octane`, not `react`, which
+// only Octane depends on. A plain alias is React's own type and is named there.
+export type AriaRole = Extract<React.AriaRole, string>;
+export type HTMLInputTypeAttribute = Extract<React.HTMLInputTypeAttribute, string>;
+export type HTMLAttributeReferrerPolicy = Extract<React.HTMLAttributeReferrerPolicy, string>;
+export type HTMLAttributeAnchorTarget = Extract<React.HTMLAttributeAnchorTarget, string>;
 export type Booleanish = boolean | 'true' | 'false';
 export type CrossOrigin = '' | 'anonymous' | 'use-credentials' | undefined;
 export type DetailedHTMLProps<E, T> = Octane.DetailedHTMLProps<E, T>;
