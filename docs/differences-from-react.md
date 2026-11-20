@@ -1705,10 +1705,10 @@ or from an update made during a discrete event (such as `click` or `keydown`),
 whether the listener is a delegated prop or a native `addEventListener`
 callback. In a discrete commit, a newly mounted reader, or one whose `subscribe`
 changed, subscribes after layout effects and before paint. Its passive effect
-adopts that subscription, so a Suspense hide keeps it connected as in React. A
-swapped store's old subscription is released with the passive cleanup. Other
-commits subscribe in the passive effect. A native listener's update counts as
-discrete when it is the first to schedule the commit, or when its event also
+adopts that subscription, so a Suspense hide keeps it connected as in React. When
+`subscribe` changes, the old subscription is released before its replacement is
+installed. Other commits release and subscribe in the passive effect. A native
+listener's update counts as discrete when it is the first to schedule the commit, or when its event also
 reaches an Octane delegation root; otherwise an update that joins a commit
 already scheduled in the same task keeps that commit's priority.
 

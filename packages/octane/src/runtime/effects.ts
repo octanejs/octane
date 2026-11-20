@@ -60,7 +60,12 @@ import {
 	blockSubtreeDisposed,
 	discardSubtreeRefAttachesFrom,
 } from './refs.js';
-import { type StateSlot, deferHiddenRevealAction, inInactiveSubtree } from './hooks.js';
+import {
+	type StateSlot,
+	deferHiddenRevealAction,
+	inInactiveSubtree,
+	subscribeToStore,
+} from './hooks.js';
 import { RENDER_VALID } from './block.js';
 import { findScheduledVisibilityOwner } from './suspense.js';
 import {
@@ -381,10 +386,18 @@ function refPosition(entry: RefAttach): Node {
 	return (entry.el as FragmentInstance)._startMarker ?? (entry.el as Element);
 }
 
-export function fireEffectCleanup(e: PendingEffect): void {
+function currentEffectSlot(e: PendingEffect): EffectSlot | undefined {
 	const slot = e.scope.hooks?.get(e.slot) as EffectSlot | undefined;
-	if (slot === undefined || slot.revision !== e.revision) return;
-	if (!nativeEffectPublicationCurrent(e, slot)) return;
+	if (slot === undefined || slot.revision !== e.revision) return undefined;
+	return nativeEffectPublicationCurrent(e, slot) ? slot : undefined;
+}
+
+export function fireEffectCleanup(e: PendingEffect): void {
+	const slot = currentEffectSlot(e);
+	if (slot !== undefined) fireCurrentEffectCleanup(e, slot);
+}
+
+function fireCurrentEffectCleanup(e: PendingEffect, slot: EffectSlot): void {
 	const disconnect = e.fn === null;
 	const cleanup = slot.cleanup;
 	if (disconnect) {
@@ -584,14 +597,15 @@ export function checkStoreChanged(inst: StoreInst<any>): boolean {
 // render-read snapshot to the committed `value`, then tear-check against the store
 // as of NOW — if a mutation slipped into the render→commit window (e.g. a sibling
 // layout effect that mutated+notified), force a re-render so the DOM catches up.
-// No sort (order is irrelevant: each entry only touches its own inst) and no
-// cleanup bookkeeping — the whole point of not routing these through the effect drains.
-export function drainQueuedStoreSyncs(): void {
+// No sort is needed: each entry only touches its own inst. A discrete
+// subscription replacement uses the actual passive effect's cleanup and receipt.
+export function drainQueuedStoreSyncs(passives: PendingEffect[] = effectQueues[PASSIVE]): void {
 	if (storeSyncQueue.length === 0) return;
 	// Snapshot-and-clear up front (like the effect drains): a forced re-render below could
 	// synchronously re-enter this drain; it must see only entries queued AFTER this
 	// point, never re-process the batch we already own.
 	const q = storeSyncQueue.splice(0);
+	let subscriptions: Map<StoreInst<any>, PendingEffect> | undefined;
 	STORE_SYNC_DEPTH++;
 	try {
 		for (let i = 0; i < q.length; i++) {
@@ -608,10 +622,61 @@ export function drainQueuedStoreSyncs(): void {
 			// owns the release and stays connected through a Suspense hide. If
 			// subscribe throws, that effect subscribes again and reports the error.
 			if (DISCRETE_FLUSH && inst.connected !== inst.subscribe) {
+				let effect: PendingEffect | undefined;
+				if (inst.connected !== null) {
+					// A previous early effect has not been adopted yet. Let the passive
+					// effect own that handoff rather than overlapping registrations.
+					if (inst.early !== null) continue;
+					// StoreInst entries have no native-publication receipt. Index the
+					// actual passive subscription effects once for this discrete drain.
+					if (subscriptions === undefined) {
+						subscriptions = new Map();
+						for (const effect of passives) {
+							if (effect.fn === subscribeToStore && effect.args !== undefined)
+								subscriptions.set(effect.args[0], effect);
+						}
+					}
+					effect = subscriptions.get(inst);
+					if (effect === undefined || effect.args !== inst.effectDeps) continue;
+					const slot = currentEffectSlot(effect);
+					if (slot === undefined) continue;
+					// Stores may deduplicate callbacks or own one handler. Retire the
+					// previous registration before installing the replacement.
+					inst.connected = null;
+					fireCurrentEffectCleanup(effect, slot);
+					// User cleanup can unmount/hide the reader, supersede this effect,
+					// or synchronously connect it by draining passive work.
+					if (
+						inst.block.disposed ||
+						inInactiveSubtree(inst.block) ||
+						inst.connected !== null ||
+						effect.args !== inst.effectDeps ||
+						currentEffectSlot(effect) !== slot
+					)
+						continue;
+				}
+				let release: Cleanup;
 				try {
-					inst.early = inst.subscribe(inst.onStoreChange);
-					inst.connected = inst.subscribe;
-				} catch {}
+					release = inst.subscribe(inst.onStoreChange);
+				} catch {
+					continue; // The passive effect retries and reports a persistent error.
+				}
+				if (
+					inst.block.disposed ||
+					inInactiveSubtree(inst.block) ||
+					(effect !== undefined &&
+						(effect.args !== inst.effectDeps || currentEffectSlot(effect) === undefined))
+				) {
+					try {
+						runEffectCleanupCallback(release, PASSIVE, effect?.scope ?? inst.block);
+					} catch (err) {
+						if (err instanceof MaximumUpdateDepthError) throw err;
+						reportEffectError(inst.block, err);
+					}
+					continue;
+				}
+				inst.early = release;
+				inst.connected = inst.subscribe;
 			}
 		}
 	} finally {
