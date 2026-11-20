@@ -1,3 +1,5 @@
+import { setFlagsFromString } from 'node:v8';
+import { runInNewContext } from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 import * as ServerRuntime from 'octane/server';
 
@@ -14,6 +16,13 @@ import { createScopedElement, createScopedValue } from '../src/internal/client.j
 import { act, mount } from './_helpers.js';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
 import * as tsx from './_fixtures/scoped-jsx-values.tsx';
+import {
+	DisclosureOwner,
+	disclosureLabels,
+	type DisclosureControls,
+	type DisclosureOwnerProps,
+} from './_fixtures/scoped-jsx-retention.tsx';
+import { NativeDisclosureOwner } from './_fixtures/scoped-jsx-retention-native.tsx';
 
 const tsrxSource = String.raw`
 import {
@@ -1511,6 +1520,68 @@ it('allows later inherited setters to write copied children before deferral', ()
 	} finally {
 		delete (Object.prototype as Record<string, unknown>)[property];
 	}
+});
+
+// A WeakRef keeps its target alive until the current job ends, so collect on
+// later macrotasks.
+async function collectGarbage(): Promise<void> {
+	setFlagsFromString('--expose-gc');
+	const gc = runInNewContext('gc') as () => void;
+	setFlagsFromString('--no-expose-gc');
+	for (let attempt = 0; attempt < 3; attempt++) {
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		gc();
+	}
+}
+
+// Open, weakly observe, and close the disclosure. Kept out of async frames so
+// no strong local outlives the call.
+function openAndClose(
+	view: ReturnType<typeof mount>,
+	controls: DisclosureControls,
+	into: WeakRef<Element>[],
+): void {
+	flushSync(() => controls.toggle());
+	const rows = view.findAll('[data-row]');
+	expect(rows.map((row) => row.textContent)).toEqual(disclosureLabels);
+	into.push(new WeakRef(view.find('[data-disclosure]')));
+	for (const row of rows) into.push(new WeakRef(row));
+	flushSync(() => controls.toggle());
+	expect(view.findAll('[data-disclosure]')).toHaveLength(0);
+}
+
+describe('scoped JSX children after their rendered subtree closes', () => {
+	it.each([
+		['ordinary', DisclosureOwner],
+		// The owner's module imports octane/signals.
+		['native-read', NativeDisclosureOwner],
+	] as const)(
+		'%s children release every closed subtree while their owner stays mounted',
+		async (_, Owner) => {
+			let controls!: DisclosureControls;
+			const props: DisclosureOwnerProps = {
+				bind(next) {
+					controls = next;
+				},
+			};
+			const view = mount(Owner, props);
+			const closed: WeakRef<Element>[] = [];
+			try {
+				// The owner never re-renders, so both opens render the same row
+				// elements: the first close and the last one must each be released.
+				openAndClose(view, controls, closed);
+				openAndClose(view, controls, closed);
+				await collectGarbage();
+				const retained = closed.flatMap((ref) => {
+					const node = ref.deref();
+					return node === undefined ? [] : [`${node.localName}:${node.textContent}`];
+				});
+				expect(retained).toEqual([]);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
 });
 
 describe('TSRX directives nested in JSX values', () => {

@@ -833,7 +833,10 @@ export function createScopedResolver<T>(read: () => T): () => T {
 				// fallback, so even an unsuccessful attempt contributes dependencies.
 				if (previousTracking && nextReads !== null) replayScopedContextReads(nextReads, null);
 			}
-			resolvedScope = scope;
+			// Only a context-reading record compares scopes. Holding the scope of a
+			// record that read none would keep its subtree, often since disposed,
+			// alive for as long as the shared descriptor lives.
+			resolvedScope = nextReads === null ? null : scope;
 			resolvedReads = nextReads;
 			resolvedValue = next;
 			resolved = true;
@@ -899,7 +902,8 @@ export function createNativeScopedResolver<T>(read: () => T): () => T {
 					if (previousTracking && nextReads !== null) replayScopedContextReads(nextReads, null);
 					nextWitness = finishNativeReadWitness(witnessToken, readCompleted);
 				}
-				resolvedScope = scope;
+				// As in createScopedResolver, only a context-reading record keeps its scope.
+				resolvedScope = nextReads === null ? null : scope;
 				resolvedReads = nextReads;
 				// An imperative inspection stays untracked. Recompute once inside a
 				// real render before trusting it as native evidence for this record.
@@ -907,8 +911,10 @@ export function createNativeScopedResolver<T>(read: () => T): () => T {
 				resolvedValue = next;
 				resolved = true;
 			} else {
-				resolvedScope = scope;
-				if (resolvedReads !== null) replayScopedContextReads(resolvedReads, CURRENT_BLOCK);
+				if (resolvedReads !== null) {
+					resolvedScope = scope;
+					replayScopedContextReads(resolvedReads, CURRENT_BLOCK);
+				}
 				if (collecting) replayNativeReadWitness(resolvedWitness);
 			}
 			completed = true;
