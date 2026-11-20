@@ -17,8 +17,11 @@ import {
 	ScopeDisposedError,
 	type Scope,
 	type SignalHandle,
+	type WritableSignal,
 } from '../../src/signals/index.js';
 import {
+	RetainedSignalProvider,
+	useOptionalRetainedSignalValue,
 	useRetainedSignalValue,
 	SignalScopeProvider,
 	useSignalSubscription,
@@ -245,6 +248,79 @@ describe('octane/signals/react', () => {
 			expect(stop).toHaveBeenCalledOnce();
 		},
 	);
+
+	it.each(['retained', 'subscription'] as const)(
+		'%s readers inherit and can override nested Activity retention defaults',
+		async (kind) => {
+			const scope = createScope({ scopeKey: `provider-${kind}` });
+			const value$ = scope.signal$('value', 'current');
+			function RetainedReader({ explicit }: { explicit?: boolean | undefined }) {
+				return h('output', null, useRetainedSignalValue(value$, undefined, explicit));
+			}
+			function SubscriptionReader({ explicit }: { explicit?: boolean | undefined }) {
+				const subscribe = useSignalSubscription(value$, explicit);
+				return h(
+					'output',
+					null,
+					React.useSyncExternalStore(subscribe, () => value$.get()),
+				);
+			}
+			const Reader = kind === 'retained' ? RetainedReader : SubscriptionReader;
+			const tree = (mode: 'visible' | 'hidden', nested?: boolean, explicit?: boolean) =>
+				h(
+					RetainedSignalProvider,
+					{ retainOnHide: false },
+					h(
+						RetainedSignalProvider,
+						{ retainOnHide: nested },
+						h((React as any).Activity, { mode }, h(Reader, { explicit })),
+					),
+				);
+			const { root } = mount(tree('visible'));
+			await act(() => root.render(tree('hidden')));
+			expect(subscribers(scope, 'value')).toBe(0);
+			await act(() => root.render(tree('visible', true)));
+			await act(() => root.render(tree('hidden', true)));
+			expect(subscribers(scope, 'value')).toBe(1);
+			await act(() => root.render(tree('visible', true, false)));
+			await act(() => root.render(tree('hidden', true, false)));
+			expect(subscribers(scope, 'value')).toBe(0);
+			await act(() => root.render(tree('visible', false, true)));
+			await act(() => root.render(tree('hidden', false, true)));
+			expect(subscribers(scope, 'value')).toBe(1);
+		},
+	);
+
+	it('returns an exact inactive fallback without observing and preserves nullable live values', async () => {
+		const scope = createScope({ scopeKey: 'optional-reader' });
+		const value$ = scope.signal$('value', null as string | null);
+		function Reader({ source }: { source: SignalHandle<string | null> | 'off' | false | null }) {
+			const value = useOptionalRetainedSignalValue(source);
+			return h('output', null, value === null ? 'null' : String(value));
+		}
+		const tree = (source: SignalHandle<string | null> | 'off' | false | null, hidden = false) =>
+			h(
+				RetainedSignalProvider,
+				{ retainOnHide: false },
+				h((React as any).Activity, { mode: hidden ? 'hidden' : 'visible' }, h(Reader, { source })),
+			);
+		const { root, container } = mount(tree('off'));
+		expect(container.textContent).toBe('off');
+		expect(subscribers(scope, 'value')).toBe(0);
+		await act(() => root.render(tree(value$)));
+		expect(container.textContent).toBe('null');
+		expect(subscribers(scope, 'value')).toBe(1);
+		await act(() => root.render(tree(value$, true)));
+		expect(subscribers(scope, 'value')).toBe(0);
+		await act(() => root.render(tree(value$)));
+		await act(() => value$.set('live'));
+		expect(container.textContent).toBe('live');
+		await act(() => root.render(tree(false)));
+		expect(container.textContent).toBe('false');
+		expect(subscribers(scope, 'value')).toBe(0);
+		await act(() => root.render(tree(null)));
+		expect(container.textContent).toBe('null');
+	});
 
 	it('releases a replaced retained handle and follows changes to the retention policy', async () => {
 		const scope = createScope({ scopeKey: 'retention-policy' });
@@ -626,9 +702,9 @@ describe('octane/signals/react', () => {
 
 	it('hydrates from a seeded scope and keeps server requests apart', async () => {
 		const greetings = new WeakMap<Scope, SignalHandle<string>>();
-		const names = new WeakMap<Scope, ReturnType<Scope['signal$']>>();
+		const names = new WeakMap<Scope, WritableSignal<string>>();
 		const requestScope = (name: string, seed?: ReturnType<Scope['serialize']>) => {
-			const scope = createScope({ scopeKey: 'request', seed });
+			const scope = createScope({ scopeKey: 'request', ...(seed ? { seed } : {}) });
 			const name$ = scope.signal$('name', name);
 			names.set(scope, name$);
 			greetings.set(
@@ -715,6 +791,63 @@ describe('octane/signals/react', () => {
 		roots.splice(roots.indexOf(root), 1);
 		expect(scope.inspect().retired).toBe(false);
 		scope.dispose();
+	});
+
+	it('uses the inherited historical snapshot for SSR and hydration, with explicit snapshots taking precedence', async () => {
+		const scope = createScope({ scopeKey: 'provider-historical' });
+		const name$ = scope.signal$('name', 'Ada');
+		const seed = scope.serialize();
+		const frame = scope.beginAdoption(seed);
+		name$.set('Lin');
+		const resolve = <T>(handle: SignalHandle<T>): T => frame.run(() => handle.get());
+		function Greeting({
+			explicit,
+			layouts,
+		}: {
+			explicit?: (() => string) | undefined;
+			layouts?: string[] | undefined;
+		}) {
+			const name = useRetainedSignalValue(name$, explicit);
+			React.useLayoutEffect(() => {
+				layouts?.push(name);
+			}, [name, layouts]);
+			return h('p', null, name);
+		}
+		const tree = (explicit?: () => string, layouts?: string[]) =>
+			h(
+				RetainedSignalProvider,
+				{ getServerSnapshot: resolve },
+				h(RetainedSignalProvider, { retainOnHide: false }, h(Greeting, { explicit, layouts })),
+			);
+		function OptionalGreeting() {
+			return h('p', null, useOptionalRetainedSignalValue(name$));
+		}
+		expect(
+			renderToString(
+				h(RetainedSignalProvider, { getServerSnapshot: resolve }, h(OptionalGreeting)),
+			),
+		).toBe('<p>Ada</p>');
+		expect(renderToString(tree(() => 'override'))).toBe('<p>override</p>');
+		const container = document.createElement('div');
+		container.innerHTML = renderToString(tree());
+		expect(container.innerHTML).toBe('<p>Ada</p>');
+		const original = container.firstChild;
+		const errors: unknown[] = [];
+		const layouts: string[] = [];
+		let root!: Root;
+		await act(() => {
+			root = hydrateRoot(container, tree(undefined, layouts), {
+				onRecoverableError: (error) => errors.push(error),
+			});
+		});
+		roots.push(root);
+		expect(errors).toEqual([]);
+		expect(container.firstChild).toBe(original);
+		expect(layouts[0]).toBe('Ada');
+		expect(container.textContent).toBe('Lin');
+		frame.release();
+		await act(() => name$.set('Grace'));
+		expect(container.textContent).toBe('Grace');
 	});
 
 	it('suspends on a pending async handle and throws its failure', async () => {
