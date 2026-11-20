@@ -2,6 +2,39 @@ import { describe, expect, it, vi } from 'vitest';
 import { createScope, observeSignalChanges, type SignalHandle } from 'octane/signals';
 
 describe('signal change diagnostics', () => {
+	it('does not report initial keyed writable refresh as a value change', () => {
+		const scope = createScope({ scopeKey: 'first-keyed-write' });
+		const source = scope.signal$('source', 1);
+		const events: string[] = [];
+		const stop = observeSignalChanges((handle, phase) => {
+			if (handle === source) events.push(phase);
+		});
+		source.set(1);
+		expect(events).toEqual(['write']);
+		source.set(2);
+		expect(events).toEqual(['write', 'write', 'change']);
+		stop();
+		scope.dispose();
+	});
+
+	it.each(['get', 'subscribe'] as const)('reports keyed derived changes through %s', (mode) => {
+		const scope = createScope({ scopeKey: `keyed-derived-${mode}` });
+		const source = scope.signal$('source', 1);
+		const derived = scope.derived$('derived', () => source.get() * 2);
+		derived.get();
+		const release = mode === 'subscribe' ? derived.subscribe(() => {}) : () => {};
+		const events: string[] = [];
+		const stop = observeSignalChanges((handle, phase) => {
+			if (handle === derived) events.push(phase);
+		});
+		source.set(2);
+		if (mode === 'get') derived.get();
+		expect(events).toEqual(['change']);
+		stop();
+		release();
+		scope.dispose();
+	});
+
 	it('prevents diagnostic callbacks from changing an updater result', () => {
 		const scope = createScope({ scopeKey: 'observer-write-guard' });
 		const source = scope.signal$(null, 0);

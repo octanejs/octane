@@ -1463,7 +1463,7 @@ export function readValue<T>(node: ScopedNode<T>): T {
 	// here; anything else (a node being computed, a re-entered or retired one) goes on.
 	if (
 		node.valueOnly &&
-		(signalMode & READS_SPECIAL) === 0 &&
+		(signalMode & (READS_SPECIAL | CHANGE_OBSERVED)) === 0 &&
 		!(node.flags & (REACTIVE_RECURSED | REACTIVE_RECURSED_CHECK | REACTIVE_SLOW)) &&
 		fresh(node)
 	) {
@@ -1871,7 +1871,7 @@ function update(node: ScopedNode | PlainComputed): boolean {
 			node.plain !== undefined && (signalMode & READS_SPECIAL) === 0
 				? updatePlain(node)
 				: evaluate(node);
-		if (changed) reportChange(node, 'change');
+		if (changed && node.kind !== 'signal') reportChange(node, 'change');
 		return changed;
 	}
 	return evaluate(node);
@@ -2172,7 +2172,7 @@ function observeCurrent(observer: SignalObserver, observed: ScopedNode): boolean
 	// Bringing a node up to date tracks no read, so it needs no untracking.
 	if (!(
 		node.valueOnly &&
-		(signalMode & READS_SPECIAL) === 0 &&
+		(signalMode & (READS_SPECIAL | CHANGE_OBSERVED)) === 0 &&
 		!(node.flags & (REACTIVE_RECURSED | REACTIVE_RECURSED_CHECK | REACTIVE_SLOW)) &&
 		fresh(node)
 	))
@@ -2231,7 +2231,7 @@ function runObserver(observer: SignalObserver): void {
 		if (
 			observer.plain &&
 			node.valueOnly &&
-			(signalMode & READS_SPECIAL) === 0 &&
+			(signalMode & (READS_SPECIAL | CHANGE_OBSERVED)) === 0 &&
 			!(node.flags & (REACTIVE_RECURSED | REACTIVE_RECURSED_CHECK | REACTIVE_SLOW)) &&
 			fresh(node)
 		) {
