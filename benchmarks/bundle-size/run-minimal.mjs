@@ -54,6 +54,7 @@ const existingScenarios = [
 	['signal-instance-derived', 'tsrx'],
 	['prop-attributes', 'tsrx'],
 	['context', 'tsrx'],
+	['guarded-component-tag', 'tsrx'],
 	['context-arms', 'tsrx'],
 	['memo-context', 'tsrx'],
 	['controlled-input', 'tsrx'],
@@ -357,6 +358,12 @@ const featureControls = {
 	'reexported-components': {
 		dropped: ['hostStringTagBody', ...hostDescriptorRenderer],
 		kept: ['componentSlotLite', 'componentSlotVoid'],
+	},
+	// A runtime-chosen component under a typeof-function guard cannot be a host
+	// string, so it skips the generic slot's host-tag renderer.
+	'guarded-component-tag': {
+		dropped: ['hostStringTagBody', ...hostDescriptorRenderer],
+		kept: ['componentSlotFunction'],
 	},
 	context: {
 		dropped: [

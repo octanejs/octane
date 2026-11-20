@@ -37502,12 +37502,68 @@ function isImmutableComponentTag(tag, ctx) {
 function isFunctionComponentTag(tag, ctx) {
 	if (tag?.type !== 'JSXIdentifier' && tag?.type !== 'Identifier') return false;
 	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	ctx.functionGuardedTags ??= collectFunctionGuardedTags(ctx.activityModuleAst, lexical);
+	if (ctx.functionGuardedTags.has(tag)) return true;
 	const scope = lexical.nodeScopes.get(tag);
 	if (scope === undefined || lexical.resolveBinding(scope, tag.name)?.scope !== lexical.rootScope)
 		return false;
 	if (ctx.moduleFunctionDeclarations?.has(tag.name)) return true;
 	ctx.lazyComponentBindings ??= collectLazyComponentBindings(ctx, lexical);
 	return ctx.lazyComponentBindings.has(tag.name);
+}
+
+// Tags of a `const` local inside the consequent of `typeof Local === 'function'`
+// (an `@if`, `@else if` or plain `if`). A const cannot change after the test, and
+// every component value (a function, memo(), lazy(), a Context) is a function,
+// so the tag is never a host string.
+function collectFunctionGuardedTags(ast, lexical) {
+	const tags = new WeakSet();
+	const consts = new WeakMap();
+	const bindingOf = (id) => lexical.resolveBinding(lexical.nodeScopes.get(id), id.name)?.scope;
+	const isConst = (id) => consts.get(bindingOf(id))?.has(id.name) === true;
+	const guarded = (test) => {
+		if (test?.type !== 'BinaryExpression' || (test.operator !== '===' && test.operator !== '=='))
+			return null;
+		const [unary, literal] =
+			test.left?.type === 'UnaryExpression' ? [test.left, test.right] : [test.right, test.left];
+		const id =
+			unary?.type === 'UnaryExpression' && unary.operator === 'typeof' ? unary.argument : null;
+		return id?.type === 'Identifier' && literal?.type === 'Literal' && literal.value === 'function'
+			? id
+			: null;
+	};
+	const collect = (node) => {
+		if (node === null || typeof node !== 'object') return;
+		if (node.type === 'VariableDeclaration' && node.kind === 'const') {
+			for (const declaration of node.declarations ?? []) {
+				if (declaration.id?.type !== 'Identifier') continue;
+				const scope = bindingOf(declaration.id);
+				if (scope === undefined) continue;
+				let names = consts.get(scope);
+				if (names === undefined) consts.set(scope, (names = new Set()));
+				names.add(declaration.id.name);
+			}
+		}
+		forEachRuntimeAstChild(node, collect);
+	};
+	const walk = (node, guards) => {
+		if (node === null || typeof node !== 'object') return;
+		if (
+			node.type === 'JSXIdentifier' &&
+			guards.some((id) => id.name === node.name && bindingOf(id) === bindingOf(node))
+		)
+			tags.add(node);
+		forEachRuntimeAstChild(node, (child, key) => {
+			const id =
+				key === 'consequent' && (node.type === 'JSXIfExpression' || node.type === 'IfStatement')
+					? guarded(node.test)
+					: null;
+			walk(child, id !== null && isConst(id) ? [...guards, id] : guards);
+		});
+	};
+	collect(ast);
+	walk(ast, []);
+	return tags;
 }
 
 function collectLazyComponentBindings(ctx, lexical) {
