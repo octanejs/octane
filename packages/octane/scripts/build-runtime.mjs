@@ -31,6 +31,7 @@ export const COMMONJS_ENTRIES = [
 	'src/data/index.ts',
 	'src/data/server.ts',
 	'src/signals/index.ts',
+	'src/signals/core.ts',
 	'src/signals/client.ts',
 	'src/signals/server.ts',
 ];

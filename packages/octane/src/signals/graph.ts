@@ -8,8 +8,6 @@ import {
 	type CandidateContext,
 	type PendingSlotLike,
 } from './transition-state.js';
-import { installSignalActions } from '#octane/signal-actions/graph';
-import { installServerReads } from '#octane/signals/server-reads';
 import {
 	assertAlive,
 	ScopeDisposedError,
@@ -270,7 +268,7 @@ const retainedNodes = new WeakMap<GraphOwner, Set<ScopedNode>>();
 // Small enough that propagate, which calls it per watched node, still inlines into a write.
 function notifyNode(node: ReactiveNode): void {
 	if (node instanceof EffectNode) queueEffect(node);
-	else if (node instanceof ScopedNode) notifyScoped(node);
+	else if (isScopedNode(node)) keyed!.notify(node);
 	else enqueue(node as SignalObserver);
 }
 
@@ -672,7 +670,7 @@ function drain(): void {
 			work();
 		} else if (work !== undefined) {
 			work.queuedAt = 0;
-			if (!work.owner.retired) refreshNode(work);
+			if (!work.owner.retired) keyed!.refresh(work);
 		}
 	}
 }
@@ -987,9 +985,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 		return equals !== undefined && !restoring && untrack(() => equals(previous, next));
 	}
 
-	get [SIGNAL_HANDLE](): true {
-		return true;
-	}
+	declare readonly [SIGNAL_HANDLE]: true;
 	deps: ReactiveNode['deps'];
 	depsTail: ReactiveNode['depsTail'];
 	subs: ReactiveNode['subs'];
@@ -1171,41 +1167,15 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 		return readValue(this);
 	}
 
-	[SIGNAL_BINDING_READ](): T {
-		return readSignalBinding(this);
-	}
-
-	[SIGNAL_BINDING_SUBSCRIBE](
+	declare [SIGNAL_BINDING_READ]: () => T;
+	declare [SIGNAL_BINDING_SUBSCRIBE]: (
 		notify: () => void,
 		onRetire?: () => void,
 		speculative?: boolean,
-	): NativeReadSubscription {
-		assertAlive(this.owner);
-		// An optional native lease can end when its exact owner retires. A live
-		// computation throwing ScopeDisposedError still uses normal invalidation.
-		return attachObserver(
-			this,
-			onRetire === undefined
-				? notify
-				: forwardNativeTransitionConsumer(notify, () =>
-						this.owner.retired ? onRetire() : notify(),
-					),
-			true,
-			speculative,
-		);
-	}
-
-	[SIGNAL_BINDING_RETIRED](): boolean {
-		return this.owner.retired;
-	}
-
-	[SIGNAL_BINDING_IDENTITY]() {
-		return { scope: 'instance' as const, nodeKey: this.key };
-	}
-
-	[NATIVE_DOM_VALUE](): T {
-		return this.get();
-	}
+	) => NativeReadSubscription;
+	declare [SIGNAL_BINDING_RETIRED]: () => boolean;
+	declare [SIGNAL_BINDING_IDENTITY]: () => { scope: 'instance'; nodeKey: string };
+	declare [NATIVE_DOM_VALUE]: () => T;
 
 	set(value: T | ((previous: T) => T)): void {
 		// The common write, in the shape of alien-signals': a value, not an updater,
@@ -1425,11 +1395,6 @@ class GraphReadSource implements NativeReadSource {
 	}
 }
 
-if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-	GraphReadSource.prototype.inspect = function (this: GraphReadSource) {
-		return this.canonicalSource()?.inspect!() ?? inspectNativeNode(this.node, this.read);
-	};
-
 export function readNode<T>(node: ScopedNode<T>, read: SignalReadMode = 'value'): NodeState<T> {
 	assertAlive(node.owner);
 	const historical = historicalReader?.(node, read) as NodeState<T> | undefined;
@@ -1506,7 +1471,7 @@ function fresh(node: ScopedNode): boolean {
 		}
 		if (!dirty) node.flags = flags & ~REACTIVE_PENDING;
 	}
-	if (dirty && updatePlain(node) && node.subs !== undefined) shallowPropagate(node.subs);
+	if (dirty && keyed!.updatePlain(node) && node.subs !== undefined) shallowPropagate(node.subs);
 	return node.valueOnly && !(node.flags & (REACTIVE_DIRTY | REACTIVE_PENDING));
 }
 
@@ -1873,6 +1838,10 @@ function settlePlain(
 /** evaluate(node), by the plain steps when the node and the moment allow them. */
 function update(node: ScopedNode | PlainComputed): boolean {
 	if (node instanceof PlainComputed) return updateLean(node);
+	return keyed!.update(node);
+}
+
+function updateScoped(node: ScopedNode): boolean {
 	if (node.plain !== undefined && (signalMode & (READS_SPECIAL | CHANGE_OBSERVED)) === 0)
 		return updatePlain(node);
 	if (signalMode & CHANGE_OBSERVED) {
@@ -2163,7 +2132,7 @@ function isPlainReady(state: NodeState | undefined, value: unknown): boolean {
  * without building a value-only node's state.
  */
 function observeCurrent(observer: SignalObserver, observed: ScopedNode): boolean {
-	const node = observed as ScopedNode | PlainComputed;
+	const node = observed as ScopedNode | PlainComputed | PlainCell;
 	if (node instanceof PlainComputed) {
 		try {
 			refreshLean(node);
@@ -2178,6 +2147,16 @@ function observeCurrent(observer: SignalObserver, observed: ScopedNode): boolean
 		observer.previous = undefined;
 		return false;
 	}
+	if (node instanceof PlainCell) {
+		if (observer.plain && Object.is(observer.value, node.last)) return true;
+		observer.plain = true;
+		observer.value = node.last;
+		return false;
+	}
+	return keyed!.observe(observer, node);
+}
+
+function observeScoped(observer: SignalObserver, node: ScopedNode): boolean {
 	// Bringing a node up to date tracks no read, so it needs no untracking.
 	if (!(
 		node.valueOnly &&
@@ -2489,7 +2468,7 @@ export function signalTransaction<T>(write: () => T): SignalTransaction<T> {
 		const changes: SignalChange[] = [];
 		for (const [node, previous] of own) {
 			if (parent !== undefined && !parent.has(node)) parent.set(node, previous);
-			if (!(node instanceof ScopedNode || node instanceof PlainCell)) continue;
+			if (!(node instanceof PlainCell || isScopedNode(node))) continue;
 			const next = node.last;
 			if (!Object.is(previous, next))
 				changes.push({ signal$: node as unknown as WritableSignal<unknown>, previous, next });
@@ -2519,12 +2498,10 @@ function restore(
 	restoring = mode;
 	try {
 		for (const [key, value] of entries) {
-			if (key instanceof ScopedNode || key instanceof PlainCell) {
+			if (key instanceof PlainCell || isScopedNode(key)) {
 				if (!key.owner.retired) key.set(() => value);
 			} else {
-				const slot = key as PendingSlotLike;
-				if (slot.node.pending === slot && !slot.node.owner.retired)
-					publishNode(slot.shadow!, readyState(value));
+				keyed!.restorePending(key as PendingSlotLike, value);
 			}
 		}
 	} finally {
@@ -2761,7 +2738,7 @@ function countLink(dep: ReactiveNode, sub: ReactiveNode): void {
 	// linked. Finish that read before its new observer sees the value.
 	if (dep.flags & (REACTIVE_DIRTY | REACTIVE_PENDING) && !(dep.flags & REACTIVE_RECURSED_CHECK)) {
 		if (dep instanceof PlainComputed) refreshLean(dep);
-		else if (dep instanceof ScopedNode) refresh(dep);
+		else if (isScopedNode(dep)) keyed!.refresh(dep);
 	}
 }
 
@@ -3551,38 +3528,111 @@ export function retireGraph(owner: GraphOwner, nodes: Iterable<ScopedNode>): voi
 	}
 }
 
-// Optional pending code receives a runtime table; graph operations use compiled constants.
-registerGraphBridge({
-	ScopedNode,
-	graph: { unlink, propagate, shallowPropagate },
-	historical: () => historicalReader !== undefined,
-	assertAlive,
-	link: (from, to) => {
-		linkDependency(from, to, ++trackingCycle);
-	},
-	removeQueued: dequeue,
-	strictValue,
-	refreshNode,
-	pure,
-	untrack,
-	signalBatch,
-	presentQueued,
-	publishNode,
-	invalidateNode,
-	readyState,
-	commitState,
-	sameState,
-	releaseRetainedOwners,
-	retainOwners,
-	releaseRetention,
-	attachObserver,
-	declarationViewFork,
-	isDeclarationView,
-});
+// Full scopes install their keyed operations when their engine loads. Keyless
+// nodes use the same dependency links, delivery queues and transaction journal.
+let keyed:
+	| {
+			Node: typeof ScopedNode;
+			notify: typeof notifyScoped;
+			update: typeof updateScoped;
+			updatePlain: typeof updatePlain;
+			refresh: typeof refresh;
+			observe: typeof observeScoped;
+			restorePending: typeof restorePending;
+	  }
+	| undefined;
 
-// Renderer transitions keep signal writes pending, including writes to signals
-// loaded after an Action awaited. An islands build moves this registration into
-// the renderer (see action-capability.ts).
-installSignalActions();
-// A server render collects its signal reads whenever signals exist.
-installServerReads();
+function isScopedNode(node: unknown): node is ScopedNode {
+	return keyed !== undefined && node instanceof keyed.Node;
+}
+
+// Computed class keys are observable operations to bundlers. Install the keyed
+// node's symbol protocol together with its engine, allowing a core consumer to
+// drop the entire class.
+function installKeyedBindings(prototype: ScopedNode): void {
+	Object.defineProperty(prototype, SIGNAL_HANDLE, { get: () => true });
+	prototype[SIGNAL_BINDING_READ] = function () {
+		return readSignalBinding(this);
+	};
+
+	prototype[SIGNAL_BINDING_SUBSCRIBE] = function (
+		notify: () => void,
+		onRetire?: () => void,
+		speculative?: boolean,
+	): NativeReadSubscription {
+		assertAlive(this.owner);
+		// An optional native lease can end when its exact owner retires. A live
+		// computation throwing ScopeDisposedError still uses normal invalidation.
+		return attachObserver(
+			this,
+			onRetire === undefined
+				? notify
+				: forwardNativeTransitionConsumer(notify, () =>
+						this.owner.retired ? onRetire() : notify(),
+					),
+			true,
+			speculative,
+		);
+	};
+
+	prototype[SIGNAL_BINDING_RETIRED] = function (): boolean {
+		return this.owner.retired;
+	};
+
+	prototype[SIGNAL_BINDING_IDENTITY] = function () {
+		return { scope: 'instance' as const, nodeKey: this.key };
+	};
+
+	prototype[NATIVE_DOM_VALUE] = function () {
+		return this.get();
+	};
+}
+
+export function installKeyedGraph(): void {
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		GraphReadSource.prototype.inspect = function (this: GraphReadSource) {
+			return this.canonicalSource()?.inspect!() ?? inspectNativeNode(this.node, this.read);
+		};
+	installKeyedBindings(ScopedNode.prototype);
+	keyed = {
+		Node: ScopedNode,
+		notify: notifyScoped,
+		update: updateScoped,
+		updatePlain,
+		refresh,
+		observe: observeScoped,
+		restorePending,
+	};
+	registerGraphBridge({
+		ScopedNode,
+		graph: { unlink, propagate, shallowPropagate },
+		historical: () => historicalReader !== undefined,
+		assertAlive,
+		link: (from, to) => {
+			linkDependency(from, to, ++trackingCycle);
+		},
+		removeQueued: dequeue,
+		strictValue,
+		refreshNode,
+		pure,
+		untrack,
+		signalBatch,
+		presentQueued,
+		publishNode,
+		invalidateNode,
+		readyState,
+		commitState,
+		sameState,
+		releaseRetainedOwners,
+		retainOwners,
+		releaseRetention,
+		attachObserver,
+		declarationViewFork,
+		isDeclarationView,
+	});
+}
+
+function restorePending(slot: PendingSlotLike, value: unknown): void {
+	if (slot.node.pending === slot && !slot.node.owner.retired)
+		publishNode(slot.shadow!, readyState(value));
+}

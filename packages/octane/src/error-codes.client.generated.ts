@@ -331,6 +331,7 @@ type ClientErrorArguments = {
 	369: [];
 	370: [];
 	371: [];
+	372: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -1466,6 +1467,8 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 					"A signal family's create function must return a new keyless signal$(null, …) or derived$(null, …) handle of the family's scope.",
 					args,
 				);
+			case 372:
+				return formatDevErrorMessage('Keyless scopes require a null signal key.', args);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

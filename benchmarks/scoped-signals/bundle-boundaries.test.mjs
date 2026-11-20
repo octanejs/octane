@@ -4066,3 +4066,39 @@ test('private context specialization preserves factory source ranges and deploym
 		);
 	}
 });
+
+test('the keyless core entry bundles the shared graph with local capabilities', async () => {
+	const bundle = await build({
+		stdin: {
+			contents: "export * from 'octane/signals/core'",
+			resolveDir: path.resolve('packages/octane'),
+		},
+		bundle: true,
+		write: false,
+		minify: true,
+		format: 'esm',
+		platform: 'browser',
+		metafile: true,
+		define: { 'process.env.NODE_ENV': '"production"' },
+	});
+	// The keyed node lives in the shared graph module. Its class should disappear
+	// even when the consuming bundler leaves the profiling flag unresolved.
+	assert.doesNotMatch(bundle.outputFiles[0].text, /hasNativeBrand\(/);
+	const output = Object.values(bundle.metafile.outputs)[0];
+	const inputs = Object.entries(output.inputs).map(([file, { bytesInOutput }]) => ({
+		path: path.resolve(file),
+		bytesInOutput,
+	}));
+	assert.ok(
+		inputs.some(({ path, bytesInOutput }) => path.endsWith('/signals/graph.ts') && bytesInOutput),
+	);
+	verifyBundleInputs({ id: 'keyless-core', rendererFree: true }, inputs);
+	for (const { path, bytesInOutput } of inputs) {
+		if (bytesInOutput) {
+			assert.doesNotMatch(
+				path,
+				/\/(signals\/(engine|pending|candidate-producers)|data-encoding)\.ts$/,
+			);
+		}
+	}
+});
