@@ -8,6 +8,32 @@ import {
 	findReturnedJsxTemplateBodies,
 } from './descriptor-lowering.js';
 
+// Directive arms render template output exactly as their parent position does.
+// Only the arms: tests, iterables and keys stay ordinary expressions. An
+// `@else if` is an IfStatement in its directive's `alternate`. An arm block's
+// rendered nodes are template; its setup statements, including a plain `if`,
+// `switch`, `try` or nested block, are not.
+const DIRECTIVE_ARMS = {
+	JSXIfExpression: ['consequent', 'alternate'],
+	IfStatement: ['consequent', 'alternate'],
+	JSXForExpression: ['body', 'empty'],
+	JSXSwitchExpression: ['cases'],
+	SwitchCase: ['consequent'],
+	JSXTryExpression: ['block', 'pending', 'handler'],
+	CatchClause: ['body'],
+};
+const isDirectiveArm = (node, parent, key) =>
+	DIRECTIVE_ARMS[node.type]?.includes(key) === true &&
+	(node.type !== 'IfStatement' ||
+		parent?.type === 'JSXIfExpression' ||
+		parent?.type === 'IfStatement');
+// The block holding an arm's statements. A case's statements usually sit on
+// `consequent` directly (the compiler's parser flattens case braces), so a
+// block there is the arm only when it is the case's sole statement.
+const isArmBlock = (owner, parent, key) =>
+	isDirectiveArm(owner, parent, key) &&
+	(owner.type !== 'SwitchCase' || owner.consequent.length === 1);
+
 /**
  * Only private contexts whose complete authored lifetime stays in template
  * bodies. `isDescriptorChildrenImport` is the bundler's proof that an imported
@@ -184,7 +210,11 @@ export function findPrivateCompiledContextProofs(ast, isDescriptorChildrenImport
 								(childKey === 'children' && !keepsDescriptorChildren(node)))) ||
 							(node.type === 'JSXFragment' && childKey === 'children') ||
 							((node.type === 'JSXOpeningElement' || node.type === 'JSXClosingElement') &&
-								childKey === 'name'));
+								childKey === 'name') ||
+							isDirectiveArm(node, parent, childKey) ||
+							(node.type === 'BlockStatement' &&
+								childKey === 'body' &&
+								isArmBlock(parent, grandparent, key)));
 			inspect(child, node, childKey, parent, childDirect);
 		});
 	};

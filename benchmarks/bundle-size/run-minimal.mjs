@@ -54,6 +54,7 @@ const existingScenarios = [
 	['signal-instance-derived', 'tsrx'],
 	['prop-attributes', 'tsrx'],
 	['context', 'tsrx'],
+	['context-arms', 'tsrx'],
 	['memo-context', 'tsrx'],
 	['controlled-input', 'tsrx'],
 	['hydrate-root', 'tsrx'],
@@ -358,6 +359,12 @@ const featureControls = {
 			...layoutQueueDeclarations,
 		],
 		kept: ['useContextInternal', ...contextDependencyDeclarations],
+	},
+	// A provider in a directive arm is as private as one in the template, so it
+	// needs neither the generic child slot nor the host descriptor renderer.
+	'context-arms': {
+		dropped: ['childSlot', ...hostDescriptorRenderer],
+		kept: ['useContextInternal'],
 	},
 	'memo-context': {
 		dropped: [],
