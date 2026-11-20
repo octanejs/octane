@@ -98,6 +98,8 @@ const stop = account.effect(() => {
 
 A `null` key declares a keyless value: `account.signal$(null, 0)` or `account.derived$(null, () => count$.get() * 2)`. A keyless signal is not serialized, seeded, adopted, inspected or staged by a transition, and takes no entry in the scope's key table. A keyless derived value belongs to no scope and records no provenance. Use keys for anything that crosses the server boundary or should appear in `scope.inspect()`; use keyless values for local graphs that only the client computes.
 
+`observeSignalChanges((handle, phase) => { ... })` observes writes and live value changes across signal scopes while diagnostics are active. It returns a stop function, passes only the handle and `write` or `change` metadata, and does not subscribe to or activate handles. Callbacks run untracked and cannot write signals; their errors do not interrupt the graph. A write that leaves a value equal still emits `write`, but does not emit `change`.
+
 `createFamily(scope, create, options?)` keeps one keyless member per logical key, so the key set can grow and shrink while the program runs without growing the scope's key table:
 
 ```ts

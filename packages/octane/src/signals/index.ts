@@ -1,5 +1,6 @@
 /** Stable scoped signals. This entry does not import a renderer. */
 export { createScope } from './engine.js';
+export { observeSignalChanges } from './graph.js';
 export { createFamily } from './family.js';
 export { bindSignalControl } from './control-binding.js';
 export type { SignalControlBinding } from './control-handoff.js';
@@ -82,6 +83,7 @@ export type {
 	ScopeSeed,
 	ScopeSignalOptions,
 	SignalChange,
+	SignalChangeObserver,
 	SignalEquals,
 	SignalHandle,
 	SignalOptions,
