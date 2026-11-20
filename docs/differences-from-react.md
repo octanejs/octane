@@ -1708,8 +1708,9 @@ changed, subscribes after layout effects and before paint. Its passive effect
 adopts that subscription, so a Suspense hide keeps it connected as in React. A
 swapped store's old subscription is released with the passive cleanup. Other
 commits subscribe in the passive effect. A native listener's update counts as
-discrete only when it is the first to schedule the commit; an update that joins
-a commit already scheduled in the same task keeps that commit's priority.
+discrete when it is the first to schedule the commit, or when its event also
+reaches an Octane delegation root; otherwise an update that joins a commit
+already scheduled in the same task keeps that commit's priority.
 
 `root.unmount()` drains pending passive work and its passive cleanups before
 returning, so root-owned subscriptions cannot outlive the unmount call.
