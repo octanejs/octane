@@ -172,6 +172,11 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		after: 'abreadychildren',
 		cleaned: true,
 	},
+	'reexported-components': {
+		before: 'a1',
+		after: 'b2',
+		cleaned: true,
+	},
 	'binding-vanilla': {
 		before: 0,
 		after: 1,

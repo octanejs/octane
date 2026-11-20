@@ -332,7 +332,15 @@ export function analyzeCompiledModule(
 	voidComponentExports: string[];
 	/** `imported` is `default` or `*` for those import forms. */
 	importBindings: { local: string; request: string; imported: string }[];
+	/** Exact named value re-exports, as {@link findNamedReexports}. */
+	reexports: { request: string; imported: string; exported: string }[];
 } | null;
+
+/** Each exact value `export { imported as exported } from 'request'`. */
+export function findNamedReexports(
+	source: string | CompilerProgram,
+	id: string,
+): { request: string; imported: string; exported: string }[];
 
 export function findDescriptorChildrenExports(
 	source: string | CompilerProgram,

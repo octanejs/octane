@@ -394,8 +394,9 @@ function normalizeHmrDialect(value) {
  * JavaScript return. A direct `memo(LocalComponent)` export preserves that
  * contract, as does a default export of such a binding, and so do null-only
  * early-return guards that compile to template control flow. Bundler adapters
- * attach this fact after compiling the exact source they loaded. Re-exports and
- * indirect bindings remain deliberately unknown.
+ * attach this fact after compiling the exact source they loaded. Indirect
+ * bindings remain deliberately unknown here; adapters follow exact re-exports
+ * through {@link findNamedReexports} on the re-exporting module's final code.
  */
 export function findVoidComponentExports(source, id) {
 	let ast;
@@ -746,6 +747,7 @@ function moduleImportBindings(ast) {
  *   transforms can rewrite compiled output (transpiler lowering, other
  *   loaders) pairs {@link findVoidComponentExports}, the authored contract,
  *   with this check of the code that actually runs.
+ * - `reexports`: exact named value re-exports, as {@link findNamedReexports}.
  * - `importBindings`: each value import binding as `{ local, request,
  *   imported }` (`imported` is `default` or `*` for those forms). Comparing
  *   the bindings Octane's output read a proof through with the final code's
@@ -762,7 +764,42 @@ export function analyzeCompiledModule(source, id) {
 	return {
 		voidComponentExports: compiledVoidExports(ast),
 		importBindings: moduleImportBindings(ast),
+		reexports: findNamedReexports(ast),
 	};
+}
+
+/**
+ * Each exact value re-export `export { imported as exported } from 'request'`
+ * as `{ request, imported, exported }`, the `reexports` shape descriptor-children
+ * analysis follows. An ESM re-export is a live binding the re-exporting module
+ * cannot reassign, so it carries the target export's proofs unchanged. Local
+ * `import`-then-`export` forms, namespace re-exports, and `export *` stay
+ * unknown.
+ */
+export function findNamedReexports(source, id) {
+	let ast;
+	try {
+		ast = source && typeof source === 'object' ? source : parseModule(source, id);
+	} catch {
+		return [];
+	}
+	const reexports = [];
+	for (const node of ast.body || []) {
+		if (
+			node.type !== 'ExportNamedDeclaration' ||
+			node.exportKind === 'type' ||
+			typeof node.source?.value !== 'string'
+		)
+			continue;
+		for (const specifier of node.specifiers || []) {
+			if (specifier.type !== 'ExportSpecifier' || specifier.exportKind === 'type') continue;
+			const imported = specifier.local?.name ?? specifier.local?.value;
+			const exported = specifier.exported?.name ?? specifier.exported?.value;
+			if (typeof imported === 'string' && typeof exported === 'string')
+				reexports.push({ request: node.source.value, imported, exported });
+		}
+	}
+	return reexports;
 }
 
 export function findDescriptorChildrenExports(source, id) {

@@ -334,3 +334,100 @@ export function run(host) {
 		});
 	},
 );
+
+// Packages commonly expose `.tsrx` components through a plain TypeScript index.
+// An exact `export { a as b } from '...'` is a live binding the index cannot
+// reassign, so the proof follows it to the module that compiled the component.
+describe('production Vite void-component proofs through re-exports', { timeout: 30_000 }, () => {
+	const slotOf = (code: string, component: string) =>
+		code.match(new RegExp(`_\\$(componentSlot\\w*)\\([^;]*?, ${component},`))?.[1];
+	const RUN = `import { createRoot, flushSync } from 'octane';
+import { App } from './App.tsrx';
+export function run(host) {
+	const root = createRoot(host);
+	root.render(App, {});
+	flushSync(() => {});
+	const text = host.textContent;
+	root.unmount();
+	return { text, empty: host.childNodes.length === 0 };
+}
+`;
+
+	it('proves components re-exported by plain modules exactly like direct imports', async () => {
+		const root = fixture({
+			'Leaf.tsrx': `export function Leaf({ label }) @{ <b>{label as string}</b> }
+export function Value() { return 'v'; }
+export function Swapped() @{ <i>{'s'}</i> }
+export function swap() { Swapped = () => 'swapped'; }
+`,
+			'nested.ts': "export { Leaf } from './Leaf.tsrx';\n",
+			'index.ts': `import { Leaf as LocalLeaf } from './Leaf.tsrx';
+export { Leaf, Leaf as Renamed, Value, Swapped } from './Leaf.tsrx';
+export { Leaf as Deep } from './nested.ts';
+export { LocalLeaf };
+`,
+			'App.tsrx': `import { Leaf as Direct } from './Leaf.tsrx';
+import { Leaf, Renamed, Deep, Value, Swapped, LocalLeaf } from './index.ts';
+export function App() @{
+	<main><Direct label="a" /><Leaf label="b" /><Renamed label="c" /><Deep label="d" /><Value /><Swapped /><LocalLeaf label="e" /></main>
+}
+`,
+			'entry.ts': RUN,
+		});
+		const { compiled, chunks } = await buildFixture(root, ['entry.ts']);
+		const app = compiled['App.tsrx'];
+		const direct = slotOf(app, 'Direct');
+		expect(direct).toBe('componentSlotLite');
+		for (const name of ['Leaf', 'Renamed', 'Deep']) expect(slotOf(app, name)).toBe(direct);
+		// A value return, a reassigned export, and an import-then-export binding
+		// stay unproven.
+		for (const name of ['Value', 'Swapped', 'LocalLeaf'])
+			expect(slotOf(app, name)).not.toMatch(/^componentSlot(?:Void|Lite)$/);
+		expect(run(chunks[0])).toEqual({ text: 'abcdvse', empty: true });
+	});
+
+	it('keeps the generic path when a later transform changes the re-exporting module', async () => {
+		const rewrite: Plugin = {
+			name: 'rewrite-index',
+			transform(code, id) {
+				if (id.endsWith('/index.ts')) return "export const Leaf = () => 'replaced';\n";
+			},
+		};
+		const root = fixture({
+			'Leaf.tsrx': 'export function Leaf({ label }) @{ <b>{label as string}</b> }\n',
+			'index.ts': "export { Leaf } from './Leaf.tsrx';\n",
+			'App.tsrx': `import { Leaf } from './index.ts';
+export function App() @{ <main><Leaf label="a" /></main> }
+`,
+			'entry.ts': RUN,
+		});
+		const { compiled, chunks } = await buildFixture(root, ['entry.ts'], [rewrite]);
+		expect(slotOf(compiled['App.tsrx'], 'Leaf')).not.toMatch(/^componentSlot(?:Void|Lite)$/);
+		expect(run(chunks[0])).toEqual({ text: 'replaced', empty: true });
+	});
+
+	it('builds and renders components that import each other through a barrel', async () => {
+		const member = (name: string, next: string) =>
+			`import { ${next} } from './index.ts';\n` +
+			`export function ${name}({ depth }) @{\n` +
+			`\t<main><span>${name}</span>@if (depth > 0) { <${next} depth={depth - 1} /> }</main>\n}\n`;
+		const root = fixture({
+			'A.tsrx': member('A', 'B'),
+			'B.tsrx': member('B', 'A'),
+			'index.ts': "export { A } from './A.tsrx';\nexport { B } from './B.tsrx';\n",
+			'entry.ts': `import { createRoot, flushSync } from 'octane';
+import { A } from './index.ts';
+export function run(host) {
+	const root = createRoot(host);
+	root.render(A, { depth: 3 });
+	flushSync(() => {});
+	const text = host.textContent;
+	root.unmount();
+	return { text, empty: host.childNodes.length === 0 };
+}
+`,
+		});
+		const { chunks } = await buildFixture(root, ['entry.ts']);
+		expect(run(chunks[0])).toEqual({ text: 'ABAB', empty: true });
+	});
+});
