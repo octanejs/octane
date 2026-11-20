@@ -2642,6 +2642,7 @@ interface WatchHook {
 	watched: () => void | (() => void);
 	cleanup: void | (() => void);
 	generation: number;
+	active: boolean;
 }
 
 export function setWatched(
@@ -2665,7 +2666,7 @@ export function setWatched(
 			},
 		};
 	}
-	watchHooks.set(node, { watched, cleanup: undefined, generation: 0 });
+	watchHooks.set(node, { watched, cleanup: undefined, generation: 0, active: false });
 	countObservers(node);
 }
 
@@ -2712,28 +2713,52 @@ function countLink(dep: ReactiveNode, sub: ReactiveNode): void {
 	}
 }
 
-/** Sources start before what reads them, and stop after. */
-function watch(node: ReactiveNode): void {
+/** Count the whole dependency tree before a hook can synchronously rewire it. */
+function countWatch(node: ReactiveNode, hooks: ReactiveNode[]): void {
 	const count = observerCounts.get(node)!;
 	observerCounts.set(node, count + 1);
 	if (count) return;
 	for (let link = node.deps; link; link = link.nextDep)
-		if (observerCounts.has(link.dep)) watch(link.dep);
-	startWatch(node);
+		if (observerCounts.has(link.dep)) countWatch(link.dep, hooks);
+	if (watchHooks.has(node)) hooks.push(node);
 }
 
-function unwatch(node: ReactiveNode): void {
+function watch(node: ReactiveNode): void {
+	const count = observerCounts.get(node)!;
+	if (count) {
+		observerCounts.set(node, count + 1);
+		return;
+	}
+	const hooks: ReactiveNode[] = [];
+	countWatch(node, hooks);
+	for (const hooked of hooks) if (observerCounts.get(hooked)! > 0) startWatch(hooked);
+}
+
+/** Stop readers before sources, after the whole dependency tree has been released. */
+function countUnwatch(node: ReactiveNode, hooks: ReactiveNode[]): void {
 	const count = observerCounts.get(node)! - 1;
 	observerCounts.set(node, count);
 	if (count) return;
-	stopWatch(node);
+	if (watchHooks.has(node)) hooks.push(node);
 	for (let link = node.deps; link; link = link.nextDep)
-		if (observerCounts.has(link.dep)) unwatch(link.dep);
+		if (observerCounts.has(link.dep)) countUnwatch(link.dep, hooks);
+}
+
+function unwatch(node: ReactiveNode): void {
+	const count = observerCounts.get(node)!;
+	if (count > 1) {
+		observerCounts.set(node, count - 1);
+		return;
+	}
+	const hooks: ReactiveNode[] = [];
+	countUnwatch(node, hooks);
+	for (const hooked of hooks) if (observerCounts.get(hooked) === 0) stopWatch(hooked);
 }
 
 function startWatch(node: ReactiveNode): void {
 	const hook = watchHooks.get(node);
-	if (hook === undefined) return;
+	if (hook === undefined || hook.active) return;
+	hook.active = true;
 	const generation = ++hook.generation;
 	const cleanup = runHook(hook.watched);
 	if (hook.generation === generation && watchHooks.get(node) === hook) hook.cleanup = cleanup;
@@ -2742,7 +2767,8 @@ function startWatch(node: ReactiveNode): void {
 
 function stopWatch(node: ReactiveNode): void {
 	const hook = watchHooks.get(node);
-	if (hook === undefined) return;
+	if (hook === undefined || !hook.active) return;
+	hook.active = false;
 	hook.generation++;
 	const cleanup = hook.cleanup;
 	hook.cleanup = undefined;

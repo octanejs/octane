@@ -2,6 +2,44 @@ import { describe, expect, it } from 'vitest';
 import { createScope, type WritableSignal } from 'octane/signals';
 
 describe('watched keyless stabilization', () => {
+	it('releases dynamically rewired dependencies after watched setup', () => {
+		const scope = createScope({ scopeKey: 'rewired-watch' });
+		const events: string[] = [];
+		let selected$: WritableSignal<boolean>;
+		selected$ = scope.signal$(null, false, {
+			watched: () => {
+				selected$.set(true);
+				result$.get();
+				return () => {
+					selected$.set(false);
+					result$.get();
+				};
+			},
+		});
+		const one$ = scope.signal$(null, 1, {
+			watched: () => {
+				events.push('one:start');
+				return () => events.push('one:stop');
+			},
+		});
+		const two$ = scope.signal$(null, 2, {
+			watched: () => {
+				events.push('two:start');
+				return () => events.push('two:stop');
+			},
+		});
+		const result$ = scope.derived$(null, () => (selected$.get() ? one$.get() : two$.get()));
+		expect(result$.get()).toBe(2);
+		const stop = result$.subscribe(() => {});
+		expect(result$.get()).toBe(1);
+		stop();
+		expect(events.filter((event) => event.endsWith(':start')).length).toBe(
+			events.filter((event) => event.endsWith(':stop')).length,
+		);
+		expect(events).toContain('one:stop');
+		scope.dispose();
+	});
+
 	it('returns a recovered value when linking a failed derived starts its watched source', () => {
 		const scope = createScope({ scopeKey: 'recovered-watch' });
 		let source: WritableSignal<number>;
