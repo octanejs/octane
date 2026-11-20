@@ -878,6 +878,9 @@ export function installPublicScope(): void {
 		startSignalBatch();
 		try {
 			executeEffect(effect);
+		} catch (error) {
+			stopEffect(effect);
+			throw error;
 		} finally {
 			endSignalBatch();
 		}

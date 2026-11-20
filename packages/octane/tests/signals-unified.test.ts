@@ -380,6 +380,35 @@ describe('unified readonly derived declarations', () => {
 		expect(never).toBeInstanceOf(Promise);
 	});
 
+	it('recovers a keyless derived reader when a failing dependency becomes ready', () => {
+		const scope = owner('keyless-recovery');
+		const source$ = scope.signal$<string | null>(null, null);
+		const value$ = scope.derived$(null, () => {
+			const value = source$.get();
+			if (value === null) throw new Error('unavailable');
+			return value;
+		});
+		const label$ = scope.derived$(null, () => {
+			try {
+				return value$.get();
+			} catch {
+				return 'waiting';
+			}
+		});
+		let shown = label$.get();
+		const stop = label$.subscribe(() => {
+			shown = label$.get();
+		});
+		expect(shown).toBe('waiting');
+		source$.set('first');
+		expect(shown).toBe('first');
+		source$.set(null);
+		expect(shown).toBe('waiting');
+		source$.set('second');
+		expect(shown).toBe('second');
+		stop();
+	});
+
 	it('lets a live scope drop a keyless signal once nothing reads it', async () => {
 		const scope = owner('keyless-release');
 		// Kept out of the async frame so no strong local outlives the call.

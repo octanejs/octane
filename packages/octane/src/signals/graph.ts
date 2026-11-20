@@ -214,6 +214,7 @@ let activeOwners: Set<GraphOwner> | undefined;
 let trackingCycle = 0;
 let executionDepth = 0;
 let pureDepth = 0;
+let runningWatchHook = false;
 /**
  * What a computation's reads leave in `activeOwners` when one presented a
  * node's state, whose activity may matter, and none had a foreign owner: so a
@@ -394,6 +395,7 @@ function unlink(link: Link, sub = link.sub): Link | undefined {
 }
 
 function propagate(link: Link, innerWrite: boolean): void {
+	const origin = link.dep;
 	let next = link.nextSub;
 	let stack: Stack<Link | undefined> | undefined;
 
@@ -409,11 +411,14 @@ function propagate(link: Link, innerWrite: boolean): void {
 				sub.flags |= REACTIVE_RECURSED;
 			}
 		} else if (!(flags & (REACTIVE_RECURSED_CHECK | REACTIVE_RECURSED))) {
+			if (runningWatchHook && link.dep === origin && flags & REACTIVE_PENDING)
+				sub.flags = flags | REACTIVE_DIRTY;
 			flags = REACTIVE_NONE;
 		} else if (!(flags & REACTIVE_RECURSED_CHECK)) {
 			sub.flags = (flags & ~REACTIVE_RECURSED) | REACTIVE_PENDING;
 		} else if (!(flags & (REACTIVE_DIRTY | REACTIVE_PENDING)) && isValidLink(link, sub)) {
 			sub.flags = flags | (REACTIVE_RECURSED | REACTIVE_PENDING);
+			if (runningWatchHook && sub instanceof EffectNode) queueEffect(sub);
 			flags &= REACTIVE_MUTABLE;
 		} else {
 			flags = REACTIVE_NONE;
@@ -424,7 +429,7 @@ function propagate(link: Link, innerWrite: boolean): void {
 		}
 
 		if (flags & REACTIVE_MUTABLE) {
-			const subSubs = sub.subs;
+			const subSubs = (sub as ReactiveNode).subs;
 			if (subSubs !== undefined) {
 				const nextSub = (link = subSubs).nextSub;
 				if (nextSub !== undefined) {
@@ -518,7 +523,7 @@ function checkDirty(link: Link, sub: ReactiveNode): boolean {
 			}
 		}
 
-		return dirty && !!sub.flags;
+		return !!((dirty || sub.flags & REACTIVE_DIRTY) && sub.flags);
 	} while (true);
 }
 
@@ -546,9 +551,13 @@ function isValidLink(checkLink: Link, sub: ReactiveNode): boolean {
 	return false;
 }
 
+/** Whether a signal write in the current synchronous context would be rejected. */
+export function isSignalReadOnly(): boolean {
+	return pureDepth !== 0 || activeNode instanceof PlainComputed || isNativeWriteGuarded();
+}
+
 export function assertWritable(): void {
-	if (pureDepth || activeNode instanceof PlainComputed || isNativeWriteGuarded())
-		throw new SignalWriteError();
+	if (isSignalReadOnly()) throw new SignalWriteError();
 }
 
 export function setHistoricalReader(
@@ -1436,10 +1445,10 @@ export function readNode<T>(node: ScopedNode<T>, read: SignalReadMode = 'value')
 
 /** readNode after its node is current: track the read and present its state. */
 function observeRead<T>(node: ScopedNode<T>, read: SignalReadMode): NodeState<T> {
+	trackRead(node, read);
 	const state = node.state!;
 	const observed =
 		read === 'latest' && state.snapshot.status !== 'ready' ? (node.lastState ?? state) : state;
-	trackRead(node, read);
 	if (activeNode !== undefined && activeOwners === undefined) activeOwners = STATE_READ;
 	// Retirement marks the owner before invoking user cancellation callbacks.
 	// A reentrant read must not expose its old value before graph teardown runs.
@@ -2209,7 +2218,12 @@ export function attachObserver(
 	// a linked observer whose stop never reached the caller.
 	// A keyless derived value has no owner to stop its subscribers.
 	node.owner?.observers.add(observer);
-	linkDependency(node, observer, ++trackingCycle);
+	try {
+		linkDependency(node, observer, ++trackingCycle);
+	} catch (error) {
+		stopObserver(observer);
+		throw error;
+	}
 	const dispose: NativeReadSubscription = () => stopObserver(observer);
 	if (speculative) dispose.observation = observer;
 	return dispose;
@@ -2680,6 +2694,7 @@ interface WatchHook {
 	watched: () => void | (() => void);
 	cleanup: void | (() => void);
 	generation: number;
+	active: boolean;
 }
 
 export function setWatched(
@@ -2703,7 +2718,7 @@ export function setWatched(
 			},
 		};
 	}
-	watchHooks.set(node, { watched, cleanup: undefined, generation: 0 });
+	watchHooks.set(node, { watched, cleanup: undefined, generation: 0, active: false });
 	countObservers(node);
 }
 
@@ -2729,31 +2744,73 @@ function countObservers(node: ReactiveNode): void {
 
 function countLink(dep: ReactiveNode, sub: ReactiveNode): void {
 	if (sub.flags & REACTIVE_MUTABLE && !observerCounts.has(sub)) countObservers(sub);
-	if (observing(sub)) watch(dep);
+	if (!observing(sub)) return;
+	// A computation has not consumed its newly linked dependency yet. Hide that
+	// edge from recursive-write checks while setup publishes its initial value;
+	// writes to dependencies consumed earlier still invalidate the computation.
+	const tail = sub.depsTail;
+	const hide = !!(sub.flags & REACTIVE_RECURSED_CHECK) && tail?.dep === dep;
+	if (hide) sub.depsTail = tail!.prevDep;
+	try {
+		watch(dep);
+	} finally {
+		if (hide && (tail!.prevDep ? tail!.prevDep.nextDep === tail : sub.deps === tail))
+			sub.depsTail = tail;
+	}
+	// Starting a source can synchronously invalidate the derived value being
+	// linked. Finish that read before its new observer sees the value.
+	if (dep.flags & (REACTIVE_DIRTY | REACTIVE_PENDING) && !(dep.flags & REACTIVE_RECURSED_CHECK)) {
+		if (dep instanceof PlainComputed) refreshLean(dep);
+		else if (dep instanceof ScopedNode) refresh(dep);
+	}
 }
 
-/** Sources start before what reads them, and stop after. */
-function watch(node: ReactiveNode): void {
+/** Count the whole dependency tree before a hook can synchronously rewire it. */
+function countWatch(node: ReactiveNode, hooks: ReactiveNode[]): void {
 	const count = observerCounts.get(node)!;
 	observerCounts.set(node, count + 1);
 	if (count) return;
 	for (let link = node.deps; link; link = link.nextDep)
-		if (observerCounts.has(link.dep)) watch(link.dep);
-	startWatch(node);
+		if (observerCounts.has(link.dep)) countWatch(link.dep, hooks);
+	if (watchHooks.has(node)) hooks.push(node);
 }
 
-function unwatch(node: ReactiveNode): void {
+function watch(node: ReactiveNode): void {
+	const count = observerCounts.get(node)!;
+	if (count) {
+		observerCounts.set(node, count + 1);
+		return;
+	}
+	const hooks: ReactiveNode[] = [];
+	countWatch(node, hooks);
+	for (const hooked of hooks) if (observerCounts.get(hooked)! > 0) startWatch(hooked);
+}
+
+/** Stop readers before sources, after the whole dependency tree has been released. */
+function countUnwatch(node: ReactiveNode, hooks: ReactiveNode[]): void {
 	const count = observerCounts.get(node)! - 1;
 	observerCounts.set(node, count);
 	if (count) return;
-	stopWatch(node);
+	if (watchHooks.has(node)) hooks.push(node);
 	for (let link = node.deps; link; link = link.nextDep)
-		if (observerCounts.has(link.dep)) unwatch(link.dep);
+		if (observerCounts.has(link.dep)) countUnwatch(link.dep, hooks);
+}
+
+function unwatch(node: ReactiveNode): void {
+	const count = observerCounts.get(node)!;
+	if (count > 1) {
+		observerCounts.set(node, count - 1);
+		return;
+	}
+	const hooks: ReactiveNode[] = [];
+	countUnwatch(node, hooks);
+	for (const hooked of hooks) if (observerCounts.get(hooked) === 0) stopWatch(hooked);
 }
 
 function startWatch(node: ReactiveNode): void {
 	const hook = watchHooks.get(node);
-	if (hook === undefined) return;
+	if (hook === undefined || hook.active) return;
+	hook.active = true;
 	const generation = ++hook.generation;
 	const cleanup = runHook(hook.watched);
 	if (hook.generation === generation && watchHooks.get(node) === hook) hook.cleanup = cleanup;
@@ -2762,7 +2819,8 @@ function startWatch(node: ReactiveNode): void {
 
 function stopWatch(node: ReactiveNode): void {
 	const hook = watchHooks.get(node);
-	if (hook === undefined) return;
+	if (hook === undefined || !hook.active) return;
+	hook.active = false;
 	hook.generation++;
 	const cleanup = hook.cleanup;
 	hook.cleanup = undefined;
@@ -2774,12 +2832,24 @@ function stopWatch(node: ReactiveNode): void {
  * than thrown: the read, stop or disposal that reached it still completes.
  */
 function runHook(hook: () => void | (() => void)): void | (() => void) {
+	// A committed observer can gain or lose a dependency while a derived value
+	// is being checked. Its lifecycle is imperative even inside that pure read.
+	const previousNode = activeNode;
+	const previousDepth = pureDepth;
+	const previousHook = runningWatchHook;
+	activeNode = undefined;
+	pureDepth = 0;
+	runningWatchHook = true;
 	try {
 		return untrack(hook);
 	} catch (error) {
 		const report = (globalThis as { reportError?: (error: unknown) => void }).reportError;
 		if (typeof report === 'function') report(error);
 		else console.error(error);
+	} finally {
+		activeNode = previousNode;
+		pureDepth = previousDepth;
+		runningWatchHook = previousHook;
 	}
 }
 
@@ -2838,13 +2908,10 @@ export class PlainComputed<T = any> implements ReactiveNode {
 			this.flags &
 			(REACTIVE_DIRTY | REACTIVE_PENDING | REACTIVE_RECURSED_CHECK | REACTIVE_FAILED)
 		)
-			refreshLean(this);
+			refreshLean(this, true);
 		const reader = activeNode;
 		if (reader !== undefined) linkDependency(this, reader, trackingCycle);
-		if ((signalMode & READ_OBSERVED) !== 0) {
-			const channel = leanChannel(this);
-			reportNativeRead(channel.source, channel.revision);
-		}
+		if ((signalMode & READ_OBSERVED) !== 0) reportLeanRead(this);
 		return this.last as T;
 	}
 
@@ -2932,8 +2999,13 @@ function leanChannel(node: PlainComputed): CellChannel {
 	return channel;
 }
 
+function reportLeanRead(node: PlainComputed): void {
+	const channel = leanChannel(node);
+	reportNativeRead(channel.source, channel.revision);
+}
+
 /** Bring a keyless derived value up to date, or rethrow what its computation threw. */
-function refreshLean(node: PlainComputed): void {
+function refreshLean(node: PlainComputed, trackFailure = false): void {
 	const flags = node.flags;
 	if (flags & REACTIVE_RECURSED_CHECK) throw new SignalCycleError('');
 	if (flags & (REACTIVE_DIRTY | REACTIVE_PENDING)) {
@@ -2949,23 +3021,52 @@ function refreshLean(node: PlainComputed): void {
 		}
 		if (dirty && updateLean(node) && node.subs !== undefined) shallowPropagate(node.subs);
 	}
-	if (node.flags & REACTIVE_FAILED) throw node.last;
+	if (node.flags & REACTIVE_FAILED) {
+		if (trackFailure) {
+			if (activeNode !== undefined) linkDependency(node, activeNode, trackingCycle);
+			if ((signalMode & READ_OBSERVED) !== 0) reportLeanRead(node);
+		}
+		if (node.flags & REACTIVE_FAILED) throw node.last;
+	}
+}
+
+/** Only a watched write that invalidates an active computation needs stabilization. */
+function stabilizeLean(node: PlainComputed, previous: unknown): boolean {
+	let rounds = 0;
+	do {
+		if (++rounds > 100) throw new SignalCycleError('');
+		const flags = node.flags;
+		let dirty = (flags & REACTIVE_DIRTY) !== 0;
+		if (!dirty) {
+			pureDepth++;
+			try {
+				dirty = checkDirty(node.deps!, node);
+			} finally {
+				pureDepth--;
+			}
+			if (!dirty) {
+				node.flags &= ~(REACTIVE_PENDING | REACTIVE_RECURSED);
+				break;
+			}
+		}
+		if (node.flags & REACTIVE_FAILED) node.last = previous;
+		recomputeLean(node, true);
+	} while (node.flags & REACTIVE_RECURSED);
+	return (node.flags & REACTIVE_FAILED) !== 0 || !same(previous, node.last);
 }
 
 /** Compute a keyless derived value, in the shape of alien-signals' update. */
 function updateLean(node: PlainComputed): boolean {
 	// A tracked channel, an earlier failure or a render collecting reads takes the
 	// wrapper, which keeps this common recomputation small enough to inline.
-	if (
-		node.flags & (REACTIVE_FAILED | REACTIVE_TRACKED_CELL) ||
+	return node.flags & (REACTIVE_FAILED | REACTIVE_TRACKED_CELL) ||
 		signalMode & (READ_OBSERVED | CHANGE_OBSERVED)
-	)
-		return updateLeanTracked(node);
-	return recomputeLean(node);
+		? updateLeanTracked(node)
+		: recomputeLean(node);
 }
 
 /** Recompute; a throw is held as the value, flagged REACTIVE_FAILED. */
-function recomputeLean(node: PlainComputed): boolean {
+function recomputeLean(node: PlainComputed, inStabilization?: boolean): boolean {
 	node.depsTail = undefined;
 	node.flags = REACTIVE_MUTABLE | REACTIVE_RECURSED_CHECK;
 	const previousNode = activeNode;
@@ -2986,15 +3087,16 @@ function recomputeLean(node: PlainComputed): boolean {
 		let obsolete = tail ? tail.nextDep : node.deps;
 		while (obsolete) obsolete = unlink(obsolete, node);
 	}
-	if (
-		!(node.flags & REACTIVE_FAILED) &&
-		(node.last === value
-			? value !== 0 || 1 / (node.last as number) === 1 / (value as number)
-			: value !== value && node.last !== node.last)
-	)
-		return false;
-	node.last = value;
-	return true;
+	const previous = node.last;
+	const changed =
+		(node.flags & REACTIVE_FAILED) !== 0 ||
+		!(previous === value
+			? value !== 0 || 1 / (previous as number) === 1 / (value as number)
+			: value !== value && previous !== previous);
+	if (changed) node.last = value;
+	return node.flags & REACTIVE_RECURSED && !inStabilization
+		? stabilizeLean(node, previous)
+		: changed;
 }
 
 function updateLeanTracked(node: PlainComputed): boolean {
