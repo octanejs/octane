@@ -15,7 +15,9 @@ function ContextArmsRoot() @{
 		<button id="minimal-context-arms-action" onClick={() => setTheme('dark')}>
 			{'change'}
 		</button>
-		@if (theme !== '') {
+		@if (theme === '') {
+			<p>{'none'}</p>
+		} @else if (theme !== 'none') {
 			<ThemeContext value={theme}>
 				<ContextReader />
 			</ThemeContext>

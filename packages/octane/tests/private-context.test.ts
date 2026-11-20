@@ -414,6 +414,8 @@ export function App(props) @{
 	<main>
 		@if (props.on) {
 			<Theme value={props.v + ':if'}><Value arm="if" /></Theme>
+		} @else if (props.items.length === 0) {
+			<Theme value={props.v + ':elseif'}><Value arm="elseif" /></Theme>
 		} @else {
 			<Theme value={props.v + ':else'}><Value arm="else" /></Theme>
 		}
@@ -475,10 +477,17 @@ export function App(props) @{
 				expect(kept.textContent).toBe('1');
 				flushSync(() => root.render(module.App, { v: 'c', on: false, items: [] }));
 				expect(armValues(host)).toEqual([
-					'else=c:else',
+					'elseif=c:elseif',
 					'empty=c:empty',
 					'default=c:default',
 					'try=c:try',
+				]);
+				flushSync(() => root.render(module.App, { v: 'd', on: false, items: ['z'] }));
+				expect(armValues(host)).toEqual([
+					'else=d:else',
+					'for-z=d:z',
+					'default=d:default',
+					'try=d:try',
 				]);
 			} finally {
 				root.unmount();

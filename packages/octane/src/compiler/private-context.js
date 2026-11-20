@@ -9,17 +9,24 @@ import {
 } from './descriptor-lowering.js';
 
 // Directive arms render template output exactly as their parent position does.
-// Only the arms: tests, iterables and keys stay ordinary expressions, and an
-// arm's setup statements other than its rendered nodes are not template.
+// Only the arms: tests, iterables and keys stay ordinary expressions. An
+// `@else if` is an IfStatement in its directive's `alternate`. An arm block's
+// rendered nodes are template; its setup statements, including a plain `if`,
+// `switch`, `try` or nested block, are not.
 const DIRECTIVE_ARMS = {
 	JSXIfExpression: ['consequent', 'alternate'],
+	IfStatement: ['consequent', 'alternate'],
 	JSXForExpression: ['body', 'empty'],
 	JSXSwitchExpression: ['cases'],
 	SwitchCase: ['consequent'],
 	JSXTryExpression: ['block', 'pending', 'handler'],
 	CatchClause: ['body'],
-	BlockStatement: ['body'],
 };
+const isDirectiveArm = (node, parent, key) =>
+	DIRECTIVE_ARMS[node.type]?.includes(key) === true &&
+	(node.type !== 'IfStatement' ||
+		parent?.type === 'JSXIfExpression' ||
+		parent?.type === 'IfStatement');
 
 /**
  * Only private contexts whose complete authored lifetime stays in template
@@ -198,7 +205,10 @@ export function findPrivateCompiledContextProofs(ast, isDescriptorChildrenImport
 							(node.type === 'JSXFragment' && childKey === 'children') ||
 							((node.type === 'JSXOpeningElement' || node.type === 'JSXClosingElement') &&
 								childKey === 'name') ||
-							DIRECTIVE_ARMS[node.type]?.includes(childKey) === true);
+							isDirectiveArm(node, parent, childKey) ||
+							(node.type === 'BlockStatement' &&
+								childKey === 'body' &&
+								isDirectiveArm(parent, grandparent, key)));
 			inspect(child, node, childKey, parent, childDirect);
 		});
 	};
