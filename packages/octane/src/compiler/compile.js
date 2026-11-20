@@ -4864,14 +4864,17 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null, freeWr
 			return;
 		}
 
-		// Block scope — hoist `var`/`function` + pre-collect `let`/`const` so
+		// Block scope — hoist `var`/`function` + pre-collect `let`/`const`/`class` so
 		// forward references work the same way they do at runtime.
 		if (t === 'BlockStatement') {
 			const newScope = new Set(scope);
 			for (const stmt of n.body || []) {
 				if (stmt.type === 'VariableDeclaration') {
 					for (const d of stmt.declarations || []) collectBindings(d.id, newScope);
-				} else if (stmt.type === 'FunctionDeclaration' && stmt.id) {
+				} else if (
+					(stmt.type === 'FunctionDeclaration' || stmt.type === 'ClassDeclaration') &&
+					stmt.id
+				) {
 					newScope.add(stmt.id.name);
 				}
 			}
@@ -4907,7 +4910,10 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null, freeWr
 			for (const stmt of n.body || []) {
 				if (stmt.type === 'VariableDeclaration') {
 					for (const d of stmt.declarations || []) collectBindings(d.id, newScope);
-				} else if (stmt.type === 'FunctionDeclaration' && stmt.id) {
+				} else if (
+					(stmt.type === 'FunctionDeclaration' || stmt.type === 'ClassDeclaration') &&
+					stmt.id
+				) {
 					newScope.add(stmt.id.name);
 				}
 			}
@@ -38904,16 +38910,36 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		: null;
 	const leftDeclId = node.left.declarations[0].id;
 	const isDestructured = leftDeclId.type !== 'Identifier';
-	const explicitKey = forRowKeyAttribute(node, ctx) ?? node.key ?? null;
+	let explicitKey = forRowKeyAttribute(node, ctx) ?? node.key ?? null;
+	// As in a for...of, the header pattern must not see the row body's
+	// declarations. A keyed row evaluates it in the key function, outside the
+	// body, so an unkeyed row whose pattern reads a name the body declares, or
+	// calls `eval`, takes that path with the key it would have had anyway.
+	let shadowed = false;
+	if (isDestructured && explicitKey === null && node.nativeArrayMap === undefined) {
+		const declared = collectModuleTopLevelBindings(node.body.body, new Set()).all;
+		const reads = collectFreeIdentifiers(node.left, []);
+		shadowed = [...reads].some((name) => name === 'eval' || declared.has(name));
+	}
+	const itemName = isDestructured
+		? explicitKey === null && !shadowed
+			? '_item'
+			: allocCompilerName(ctx, '__rowInput')
+		: leftDeclId.name;
+	if (shadowed) {
+		const item = b.id(itemName);
+		explicitKey = node.index
+			? b.id(node.index.name, node.index)
+			: b.conditional(
+					b.binary('!=', b.member(item, 'id'), b.literal(null, 'null')),
+					b.member(item, 'id'),
+					item,
+				);
+	}
 	const snapshot =
 		isDestructured && explicitKey !== null
 			? projectForPatternSnapshot(node, explicitKey, ctx, forPatternSnapshot(leftDeclId))
 			: null;
-	const itemName = isDestructured
-		? snapshot === null
-			? '_item'
-			: allocCompilerName(ctx, '__rowInput')
-		: leftDeclId.name;
 	const subStmts = forItemTemplateBody(node, ctx);
 
 	// Key resolution priority (matches @tsrx/core's build_hoisted_for_of_with_hooks):
@@ -39005,8 +39031,9 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	const keyHelper = `_key$${ctx.nextHelperId++}`;
 	const keyOrigin = node.loc ? node : keyFn.loc ? keyFn : ctx._moduleOrigin;
 	const keyBody = keyFn.body;
-	const keyCapturesParent = [...collectFreeIdentifiers(keyFn, new Set())].some((name) =>
-		rowLocals?.has(name),
+	// A direct `eval` can read any parent local.
+	const keyCapturesParent = [...collectFreeIdentifiers(keyFn, new Set())].some(
+		(name) => rowLocals != null && (name === 'eval' || rowLocals.has(name)),
 	);
 	const inlineKey =
 		keyCapturesParent ||

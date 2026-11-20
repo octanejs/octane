@@ -390,6 +390,81 @@ describe('bare-left @for row bindings', () => {
 		expect(text([...host.querySelectorAll('li')])).toEqual(['outer0', 'outer1']);
 	});
 
+	describe.each([
+		['a module binding', "const prefix = 'outer';", '{ rows }'],
+		['a prop', '', '{ rows, prefix }'],
+	])('client row defaults reading %s', (_, outer, props) => {
+		it.each([
+			['{ value = prefix }', '', "const prefix = 'row';", ['outer', 'outer']],
+			['{ value = prefix }', '', 'class prefix {}', ['outer', 'outer']],
+			['{ value = prefix }', '', 'function prefix() {}', ['outer', 'outer']],
+			['{ value = prefix }', '', 'enum prefix { Row }', ['outer', 'outer']],
+			["{ value = eval('prefix') }", '', "const prefix = 'row';", ['outer', 'outer']],
+			[
+				'{ read = () => prefix + index }',
+				'; index index',
+				"const prefix = 'row';",
+				['outer0', 'outer1'],
+			],
+			['{ [prefix]: value = prefix }', '', "const prefix = 'row';", ['outer', 'outer']],
+		])('%s%s stay out of a body with %s', (pattern, header, declaration, expected) => {
+			// As in a for…of, a header pattern never sees the row body's declarations.
+			const value = pattern.includes('read') ? 'read()' : 'value';
+			const source = `
+				${outer}
+				export function List(${props}) @{
+					<ul>@for (const ${pattern} of rows${header}) {
+						${declaration}
+						<li>{${value} as string}</li>
+					}</ul>
+				}
+			`;
+			const id = 'row-pattern-body-scope.tsrx';
+			const input = { rows: [{}, {}], prefix: 'outer' };
+			const { List: ClientList } = loadCompiledFixtureSource(source, { id, mode: 'client' });
+			const { List: ServerList } = loadCompiledFixtureSource(source, { id, mode: 'server' });
+			const host = container(renderToString(ServerList, input).html);
+			const before = [...host.querySelectorAll('li')];
+			expect(text(before)).toEqual(expected);
+
+			const errors: unknown[] = [];
+			const root = hydrateRoot(host, ClientList, input, {
+				onRecoverableError: (error: unknown) => errors.push(error),
+			});
+			cleanups.push(() => root.unmount());
+			flushSync(() => {});
+			expectAdopted([...host.querySelectorAll('li')], before);
+			expect(text([...host.querySelectorAll('li')])).toEqual(expected);
+			expect(errors).toEqual([]);
+
+			// A fresh client mount and an update read the same outer binding.
+			const view = mount(ClientList, input);
+			cleanups.push(() => view.unmount());
+			expect(text(view.findAll('li'))).toEqual(expected);
+			flushSync(() => view.root.render(ClientList, { ...input, rows: [{}, {}, {}] }));
+			expect(text(view.findAll('li'))).toEqual([...expected, expected[0].replace('0', '2')]);
+		});
+	});
+
+	it.each([
+		['if (true) { var prefix = 1; } <li>{value as string}</li>'],
+		['for (;;) { var prefix = 1; break; } <li>{value as string}</li>'],
+		['<li>@{ var prefix = 1; <b>{value as string}</b> }</li>'],
+	])('rejects a nested var that could shadow a header default: %s', (body) => {
+		// A `var` would hoist past the row body's own scope and shadow the header.
+		const source = `
+			const prefix = 'outer';
+			export function List({ rows }) @{
+				<ul>@for (const { value = prefix } of rows) { ${body} }</ul>
+			}
+		`;
+		for (const mode of ['client', 'server'] as const) {
+			expect(() =>
+				loadCompiledFixtureSource(source, { id: 'row-pattern-nested-var.tsrx', mode }),
+			).toThrow(/`var` declarations/);
+		}
+	});
+
 	it.each([
 		['prefix + index', "const prefix = 'row';", 'outer'],
 		['prefix + index', 'class prefix {}', 'outer'],
