@@ -396,6 +396,8 @@ export function useChannel<T>(input: T): T extends Token ? string : { text: stri
 });
 
 it.each([
+	['0.16.6', false],
+	['0.16.7', true],
 	['0.17.0', true],
 	['0.18.0', true],
 	['0.18.1', true],
@@ -403,7 +405,11 @@ it.each([
 	['0.20.0', true],
 	['0.21.0', true],
 	['0.22.0', true],
-	['0.23.0', false],
+	['0.23.0', true],
+	['0.23.10', true],
+	['0.23.0-rc.1', false],
+	['0.23.01', false],
+	['0.24.0', false],
 ])('gates the generated adapters on installed Octane %s', async (version, supported) => {
 	const { app, root } = project({
 		'app/src/pane.tsx': `import {useSnapshot} from 'observer';
