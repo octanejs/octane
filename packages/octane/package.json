@@ -105,6 +105,7 @@
     "./data/octane/server": "./src/data/octane.server.ts",
     "./data/manifest": "./src/data/manifest.ts",
     "./signals": "./src/signals/index.ts",
+    "./signals/core": "./src/signals/core.ts",
     "./signals/client": "./src/signals/client.ts",
     "./signals/server": "./src/signals/server.ts",
     "./signals/react": "./src/signals/react.ts",
@@ -365,6 +366,17 @@
         "import": "./dist/signals/index.js",
         "require": "./dist/cjs/signals/index.cjs",
         "default": "./dist/signals/index.js"
+      },
+      "./signals/core": {
+        "types": "./dist/signals/core.d.ts",
+        "node": {
+          "import": "./dist/node/signals/core.js",
+          "require": "./dist/cjs/signals/core.cjs",
+          "default": "./dist/node/signals/core.js"
+        },
+        "import": "./dist/signals/core.js",
+        "require": "./dist/cjs/signals/core.cjs",
+        "default": "./dist/signals/core.js"
       },
       "./signals/client": {
         "types": "./dist/signals/client.d.ts",

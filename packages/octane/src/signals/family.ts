@@ -1,5 +1,5 @@
 import { formatClientError } from '../error-codes.client.generated.js';
-import { ScopeImpl } from './engine.js';
+import { ScopeLifetime, type KeylessScope } from './keyless-scope.js';
 import {
 	EffectNode,
 	PlainCell,
@@ -22,7 +22,6 @@ import {
 	SIGNAL_BINDING_RETIRED,
 	SIGNAL_BINDING_SUBSCRIBE,
 	type FamilyOptions,
-	type Scope,
 	type SignalFamily,
 	type SignalHandle,
 } from './types.js';
@@ -122,12 +121,12 @@ function retireComputed(member: PlainComputed): void {
 class Family<K, H extends SignalHandle<unknown>> implements SignalFamily<K, H> {
 	readonly members = new Map<unknown, Member>();
 	/** Evicted cells move here, a retired owner of the same shape as the scope. */
-	private retired: ScopeImpl | undefined = undefined;
+	private retired: ScopeLifetime | undefined = undefined;
 	/** The scope's hold on this family while it has members; see `guard`. */
 	private guardEffect: EffectNode | undefined = undefined;
 
 	constructor(
-		readonly scope: ScopeImpl,
+		readonly scope: ScopeLifetime,
 		private readonly create: (key: K) => H,
 		private readonly keyOf: ((key: K) => unknown) | undefined,
 		readonly idle: number,
@@ -234,7 +233,7 @@ class Family<K, H extends SignalHandle<unknown>> implements SignalFamily<K, H> {
 		entries.delete(member);
 		let retired = this.retired;
 		if (retired === undefined) {
-			retired = this.retired = new ScopeImpl(this.scope.scopeKey, false, undefined, 0);
+			retired = this.retired = new ScopeLifetime(this.scope.scopeKey);
 			retired.disposed = true;
 		}
 		retireKeyless(member, retired, this.scope.scopeKey);
@@ -250,14 +249,14 @@ class Family<K, H extends SignalHandle<unknown>> implements SignalFamily<K, H> {
  * of its key creates a new member.
  */
 export function createFamily<K, H extends SignalHandle<unknown>>(
-	scope: Scope,
+	scope: KeylessScope,
 	create: (key: K) => H,
 	options?: FamilyOptions<K>,
 ): SignalFamily<K, H> {
 	const keyOf = options?.keyOf;
 	const idle = options?.idle ?? -1;
 	if (
-		!(scope instanceof ScopeImpl) ||
+		!(scope instanceof ScopeLifetime) ||
 		typeof create !== 'function' ||
 		(options !== undefined && (options === null || typeof options !== 'object')) ||
 		(keyOf !== undefined && typeof keyOf !== 'function') ||

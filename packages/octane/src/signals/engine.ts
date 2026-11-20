@@ -1,3 +1,12 @@
+import {
+	deriveKeyless,
+	equalsOption,
+	installScopeOperations,
+	requireKey,
+	ScopeLifetime,
+} from './keyless-scope.js';
+import { installSignalActions } from '#octane/signal-actions/graph';
+import { installServerReads } from '#octane/signals/server-reads';
 import { REACTIVE_SLOW } from './graph-flags.js';
 import { formatClientError } from '../error-codes.client.generated.js';
 import { decodeSignalValue, snapshotSignalValue } from './encoding.js';
@@ -5,22 +14,18 @@ import { ScopeDisposedError, SignalFrameError, SignalSerializationError } from '
 import type { ScopeStreams } from './scope-streams.js';
 import { scopeSeedEntry } from './seed-serialization.js';
 import {
-	EffectNode,
 	PlainCell,
 	PlainComputed,
 	ScopedNode,
 	assertAlive,
 	assertWritable,
-	addEffect,
 	computeEqual,
 	derivedState,
-	effectRing,
 	endSignalBatch,
-	executeEffect,
 	historicalBindingRead,
 	initializeValue,
+	installKeyedGraph,
 	inspectNativeNode,
-	presentDuringFlush,
 	readNode,
 	readValue,
 	readyState,
@@ -30,15 +35,12 @@ import {
 	setWatched,
 	setHistoricalReader,
 	signalBatch,
-	signalTransaction,
 	startSignalBatch,
-	stopEffect,
 	unchangedLiveRead,
 	untrack,
 	type GraphOwner,
 	type CandidateProducer,
 	type NodeState,
-	type SignalObserver,
 	type SignalReadMode,
 	type CandidateContext,
 } from './graph.js';
@@ -49,8 +51,6 @@ import {
 	getNativeAdoptionResolver,
 	nativeAdoptionMiss,
 	nativeReadRebase,
-	registerNativeBatchHooks,
-	registerNativeSignalHydration,
 	reportNativeRead,
 	type NativeReadSource,
 } from './read-protocol.js';
@@ -74,7 +74,6 @@ import type {
 	ScopeSeed,
 	ScopeSignalOptions,
 	skip,
-	SignalEquals,
 	SignalHandle,
 	SignalSeedEntry,
 	SignalTraceEvent,
@@ -120,18 +119,13 @@ interface FrameData {
 
 let activeFrames: Map<ScopeImpl, AdoptionFrameImpl> | undefined;
 
-registerNativeBatchHooks({
-	startBatch: startSignalBatch,
-	endBatch: endSignalBatch,
-	present: presentDuringFlush,
-});
-registerNativeSignalHydration();
-
-function requireKey(key: string, label: string): void {
-	if (typeof key !== 'string' || !key.trim()) {
-		throw new TypeError(formatClientError(125, label));
-	}
-}
+installKeyedGraph();
+// Renderer transitions keep signal writes pending, including writes to signals
+// loaded after an Action awaited. An islands build moves this registration into
+// the renderer (see action-capability.ts).
+installSignalActions();
+// A server render collects its signal reads whenever signals exist.
+installServerReads();
 
 function seedKey(key: string, read: SignalReadMode = 'value'): string {
 	return `${read}:${key}`;
@@ -221,9 +215,8 @@ function decodeSeed(scopeKey: string, seed: ScopeSeed): Map<string, DecodedSeedE
 	return entries;
 }
 
-export class ScopeImpl implements Scope, GraphOwner {
+export class ScopeImpl extends ScopeLifetime implements Scope, GraphOwner {
 	readonly nodes = new Map<string, ScopedNode>();
-	readonly observers = new Set<SignalObserver>();
 	// Optional capabilities allocate on first use. A scope holding only writable
 	// and synchronous derived signals, such as every `useSignal$` hook scope,
 	// never pays for request, resource, stream, adoption or trace bookkeeping.
@@ -233,18 +226,11 @@ export class ScopeImpl implements Scope, GraphOwner {
 	streams: ScopeStreams | undefined = undefined;
 	derivedBindings: Map<ScopedNode, DerivedBindingLifecycle> | undefined = undefined;
 	frames: Set<AdoptionFrameImpl> | undefined = undefined;
-	/** Effects this scope stops when it retires. */
-	effects: EffectNode | undefined = undefined;
-	heldCells: PlainCell[] | undefined = undefined;
-	heldReleased = 0;
 	/** Holds a writable or asynchronous derived cell that new render inputs cannot re-select. */
 	unkeyedState = false;
 	readonly seedEntries: Map<string, DecodedSeedEntry> | undefined;
-	readonly traceLimit: number;
 	events: SignalTraceEvent[] | undefined = undefined;
 	sequence = 0;
-	private lifetime = 0;
-	disposed = false;
 	// Installed by installPublicScope, so only applications that can hold a
 	// scope (createScope, currentSignalOwner) ship these.
 	declare derived$: Scope['derived$'];
@@ -260,26 +246,13 @@ export class ScopeImpl implements Scope, GraphOwner {
 	readBarrier: Promise<void> | undefined;
 
 	constructor(
-		private readonly key: string,
-		readonly seedable: boolean,
+		key: string,
+		seedable: boolean,
 		seedEntries: Map<string, DecodedSeedEntry> | undefined,
 		traceLimit: number,
 	) {
-		requireKey(key, 'scopeKey');
-		this.traceLimit = traceLimit;
+		super(key, seedable, traceLimit);
 		this.seedEntries = seedEntries;
-	}
-
-	get scopeKey(): string {
-		return this.key;
-	}
-
-	get epoch(): number {
-		return this.lifetime;
-	}
-
-	get retired(): boolean {
-		return this.disposed;
 	}
 
 	// installPublicScope adds the `equals` option, which only createScope's scopes take.
@@ -300,7 +273,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 	// Hydration adopts internal owner scopes too. It reaches them through the
 	// owner: its protocol modules load without signals, so importing the engine
 	// there would ship it in applications that never create a signal.
-	beginAdoption(seed: ScopeSeed): AdoptionFrame {
+	override beginAdoption(seed: ScopeSeed): AdoptionFrame {
 		assertAlive(this);
 		if (!this.seedable) throw new SignalFrameError(formatClientError(142));
 		const data: FrameData = {
@@ -311,7 +284,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 		return new AdoptionFrameImpl(data);
 	}
 
-	trace(type: SignalTraceEvent['type'], node?: ScopedNode): void {
+	override trace(type: SignalTraceEvent['type'], node?: ScopedNode): void {
 		if (this.traceLimit !== 0) recordScopeTrace!(this, type, node);
 	}
 
@@ -319,15 +292,9 @@ export class ScopeImpl implements Scope, GraphOwner {
 		if (this.disposed) return;
 		assertWritable();
 		signalBatch(() => {
-			// Effects stop first, so their cleanups still read this scope's values.
-			const ring = this.effects;
-			if (ring !== undefined) {
-				while (ring.next !== ring) stopEffect(ring.next!);
-			}
-			this.disposed = true;
+			this.stopEffectsAndRetire();
 			// Reads and writes from cancellation callbacks below take the general path, which throws.
 			for (const node of this.nodes.values()) node.flags |= REACTIVE_SLOW;
-			this.lifetime++;
 			// Optional capabilities keep their original order: producers stop before
 			// channels clear, and adoption leases release before the graph retires.
 			if (this.resources) {
@@ -737,24 +704,6 @@ function ownScopeNode<T>(scope: ScopeImpl, handle$: SignalHandle<T>): ScopedNode
 
 let publicScope = false;
 
-/** `scope.effect`'s stop, bound to its effect, as small as alien-signals' own. */
-function stopScopeEffect(this: EffectNode): void {
-	if (this.run !== undefined || this.cleanup !== undefined) stopEffect(this);
-}
-
-/** A Scope signal's `equals`, or undefined when Object.is alone compares its values; checks `watched` too. */
-function equalsOption<T>(options: ScopeSignalOptions<T> | undefined): SignalEquals<T> | undefined {
-	if (options === undefined) return undefined;
-	if (options === null || typeof options !== 'object') throw new TypeError(formatClientError(160));
-	const equals = options.equals;
-	if (equals !== undefined && typeof equals !== 'function')
-		throw new TypeError(formatClientError(366));
-	const watched = options.watched;
-	if (watched !== undefined && typeof watched !== 'function')
-		throw new TypeError(formatClientError(367));
-	return equals;
-}
-
 /** Optional authored cell setup stays out of ordinary declaration factories. */
 export function prepareDeclaredCellOptions<T>(
 	options: ScopeSignalOptions<T>,
@@ -812,11 +761,7 @@ export function installPublicScope(): void {
 		if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
 		const equals = equalsOption(options);
 		if (key === null) {
-			assertAlive(this);
-			const node = new PlainComputed<T>(compute);
-			if (equals) node.getter = computeEqual(node, compute, equals);
-			if (options?.watched) setWatched(node, options.watched);
-			return node as unknown as DerivedSignal<T>;
+			return deriveKeyless(this, compute, options, equals);
 		}
 		const node = createScopeNode<T>(this, key, 'derived');
 		const read: () => T = equals ? computeEqual(node, compute, equals) : compute;
@@ -860,32 +805,7 @@ export function installPublicScope(): void {
 			throw error;
 		}
 	};
-	prototype.batch = function <T>(this: ScopeImpl, write: () => T): T {
-		assertAlive(this);
-		return signalBatch(write);
-	};
-	prototype.transaction = function <T>(this: ScopeImpl, write: () => T) {
-		assertAlive(this);
-		if (typeof write !== 'function') throw new TypeError(formatClientError(368));
-		return signalTransaction(write);
-	};
-	prototype.effect = function (this: ScopeImpl, run: () => void | (() => void)): () => void {
-		assertAlive(this);
-		assertWritable();
-		if (typeof run !== 'function') throw new TypeError(formatClientError(363));
-		const effect = new EffectNode(run);
-		addEffect((this.effects ??= effectRing()), effect);
-		startSignalBatch();
-		try {
-			executeEffect(effect);
-		} catch (error) {
-			stopEffect(effect);
-			throw error;
-		} finally {
-			endSignalBatch();
-		}
-		return stopScopeEffect.bind(effect);
-	};
+	installScopeOperations(prototype);
 	prototype.action = function <F extends (...args: any[]) => any>(this: ScopeImpl, write: F): F {
 		if (typeof write !== 'function') throw new TypeError(formatClientError(139));
 		const owner = this;

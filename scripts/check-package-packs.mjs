@@ -1110,6 +1110,7 @@ export function renderProbe() {
 					'./react/server',
 					'./data/react',
 					'./signals/react',
+					'./signals/core',
 					'./data/manifest',
 				].includes(subpath),
 		)
