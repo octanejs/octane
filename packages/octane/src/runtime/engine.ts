@@ -4271,7 +4271,7 @@ function completeDeferredLayouts(capture: DeferredLayoutCapture, interrupted = f
 			for (const store of capture.stores) storeSyncQueue.push(store);
 			capture.stores.length = 0;
 			try {
-				drainStoreSyncs();
+				drainStoreSyncs(capture.passives);
 			} finally {
 				for (const store of laterStores) storeSyncQueue.push(store);
 			}
