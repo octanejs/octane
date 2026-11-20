@@ -75,6 +75,11 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		clicks: 1,
 		cleaned: true,
 	},
+	'guarded-component-tag': {
+		before: 'first',
+		after: 'second',
+		cleaned: true,
+	},
 	context: {
 		before: 'light',
 		after: 'dark',
