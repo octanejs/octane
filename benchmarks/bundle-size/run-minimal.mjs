@@ -54,6 +54,7 @@ const existingScenarios = [
 	['signal-instance-derived', 'tsrx'],
 	['prop-attributes', 'tsrx'],
 	['context', 'tsrx'],
+	['context-arms', 'tsrx'],
 	['memo-context', 'tsrx'],
 	['controlled-input', 'tsrx'],
 	['hydrate-root', 'tsrx'],
@@ -66,6 +67,7 @@ const existingScenarios = [
 	['component-owned-effects', 'ts'],
 	['descriptor-children', 'ts'],
 	['renderable-holes', 'tsrx'],
+	['reexported-components', 'tsrx'],
 	['binding-vanilla', 'ts'],
 	['binding-hooks', 'tsrx'],
 ];
@@ -350,6 +352,12 @@ const featureControls = {
 		dropped: hostDescriptorRenderer,
 		kept: ['childSlot', 'renderPreparedChildList'],
 	},
+	// Components imported through a plain `.ts` re-export index keep their void
+	// proof, so no generic component slot can resolve a host string tag.
+	'reexported-components': {
+		dropped: ['hostStringTagBody', ...hostDescriptorRenderer],
+		kept: ['componentSlotLite', 'componentSlotVoid'],
+	},
 	context: {
 		dropped: [
 			...signalOwnerDeclarations,
@@ -358,6 +366,12 @@ const featureControls = {
 			...layoutQueueDeclarations,
 		],
 		kept: ['useContextInternal', ...contextDependencyDeclarations],
+	},
+	// A provider in a directive arm is as private as one in the template, so it
+	// needs neither the generic child slot nor the host descriptor renderer.
+	'context-arms': {
+		dropped: ['childSlot', ...hostDescriptorRenderer],
+		kept: ['useContextInternal'],
 	},
 	'memo-context': {
 		dropped: [],

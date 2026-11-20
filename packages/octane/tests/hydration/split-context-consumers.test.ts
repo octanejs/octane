@@ -49,6 +49,19 @@ describe('Context providers across split hydration', { timeout: 15_000 }, () => 
 		root.unmount();
 		expect(host.childNodes.length).toBe(0);
 	});
+	it('provides through directive arms inside a split boundary', async () => {
+		const values = () =>
+			[...host.querySelectorAll('.split-context-eager')].map((node) => node.textContent);
+		root = createRoot(container());
+		await act(() => root!.render(client.Arms, { when: load(), value: 'if' }));
+		await vi.waitFor(() => expect(values()).toEqual(['if']), SPLIT_CHILD_LOAD);
+		await act(() => root!.render(client.Arms, { when: load(), value: 'updated' }));
+		await vi.waitFor(() => expect(values()).toEqual(['updated']));
+		await act(() => root!.render(client.Arms, { when: load(), value: 'x', outer: 'else' }));
+		await vi.waitFor(() => expect(values()).toEqual(['else']));
+		root.unmount();
+		expect(host.childNodes.length).toBe(0);
+	});
 	it('retains one shared Context identity, nearest values and native component state', async () => {
 		const onEffect = vi.fn();
 		const props = { when: load(), value: 'first', onEffect };
