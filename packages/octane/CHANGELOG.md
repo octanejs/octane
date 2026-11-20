@@ -1,5 +1,28 @@
 # octane
 
+## 0.23.0
+
+### Minor Changes
+
+- adc43d2: Pass `{ fetch: false }` to a read handle's `subscribe` or `{ suspend: false, fetch: false }` to `useRead` in Octane and React to keep receiving cached data and updates while pausing automatic fetches for that subscriber.
+- 11a2e2c: Add `octane/signals/core` for synchronous keyless scopes, families and change observers. Its handles share dependencies and transactions with full scopes.
+- d85efff: Add `useRetainedSignalValue` and `useSignalSubscription` to `octane/signals/react`. Readers can keep a watched source active while React Activity hides their view and catch up when it returns. The subscription hook lets `useSyncExternalStore` consumers provide their own snapshots and optionally customize how they attach a listener. `RetainedSignalProvider` shares a historical server snapshot resolver and Activity retention defaults with nested readers; explicit hook arguments take precedence. `useOptionalRetainedSignalValue` accepts a native handle or an inactive primitive fallback without adding work to the strict handle reader.
+
+### Patch Changes
+
+- 18ceb2a: Fix `<Activity mode={…}>` returned from a component: children that read the component's locals no longer throw `props is not defined`.
+- 0d388ad: Refresh imported-read projections, `@if` branches and `@for` collections in DOM bindings when an accepted source changes while a newer replacement suspends, instead of leaving the visible UI stale until the replacement settles.
+- 685e1a7: Fix a client `@for` header default or computed key that names something the row body declares (`{ value = prefix }` beside a body `const prefix`). It now reads the outer binding, as a `for…of` header does and as server rendering already did, instead of throwing a `ReferenceError` or reading the body's value. Rows whose header pattern calls `eval` are fixed too, and a row body's `class` declaration no longer collides with a captured outer binding of the same name.
+- 247be5a: Keep a directive in returned children in source order after a sibling component that is also passed children.
+- 2277400: A `const` component tag rendered inside `@if (typeof Tag === 'function')` (or an `@else if` or plain `if` with that test) now compiles to the function-only component slot. Since the tag can't be a host string there, an application that renders runtime-chosen components this way no longer ships the generic slot's host-tag renderer.
+- 591b885: Stabilize keyed derived signals before publishing synchronous watched setup updates, preserving equality and the last committed ready value across transient failures.
+- ebb5ca4: A private Context provider inside an `@if`, `@for`, `@switch` or `@try` arm now compiles to the compiled provider, as one directly in the template already did. Before, a single such provider sent every provider of that Context through the public path, and an application paid for the generic child slot and host-element renderer it needs: about 35 KB gzip in a Strong signals app.
+- 6a1e0c4: Add an optional metadata-only observer for signal writes and committed changes, without activating signal subscriptions.
+- e4338ff: Allow watched signal setup and cleanup to publish synchronous updates when an observed derived value changes dependencies. The first observer now reads the updated value through derived signals, and keyless derived readers recover when a failing dependency becomes ready. Export `isSignalReadOnly()` so integrations can detect the same synchronous write guard used by the graph.
+- eba13ee: Server rendering no longer throws `Cannot access 'index' before initialization` when an unkeyed `@for` item pattern reads its index together with a name the row body declares (`{ value = prefix + index }` beside a body `const prefix`), or calls `eval`. The server binds the index first and moves the row body into its own block, so the pattern still resolves names outside the body, as a `for…of` header does.
+- 57c2638: `useSyncExternalStore` now subscribes a newly mounted reader, or a swapped store, during the commit of a discrete event (delegated or native listener) or `flushSync` update rather than after paint, as React does. A store change between that commit and the next paint is no longer missed (#3095).
+- 6d8e877: Follow exact `export { a as b } from '...'` re-exports when proving imported void components in production Vite and Rspack builds, so a component imported through a plain `.ts` index (such as a package entry over `.tsrx` files) compiles to the same specialized call as a direct import and no longer retains the generic host-element renderer.
+
 ## 0.22.0
 
 ### Minor Changes

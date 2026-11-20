@@ -1,5 +1,27 @@
 # @octanejs/rspack-plugin
 
+## 0.2.15
+
+### Patch Changes
+
+- 6d8e877: Follow exact `export { a as b } from '...'` re-exports when proving imported void components in production Vite and Rspack builds, so a component imported through a plain `.ts` index (such as a package entry over `.tsrx` files) compiles to the same specialized call as a direct import and no longer retains the generic host-element renderer.
+- Updated dependencies [18ceb2a]
+- Updated dependencies [0d388ad]
+- Updated dependencies [685e1a7]
+- Updated dependencies [adc43d2]
+- Updated dependencies [247be5a]
+- Updated dependencies [2277400]
+- Updated dependencies [591b885]
+- Updated dependencies [11a2e2c]
+- Updated dependencies [ebb5ca4]
+- Updated dependencies [d85efff]
+- Updated dependencies [6a1e0c4]
+- Updated dependencies [e4338ff]
+- Updated dependencies [eba13ee]
+- Updated dependencies [57c2638]
+- Updated dependencies [6d8e877]
+  - octane@0.23.0
+
 ## 0.2.14
 
 ### Patch Changes

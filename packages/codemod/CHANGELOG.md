@@ -1,5 +1,27 @@
 # @octanejs/codemod
 
+## 0.2.9
+
+### Patch Changes
+
+- e68e057: Enable the React Intl and scoped-store migration adapters for projects using stable Octane 0.23.x releases.
+- Updated dependencies [18ceb2a]
+- Updated dependencies [0d388ad]
+- Updated dependencies [685e1a7]
+- Updated dependencies [adc43d2]
+- Updated dependencies [247be5a]
+- Updated dependencies [2277400]
+- Updated dependencies [591b885]
+- Updated dependencies [11a2e2c]
+- Updated dependencies [ebb5ca4]
+- Updated dependencies [d85efff]
+- Updated dependencies [6a1e0c4]
+- Updated dependencies [e4338ff]
+- Updated dependencies [eba13ee]
+- Updated dependencies [57c2638]
+- Updated dependencies [6d8e877]
+  - octane@0.23.0
+
 ## 0.2.8
 
 ### Patch Changes
