@@ -55,7 +55,45 @@ describe('watched keyless stabilization', () => {
 		const stop = selected$.subscribe(() => {});
 		enabled$.set(true);
 		expect(selected$.get()).toBe(2);
-		expect(compared).toEqual([]);
+		expect(compared).toEqual([1]);
+		stop();
+		scope.dispose();
+	});
+
+	it('retains the committed ready value across successive failed stabilization rounds', () => {
+		const scope = createScope({ scopeKey: 'recovered-selector-equality' });
+		const enabled$ = scope.signal$(null, false);
+		const phase$ = scope.signal$(null, 0);
+		const first$ = scope.signal$(null, 0, { watched: () => phase$.set(1) });
+		const second$ = scope.signal$(null, 0, { watched: () => phase$.set(2) });
+		const comparisons: Array<readonly [{ x: number }, { x: number }]> = [];
+		const selected$ = scope.derived$(
+			null,
+			() => {
+				if (!enabled$.get()) return { x: 1 };
+				const phase = phase$.get();
+				if (phase < 2) {
+					(phase === 0 ? first$ : second$).get();
+					throw new Error('not ready');
+				}
+				return { x: 1 };
+			},
+			{
+				equals: (previous, next) => {
+					comparisons.push([previous, next]);
+					return previous.x === next.x;
+				},
+			},
+		);
+		const committed = selected$.get();
+		let notices = 0;
+		const stop = selected$.subscribe(() => notices++);
+		enabled$.set(true);
+		expect(selected$.get()).toBe(committed);
+		expect(comparisons).toHaveLength(1);
+		expect(comparisons[0]?.[0]).toBe(committed);
+		expect(comparisons[0]?.[1]).not.toBe(committed);
+		expect(notices).toBe(0);
 		stop();
 		scope.dispose();
 	});
@@ -100,16 +138,27 @@ describe('watched keyless stabilization', () => {
 		const scope = createScope({ scopeKey: 'recovered-watch' });
 		let source$: WritableSignal<number>;
 		source$ = scope.signal$(null, 0, { watched: () => source$.set(1) });
-		const value$ = scope.derived$(null, () => {
-			const current = source$.get();
-			if (current === 0) throw new Error('not ready');
-			return current;
-		});
+		let comparisons = 0;
+		const value$ = scope.derived$(
+			null,
+			() => {
+				const current = source$.get();
+				if (current === 0) throw new Error('not ready');
+				return current;
+			},
+			{
+				equals: (previous, next) => {
+					comparisons++;
+					return previous === next;
+				},
+			},
+		);
 		const seen: number[] = [];
 		const stop = scope.effect(() => {
 			seen.push(value$.get());
 		});
 		expect(seen).toEqual([1]);
+		expect(comparisons).toBe(0);
 		stop();
 		scope.dispose();
 	});

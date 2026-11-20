@@ -2999,7 +2999,7 @@ function stabilizeLean(node: PlainComputed, previous: unknown): boolean {
 				break;
 			}
 		}
-		if (node.flags & REACTIVE_FAILED) node.last = NO_FAILURE;
+		if (node.flags & REACTIVE_FAILED) node.last = previous;
 		recomputeLean(node, true);
 	} while (node.flags & REACTIVE_RECURSED);
 	return (node.flags & REACTIVE_FAILED) !== 0 || !same(previous, node.last);
