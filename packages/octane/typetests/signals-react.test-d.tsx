@@ -1,9 +1,11 @@
 /** @jsxImportSource react */
 // `octane/signals/react` resolves through the package exports with React's JSX types.
+import { useSyncExternalStore } from 'react';
 import { createScope, type Scope, type SignalHandle } from 'octane/signals';
 import {
 	SignalScopeProvider,
 	useRetainedSignalValue,
+	useSignalSubscription,
 	useSignalScope,
 	useSignalValue,
 } from 'octane/signals/react';
@@ -42,3 +44,12 @@ export const missing = <SignalScopeProvider />;
 
 declare const handle: SignalHandle<{ readonly id: string }>;
 export const id = (): string => useSignalValue(handle).id;
+
+export function useCount(handle: SignalHandle<readonly string[]> | null): number {
+	const subscribe = useSignalSubscription(handle, false);
+	return useSyncExternalStore(
+		subscribe,
+		() => handle?.get().length ?? 0,
+		() => 0,
+	);
+}

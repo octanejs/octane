@@ -65,15 +65,39 @@ export function useRetainedSignalValue<T>(
 	getServerSnapshot?: () => T,
 	retainOnHide = true,
 ): T {
-	const binding = useMemo(() => activityBinding(handle$), [handle$]);
-	useInsertionEffect(() => {
-		if (retainOnHide) return binding.retain();
-	}, [binding, retainOnHide]);
-	useLayoutEffect(binding.prepare, [binding]);
-	return useSyncExternalStore(binding.subscribe, binding.read, getServerSnapshot ?? binding.read);
+	const subscribe = useSignalSubscription(handle$, retainOnHide);
+	const read = useCallback(() => handle$[SIGNAL_BINDING_READ](), [handle$]);
+	return useSyncExternalStore(subscribe, read, getServerSnapshot ?? read);
 }
 
-function activityBinding<T>(handle$: SignalHandle<T>) {
+type Subscribe = (notify: () => void) => () => void;
+const noop = () => {};
+const subscribeToNothing: Subscribe = () => noop;
+
+/**
+ * The Activity-aware subscription for a useSyncExternalStore reader that
+ * supplies its own snapshot. Pass a native handle, a stable subscribe
+ * function, or null for a reader with no current source. The returned
+ * subscription belongs to one useSyncExternalStore call in this component.
+ */
+export function useSignalSubscription<T>(
+	source: SignalHandle<T> | Subscribe | null,
+	retainOnHide = true,
+): Subscribe {
+	const binding = useMemo(() => {
+		if (source === null) return null;
+		return activityBinding(
+			typeof source === 'function' ? source : (notify) => source[SIGNAL_BINDING_SUBSCRIBE](notify),
+		);
+	}, [source]);
+	useInsertionEffect(() => {
+		if (retainOnHide) return binding?.retain();
+	}, [binding, retainOnHide]);
+	useLayoutEffect(binding?.prepare ?? noop, [binding]);
+	return binding?.subscribe ?? subscribeToNothing;
+}
+
+function activityBinding(subscribe: Subscribe) {
 	let release: (() => void) | undefined;
 	let notify: (() => void) | undefined;
 	let retained = false;
@@ -91,7 +115,6 @@ function activityBinding<T>(handle$: SignalHandle<T>) {
 		}
 	};
 	return {
-		read: () => handle$[SIGNAL_BINDING_READ](),
 		// Insertion effects survive an Activity hide.
 		retain() {
 			retained = true;
@@ -105,13 +128,13 @@ function activityBinding<T>(handle$: SignalHandle<T>) {
 			// On reveal, connect before React disconnects outgoing passive readers.
 			// Initial observation still starts in the passive subscription.
 			if (needsSnapshotCheck && !release) {
-				release = handle$[SIGNAL_BINDING_SUBSCRIBE](invalidate);
+				release = subscribe(invalidate);
 				return releaseIfIdle;
 			}
 		},
 		subscribe(listener: () => void) {
 			notify = listener;
-			release ??= handle$[SIGNAL_BINDING_SUBSCRIBE](invalidate);
+			release ??= subscribe(invalidate);
 			if (needsSnapshotCheck) {
 				needsSnapshotCheck = false;
 				listener();

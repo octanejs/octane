@@ -21,6 +21,7 @@ import {
 import {
 	useRetainedSignalValue,
 	SignalScopeProvider,
+	useSignalSubscription,
 	useSignalScope,
 	useSignalValue,
 } from '../../src/signals/react.js';
@@ -189,7 +190,7 @@ describe('octane/signals/react', () => {
 		expect(subscribers(scope, 'value')).toBe(0);
 	});
 
-	it('hands a watched source between returning Activities with hidden retention disabled', async () => {
+	it('keeps a shared source watched when returning to an Activity with retention disabled', async () => {
 		const scope = createScope({ scopeKey: 'activity-handoff' });
 		const stop = vi.fn();
 		const value$ = scope.signal$('value', 0, { watched: () => stop });
@@ -209,6 +210,41 @@ describe('octane/signals/react', () => {
 		await act(() => root.render(null));
 		expect(stop).toHaveBeenCalledOnce();
 	});
+
+	it.each(['handle', 'callback'])(
+		'observes a custom snapshot through a %s source and releases it for a plain fallback',
+		async (kind) => {
+			const scope = createScope({ scopeKey: 'projected' });
+			const stop = vi.fn();
+			const watch = vi.fn(() => stop);
+			const count$ = scope.signal$('count', 2, { watched: watch });
+			const source = kind === 'handle' ? count$ : (notify: () => void) => count$.subscribe(notify);
+			function Reader({ active }: { active: boolean }) {
+				const subscribe = useSignalSubscription(active ? source : null);
+				const doubled = React.useSyncExternalStore(subscribe, () =>
+					active ? count$.get() * 2 : 'none',
+				);
+				return h('output', null, doubled);
+			}
+			const tree = (active: boolean, hidden = false) =>
+				h((React as any).Activity, { mode: hidden ? 'hidden' : 'visible' }, h(Reader, { active }));
+			const { root, container } = mount(tree(false));
+			expect(container.textContent).toBe('none');
+			await act(() => root.render(tree(true)));
+			expect(container.textContent).toBe('4');
+			await act(() => count$.set(3));
+			expect(container.textContent).toBe('6');
+			await act(() => root.render(tree(true, true)));
+			expect(stop).not.toHaveBeenCalled();
+			await act(() => count$.set(5));
+			await act(() => root.render(tree(true)));
+			expect(container.textContent).toBe('10');
+			expect(watch).toHaveBeenCalledOnce();
+			await act(() => root.render(tree(false)));
+			expect(container.textContent).toBe('none');
+			expect(stop).toHaveBeenCalledOnce();
+		},
+	);
 
 	it('releases a replaced retained handle and follows changes to the retention policy', async () => {
 		const scope = createScope({ scopeKey: 'retention-policy' });
@@ -631,7 +667,8 @@ describe('octane/signals/react', () => {
 		expect(container.innerHTML).toBe('<p>Hello Lin</p>');
 	});
 
-	it('adopts a historical server value before catching up to a pre-hydration write', async () => {
+	const readers = Object.entries({ useSignalValue, useRetainedSignalValue });
+	it.each(readers)('%s adopts a historical snapshot before catching up', async (_, useValue) => {
 		const request = createScope({ scopeKey: 'historical-request' });
 		const serverName$ = request.signal$('name', 'Ada');
 		function Greeting(props: {
@@ -639,7 +676,7 @@ describe('octane/signals/react', () => {
 			getServerSnapshot?: () => string;
 			layouts?: string[];
 		}) {
-			const name = useSignalValue(props.name$, props.getServerSnapshot);
+			const name = useValue(props.name$, props.getServerSnapshot);
 			React.useLayoutEffect(() => {
 				props.layouts?.push(name);
 			}, [name, props.layouts]);
