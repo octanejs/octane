@@ -25331,6 +25331,8 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html', inDescriptor =
 		} else if (t === 'Element' || t === 'JSXElement') {
 			if (descriptor && !isComponentTag(child)) {
 				newChildren.push(extractFragment(child, ctx, holeProps, childNs, true));
+			} else if (!descriptor && ctx._foldCtx && isDirectActivityLongForm(child, ctx)) {
+				newChildren.push(foldActivity(child, ctx, holeProps));
 			} else if (!descriptor && isLongFormTemplateSentinel(child, childNs, true, ctx)) {
 				newChildren.push(extractFragment(child, ctx, holeProps, childNs));
 			} else if (
@@ -25786,7 +25788,40 @@ function extractFragmentComponent(node, ctx, holeProps, parentNs = 'html') {
 	return out;
 }
 
+// FOLD a mode-only `<Activity>` like an `@if` (see extractFragment): its body is
+// compiled component-side, so it closes over setup locals, and the mode, body
+// helper, and env tuple thread into the renderer as `props.hN` holes.
+function foldActivity(node, ctx, holeProps) {
+	const fc = ctx._foldCtx;
+	const ac = makeActivityCall(
+		activityStatement(node),
+		ctx,
+		fc.compInlinedSubs,
+		fc.parentNs,
+		fc.cssHash,
+	);
+	if (ac.modeExpr.type !== 'Literal') {
+		const modeHole = `h${holeProps.length}`;
+		holeProps.push(objectProp(modeHole, rewriteJsxValues(ac.modeExpr, ctx)));
+		ac.modeExpr = memberProps(modeHole, ac.modeExpr);
+	}
+	const bodyHole = `h${holeProps.length}`;
+	holeProps.push(objectProp(bodyHole, b.id(ac.thenHelper)));
+	ac.thenHelper = `props.${bodyHole}`;
+	if (ac.envNames?.length) {
+		const envHole = `h${holeProps.length}`;
+		holeProps.push(objectProp(envHole, b.array(ac.envNames.map((n) => b.id(n)))));
+		ac.envExpr = `props.${envHole}`;
+	}
+	fc.directiveCalls.ifCalls.push(ac);
+	return { type: 'FoldedDirective', kind: 'if', recordIndex: fc.directiveCalls.ifCalls.length - 1 };
+}
+
 function extractFragmentRoot(node, ctx, holeProps, parentNs = 'html') {
+	if (ctx._foldCtx && isDirectActivityLongForm(node, ctx)) {
+		// The renderer's root is a fragment around the folded boundary.
+		return inheritOriginLoc(b.jsx_fragment([foldActivity(node, ctx, holeProps)]), node);
+	}
 	if (
 		(node.type === 'Element' || node.type === 'JSXElement') &&
 		isComponentTag(node) &&
@@ -28541,18 +28576,7 @@ function normalizeChildren(
 			// configs retain the ordinary element descriptor path below, where keys,
 			// spreads, children props, and authored evaluation order are preserved.
 			if (isDirectActivityLongForm(n, ctx)) {
-				const modeAttr = (n.openingElement.attributes || []).find(
-					(a) =>
-						(a.type === 'Attribute' || a.type === 'JSXAttribute') &&
-						a.name &&
-						(a.name.name || a.name) === 'mode',
-				);
-				let mode = null;
-				if (modeAttr) {
-					const v = modeAttr.value;
-					mode = v && v.type === 'JSXExpressionContainer' ? v.expression : v;
-				}
-				out.push({ type: 'ActivityStatement', mode, children: n.children || [] });
+				out.push(activityStatement(n));
 				continue;
 			}
 			// Keys need a reconciliation boundary. Parser-sensitive host trees need
@@ -34451,6 +34475,17 @@ function appendBakedAttribute(template, chunk, attrName, nameNode, valueNode, in
 	appendTemplatePart(template, chunk, 'attribute', origins);
 }
 
+// A folded directive's record was built while extractFragment walked the
+// component, before the renderer walk builds its sibling constructs, so its
+// construct id is stale. Re-stamp it in renderer-walk order: constructs anchored
+// at `__block.endMarker` mount in id order, and a stale id would mount this
+// directive ahead of an earlier sibling component (#3094).
+function foldedDirectiveRecord(node, ctx) {
+	const rec = ctx._foldedDirectiveCalls[`${node.kind}Calls`][node.recordIndex];
+	rec.id = ctx.nextHelperId++;
+	return rec;
+}
+
 function emitNodeHtml(
 	node,
 	path,
@@ -34661,19 +34696,11 @@ function emitNodeHtml(
 		// fixed siblings. Its branch helpers and control expressions were already
 		// extracted component-side; register the pre-built call exactly as the
 		// in-element child path does below.
-		const dc = ctx._foldedDirectiveCalls;
-		if (node.kind === 'if') {
-			return registerConstruct(dc.ifCalls[node.recordIndex], ifCalls);
-		}
-		if (node.kind === 'for') {
-			return registerConstruct(dc.forCalls[node.recordIndex], forCalls);
-		}
-		if (node.kind === 'switch') {
-			return registerConstruct(dc.switchCalls[node.recordIndex], ctx._switchCalls);
-		}
-		if (node.kind === 'try') {
-			return registerConstruct(dc.tryCalls[node.recordIndex], tryCalls);
-		}
+		const rec = foldedDirectiveRecord(node, ctx);
+		if (node.kind === 'if') return registerConstruct(rec, ifCalls);
+		if (node.kind === 'for') return registerConstruct(rec, forCalls);
+		if (node.kind === 'switch') return registerConstruct(rec, ctx._switchCalls);
+		if (node.kind === 'try') return registerConstruct(rec, tryCalls);
 	}
 	return createTemplateIr();
 }
@@ -36256,30 +36283,29 @@ function emitElementHtml(
 				// compiled component-side and its control/helpers rewritten to `props.hN`.
 				// Use the PRE-BUILT record (don't re-run makeIfCall); just assign the
 				// renderer's host/anchor template paths and slot it like a normal @if.
-				const dc = ctx._foldedDirectiveCalls;
 				if (child.kind === 'if') {
-					const ic = dc.ifCalls[child.recordIndex];
+					const ic = foldedDirectiveRecord(child, ctx);
 					ic.hostPath = path;
 					ic.anchorPath = [...path, childIdx];
 					ifCalls.push(ic);
 					appendTemplatePart(html, '<!>', 'anchor');
 					childIdx++;
 				} else if (child.kind === 'for') {
-					const fcRec = dc.forCalls[child.recordIndex];
+					const fcRec = foldedDirectiveRecord(child, ctx);
 					fcRec.hostPath = path;
 					fcRec.anchorPath = [...path, childIdx];
 					forCalls.push(fcRec);
 					appendTemplatePart(html, '<!>', 'anchor');
 					childIdx++;
 				} else if (child.kind === 'switch') {
-					const sc = dc.switchCalls[child.recordIndex];
+					const sc = foldedDirectiveRecord(child, ctx);
 					sc.hostPath = path;
 					sc.anchorPath = [...path, childIdx];
 					ctx._switchCalls.push(sc);
 					appendTemplatePart(html, '<!>', 'anchor');
 					childIdx++;
 				} else if (child.kind === 'try') {
-					const tc = dc.tryCalls[child.recordIndex];
+					const tc = foldedDirectiveRecord(child, ctx);
 					tc.hostPath = path;
 					tc.anchorPath = [...path, childIdx];
 					tryCalls.push(tc);
@@ -36939,6 +36965,19 @@ function makeActivityCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = n
 		elseHelper: null,
 		hostPath: null,
 	};
+}
+
+// A mode-only `<Activity>` element as the ActivityStatement makeActivityCall lowers.
+function activityStatement(node) {
+	const modeAttr = (node.openingElement.attributes || []).find(
+		(a) =>
+			(a.type === 'Attribute' || a.type === 'JSXAttribute') &&
+			a.name &&
+			(a.name.name || a.name) === 'mode',
+	);
+	const v = modeAttr?.value ?? null;
+	const mode = v?.type === 'JSXExpressionContainer' ? v.expression : v;
+	return { type: 'ActivityStatement', mode, children: node.children || [] };
 }
 
 function isActivityName(value) {
