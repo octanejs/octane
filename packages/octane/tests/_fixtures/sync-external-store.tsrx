@@ -177,3 +177,15 @@ export function NativeListenerMountedReader(props: { store: StoreLike; type: str
 		}
 	</div>
 }
+
+// A controlled input whose first edit mounts the reader; its discrete dispatch
+// commits synchronously before the controlled restore.
+export function ControlledInputMountedReader(props: { store: StoreLike }) @{
+	const [text, setText] = useState('');
+	<div>
+		<input value={text} onInput={(event) => setText((event.target as HTMLInputElement).value)} />
+		@if (text !== '') {
+			<Reader store={props.store} />
+		}
+	</div>
+}

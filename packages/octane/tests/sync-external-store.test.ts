@@ -4,6 +4,7 @@ import { mount, nextPaint } from './_helpers';
 import {
 	ClickMountedReader,
 	ConditionalReader,
+	ControlledInputMountedReader,
 	LayoutCascadeReader,
 	NativeListenerMountedReader,
 	TwoClickMountedReaders,
@@ -197,6 +198,25 @@ describe('useSyncExternalStore', () => {
 			.querySelector('button')!
 			.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
 		await Promise.resolve();
+		expect(container.querySelector('.value')?.textContent).toBe('0');
+		expect(store.listenerCount()).toBe(1);
+		root.unmount();
+		host.remove();
+		expect(store.listenerCount()).toBe(0);
+	});
+
+	it('subscribes during the synchronous commit of a controlled input inside a shadow root', async () => {
+		const host = document.createElement('div');
+		document.body.appendChild(host);
+		const container = document.createElement('div');
+		host.attachShadow({ mode: 'open' }).appendChild(container);
+		const store = makeStore(0);
+		const root = createRoot(container);
+		flushSync(() => root.render(ControlledInputMountedReader, { store }));
+		await nextPaint();
+		const input = container.querySelector('input')!;
+		input.value = 'a';
+		input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
 		expect(container.querySelector('.value')?.textContent).toBe('0');
 		expect(store.listenerCount()).toBe(1);
 		root.unmount();

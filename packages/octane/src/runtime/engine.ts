@@ -655,12 +655,13 @@ export function requestFlush(): void {
 export let syncFlush = false; // flushSync sets this to drain the queue synchronously
 // True while a flush commits discrete work, until it ends: work a discrete
 // delegated dispatch left scheduled (DISCRETE_DISPATCH_COUNT moved since the last
-// flush), an update that armed the flush during a native discrete event (React
-// reads `window.event`), or a flushSync drain whose callback queued work. React
-// commits such updates in its sync lane and flushes their passive effects in the
-// commit; here only useSyncExternalStore follows it, by subscribing in the commit
-// (drainQueuedStoreSyncs, #3095). scheduleRender inlines its check so an update
-// adds no call; the colder arm sites share markDiscreteFlush.
+// flush or flushSync drain), an update that armed the flush during a native
+// discrete event (React reads `window.event`), or a flushSync drain whose
+// callback queued work. React commits such updates in its sync lane and flushes
+// their passive effects in the commit; here only useSyncExternalStore follows it,
+// by subscribing in the commit (drainQueuedStoreSyncs, #3095). scheduleRender
+// inlines its check so an update adds no call; the colder arm sites share
+// markDiscreteFlush.
 export let DISCRETE_FLUSH = false;
 let SEEN_DISCRETE_DISPATCHES = 0;
 function markDiscreteFlush(): void {
@@ -3776,8 +3777,15 @@ export function flushSync<T>(fn?: (() => T) | null): T | void {
 	try {
 		try {
 			result = nativeBatchHooks ? runNativeBatch(callback) : callback();
-			// Work the callback queued is sync, as in React; work already waiting is not.
-			if (QUEUE.length + ROOT_RENDER_TRANSACTIONS.length > queuedBefore) DISCRETE_FLUSH = true;
+			// Work the callback queued is sync, as in React; work already waiting is
+			// not, unless a discrete dispatch left it (maybeFlushDiscrete drains here).
+			if (
+				QUEUE.length + ROOT_RENDER_TRANSACTIONS.length > queuedBefore ||
+				SEEN_DISCRETE_DISPATCHES !== DISCRETE_DISPATCH_COUNT
+			) {
+				SEEN_DISCRETE_DISPATCHES = DISCRETE_DISPATCH_COUNT;
+				DISCRETE_FLUSH = true;
+			}
 			// flushSync drains both priorities, including transitions waiting for their task.
 			if (TRANSITION_TASK_DRIVER) TRANSITION_TASK_DRIVER.adopt(true);
 			// `inFlush` guards only the DRAIN below, not fn(): a nested flushSync
