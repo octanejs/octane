@@ -2,6 +2,34 @@ import { describe, expect, it } from 'vitest';
 import { createScope, type WritableSignal } from 'octane/signals';
 
 describe('watched keyless stabilization', () => {
+	it('does not recompute a child when watched stabilization restores the prior value', () => {
+		const scope = createScope({ scopeKey: 'net-equal-watch' });
+		const value$ = scope.signal$(null, 0);
+		const enabled$ = scope.signal$(null, false);
+		const source$ = scope.signal$(null, 0, { watched: () => value$.set(0) });
+		const parent$ = scope.derived$(null, () => {
+			const value = value$.get();
+			if (enabled$.get()) source$.get();
+			return value;
+		});
+		let childReads = 0;
+		const child$ = scope.derived$(null, () => {
+			childReads++;
+			return parent$.get();
+		});
+		let notices = 0;
+		const stop = child$.subscribe(() => notices++);
+		scope.batch(() => {
+			value$.set(1);
+			enabled$.set(true);
+		});
+		expect(child$.get()).toBe(0);
+		expect(childReads).toBe(1);
+		expect(notices).toBe(0);
+		stop();
+		scope.dispose();
+	});
+
 	it('releases dynamically rewired dependencies after watched setup', () => {
 		const scope = createScope({ scopeKey: 'rewired-watch' });
 		const events: string[] = [];
@@ -9,10 +37,8 @@ describe('watched keyless stabilization', () => {
 		selected$ = scope.signal$(null, false, {
 			watched: () => {
 				selected$.set(true);
-				result$.get();
 				return () => {
 					selected$.set(false);
-					result$.get();
 				};
 			},
 		});
@@ -42,16 +68,16 @@ describe('watched keyless stabilization', () => {
 
 	it('returns a recovered value when linking a failed derived starts its watched source', () => {
 		const scope = createScope({ scopeKey: 'recovered-watch' });
-		let source: WritableSignal<number>;
-		source = scope.signal$(null, 0, { watched: () => source.set(1) });
-		const value = scope.derived$(null, () => {
-			const current = source.get();
+		let source$: WritableSignal<number>;
+		source$ = scope.signal$(null, 0, { watched: () => source$.set(1) });
+		const value$ = scope.derived$(null, () => {
+			const current = source$.get();
 			if (current === 0) throw new Error('not ready');
 			return current;
 		});
 		const seen: number[] = [];
 		const stop = scope.effect(() => {
-			seen.push(value.get());
+			seen.push(value$.get());
 		});
 		expect(seen).toEqual([1]);
 		stop();
@@ -60,32 +86,32 @@ describe('watched keyless stabilization', () => {
 
 	it('recomputes when watched setup changes an earlier dependency', () => {
 		const scope = createScope({ scopeKey: 'stabilize-watch' });
-		const enabled = scope.signal$(null, false);
-		const earlier = scope.signal$(null, 0);
-		const watched = scope.signal$(null, 0, { watched: () => earlier.set(1) });
-		const value = scope.derived$(null, () => {
-			const first = earlier.get();
-			return enabled.get() ? first + watched.get() : first;
+		const enabled$ = scope.signal$(null, false);
+		const earlier$ = scope.signal$(null, 0);
+		const watched$ = scope.signal$(null, 0, { watched: () => earlier$.set(1) });
+		const value$ = scope.derived$(null, () => {
+			const first = earlier$.get();
+			return enabled$.get() ? first + watched$.get() : first;
 		});
 		const seen: number[] = [];
 		const stop = scope.effect(() => {
-			seen.push(value.get());
+			seen.push(value$.get());
 		});
-		enabled.set(true);
+		enabled$.set(true);
 		expect(seen).toEqual([0, 1]);
 		stop();
 		scope.dispose();
 	});
 	it('notifies a pending subscriber when a later equal dependency starts a watched source', () => {
 		const scope = createScope({ scopeKey: 'pending-subscriber-watch' });
-		const enabled = scope.signal$(null, false);
-		const earlier = scope.signal$(null, 0);
-		const watched = scope.signal$(null, 0, { watched: () => earlier.set(1) });
-		const inner = scope.derived$(null, () => (enabled.get() ? watched.get() : 0));
-		const outer = scope.derived$(null, () => earlier.get() + inner.get());
+		const enabled$ = scope.signal$(null, false);
+		const earlier$ = scope.signal$(null, 0);
+		const watched$ = scope.signal$(null, 0, { watched: () => earlier$.set(1) });
+		const inner$ = scope.derived$(null, () => (enabled$.get() ? watched$.get() : 0));
+		const outer$ = scope.derived$(null, () => earlier$.get() + inner$.get());
 		const seen: number[] = [];
-		const stop = outer.subscribe(() => seen.push(outer.get()));
-		enabled.set(true);
+		const stop = outer$.subscribe(() => seen.push(outer$.get()));
+		enabled$.set(true);
 		expect(seen).toEqual([1]);
 		stop();
 		scope.dispose();
