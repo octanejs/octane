@@ -27,6 +27,12 @@ const isDirectiveArm = (node, parent, key) =>
 	(node.type !== 'IfStatement' ||
 		parent?.type === 'JSXIfExpression' ||
 		parent?.type === 'IfStatement');
+// The block holding an arm's statements. A case's statements usually sit on
+// `consequent` directly (the compiler's parser flattens case braces), so a
+// block there is the arm only when it is the case's sole statement.
+const isArmBlock = (owner, parent, key) =>
+	isDirectiveArm(owner, parent, key) &&
+	(owner.type !== 'SwitchCase' || owner.consequent.length === 1);
 
 /**
  * Only private contexts whose complete authored lifetime stays in template
@@ -208,7 +214,7 @@ export function findPrivateCompiledContextProofs(ast, isDescriptorChildrenImport
 							isDirectiveArm(node, parent, childKey) ||
 							(node.type === 'BlockStatement' &&
 								childKey === 'body' &&
-								isDirectiveArm(parent, grandparent, key)));
+								isArmBlock(parent, grandparent, key)));
 			inspect(child, node, childKey, parent, childDirect);
 		});
 	};
