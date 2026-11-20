@@ -1,13 +1,80 @@
 import { describe, expect, it } from 'vitest';
 import { createScope, type WritableSignal } from 'octane/signals';
 
-describe('watched keyless stabilization', () => {
-	it('does not recompute a child when watched stabilization restores the prior value', () => {
+describe('watched derived stabilization', () => {
+	it.each([null, 'selected'] as const)('compares only the stabilized value (%s)', (key) => {
+		const scope = createScope({ scopeKey: 'stable-comparison' });
+		const enabled$ = scope.signal$(null, false);
+		const value$ = scope.signal$(null, 0);
+		const watched$ = scope.signal$(null, 0, { watched: () => value$.set(2) });
+		const comparisons: Array<readonly [{ v: number }, { v: number }]> = [];
+		const selected$ = scope.derived$(
+			key,
+			() => {
+				const v = value$.get();
+				if (enabled$.get()) watched$.get();
+				return { v };
+			},
+			{
+				equals(previous, next) {
+					comparisons.push([previous, next]);
+					if (next.v === 0) throw new Error('intermediate comparison');
+					return previous.v === next.v;
+				},
+			},
+		);
+		const committed = selected$.get();
+		const stop = selected$.subscribe(() => {});
+		enabled$.set(true);
+		expect(selected$.get()).toEqual({ v: 2 });
+		expect(comparisons).toHaveLength(1);
+		expect(comparisons[0]?.[0]).toBe(committed);
+		expect(comparisons[0]?.[1]).toEqual({ v: 2 });
+		stop();
+		scope.dispose();
+	});
+
+	it.each([null, 'selected'] as const)(
+		'finishes equality after a net-equal dependency (%s)',
+		(key) => {
+			const scope = createScope({ scopeKey: 'pending-net-equal' });
+			const raw$ = scope.signal$(null, 0);
+			const parity$ = scope.derived$(null, () => raw$.get() % 2);
+			const enabled$ = scope.signal$(null, false);
+			const watched$ = scope.signal$(null, 0, { watched: () => raw$.set(2) });
+			let comparisons = 0;
+			const selected$ = scope.derived$(
+				key,
+				() => {
+					const v = parity$.get();
+					if (enabled$.get()) watched$.get();
+					return { v };
+				},
+				{
+					equals(previous, next) {
+						comparisons++;
+						return previous.v === next.v;
+					},
+				},
+			);
+			const committed = selected$.get();
+			let notices = 0;
+			const stop = selected$.subscribe(() => notices++);
+			enabled$.set(true);
+			expect(selected$.get()).toBe(committed);
+			expect(comparisons).toBe(1);
+			expect(notices).toBe(0);
+			stop();
+			scope.dispose();
+		},
+	);
+
+	it.each([null, 'parent'] as const)('filters a net-equal watched change (%s)', (key) => {
 		const scope = createScope({ scopeKey: 'net-equal-watch' });
 		const value$ = scope.signal$(null, 0);
 		const enabled$ = scope.signal$(null, false);
 		const source$ = scope.signal$(null, 0, { watched: () => value$.set(0) });
-		const parent$ = scope.derived$(null, () => {
+		const parent$ = scope.derived$(key, () => {
 			const value = value$.get();
 			if (enabled$.get()) source$.get();
 			return value;
@@ -30,14 +97,14 @@ describe('watched keyless stabilization', () => {
 		scope.dispose();
 	});
 
-	it('does not compare a failed stabilization round with its recovered value', () => {
+	it.each([null, 'selected'] as const)('compares recovery with the ready value (%s)', (key) => {
 		const scope = createScope({ scopeKey: 'failed-watch-equality' });
 		const enabled$ = scope.signal$(null, false);
 		const ready$ = scope.signal$(null, false);
 		const watched$ = scope.signal$(null, 0, { watched: () => ready$.set(true) });
 		const compared: unknown[] = [];
 		const selected$ = scope.derived$(
-			null,
+			key,
 			() => {
 				const ready = ready$.get();
 				if (!enabled$.get()) return 1;
@@ -60,7 +127,7 @@ describe('watched keyless stabilization', () => {
 		scope.dispose();
 	});
 
-	it('retains the committed ready value across successive failed stabilization rounds', () => {
+	it.each([null, 'selected'] as const)('retains ready equality across failures (%s)', (key) => {
 		const scope = createScope({ scopeKey: 'recovered-selector-equality' });
 		const enabled$ = scope.signal$(null, false);
 		const phase$ = scope.signal$(null, 0);
@@ -68,7 +135,7 @@ describe('watched keyless stabilization', () => {
 		const second$ = scope.signal$(null, 0, { watched: () => phase$.set(2) });
 		const comparisons: Array<readonly [{ x: number }, { x: number }]> = [];
 		const selected$ = scope.derived$(
-			null,
+			key,
 			() => {
 				if (!enabled$.get()) return { x: 1 };
 				const phase = phase$.get();
@@ -94,6 +161,26 @@ describe('watched keyless stabilization', () => {
 		expect(comparisons[0]?.[0]).toBe(committed);
 		expect(comparisons[0]?.[1]).not.toBe(committed);
 		expect(notices).toBe(0);
+		stop();
+		scope.dispose();
+	});
+
+	it('refreshes a transitive subscriber when a stabilized keyed dependency changes', () => {
+		const scope = createScope({ scopeKey: 'keyed-transitive-watch' });
+		const enabled$ = scope.signal$(null, false);
+		const value$ = scope.signal$(null, 0);
+		const watched$ = scope.signal$(null, 0, { watched: () => value$.set(1) });
+		const parent$ = scope.derived$('parent', () => {
+			const value = value$.get();
+			if (enabled$.get()) watched$.get();
+			return value;
+		});
+		const child$ = scope.derived$('child', () => parent$.get() * 2);
+		const seen: number[] = [];
+		const stop = child$.subscribe(() => seen.push(child$.get()));
+		enabled$.set(true);
+		expect(child$.get()).toBe(2);
+		expect(seen).toEqual([2]);
 		stop();
 		scope.dispose();
 	});
