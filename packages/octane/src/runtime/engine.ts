@@ -6,7 +6,6 @@
 // which only the declaring module may do, so they share this module. It
 // evaluates after the drivers it reads.
 
-import { DISCRETE_EVENTS } from '../event-names.js';
 import {
 	drainRefDetaches,
 	storeSyncQueue,
@@ -19,6 +18,7 @@ import {
 	attachRef,
 	type FragmentInstance,
 } from './refs.js';
+import { DISCRETE_EVENTS } from '../event-names.js';
 import { hydrationStarted, hydrating } from '../hydration-flag.js';
 import { renderSlice } from '../render-slice.js';
 import { type BindingHandoff, releaseBindingHandoff } from '../dom-binding-handoff.js';
@@ -370,7 +370,7 @@ import {
 	_eventRoots,
 	unregisterDelegationTarget,
 	_dispatchDepth,
-	DISCRETE_DISPATCH_DEPTH,
+	DISCRETE_DISPATCH_COUNT,
 	CAPTURE_SLOTS,
 	type PortalEventBoundary,
 	ACTIVE_SUBMIT_DISPATCH,
@@ -653,18 +653,19 @@ export function requestFlush(): void {
 	queueMicrotask(flush);
 }
 export let syncFlush = false; // flushSync sets this to drain the queue synchronously
-// True while the scheduled flush commits discrete work, until that flush ends: an
-// update that armed it during a discrete event, delegated or native (React reads
-// `window.event`), or a flushSync drain whose callback queued work. React commits
-// such updates in its sync lane and flushes their passive effects in the commit;
-// here only useSyncExternalStore follows it, by subscribing in the commit
-// (drainQueuedStoreSyncs, #3095). scheduleRender inlines this check so an update
+// True while a flush commits discrete work, until it ends: work a discrete
+// delegated dispatch left scheduled (DISCRETE_DISPATCH_COUNT moved since the last
+// flush), an update that armed the flush during a native discrete event (React
+// reads `window.event`), or a flushSync drain whose callback queued work. React
+// commits such updates in its sync lane and flushes their passive effects in the
+// commit; here only useSyncExternalStore follows it, by subscribing in the commit
+// (drainQueuedStoreSyncs, #3095). scheduleRender inlines its check so an update
 // adds no call; the colder arm sites share markDiscreteFlush.
 export let DISCRETE_FLUSH = false;
+let SEEN_DISCRETE_DISPATCHES = 0;
 function markDiscreteFlush(): void {
 	const event = typeof window === 'undefined' ? undefined : window.event;
-	if (DISCRETE_DISPATCH_DEPTH !== 0 || (event !== undefined && DISCRETE_EVENTS.has(event.type)))
-		DISCRETE_FLUSH = true;
+	if (event !== undefined && DISCRETE_EVENTS.has(event.type)) DISCRETE_FLUSH = true;
 }
 // True while a flush (drainQueue/commitEffects) is on the stack. A flushSync
 // that lands during it — a handler's own flushSync, or maybeFlushDiscrete when a
@@ -2199,8 +2200,7 @@ export function scheduleRender(
 		scheduled = true;
 		queueMicrotask(flush);
 		const event = typeof window === 'undefined' ? undefined : window.event;
-		if (DISCRETE_DISPATCH_DEPTH !== 0 || (event !== undefined && DISCRETE_EVENTS.has(event.type)))
-			DISCRETE_FLUSH = true;
+		if (event !== undefined && DISCRETE_EVENTS.has(event.type)) DISCRETE_FLUSH = true;
 	}
 }
 
@@ -2780,6 +2780,7 @@ export function flush(): void {
 		!VIEW_TRANSITION_DRIVER
 	) {
 		DISCRETE_FLUSH = false;
+		SEEN_DISCRETE_DISPATCHES = DISCRETE_DISPATCH_COUNT;
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__devtoolsNotifyFlush();
 		return;
@@ -3017,6 +3018,10 @@ function rethrowAfterControlledRestore(error: unknown): never {
 function flushWork(): void {
 	try {
 		inFlush = true;
+		if (SEEN_DISCRETE_DISPATCHES !== DISCRETE_DISPATCH_COUNT) {
+			SEEN_DISCRETE_DISPATCHES = DISCRETE_DISPATCH_COUNT;
+			DISCRETE_FLUSH = true;
+		}
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileFlush();
 		// Batches flushed so far belong to the drain below, unless their renders

@@ -183,6 +183,27 @@ describe('useSyncExternalStore', () => {
 		expect(store.listenerCount()).toBe(0);
 	});
 
+	it('subscribes during the commit of a native click listener inside a shadow root', async () => {
+		// The listener sees no window.event; the event's delegated dispatch marks the commit.
+		const host = document.createElement('div');
+		document.body.appendChild(host);
+		const container = document.createElement('div');
+		host.attachShadow({ mode: 'open' }).appendChild(container);
+		const store = makeStore(0);
+		const root = createRoot(container);
+		flushSync(() => root.render(NativeListenerMountedReader, { store, type: 'click' }));
+		await nextPaint();
+		container
+			.querySelector('button')!
+			.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+		await Promise.resolve();
+		expect(container.querySelector('.value')?.textContent).toBe('0');
+		expect(store.listenerCount()).toBe(1);
+		root.unmount();
+		host.remove();
+		expect(store.listenerCount()).toBe(0);
+	});
+
 	it('subscribes during the commit of an update from a native click listener', async () => {
 		const store = makeStore(0);
 		const r = mount(NativeListenerMountedReader, { store, type: 'click' });
