@@ -37,6 +37,41 @@ async function observe<T>(handle: { getSnapshot(): { value: T | undefined }; sub
 const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('octane/data store', () => {
+	it('lets a paused reader follow a live reader without keeping its fetches active', async () => {
+		const server = createServer();
+		const store = createDataStore({ transport: server.transport });
+		const handle = store.read(todos);
+		const titles: Array<string | undefined> = [];
+		const stop = handle.subscribe(() => titles.push(handle.getSnapshot().value?.[0]?.title), {
+			fetch: false,
+		});
+		await settled();
+		expect(server.log).toEqual([]);
+		expect(handle.getSnapshot().status).toBe('pending');
+
+		const live = await observe(handle);
+		expect(titles.at(-1)).toBe('Tides');
+		live.stop();
+		server.rows[0]!.title = 'Atoll';
+		await store.write(setDone, { id: 'a', done: true });
+		store.invalidate(['todo']);
+		await settled();
+		expect(handle.getSnapshot().value?.[0]?.done).toBe(true);
+		expect(titles.at(-1)).toBe('Tides');
+		expect(server.log).toEqual(['list', 'setDone true']);
+
+		await handle.refresh();
+		expect(titles.at(-1)).toBe('Atoll');
+		const forgotten = store.forget(todos, undefined);
+		expect(titles.at(-1)).toBeUndefined();
+		await forgotten;
+		await store.publish(todos, undefined, server.rows);
+		expect(titles.at(-1)).toBe('Atoll');
+		await store.retire();
+		expect(titles.at(-1)).toBeUndefined();
+		stop();
+	});
+
 	it('does no network work until a read is observed, and shares one load', async () => {
 		const server = createServer();
 		const store = createDataStore({ transport: server.transport });

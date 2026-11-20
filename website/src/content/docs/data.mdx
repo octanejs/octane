@@ -350,9 +350,35 @@ show when an update is underway. Here's what you can read from a snapshot.
 | `value`      | The latest value from the server, including any edits you're waiting for it to confirm.                |
 | `error`      | The reason the load failed, when `status` is `'error'`.                                                |
 | `refreshing` | The store is reloading the value while showing the current one.                                        |
-| `stale`      | The value has aged past its freshness limit or a write marked it stale. It reloads when observed.      |
+| `stale`      | The value has aged past its freshness limit or a write marked it stale.                                |
 | `more`       | For a [view](#views), there are more rows after the ones you see.                                      |
 | `preview`    | The load is still underway and `value` holds a [provisional result](#progressive-reads).               |
+
+<h3 id="pause-fetching">Show cached data while fetching is paused</h3>
+
+Suppose you're moving book titles to a new loader. While it starts up, keep
+reading the same book ID from the signed-in account's store. In Octane and
+React, pass the loader's readiness to `fetch`.
+
+```ts
+import { useDataStore, useRead } from 'octane/data/octane';
+import { book } from './contracts.data.ts';
+
+export function useBook(id: string, loaderReady: boolean) {
+	const handle = useDataStore().read(book, { id });
+	return useRead(handle, { suspend: false, fetch: loaderReady });
+}
+```
+
+With `fetch: false`, the snapshot shows the cached book, including a copy
+restored from storage. A cache miss starts out `pending`. Another reader or
+an explicit `handle.refresh()` can fetch the book, and this snapshot receives
+the result. When `loaderReady` becomes `true`, the store fetches if the
+book is missing or needs a refresh.
+
+Use this option while the account still has access to the book. If access
+ends, stop rendering the book. [Retire the store](#sign-out) when the account
+signs out.
 
 <h3 id="progressive-reads">Show results as they arrive</h3>
 
@@ -408,8 +434,8 @@ By default the store finishes a load even after the component that asked
 for it unmounts. That gives the next reader a cached value. For a search
 that follows each keystroke, though, there's little reason to finish
 loading results for text the user has already changed. Set `cancel: true`
-to have the store abort the transport's `signal` when the last observer
-stops reading.
+to have the store abort the transport's `signal` when the last fetching
+subscriber leaves or pauses.
 
 ```ts
 export const search = read({
@@ -481,7 +507,7 @@ can still find it after a restart.
 The hooks use the same store you can call directly from an event handler,
 a route loader, a test or any other code. Calling `store.read` gives you
 a **read handle** without making a request. Loading starts when something
-subscribes to the read, prefetches it or asks it to refresh.
+subscribes with fetching enabled, prefetches the read or asks it to refresh.
 
 ```ts
 import { createDataStore, serverTransport } from 'octane/data';
@@ -507,8 +533,9 @@ stop(); // The last subscriber leaving starts the `keep` timer.
   object until something changes, so you can use it directly with
   `useSyncExternalStore`.
 - `subscribe(notify)` starts observing the read and returns a function
-  you can call to stop. The first subscriber triggers a load if the
-  value is missing or stale.
+  you can call to stop. To [pause fetching](#pause-fetching) for this
+  subscriber, use `subscribe(notify, { fetch: false })`. Stop and subscribe
+  again with `fetch: true` or omit the option to resume.
 - `refresh()` starts a reload now and resolves when it settles.
 
 Suppose you `prefetch` a page's data when someone hovers over its link.

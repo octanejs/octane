@@ -5,6 +5,11 @@ import { listen, pages } from 'octane/data';
 import { DataProvider, useDataStore, useFeed, usePages, useRead } from 'octane/data/react';
 import { setDone, todoChanges, todoPages, todos } from '../_data-todos.js';
 
+export function ReactTitle(props: { store: DataStore; fetch: boolean }) {
+	const { value } = useRead(props.store.read(todos), { suspend: false, fetch: props.fetch });
+	return <output>{value?.[0]?.title}</output>;
+}
+
 function ReactDoneCount() {
 	const { value } = useRead(useDataStore().read(todos), { suspend: false });
 	return (
