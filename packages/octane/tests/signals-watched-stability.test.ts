@@ -30,6 +30,36 @@ describe('watched keyless stabilization', () => {
 		scope.dispose();
 	});
 
+	it('does not compare a failed stabilization round with its recovered value', () => {
+		const scope = createScope({ scopeKey: 'failed-watch-equality' });
+		const enabled$ = scope.signal$(null, false);
+		const ready$ = scope.signal$(null, false);
+		const watched$ = scope.signal$(null, 0, { watched: () => ready$.set(true) });
+		const compared: unknown[] = [];
+		const selected$ = scope.derived$(
+			null,
+			() => {
+				const ready = ready$.get();
+				if (!enabled$.get()) return 1;
+				watched$.get();
+				if (!ready) throw new Error('not ready');
+				return 2;
+			},
+			{
+				equals: (previous, next) => {
+					compared.push(previous);
+					return previous === next;
+				},
+			},
+		);
+		const stop = selected$.subscribe(() => {});
+		enabled$.set(true);
+		expect(selected$.get()).toBe(2);
+		expect(compared).toEqual([]);
+		stop();
+		scope.dispose();
+	});
+
 	it('releases dynamically rewired dependencies after watched setup', () => {
 		const scope = createScope({ scopeKey: 'rewired-watch' });
 		const events: string[] = [];
