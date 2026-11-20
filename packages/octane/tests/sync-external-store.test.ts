@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { flushSync } from '../src/index.js';
+import { createRoot, flushSync } from '../src/index.js';
 import { mount, nextPaint } from './_helpers';
 import {
 	ClickMountedReader,
 	ConditionalReader,
+	LayoutCascadeReader,
+	TwoClickMountedReaders,
 	makeRetainedCallbackStore,
 	makeStore,
 	Reader,
@@ -170,6 +172,51 @@ describe('useSyncExternalStore', () => {
 		r.click('button');
 		r.unmount();
 		expect(store.listenerCount()).toBe(0);
+	});
+
+	it('releases a commit-time subscription that a layout cascade swaps before paint', async () => {
+		const a = makeStore(1);
+		const b = makeStore(2);
+		const r = mount(LayoutCascadeReader, { store: a, next: b, mode: 'swap' });
+		r.click('button');
+		await nextPaint();
+		expect(r.find('.value').textContent).toBe('2');
+		expect(a.listenerCount()).toBe(0);
+		expect(b.listenerCount()).toBe(1);
+		r.unmount();
+		expect(b.listenerCount()).toBe(0);
+	});
+
+	it('disconnects a commit-time subscription that a layout cascade hides before paint', async () => {
+		const a = makeStore(1);
+		const r = mount(LayoutCascadeReader, { store: a, next: a, mode: 'hide' });
+		r.click('button');
+		await nextPaint();
+		expect(a.listenerCount()).toBe(0);
+		r.unmount();
+		expect(a.listenerCount()).toBe(0);
+	});
+
+	it('keeps subscribing later readers when an earlier subscribe throws', async () => {
+		const failing = makeStore(0);
+		const failure = new Error('subscribe failed');
+		failing.subscribe = () => {
+			throw failure;
+		};
+		const second = makeStore(0);
+		const errors: unknown[] = [];
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const root = createRoot(container, { onUncaughtError: (error) => errors.push(error) });
+		root.render(TwoClickMountedReaders, { first: failing, second });
+		flushSync(() => {});
+		flushSync(() => (container.querySelector('button') as HTMLElement).click());
+		expect(second.listenerCount()).toBe(1);
+		await nextPaint();
+		expect(errors).toContain(failure);
+		root.unmount();
+		container.remove();
+		expect(second.listenerCount()).toBe(0);
 	});
 
 	it('swapping the store unsubscribes from the old and subscribes to the new', async () => {

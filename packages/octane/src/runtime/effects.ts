@@ -604,9 +604,13 @@ export function drainQueuedStoreSyncs(): void {
 			// Subscribe a new or swapped store now, before paint, rather than waiting
 			// for the passive effect (#3095). That effect adopts this subscription, so
 			// it still owns the release and stays connected through a Suspense hide.
+			// If subscribe throws, the passive effect subscribes again and reports it
+			// through the effect error path.
 			if (inst.connected !== inst.subscribe) {
-				inst.connected = inst.subscribe;
-				inst.early = inst.subscribe(inst.onStoreChange);
+				try {
+					inst.early = inst.subscribe(inst.onStoreChange);
+					inst.connected = inst.subscribe;
+				} catch {}
 			}
 		}
 	} finally {

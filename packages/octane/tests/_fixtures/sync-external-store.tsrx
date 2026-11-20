@@ -1,4 +1,4 @@
-import { useSyncExternalStore, useCallback, useState } from 'octane';
+import { Activity, useSyncExternalStore, useCallback, useLayoutEffect, useState } from 'octane';
 
 type StoreListener = () => void;
 type StoreLike = {
@@ -110,6 +110,45 @@ export function ClickMountedReader(props: { store: StoreLike }) @{
 		<button onClick={() => setShown(true)}>{'Show'}</button>
 		@if (shown) {
 			<Reader store={props.store} />
+		}
+	</div>
+}
+
+// A click mounts the reader, then a layout effect in the same commit swaps its
+// store or hides it before the reader's passive effect has run.
+export function LayoutCascadeReader(props: {
+	store: StoreLike;
+	next: StoreLike;
+	mode: 'swap' | 'hide';
+}) @{
+	const [shown, setShown] = useState(false);
+	const [swapped, setSwapped] = useState(false);
+	const [hidden, setHidden] = useState(false);
+	useLayoutEffect(() => {
+		if (!shown) return;
+		if (props.mode === 'swap') setSwapped(true);
+		else setHidden(true);
+	}, [shown]);
+	<div>
+		<button onClick={() => setShown(true)}>{'Show'}</button>
+		@if (shown) {
+			<Activity mode={hidden ? 'hidden' : 'visible'}>
+				<Reader store={swapped ? props.next : props.store} />
+			</Activity>
+		}
+	</div>
+}
+
+// Two readers mounted by one click; the first store's subscribe can throw.
+export function TwoClickMountedReaders(props: { first: StoreLike; second: StoreLike }) @{
+	const [shown, setShown] = useState(false);
+	<div>
+		<button onClick={() => setShown(true)}>{'Show'}</button>
+		@if (shown) {
+			<>
+				<Reader store={props.first} />
+				<Reader store={props.second} />
+			</>
 		}
 	</div>
 }
