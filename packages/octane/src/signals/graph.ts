@@ -178,6 +178,7 @@ let activeOwners: Set<GraphOwner> | undefined;
 let trackingCycle = 0;
 let executionDepth = 0;
 let pureDepth = 0;
+let runningWatchHook = false;
 /**
  * What a computation's reads leave in `activeOwners` when one presented a
  * node's state, whose activity may matter, and none had a foreign owner: so a
@@ -378,6 +379,7 @@ function propagate(link: Link, innerWrite: boolean): void {
 			sub.flags = (flags & ~REACTIVE_RECURSED) | REACTIVE_PENDING;
 		} else if (!(flags & (REACTIVE_DIRTY | REACTIVE_PENDING)) && isValidLink(link, sub)) {
 			sub.flags = flags | (REACTIVE_RECURSED | REACTIVE_PENDING);
+			if (runningWatchHook && sub instanceof EffectNode) queueEffect(sub);
 			flags &= REACTIVE_MUTABLE;
 		} else {
 			flags = REACTIVE_NONE;
@@ -388,7 +390,7 @@ function propagate(link: Link, innerWrite: boolean): void {
 		}
 
 		if (flags & REACTIVE_MUTABLE) {
-			const subSubs = sub.subs;
+			const subSubs = (sub as ReactiveNode).subs;
 			if (subSubs !== undefined) {
 				const nextSub = (link = subSubs).nextSub;
 				if (nextSub !== undefined) {
@@ -1398,10 +1400,10 @@ export function readNode<T>(node: ScopedNode<T>, read: SignalReadMode = 'value')
 
 /** readNode after its node is current: track the read and present its state. */
 function observeRead<T>(node: ScopedNode<T>, read: SignalReadMode): NodeState<T> {
+	trackRead(node, read);
 	const state = node.state!;
 	const observed =
 		read === 'latest' && state.snapshot.status !== 'ready' ? (node.lastState ?? state) : state;
-	trackRead(node, read);
 	if (activeNode !== undefined && activeOwners === undefined) activeOwners = STATE_READ;
 	// Retirement marks the owner before invoking user cancellation callbacks.
 	// A reentrant read must not expose its old value before graph teardown runs.
@@ -2162,7 +2164,12 @@ export function attachObserver(
 	// a linked observer whose stop never reached the caller.
 	// A keyless derived value has no owner to stop its subscribers.
 	node.owner?.observers.add(observer);
-	linkDependency(node, observer, ++trackingCycle);
+	try {
+		linkDependency(node, observer, ++trackingCycle);
+	} catch (error) {
+		stopObserver(observer);
+		throw error;
+	}
 	const dispose: NativeReadSubscription = () => stopObserver(observer);
 	if (speculative) dispose.observation = observer;
 	return dispose;
@@ -2679,7 +2686,25 @@ function countObservers(node: ReactiveNode): void {
 
 function countLink(dep: ReactiveNode, sub: ReactiveNode): void {
 	if (sub.flags & REACTIVE_MUTABLE && !observerCounts.has(sub)) countObservers(sub);
-	if (observing(sub)) watch(dep);
+	if (!observing(sub)) return;
+	// A computation has not consumed its newly linked dependency yet. Hide that
+	// edge from recursive-write checks while setup publishes its initial value;
+	// writes to dependencies consumed earlier still invalidate the computation.
+	const tail = sub.depsTail;
+	const hide = !!(sub.flags & REACTIVE_RECURSED_CHECK) && tail?.dep === dep;
+	if (hide) sub.depsTail = tail!.prevDep;
+	try {
+		watch(dep);
+	} finally {
+		if (hide && (tail!.prevDep ? tail!.prevDep.nextDep === tail : sub.deps === tail))
+			sub.depsTail = tail;
+	}
+	// Starting a source can synchronously invalidate the derived value being
+	// linked. Finish that read before its new observer sees the value.
+	if (dep.flags & (REACTIVE_DIRTY | REACTIVE_PENDING) && !(dep.flags & REACTIVE_RECURSED_CHECK)) {
+		if (dep instanceof PlainComputed) refreshLean(dep);
+		else if (dep instanceof ScopedNode) refresh(dep);
+	}
 }
 
 /** Sources start before what reads them, and stop after. */
@@ -2724,12 +2749,24 @@ function stopWatch(node: ReactiveNode): void {
  * than thrown: the read, stop or disposal that reached it still completes.
  */
 function runHook(hook: () => void | (() => void)): void | (() => void) {
+	// A committed observer can gain or lose a dependency while a derived value
+	// is being checked. Its lifecycle is imperative even inside that pure read.
+	const previousNode = activeNode;
+	const previousDepth = pureDepth;
+	const previousHook = runningWatchHook;
+	activeNode = undefined;
+	pureDepth = 0;
+	runningWatchHook = true;
 	try {
 		return untrack(hook);
 	} catch (error) {
 		const report = (globalThis as { reportError?: (error: unknown) => void }).reportError;
 		if (typeof report === 'function') report(error);
 		else console.error(error);
+	} finally {
+		activeNode = previousNode;
+		pureDepth = previousDepth;
+		runningWatchHook = previousHook;
 	}
 }
 
@@ -2788,13 +2825,10 @@ export class PlainComputed<T = any> implements ReactiveNode {
 			this.flags &
 			(REACTIVE_DIRTY | REACTIVE_PENDING | REACTIVE_RECURSED_CHECK | REACTIVE_FAILED)
 		)
-			refreshLean(this);
+			refreshLean(this, true);
 		const reader = activeNode;
 		if (reader !== undefined) linkDependency(this, reader, trackingCycle);
-		if ((signalMode & READ_OBSERVED) !== 0) {
-			const channel = leanChannel(this);
-			reportNativeRead(channel.source, channel.revision);
-		}
+		if ((signalMode & READ_OBSERVED) !== 0) reportLeanRead(this);
 		return this.last as T;
 	}
 
@@ -2882,8 +2916,13 @@ function leanChannel(node: PlainComputed): CellChannel {
 	return channel;
 }
 
+function reportLeanRead(node: PlainComputed): void {
+	const channel = leanChannel(node);
+	reportNativeRead(channel.source, channel.revision);
+}
+
 /** Bring a keyless derived value up to date, or rethrow what its computation threw. */
-function refreshLean(node: PlainComputed): void {
+function refreshLean(node: PlainComputed, trackFailure = false): void {
 	const flags = node.flags;
 	if (flags & REACTIVE_RECURSED_CHECK) throw new SignalCycleError('');
 	if (flags & (REACTIVE_DIRTY | REACTIVE_PENDING)) {
@@ -2899,7 +2938,13 @@ function refreshLean(node: PlainComputed): void {
 		}
 		if (dirty && updateLean(node) && node.subs !== undefined) shallowPropagate(node.subs);
 	}
-	if (node.flags & REACTIVE_FAILED) throw node.last;
+	if (node.flags & REACTIVE_FAILED) {
+		if (trackFailure) {
+			if (activeNode !== undefined) linkDependency(node, activeNode, trackingCycle);
+			if ((signalMode & READ_OBSERVED) !== 0) reportLeanRead(node);
+		}
+		throw node.last;
+	}
 }
 
 /** Compute a keyless derived value, in the shape of alien-signals' update. */

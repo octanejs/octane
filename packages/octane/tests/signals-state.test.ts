@@ -1060,6 +1060,117 @@ describe('watched', () => {
 		]);
 	});
 
+	for (const key of ['source', null]) {
+		it(`presents a synchronous watched write through a ${key === null ? 'keyless' : 'keyed'} derived dependency`, () => {
+			const scope = owner();
+			const source$ = scope.signal$(key, 1, { watched: (): void => source$.set(2) });
+			const derived$ = scope.derived$(null, () => source$.get());
+			const seen: number[] = [];
+			scope.effect(() => {
+				seen.push(derived$.get());
+			});
+			expect(seen).toEqual([2]);
+		});
+
+		it(`allows a dynamically observed ${key === null ? 'keyless' : 'keyed'} source to write during setup and cleanup`, () => {
+			const scope = owner();
+			const enabled$ = scope.signal$(null, false);
+			const status$ = scope.signal$(null, 'idle');
+			const source$ = scope.signal$(key, 1, {
+				watched: () => {
+					source$.set(2);
+					status$.set('active');
+					return () => status$.set('idle');
+				},
+			});
+			const derived$ = scope.derived$(null, () => (enabled$.get() ? source$.get() : 0));
+			const seen: number[] = [];
+			scope.effect(() => {
+				seen.push(derived$.get());
+			});
+			enabled$.set(true);
+			expect(seen.at(-1)).toBe(2);
+			expect(status$.get()).toBe('active');
+			enabled$.set(false);
+			expect(seen.at(-1)).toBe(0);
+			expect(status$.get()).toBe('idle');
+		});
+	}
+
+	it('presents a synchronous watched write in a keyed derived snapshot', () => {
+		const scope = owner();
+		const source$ = scope.signal$(null, 1, { watched: (): void => source$.set(2) });
+		const derived$ = scope.derived$('copy', () => source$.get());
+		const seen: number[] = [];
+		scope.effect(() => {
+			const snapshot = derived$.snapshot();
+			if (snapshot.status === 'ready') seen.push(snapshot.value);
+		});
+		expect(seen).toEqual([2]);
+	});
+
+	it('keeps equality filtering active after a watched source initializes synchronously', () => {
+		const scope = owner();
+		const source$ = scope.signal$(
+			null,
+			{ data: 0, fetching: false },
+			{
+				watched: (): void => source$.set({ data: 1, fetching: false }),
+			},
+		);
+		const data$ = scope.derived$(null, () => ({ value: source$.get().data }), {
+			equals: (a, b) => a.value === b.value,
+		});
+		const seen: number[] = [];
+		scope.effect(() => {
+			seen.push(data$.get().value);
+		});
+		source$.set({ data: 1, fetching: true });
+		expect(seen).toEqual([1]);
+	});
+
+	it('still reruns an effect when watched setup changes a dependency it already read', () => {
+		const scope = owner();
+		const before$ = scope.signal$(null, 1);
+		const source$ = scope.signal$(null, 1, { watched: () => before$.set(2) });
+		const seen: number[] = [];
+		scope.effect(() => {
+			seen.push(before$.get());
+			source$.get();
+		});
+		expect(seen.at(-1)).toBe(2);
+	});
+
+	it.each(['effect', 'subscription'] as const)(
+		'cleans up watched sources when initial %s attachment throws',
+		(kind) => {
+			const scope = owner();
+			let starts = 0;
+			let stops = 0;
+			const source$ = scope.signal$(null, 0, {
+				watched: () => {
+					starts++;
+					source$.set(1);
+					return () => {
+						stops++;
+					};
+				},
+			});
+			const derived$ = scope.derived$(null, () => {
+				if (source$.get()) throw new Error('bad');
+				return 0;
+			});
+			expect(() =>
+				kind === 'effect'
+					? scope.effect(() => {
+							derived$.get();
+						})
+					: scope.batch(() => derived$.subscribe(() => {})),
+			).toThrow('bad');
+			expect({ starts, stops }).toEqual({ starts: 1, stops: 1 });
+		},
+	);
+
 	it('starts a derived value with its first observer', () => {
 		const scope = owner();
 		const log: string[] = [];
