@@ -67,7 +67,7 @@ import {
 } from './react-island-sources.js';
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
-const ADAPTER_OCTANE_VERSION = /^0\.(?:16\.(?:[7-9]|[1-9]\d+)|(?:1[789]|2[012])\.(?:0|[1-9]\d*))$/;
+const ADAPTER_OCTANE_VERSION = /^0\.(?:16\.(?:[7-9]|[1-9]\d+)|(?:1[789]|2[0-3])\.(?:0|[1-9]\d*))$/;
 const INTL_ENTRIES = {
 	'index.js': '8f5854dadcd055f066234e13a344bd0b102aea2d50ddfd2f0cf12e9f48116059',
 	'lib/index.js': '208130dc122cbb84cbc0d4cce54fd7f458954f45d2cd5dc505d7263686ca6093',
