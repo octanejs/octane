@@ -34451,6 +34451,17 @@ function appendBakedAttribute(template, chunk, attrName, nameNode, valueNode, in
 	appendTemplatePart(template, chunk, 'attribute', origins);
 }
 
+// A folded directive's record was built while extractFragment walked the
+// component, before the renderer walk builds its sibling constructs, so its
+// construct id is stale. Re-stamp it in renderer-walk order: constructs anchored
+// at `__block.endMarker` mount in id order, and a stale id would mount this
+// directive ahead of an earlier sibling component (#3094).
+function foldedDirectiveRecord(node, ctx) {
+	const rec = ctx._foldedDirectiveCalls[`${node.kind}Calls`][node.recordIndex];
+	rec.id = ctx.nextHelperId++;
+	return rec;
+}
+
 function emitNodeHtml(
 	node,
 	path,
@@ -34661,19 +34672,11 @@ function emitNodeHtml(
 		// fixed siblings. Its branch helpers and control expressions were already
 		// extracted component-side; register the pre-built call exactly as the
 		// in-element child path does below.
-		const dc = ctx._foldedDirectiveCalls;
-		if (node.kind === 'if') {
-			return registerConstruct(dc.ifCalls[node.recordIndex], ifCalls);
-		}
-		if (node.kind === 'for') {
-			return registerConstruct(dc.forCalls[node.recordIndex], forCalls);
-		}
-		if (node.kind === 'switch') {
-			return registerConstruct(dc.switchCalls[node.recordIndex], ctx._switchCalls);
-		}
-		if (node.kind === 'try') {
-			return registerConstruct(dc.tryCalls[node.recordIndex], tryCalls);
-		}
+		const rec = foldedDirectiveRecord(node, ctx);
+		if (node.kind === 'if') return registerConstruct(rec, ifCalls);
+		if (node.kind === 'for') return registerConstruct(rec, forCalls);
+		if (node.kind === 'switch') return registerConstruct(rec, ctx._switchCalls);
+		if (node.kind === 'try') return registerConstruct(rec, tryCalls);
 	}
 	return createTemplateIr();
 }
@@ -36256,30 +36259,29 @@ function emitElementHtml(
 				// compiled component-side and its control/helpers rewritten to `props.hN`.
 				// Use the PRE-BUILT record (don't re-run makeIfCall); just assign the
 				// renderer's host/anchor template paths and slot it like a normal @if.
-				const dc = ctx._foldedDirectiveCalls;
 				if (child.kind === 'if') {
-					const ic = dc.ifCalls[child.recordIndex];
+					const ic = foldedDirectiveRecord(child, ctx);
 					ic.hostPath = path;
 					ic.anchorPath = [...path, childIdx];
 					ifCalls.push(ic);
 					appendTemplatePart(html, '<!>', 'anchor');
 					childIdx++;
 				} else if (child.kind === 'for') {
-					const fcRec = dc.forCalls[child.recordIndex];
+					const fcRec = foldedDirectiveRecord(child, ctx);
 					fcRec.hostPath = path;
 					fcRec.anchorPath = [...path, childIdx];
 					forCalls.push(fcRec);
 					appendTemplatePart(html, '<!>', 'anchor');
 					childIdx++;
 				} else if (child.kind === 'switch') {
-					const sc = dc.switchCalls[child.recordIndex];
+					const sc = foldedDirectiveRecord(child, ctx);
 					sc.hostPath = path;
 					sc.anchorPath = [...path, childIdx];
 					ctx._switchCalls.push(sc);
 					appendTemplatePart(html, '<!>', 'anchor');
 					childIdx++;
 				} else if (child.kind === 'try') {
-					const tc = dc.tryCalls[child.recordIndex];
+					const tc = foldedDirectiveRecord(child, ctx);
 					tc.hostPath = path;
 					tc.anchorPath = [...path, childIdx];
 					tryCalls.push(tc);
