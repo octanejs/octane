@@ -755,6 +755,11 @@ export interface StoreInst<T> {
 	/** True while this inst sits in the sync queue — prevents a second push when a
 	 *  block renders twice before its single commit (last render's `pending` wins). */
 	queued: boolean;
+	/** The subscribe most recently connected, early by the drain or by the effect. */
+	connected: ((onStoreChange: () => void) => () => void) | null;
+	/** The release of a drain-made subscription the passive effect has not yet
+	 *  adopted; `null` when none is waiting. */
+	early: (() => void) | null;
 }
 
 // Deferred ref attaches (React-19 timing parity). On mount the whole subtree is

@@ -1570,10 +1570,20 @@ export function subscribeToStore(
 	inst: StoreInst<any>,
 	subscribe: (cb: () => void) => () => void,
 ): Cleanup {
+	// Adopt the subscription the commit-time store sync made for this store. It
+	// ran the tear check before subscribing, and onStoreChange has seen every
+	// change since.
+	const early = inst.early;
+	if (early !== null) {
+		inst.early = null;
+		if (inst.connected === subscribe) return early;
+		if (typeof early === 'function') early();
+	}
 	// The store may have mutated between the render read and this subscription
 	// taking effect; re-check immediately so an early notify isn't missed. Uses
 	// inst.getSnapshot, which render already advanced to the latest closure.
 	if (checkStoreChanged(inst)) inst.forceUpdate();
+	inst.connected = subscribe;
 	// One stable handler across re-subscribes (inst.onStoreChange never changes) —
 	// harmless here since stores key listeners by our Set membership, and the
 	// swap-cleanup removes the old registration before we add the new one.

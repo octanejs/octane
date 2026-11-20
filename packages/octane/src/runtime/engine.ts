@@ -5086,10 +5086,19 @@ export function useSyncExternalStore<T>(
 			},
 			block,
 			queued: false,
+			connected: null,
+			early: null,
 		};
 		inst = created;
 		created.effectDeps = [created, subscribe];
 		ensureHooks(scope).set(subs.inst, inst);
+		// An owner removed before its passive effect runs never adopts the
+		// commit-time subscription, so its unmount releases that subscription.
+		registerHookCleanup(scope, () => {
+			const early = created.early;
+			created.early = null;
+			if (typeof early === 'function') early();
+		});
 		// Always enqueue on mount: the first commit must run the tear check — for
 		// hydrate-then-sync, and for any store mutation in the render→commit window.
 		enqueueStoreSync(inst, value, subscribe);
@@ -5111,7 +5120,8 @@ export function useSyncExternalStore<T>(
 
 	// Subscription lifecycle stays a real passive effect — it owns the unsubscribe
 	// cleanup (re-subscribe on store swap, unsubscribe on unmount) a bare queue
-	// entry can't carry. inst is identity-stable, so the deps `[inst, subscribe]`
+	// entry can't carry. A new or swapped store is subscribed earlier, by the
+	// commit-time store sync, and this effect adopts that subscription (#3095). inst is identity-stable, so the deps `[inst, subscribe]`
 	// fire exactly when the old `[subscribe]` deps did. Body is the module-level
 	// deps-as-args fn (cast: EffectFn is nominally zero-arg, but the effect drain applies
 	// the deps positionally — see subscribeToStore). Keep the pair immutable once

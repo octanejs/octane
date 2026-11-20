@@ -601,6 +601,13 @@ export function drainQueuedStoreSyncs(): void {
 			if (inst.block.disposed || inInactiveSubtree(inst.block)) continue;
 			inst.value = inst.pending;
 			if (checkStoreChanged(inst)) inst.forceUpdate();
+			// Subscribe a new or swapped store now, before paint, rather than waiting
+			// for the passive effect (#3095). That effect adopts this subscription, so
+			// it still owns the release and stays connected through a Suspense hide.
+			if (inst.connected !== inst.subscribe) {
+				inst.connected = inst.subscribe;
+				inst.early = inst.subscribe(inst.onStoreChange);
+			}
 		}
 	} finally {
 		STORE_SYNC_DEPTH--;

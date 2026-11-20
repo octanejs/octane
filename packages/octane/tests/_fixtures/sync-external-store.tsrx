@@ -1,4 +1,4 @@
-import { useSyncExternalStore, useCallback } from 'octane';
+import { useSyncExternalStore, useCallback, useState } from 'octane';
 
 type StoreListener = () => void;
 type StoreLike = {
@@ -101,4 +101,15 @@ export function makeRetainedCallbackStore(initial = 0): StoreLike & {
 		},
 		listenerCount: () => listeners.size,
 	};
+}
+
+// Mounts a reader from a click, as a submenu opened by one key press would.
+export function ClickMountedReader(props: { store: StoreLike }) @{
+	const [shown, setShown] = useState(false);
+	<div>
+		<button onClick={() => setShown(true)}>{'Show'}</button>
+		@if (shown) {
+			<Reader store={props.store} />
+		}
+	</div>
 }

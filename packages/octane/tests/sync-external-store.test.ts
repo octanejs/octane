@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import { flushSync } from '../src/index.js';
 import { mount, nextPaint } from './_helpers';
 import {
+	ClickMountedReader,
 	ConditionalReader,
 	makeRetainedCallbackStore,
 	makeStore,
@@ -128,6 +130,46 @@ describe('useSyncExternalStore', () => {
 		expect(r.find('#conditional-survivor')).toBe(survivor);
 		expect(r.findAll('.value')).toHaveLength(0);
 		r.unmount();
+	});
+
+	it('subscribes a click-mounted reader during the commit, before passive effects', () => {
+		// #3095: a store change between the commit and the next paint must reach a
+		// reader that a discrete event just mounted.
+		const store = makeStore(0);
+		const r = mount(ClickMountedReader, { store });
+		r.click('button');
+		expect(store.listenerCount()).toBe(1);
+
+		store.set(5);
+		flushSync(() => {});
+		expect(r.find('.value').textContent).toBe('5');
+		r.unmount();
+		expect(store.listenerCount()).toBe(0);
+	});
+
+	it('subscribes a swapped store during the commit and releases the old one after it', async () => {
+		const a = makeStore(10);
+		const b = makeStore(20);
+		const r = mount(SwappableReader, { store: a, alt: b });
+		r.update(SwappableReader, { store: b, alt: b });
+		expect(b.listenerCount()).toBe(1);
+		b.set(21);
+		flushSync(() => {});
+		expect(r.find('.value').textContent).toBe('21');
+
+		await nextPaint();
+		expect(a.listenerCount()).toBe(0);
+		expect(b.listenerCount()).toBe(1);
+		r.unmount();
+		expect(b.listenerCount()).toBe(0);
+	});
+
+	it('releases a click-mounted subscription when the root unmounts before paint', () => {
+		const store = makeStore(0);
+		const r = mount(ClickMountedReader, { store });
+		r.click('button');
+		r.unmount();
+		expect(store.listenerCount()).toBe(0);
 	});
 
 	it('swapping the store unsubscribes from the old and subscribes to the new', async () => {
