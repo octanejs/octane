@@ -52,6 +52,21 @@ function removeEscapeLayer(registry: EscapeRegistry, node: HTMLElement): void {
 	if (index >= 0) registry.layers.splice(index, 1);
 }
 
+function crossesReactCompat(target: EventTarget | null, node: HTMLElement): boolean {
+	const host = target instanceof Element ? target.closest('[data-react-compat]') : null;
+	return host !== null && host !== node && node.contains(host);
+}
+
+// Re-run `action` from the root element's capture phase, after every document capture listener.
+function deferEscape(document: Document, event: KeyboardEvent, action: NativeEscapeAction): void {
+	const root = document.documentElement;
+	const listener = (current: Event): void => {
+		root.removeEventListener('keydown', listener, true);
+		if (current === event && !event.defaultPrevented) action(event, true);
+	};
+	root.addEventListener('keydown', listener, true);
+}
+
 /** Opt a React Radix Dialog.Content into Escape ordering with native Dialog layers. */
 export function createEscapeLayerBridge(): {
 	ref: (node: HTMLElement | null) => void;
@@ -201,6 +216,16 @@ export function DismissableLayer(props: any): any {
 				const registry = escapeRegistries.get(ownerDocument);
 				if (registry && registry.layers.at(-1)?.node !== node) return;
 				if (registry) (handledEscapes ??= new WeakSet()).add(event);
+				else if (
+					crossesReactCompat(event.target, node!) &&
+					!node!.closest('[data-octane-compat]')
+				) {
+					// A React layer between the target and this one listens on the document after
+					// us. Answer once those listeners have run, as a parent layer would. Inside an
+					// OctaneCompat island an enclosing React layer would answer first, so don't wait.
+					deferEscape(ownerDocument, event, handleKeyDown);
+					return;
+				}
 			}
 			onEscapeKeyDown?.(event);
 			if (!event.defaultPrevented && onDismiss) {
@@ -214,10 +239,16 @@ export function DismissableLayer(props: any): any {
 	useEffect(
 		() => {
 			if (!isHighestLayer) return;
-			ownerDocument.addEventListener('keydown', handleKeyDown, { capture: true });
-			return () => ownerDocument.removeEventListener('keydown', handleKeyDown, { capture: true });
+			// Inside an OctaneCompat island, a React layer around this one may already listen on
+			// the document. Listen on the window so the newer layer answers first.
+			const target = node?.closest('[data-octane-compat]')
+				? (ownerDocument.defaultView ?? ownerDocument)
+				: ownerDocument;
+			target.addEventListener('keydown', handleKeyDown as EventListener, { capture: true });
+			return () =>
+				target.removeEventListener('keydown', handleKeyDown as EventListener, { capture: true });
 		},
-		[ownerDocument, isHighestLayer],
+		[ownerDocument, isHighestLayer, node],
 		subSlot(slot, 'e:esc'),
 	);
 

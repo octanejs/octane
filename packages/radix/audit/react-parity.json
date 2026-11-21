@@ -156,7 +156,7 @@
         {
           "path": "packages/radix/audit/test-classifications.json",
           "role": "support",
-          "sha256": "0648754325c542cd481a7a2188ce28a12834bfdbc09569b2e60dca2415a553f3"
+          "sha256": "9cc9c539a3a1e98cbc838603f910c3c96404c2dac3f0fb196f00cabf6d7ca76e"
         },
         {
           "path": "packages/radix/scripts/check-upstream-ledger.mjs",

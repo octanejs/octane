@@ -15,6 +15,7 @@ type LayerProps = {
 	log: Log;
 	veto?: boolean;
 	throwEscape?: boolean;
+	cooperate?: boolean;
 	bridge?: ReturnType<typeof createEscapeLayerBridge>;
 };
 const keepFocus = (event: Event) => event.preventDefault();
@@ -25,7 +26,13 @@ function recordEscape(props: LayerProps, event: KeyboardEvent): void {
 	if (props.throwEscape) throw new Error('escape callback failed');
 }
 
-function NativeLayer(props: LayerProps & { reactChild?: LayerProps; nativeChild?: LayerProps }) {
+function ReactContent(props: { id: string }) {
+	return React.createElement('button', { id: `${props.id}-target` }, 'Target');
+}
+
+function NativeLayer(
+	props: LayerProps & { reactChild?: LayerProps; reactContent?: string; nativeChild?: LayerProps },
+) {
 	return (
 		<Dialog.Root
 			defaultOpen
@@ -42,15 +49,16 @@ function NativeLayer(props: LayerProps & { reactChild?: LayerProps; nativeChild?
 				<Dialog.Description>Native</Dialog.Description>
 				<button id={`${props.id}-target`}>Target</button>
 				{props.reactChild ? <ReactCompat component={ReactLayer} props={props.reactChild} /> : null}
+				{props.reactContent ? (
+					<ReactCompat component={ReactContent} props={{ id: props.reactContent }} />
+				) : null}
 				{props.nativeChild ? <NativeLayer {...props.nativeChild} /> : null}
 			</Dialog.Content>
 		</Dialog.Root>
 	);
 }
 
-function ReactLayer(
-	props: LayerProps & { children?: React.ReactNode; cooperate?: boolean; refs?: string[] },
-) {
+function ReactLayer(props: LayerProps & { children?: React.ReactNode; refs?: string[] }) {
 	const bridge = React.useMemo(() => props.bridge ?? createEscapeLayerBridge(), [props.bridge]);
 	const ref = React.useCallback(
 		(node: HTMLElement | null) => {
@@ -89,13 +97,20 @@ function ReactLayer(
 
 function ReactOuter(props: {
 	log: Log;
-	inner?: LayerProps & { reactChild?: LayerProps };
+	inner?: LayerProps & { reactChild?: LayerProps; reactContent?: string };
 	refs?: string[];
 	bridge?: ReturnType<typeof createEscapeLayerBridge>;
+	cooperate?: boolean;
 }) {
 	return React.createElement(
 		ReactLayer,
-		{ id: 'outer', log: props.log, refs: props.refs, bridge: props.bridge },
+		{
+			id: 'outer',
+			log: props.log,
+			refs: props.refs,
+			bridge: props.bridge,
+			cooperate: props.cooperate,
+		},
 		props.inner &&
 			React.createElement<OctaneCompatComponentProps<Parameters<typeof NativeLayer>[0]>>(
 				OctaneCompat,
@@ -170,6 +185,82 @@ describe('cooperative mixed Radix Dialog Escape', () => {
 		await settle();
 	});
 
+	it.each(['react', 'native'] as const)(
+		'dismisses the top layer first under a %s outer dialog without the bridge',
+		async (outer) => {
+			const log: Log = [];
+			if (outer === 'react')
+				await renderReact(
+					React.createElement(ReactOuter, {
+						log,
+						cooperate: false,
+						inner: { id: 'inner', log },
+					}),
+				);
+			else
+				await renderNative({
+					id: 'outer',
+					log,
+					reactChild: { id: 'inner', log, cooperate: false },
+				});
+			const event = await press('inner');
+			expect(event.defaultPrevented).toBe(true);
+			// React Radix still calls the outer callback, with the event already prevented.
+			expect(log).toEqual(
+				outer === 'react'
+					? ['inner:escape', 'outer:escape', 'inner:false']
+					: ['inner:escape', 'inner:false'],
+			);
+			expect(document.getElementById('inner')).toBeNull();
+			expect(document.getElementById('outer')).not.toBeNull();
+			log.length = 0;
+			await press('outer');
+			expect(log).toEqual(['outer:escape', 'outer:false']);
+			expect(document.getElementById('outer')).toBeNull();
+		},
+	);
+
+	it('dismisses a native layer before its React parent when focus is in ReactCompat content', async () => {
+		const log: Log = [];
+		await renderReact(
+			React.createElement(ReactOuter, {
+				log,
+				cooperate: false,
+				inner: { id: 'inner', log, reactContent: 'content' },
+			}),
+		);
+		await press('content');
+		expect(log).toEqual(['inner:escape', 'outer:escape', 'inner:false']);
+		expect(document.getElementById('inner')).toBeNull();
+		expect(document.getElementById('outer')).not.toBeNull();
+	});
+
+	it.each(['react', 'native'] as const)(
+		'honors a top-layer veto under a %s outer dialog without the bridge',
+		async (outer) => {
+			const log: Log = [];
+			if (outer === 'react')
+				await renderReact(
+					React.createElement(ReactOuter, {
+						log,
+						cooperate: false,
+						inner: { id: 'inner', log, veto: true },
+					}),
+				);
+			else
+				await renderNative({
+					id: 'outer',
+					log,
+					reactChild: { id: 'inner', log, veto: true, cooperate: false },
+				});
+			const event = await press('inner');
+			expect(event.defaultPrevented).toBe(true);
+			expect(log).toEqual(outer === 'react' ? ['inner:escape', 'outer:escape'] : ['inner:escape']);
+			expect(document.getElementById('inner')).not.toBeNull();
+			expect(document.getElementById('outer')).not.toBeNull();
+		},
+	);
+
 	it('dismisses native inner then React outer, composing the React ref and preserving propagation', async () => {
 		const log: Log = [],
 			refs: string[] = [],
@@ -224,10 +315,10 @@ describe('cooperative mixed Radix Dialog Escape', () => {
 
 	it('retains earlier cancellation and calls the native top callback only once', async () => {
 		const log: Log = [];
-		await renderReact(React.createElement(ReactOuter, { log, inner: { id: 'inner', log } }));
 		const cancel = (event: Event) => event.preventDefault();
 		window.addEventListener('keydown', cancel, { capture: true });
 		try {
+			await renderReact(React.createElement(ReactOuter, { log, inner: { id: 'inner', log } }));
 			await press('inner');
 		} finally {
 			window.removeEventListener('keydown', cancel, { capture: true });
