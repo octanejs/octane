@@ -447,6 +447,8 @@ class HostedIslandController {
 	private visibility: Visibility = 'visible';
 	/** A disconnect awaits its microtask check; any commit cancels it. */
 	private requestedVisibility: Visibility | null = null;
+	/** The last insertion-phase snapshot, which a hide commit's microtask publishes. */
+	private insertionSnapshot: ContextSnapshot = EMPTY_SNAPSHOT;
 
 	constructor(private clientSignalOwner: RootOptions['signalOwner']) {}
 
@@ -729,9 +731,11 @@ class HostedIslandController {
 	 * tree here. The hosted Activity stays hidden, so only Octane insertion
 	 * effects run; layout, passive, and ref work waits for reveal. React forbids
 	 * updates from insertion effects, so a notification raised by this flush is
-	 * deferred to a microtask.
+	 * deferred to a microtask. A commit that also hides the island runs this
+	 * before the hide, so the hide's microtask publishes the saved snapshot.
 	 */
 	publishHidden(snapshot: ContextSnapshot): void {
+		this.insertionSnapshot = snapshot;
 		if (this.visibility === 'visible' || this.status !== 0 || !this.rootLive) return;
 		if (this.lifecycleGeneration < 0 || !this.publishSnapshots(snapshot)) return;
 		const notify = this.notify;
@@ -767,6 +771,7 @@ class HostedIslandController {
 			if (requested !== 'hidden' && this.episode !== null) return;
 			this.visibility = requested;
 			try {
+				this.publishSnapshots(this.insertionSnapshot);
 				this.attachAndFlush();
 			} catch (error) {
 				reportHostedFault(error);

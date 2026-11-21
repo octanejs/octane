@@ -1361,6 +1361,15 @@ describe('octane/react — StrictMode, hide/reveal, and teardown discrimination 
 				react: ['layout setup:next'],
 				octane: ['layout setup:next'],
 			});
+			// A context change committed together with the hide also reaches the island.
+			await mounted.render(tree('visible', 'first'));
+			flushEffects();
+			drain();
+			await mounted.render(tree('hidden', 'again'));
+			expect(drain()).toEqual({
+				react: ['layout cleanup:first', 'insertion cleanup:first', 'insertion setup:again'],
+				octane: ['layout cleanup:first', 'insertion cleanup:first', 'insertion setup:again'],
+			});
 			expect(consoleError).not.toHaveBeenCalled();
 		} finally {
 			consoleError.mockRestore();
