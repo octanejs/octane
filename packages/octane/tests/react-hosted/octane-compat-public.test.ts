@@ -1448,6 +1448,111 @@ describe('octane/react — StrictMode, hide/reveal, and teardown discrimination 
 		}
 	});
 
+	it('replaces a hidden Activity island on a child identity change like a React child (#2738)', async () => {
+		const reactLog = createLog();
+		const octaneLog = createLog();
+		function ReactChild({ label, log }: { label: string; log: (message: string) => void }) {
+			React.useInsertionEffect(() => {
+				log('insertion setup:' + label);
+				return () => log('insertion cleanup:' + label);
+			}, [label]);
+			React.useLayoutEffect(() => {
+				log('layout setup:' + label);
+				return () => log('layout cleanup:' + label);
+			}, [label]);
+			return h('output', null, label);
+		}
+		const tree = (mode: 'visible' | 'hidden', id: string) =>
+			h(React.Activity, {
+				mode,
+				children: [
+					h(
+						React.Fragment,
+						{ key: 'react' },
+						h(ReactChild, { key: id, label: id, log: reactLog.push }),
+					),
+					h(
+						OctaneCompat,
+						{ key: 'octane' },
+						h(HiddenLabelIsland as any, { key: id, label: id, log: octaneLog.push }),
+					),
+				],
+			});
+		const consoleError = vi.spyOn(console, 'error');
+		const mounted = await mountReactHost(tree('visible', 'a'));
+		try {
+			flushEffects();
+			const drain = () => ({ react: reactLog.drain(), octane: octaneLog.drain() });
+			drain();
+
+			await mounted.render(tree('hidden', 'a'));
+			expect(drain()).toEqual({ react: ['layout cleanup:a'], octane: ['layout cleanup:a'] });
+
+			// React mounts the new identity hidden: insertion effects only, no layout.
+			await mounted.render(tree('hidden', 'b'));
+			expect(drain()).toEqual({
+				react: ['insertion cleanup:a', 'insertion setup:b'],
+				octane: ['insertion cleanup:a', 'insertion setup:b'],
+			});
+			expect(mounted.host().querySelector('output')?.textContent).toBe('b');
+
+			await mounted.render(tree('visible', 'b'));
+			flushEffects();
+			expect(drain()).toEqual({ react: ['layout setup:b'], octane: ['layout setup:b'] });
+
+			// An identity change committed together with the hide also replaces the island.
+			await mounted.render(tree('hidden', 'c'));
+			expect(drain()).toEqual({
+				react: ['layout cleanup:b', 'insertion cleanup:b', 'insertion setup:c'],
+				octane: ['layout cleanup:b', 'insertion cleanup:b', 'insertion setup:c'],
+			});
+			expect(mounted.host().querySelector('output')?.textContent).toBe('c');
+			expect(consoleError).not.toHaveBeenCalled();
+		} finally {
+			consoleError.mockRestore();
+			await mounted.unmount();
+		}
+	});
+
+	it('resolves React context for a child identity mounted while hidden (#2738)', async () => {
+		const Context = React.createContext('fallback');
+		const log = createLog();
+		const tree = (mode: 'visible' | 'hidden', id: string, value: string) =>
+			h(Context, {
+				value,
+				children: h(React.Activity, {
+					mode,
+					children: h(
+						OctaneCompat,
+						null,
+						h(HiddenContextIsland as any, { key: id, context: Context, log: log.push }),
+					),
+				}),
+			});
+		const consoleError = vi.spyOn(console, 'error');
+		const mounted = await mountReactHost(tree('visible', 'a', 'first'));
+		try {
+			flushEffects();
+			await mounted.render(tree('hidden', 'a', 'first'));
+			log.drain();
+
+			// The replacement discovers the context while hidden and mounts with its value.
+			await mounted.render(tree('hidden', 'b', 'first'));
+			expect(log.drain()).toEqual(['insertion cleanup:first', 'insertion setup:first']);
+			await mounted.render(tree('hidden', 'b', 'next'));
+			expect(log.drain()).toEqual(['insertion cleanup:first', 'insertion setup:next']);
+
+			await mounted.render(tree('visible', 'b', 'next'));
+			flushEffects();
+			expect(mounted.host().querySelector('output')?.textContent).toBe('next');
+			expect(log.drain()).toEqual(['layout setup:next']);
+			expect(consoleError).not.toHaveBeenCalled();
+		} finally {
+			consoleError.mockRestore();
+			await mounted.unmount();
+		}
+	});
+
 	it('routes a hosted cleanup fault through reportError without scheduling the dead wrapper', async () => {
 		// jsdom does not implement reportError; stub the global the module
 		// feature-detects (browsers and Node both provide it).

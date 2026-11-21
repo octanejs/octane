@@ -711,7 +711,7 @@ class HostedIslandController {
 	 * reveal. React forbids updates from insertion effects, so a notification
 	 * raised by this flush is deferred to a microtask. A commit that also hides
 	 * the island runs this before the hide, so the hide's microtask applies the
-	 * saved child and snapshot.
+	 * saved child and snapshot after hiding the current one.
 	 */
 	publishHidden(child: TransportedChild, snapshot: ContextSnapshot): void {
 		this.insertionChild = child;
@@ -785,8 +785,13 @@ class HostedIslandController {
 			if (requested !== 'hidden' && this.episode !== null) return;
 			this.visibility = requested;
 			try {
-				if (this.insertionChild !== null) this.apply(this.insertionChild, this.insertionSnapshot);
+				// Disconnect the current child first, as React does, then apply what the
+				// hiding commit changed: a replaced child is deleted after its hide.
 				this.attachAndFlush();
+				const child = this.insertionChild;
+				if (child !== null && this.status === 0 && this.apply(child, this.insertionSnapshot)) {
+					this.attachAndFlush();
+				}
 			} catch (error) {
 				reportHostedFault(error);
 			}
