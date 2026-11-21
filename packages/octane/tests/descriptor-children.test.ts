@@ -111,10 +111,11 @@ describe('descriptorChildren', () => {
 		expect(shown.findAll('button.gated')).toHaveLength(1);
 		shown.unmount();
 
+		// A closed arm contributes no child, as `{props.show && <button />}` does.
 		inspect.mockClear();
 		const hidden = mount(DescriptorChildrenDirectiveApp, { show: false, inspect });
 		expect(inspect).toHaveBeenCalledTimes(1);
-		expect(descriptorIsElement(inspect.mock.calls[0][0])).toBe(true);
+		expect(inspect.mock.calls[0][0]).toBeNull();
 		expect(hidden.findAll('button.gated')).toHaveLength(0);
 		hidden.unmount();
 	});
