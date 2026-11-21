@@ -262,45 +262,48 @@ describe('octane/signals/react', () => {
 		},
 	);
 
-	it('releases a departing sibling after a layout-only Suspense reveal', async () => {
-		const scope = createScope({ scopeKey: 'reveal' });
-		const stop = vi.fn();
-		const value$ = scope.signal$(null, 1, { watched: () => stop });
-		const gate = deferred<void>();
-		function Content({ pending }: { pending: boolean }) {
-			if (pending) React.use(gate.promise);
-			return 'visible';
-		}
-		function Reader() {
-			return h('output', null, useRetainedSignalValue(value$));
-		}
-		const tree = (pending: boolean, showReader: boolean) =>
-			h(
-				React.StrictMode,
-				null,
+	it.each([false, true])(
+		'releases a departing sibling after Suspense reveals (strict %s)',
+		async (strict) => {
+			const scope = createScope({ scopeKey: 'reveal' });
+			const stop = vi.fn();
+			const value$ = scope.signal$(null, 1, { watched: () => stop });
+			const gate = deferred<void>();
+			function Content({ pending }: { pending: boolean }) {
+				if (pending) React.use(gate.promise);
+				return 'visible';
+			}
+			function Reader() {
+				return h('output', null, useRetainedSignalValue(value$));
+			}
+			const tree = (pending: boolean, showReader: boolean) =>
 				h(
-					RetainedSignalProvider,
+					strict ? React.StrictMode : React.Fragment,
 					null,
 					h(
-						React.Suspense,
-						{ fallback: h('p', null, 'waiting') },
-						h(RetainedSignalProvider, null, h(Content, { pending })),
+						RetainedSignalProvider,
+						null,
+						h(
+							React.Suspense,
+							{ fallback: h('p', null, 'waiting') },
+							h(RetainedSignalProvider, null, h(Content, { pending })),
+						),
+						showReader ? h(RetainedSignalProvider, null, h(Reader)) : null,
 					),
-					showReader ? h(RetainedSignalProvider, null, h(Reader)) : null,
-				),
-			);
-		const { root, container } = mount(tree(false, true));
-		await act(() => {
-			flushSync(() => root.render(tree(true, true)));
-		});
-		expect(container.querySelector('p')?.textContent).toBe('waiting');
-		await act(async () => {
-			gate.resolve();
-		});
-		expect(container.textContent).toBe('visible1');
-		flushSync(() => root.render(tree(true, false)));
-		expect(stop).toHaveBeenCalledOnce();
-	});
+				);
+			const { root, container } = mount(tree(false, true));
+			await act(() => {
+				flushSync(() => root.render(tree(true, true)));
+			});
+			expect(container.querySelector('p')?.textContent).toBe('waiting');
+			await act(async () => {
+				gate.resolve();
+			});
+			expect(container.textContent).toBe('visible1');
+			flushSync(() => root.render(tree(true, false)));
+			expect(stop).toHaveBeenCalledOnce();
+		},
+	);
 
 	it.each([1, 2])(
 		'drains all outgoing subscriptions when %i custom cleanups throw',
