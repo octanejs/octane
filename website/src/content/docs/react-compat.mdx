@@ -203,7 +203,8 @@ in this direction.
 
 When React's `Activity` hides the island, prop and React context changes still reach it,
 as they reach a hidden React child: the island re-renders and its insertion
-effects run. Layout effects, passive effects, and refs wait for reveal.
+effects run, and a new child identity replaces it. Layout effects, passive
+effects, and refs wait for reveal.
 
 <h3 id="octane-context-in-react">Octane context in a React island</h3>
 

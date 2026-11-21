@@ -1436,6 +1436,10 @@ not `O(islands × global event types)`.
     hidden island and flushes it with the hosted Activity still hidden. Only
     Octane insertion effects run; notifications raised by that flush are
     deferred to a microtask because React forbids insertion-effect updates.
+    A child identity change while hidden replaces the island the same way. When
+    a change is committed together with the hide, the hide microtask first
+    disconnects the current child and then applies the change, so a replaced
+    child's layout cleanup runs before its insertion cleanup, as in React.
 14. Translation or rejection policy for Octane head resources in hosted SSR,
     including CSP.
 15. ~~Whether React retains a newly discovered context dependency in an
