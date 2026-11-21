@@ -319,7 +319,8 @@ export function blockIsAncestorOf(anc: Block, node: Block): boolean {
 // and disjoint subtrees fire in tree order. We reconstruct that from the flat queues:
 // descendant-before-ancestor via the parentBlock chain; everything else (disjoint
 // subtrees, and multiple entries on the SAME block) falls back to enqueue order, which
-// IS tree order because rendering is top-down DFS pre-order. Effects pass their explicit
+// IS tree order within a render because rendering is top-down DFS pre-order, and the
+// queue order of a wave's standalone renders (sortRenderWave). Effects pass their explicit
 // sequence; refs pass equal sequence values and rely on ES stable sort to retain their
 // queue order. This is correct where a plain depth sort was not — a shallow node in an
 // earlier sibling subtree must fire before a deeper node in a LATER sibling subtree,

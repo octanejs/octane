@@ -2448,40 +2448,54 @@ export function drainHydrationRenderPhaseUpdates(
 	}
 }
 
-// Sort a render wave shallow-first so an ancestor can consume or remove queued
-// descendants before their standalone updates. No user code runs during this
-// sort. Negative drain stamps temporarily reuse the loop-guard fields for depth;
-// the positive drain id resets them to a render count before executing a block.
-// Cache every real ancestor for this wave, including unqueued intermediates.
-// Two walks over each unknown path avoid allocating a path stack or collections.
-function sortWaveByDepth(wave: Block[], drainId: number): Block[] {
+// Order a render wave so each queued ancestor renders before its queued
+// descendants, where its cascade can consume or remove their standalone
+// updates, while unrelated blocks keep their queue order. Rendering every
+// shallower block first instead would move a deeper block behind later
+// unrelated ones, and the commit runs the refs and effects of disjoint subtrees
+// in render order (comparePostOrder), so siblings at different depths would
+// commit out of tree order. No user code runs during this sort. Negative drain
+// stamps temporarily reuse the loop-guard fields: a queued block holds -1 until
+// it is placed, and any other real block on a walked path holds 0, meaning no
+// unplaced queued ancestor remains above it. The positive drain id resets both
+// before a block executes. Two walks over each unknown path avoid allocating a
+// path stack or collections.
+function sortRenderWave(wave: Block[], drainId: number): Block[] {
 	const stamp = -drainId;
 	for (let i = 0; i < wave.length; i++) {
-		const start = wave[i];
-		if (start.drainStamp === stamp) continue;
-		let current: Block | null = start;
-		let depth = 0;
-		while (current !== null && current.drainStamp !== stamp) {
-			depth++;
-			current = current.parentBlock;
-		}
-		depth += current === null ? -1 : current.drainRenders;
-		current = start;
-		while (current !== null && current.drainStamp !== stamp) {
-			// Lite ancestry proxies intentionally have no scheduler fields.
-			if (current.drainStamp !== undefined) {
-				current.drainStamp = stamp;
-				current.drainRenders = depth;
-			}
-			depth--;
-			current = current.parentBlock;
-		}
+		wave[i].drainStamp = stamp;
+		wave[i].drainRenders = -1;
 	}
-	wave.sort(compareWaveDepth);
+	let next = 0;
+	for (let i = 0; i < wave.length; i++) {
+		const start = wave[i];
+		if (start.drainRenders !== -1) continue;
+		let above = 0;
+		let current = start.parentBlock;
+		while (current !== null && (current.drainStamp !== stamp || current.drainRenders === -1)) {
+			if (current.drainStamp === stamp) above++;
+			current = current.parentBlock;
+		}
+		// Place those ancestors outermost first, then `start`.
+		let position = next + above;
+		current = start.parentBlock;
+		while (current !== null && (current.drainStamp !== stamp || current.drainRenders === -1)) {
+			if (current.drainStamp === stamp) current.drainRenders = --position;
+			// Lite ancestry proxies intentionally have no scheduler fields.
+			else if (current.drainStamp !== undefined) {
+				current.drainStamp = stamp;
+				current.drainRenders = 0;
+			}
+			current = current.parentBlock;
+		}
+		start.drainRenders = next + above;
+		next += above + 1;
+	}
+	wave.sort(compareWaveOrder);
 	return wave;
 }
 
-function compareWaveDepth(a: Block, b: Block): number {
+function compareWaveOrder(a: Block, b: Block): number {
 	return a.drainRenders - b.drainRenders;
 }
 
@@ -2536,7 +2550,7 @@ function drainQueue(): { err: any } | null {
 	const drainId = ++DRAIN_ID;
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileDrain(drainId);
-	if (QUEUE.length > 1) sortWaveByDepth(QUEUE, drainId);
+	if (QUEUE.length > 1) sortRenderWave(QUEUE, drainId);
 	// Iterate by index. A render may enqueue MORE work (e.g. a setState during
 	// render) — it appends to QUEUE, and `i < QUEUE.length` is re-evaluated every
 	// step, so those are drained in this same pass. The loop only exits once i has
@@ -3798,7 +3812,7 @@ export function flushSync<T>(fn?: (() => T) | null): T | void {
 			CURRENT_EFFECT_PHASE = -1;
 			let pendingError: { err: any } | null = null;
 			try {
-				// Drain anything scheduled by fn (same depth-sorted, coalescing drain as flush()).
+				// Drain anything scheduled by fn (same ancestor-first, coalescing drain as flush()).
 				// Octane drains insertion + layout synchronously. Newly queued passive
 				// effects retain the documented post-paint policy in commitEffects.
 				if (QUEUE.length > 0) drainPassivesBeforeRender();

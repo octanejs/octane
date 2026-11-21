@@ -212,3 +212,30 @@ export function ControlledInputMountedReader(props: { store: StoreLike }) @{
 		}
 	</div>
 }
+
+// Reads a boolean store and attaches a ref only while it is true.
+function RefReader(props: { store: StoreLike; name: string; log: string[] }) @{
+	const shown = useSyncExternalStore(props.store.subscribe, props.store.get);
+	<>
+		@if (shown) {
+			<span
+				ref={(el) => {
+					if (el) props.log.push(`ref ${props.name}`);
+				}}
+			>
+				{props.name as string}
+			</span>
+		}
+	</>
+}
+
+// Sibling readers at different depths: the first sits inside an `@if` arm.
+export function NestedRefReaders(props: { store: StoreLike; log: string[] }) @{
+	<div>
+		@if (props.store !== null) {
+			<RefReader store={props.store} name="first" log={props.log} />
+		}
+		<RefReader store={props.store} name="second" log={props.log} />
+		<RefReader store={props.store} name="third" log={props.log} />
+	</div>
+}
