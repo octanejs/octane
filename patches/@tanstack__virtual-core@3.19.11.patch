@@ -24,7 +24,7 @@ index e08c978a8870d1560c13e30abc3a818823001f0c..959adc05045f656e11fd5fd9e7f2dddf
              this.pendingWrite = null;
 +            if (kind === "readBack" || kind === "clampedReadBack" || kind === "clampedEcho") {
 +              this._ownWriteAt = offset;
-+            } else if (kind !== "restEcho") {
++            } else if (kind !== "restEcho" && kind !== "spurious") {
 +              this._ownWriteAt = null;
 +            }
              if (this._clampedAdjustment !== null && Math.abs(offset - this._clampedAdjustment.maxAtWrite) >= 1.5) {
@@ -108,7 +108,7 @@ index abe4b4906a110b39d76eb8926db4af5683acc1d2..382230f38cddf5d08d3f9e572bdd8428
              this.pendingWrite = null;
 +            if (kind === "readBack" || kind === "clampedReadBack" || kind === "clampedEcho") {
 +              this._ownWriteAt = offset;
-+            } else if (kind !== "restEcho") {
++            } else if (kind !== "restEcho" && kind !== "spurious") {
 +              this._ownWriteAt = null;
 +            }
              if (this._clampedAdjustment !== null && Math.abs(offset - this._clampedAdjustment.maxAtWrite) >= 1.5) {
