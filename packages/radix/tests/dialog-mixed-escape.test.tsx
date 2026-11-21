@@ -26,7 +26,13 @@ function recordEscape(props: LayerProps, event: KeyboardEvent): void {
 	if (props.throwEscape) throw new Error('escape callback failed');
 }
 
-function NativeLayer(props: LayerProps & { reactChild?: LayerProps; nativeChild?: LayerProps }) {
+function ReactContent(props: { id: string }) {
+	return React.createElement('button', { id: `${props.id}-target` }, 'Target');
+}
+
+function NativeLayer(
+	props: LayerProps & { reactChild?: LayerProps; reactContent?: string; nativeChild?: LayerProps },
+) {
 	return (
 		<Dialog.Root
 			defaultOpen
@@ -43,6 +49,9 @@ function NativeLayer(props: LayerProps & { reactChild?: LayerProps; nativeChild?
 				<Dialog.Description>Native</Dialog.Description>
 				<button id={`${props.id}-target`}>Target</button>
 				{props.reactChild ? <ReactCompat component={ReactLayer} props={props.reactChild} /> : null}
+				{props.reactContent ? (
+					<ReactCompat component={ReactContent} props={{ id: props.reactContent }} />
+				) : null}
 				{props.nativeChild ? <NativeLayer {...props.nativeChild} /> : null}
 			</Dialog.Content>
 		</Dialog.Root>
@@ -88,7 +97,7 @@ function ReactLayer(props: LayerProps & { children?: React.ReactNode; refs?: str
 
 function ReactOuter(props: {
 	log: Log;
-	inner?: LayerProps & { reactChild?: LayerProps };
+	inner?: LayerProps & { reactChild?: LayerProps; reactContent?: string };
 	refs?: string[];
 	bridge?: ReturnType<typeof createEscapeLayerBridge>;
 	cooperate?: boolean;
@@ -210,6 +219,21 @@ describe('cooperative mixed Radix Dialog Escape', () => {
 			expect(document.getElementById('outer')).toBeNull();
 		},
 	);
+
+	it('dismisses a native layer before its React parent when focus is in ReactCompat content', async () => {
+		const log: Log = [];
+		await renderReact(
+			React.createElement(ReactOuter, {
+				log,
+				cooperate: false,
+				inner: { id: 'inner', log, reactContent: 'content' },
+			}),
+		);
+		await press('content');
+		expect(log).toEqual(['inner:escape', 'outer:escape', 'inner:false']);
+		expect(document.getElementById('inner')).toBeNull();
+		expect(document.getElementById('outer')).not.toBeNull();
+	});
 
 	it.each(['react', 'native'] as const)(
 		'honors a top-layer veto under a %s outer dialog without the bridge',
