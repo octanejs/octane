@@ -904,6 +904,15 @@ function Example() @{
 The marker leaves the component's runtime identity unchanged and requests
 descriptor children at compiled call sites. The bundler follows marked exports
 through imports; a standalone compiler caller can mark a local binding explicitly.
+
+Among those children, an `@if` or `@for` whose arm or row holds only its output
+node arrives as the elements it renders, as `{cond ? <A /> : null}` and a keyed
+`.map()` would. A closed arm contributes no child, and each row carries its
+`key`, or its position when the list declares none. These children follow
+descriptor identity by type and key, not the separate arm scopes described
+under Template branch identity. An arm or row with setup statements, `@empty`,
+`@for await`, `@switch`, and `@try` keep their own render scope and arrive as
+one element that renders them but cannot be inspected.
 For a function-as-child API that also accepts ordinary template children, use
 `typeof children === 'function' && !isChildrenBlock(children)` before invoking a
 render prop. A compiled children body must be rendered through Octane.
@@ -953,7 +962,8 @@ separate render scope. Switching arms remounts their contents even when both
 arms contain the same component or host tag. Uncontrolled values and child
 state therefore reset. To preserve identity, keep one component outside the
 branch and make its props conditional, such as `<Row value={active ? a : b} />`.
-Ordinary returned element descriptors follow their type and key identity instead.
+Ordinary returned element descriptors follow their type and key identity instead,
+as do the render-only arms passed to a `descriptorChildren` component.
 
 ### Raw script and scoped style bodies
 

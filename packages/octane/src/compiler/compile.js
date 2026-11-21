@@ -17477,7 +17477,15 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 			// matching the client's childSlot(descriptor). A `__children` render-fn would
 			// instead add a wrapping block (ssrChild wraps the fn), making the server one
 			// block deeper than the client and desyncing the hydration cursor.
-			const kids = children.map((c) => lowerInspectableJsxChild(c, ctx)).filter((e) => e != null);
+			// The client lowers template children of a marked call through
+			// makeCompCall, and value-position children through jsxElementToCreateElement.
+			const templateChildren =
+				isDescriptorChildrenTag(node, ctx) && !ctx._tsxValuePos && !returnedFragmentTemplate
+					? inspectableTemplateDirectives(children, ctx, true)
+					: children;
+			const kids = templateChildren
+				.map((c) => lowerInspectableJsxChild(c, ctx))
+				.filter((e) => e != null);
 			if (kids.length > 0) {
 				// The children array shell maps to the authored component element.
 				let childrenExpr = kids[0];
@@ -26722,6 +26730,135 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 		if (VALUE_DIRECTIVE_ARM_TYPES.has(t)) rejectUnownedValueDirective(n);
 		return null;
 	});
+}
+
+// A descriptorChildren call site's children are inspected the way React children
+// are, so a render-only `@if` or `@for` among them becomes the value a React
+// author writes for it: `test ? <A /> : null`, or `Array.from(items, (item,
+// index) => <Row key={…} />)`, which rewriteJsxValues then lowers like any
+// conditional or mapped JSX. An arm or row with setup statements, a text arm,
+// `@empty`, `@for await`, and `@switch`/`@try` keep their own render scope and
+// stay one compiled fragment, as a setup-bearing `@{ … }` child does. Only JSX
+// child positions are rewritten, never a nested function's or attribute's JSX.
+// Both emitters rewrite the same children of the same template call sites, so
+// the server renders the descriptors the client hydrates.
+function inspectableTemplateDirectives(node, ctx, jsxChild = false) {
+	if (node == null || typeof node !== 'object') return node;
+	if (Array.isArray(node)) {
+		let out = node;
+		for (let index = 0; index < node.length; index++) {
+			const value = inspectableTemplateDirectives(node[index], ctx, jsxChild);
+			if (value !== node[index]) {
+				if (out === node) out = node.slice();
+				out[index] = value;
+			}
+		}
+		return out;
+	}
+	if (isFunctionNode(node) || node.type === 'Tsx' || node.type === 'Tsrx') return node;
+	if (SETUP_VALUE_DIRECTIVE_TYPES.has(node.type)) {
+		const value = jsxChild ? inspectableDirectiveValue(node, ctx) : null;
+		return value === null ? node : b.jsx_expression_container(value, node);
+	}
+	// A host's or component's attributes are props, which keep their descriptors.
+	const childrenOnly = JSX_CHILDREN_BEARING_TYPES.has(node.type);
+	let out = node;
+	for (const key in node) {
+		if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata') continue;
+		if (childrenOnly && key !== 'children') continue;
+		const value = inspectableTemplateDirectives(node[key], ctx, childrenOnly);
+		if (value !== node[key]) {
+			if (out === node) out = { ...node };
+			out[key] = value;
+		}
+	}
+	return out;
+}
+
+// The descriptor value of a render-only `@if` (or an `@else if` arm) or `@for`,
+// or null when the directive keeps its compiled fragment.
+function inspectableDirectiveValue(directive, ctx) {
+	if (directive.type === 'JSXIfExpression' || directive.type === 'IfStatement') {
+		const consequent = inspectableArmValue(directive.consequent, ctx);
+		const alternate =
+			directive.alternate == null
+				? b.literal(null, 'null')
+				: directive.alternate.type === 'IfStatement'
+					? inspectableDirectiveValue(directive.alternate, ctx)
+					: inspectableArmValue(directive.alternate, ctx);
+		if (consequent === null || alternate === null) return null;
+		return inheritOriginLoc(b.conditional(directive.test, consequent, alternate), directive);
+	}
+	if (
+		directive.type !== 'JSXForExpression' ||
+		directive.await ||
+		directive.empty != null ||
+		directive.left?.declarations?.length !== 1
+	)
+		return null;
+	let row = renderOnlyArmOutput(directive.body);
+	if (row === null || row === undefined) return null;
+	const keyed = row.type === 'JSXElement' && row.openingElement.attributes.some(isKeyAttribute);
+	if (directive.key != null && !keyed) {
+		// The header key identifies the row, so it needs one element to carry it.
+		if (row.type !== 'JSXElement') return null;
+		row = {
+			...row,
+			openingElement: {
+				...row.openingElement,
+				attributes: [
+					...row.openingElement.attributes,
+					inheritOriginLoc(
+						b.jsx_attribute(b.jsx_id('key'), b.jsx_expression_container(directive.key)),
+						directive.key,
+					),
+				],
+			},
+		};
+	}
+	const value = inspectableArmValue(row, ctx);
+	if (value === null) return null;
+	const params = [directive.left.declarations[0].id];
+	if (directive.index) params.push(directive.index);
+	const rows = inheritOriginLoc(
+		b.call(
+			b.member(b.id('Array'), 'from'),
+			directive.right,
+			inheritOriginLoc(b.arrow(params, value), directive.body),
+		),
+		directive,
+	);
+	// An unkeyed row is keyed by its position, as the template list keys it,
+	// and must not raise React's missing-key warning.
+	if (directive.key != null || keyed) return rows;
+	ctx.runtimeNeeded.add('positionalChildren');
+	return inheritOriginLoc(b.call(rtAlias('positionalChildren'), rows), directive);
+}
+
+// An arm's single output node, undefined for an empty arm, or null when the arm
+// has setup or renders bare text.
+function renderOnlyArmOutput(arm) {
+	const body = arm.type === 'BlockStatement' ? arm.body : [arm];
+	if (body.length === 0) return undefined;
+	return body.length === 1 && JSX_OUTPUT_TYPES.has(body[0].type) ? body[0] : null;
+}
+
+const JSX_OUTPUT_TYPES = new Set([
+	'JSXElement',
+	'Element',
+	'JSXFragment',
+	'Fragment',
+	...SETUP_VALUE_DIRECTIVE_TYPES,
+]);
+
+function inspectableArmValue(arm, ctx) {
+	const output = renderOnlyArmOutput(arm);
+	if (output === undefined) return b.literal(null, 'null');
+	if (output === null) return null;
+	// A directive or code block left here folds at expression position.
+	if (SETUP_VALUE_DIRECTIVE_TYPES.has(output.type))
+		return inspectableDirectiveValue(output, ctx) ?? output;
+	return inspectableTemplateDirectives(output, ctx);
 }
 
 // Lower one JSX child node to a `createElement` argument expression (or null to
@@ -37773,7 +37910,7 @@ function makeCompCall(
 		const childrenParentNs =
 			!activityDescriptor && !isFragmentLongForm(node, ctx) ? 'opaque' : parentNs;
 		if (compName !== null && isDescriptorChildrenTag(node, ctx)) {
-			const kids = children
+			const kids = inspectableTemplateDirectives(children, ctx, true)
 				.map((child) => lowerInspectableJsxChild(child, ctx))
 				.filter((child) => child != null);
 			if (kids.length > 0) {
