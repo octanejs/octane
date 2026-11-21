@@ -447,6 +447,8 @@ class HostedIslandController {
 	private visibility: Visibility = 'visible';
 	/** A disconnect awaits its microtask check; any commit cancels it. */
 	private requestedVisibility: Visibility | null = null;
+	/** Snapshot deferred by a combined hide-and-context-update (insertion before layout). */
+	private deferredSnapshot: ContextSnapshot | null = null;
 
 	constructor(private clientSignalOwner: RootOptions['signalOwner']) {}
 
@@ -680,6 +682,7 @@ class HostedIslandController {
 	 */
 	commit(child: TransportedChild, identifierPrefix: string, snapshot: ContextSnapshot): void {
 		if (this.disposed) return;
+		this.deferredSnapshot = null;
 		this.identifierPrefix = identifierPrefix;
 		const previous = this.committed;
 		// A child identity/key change replaces the island — and resets context
@@ -732,8 +735,13 @@ class HostedIslandController {
 	 * deferred to a microtask.
 	 */
 	publishHidden(snapshot: ContextSnapshot): void {
-		if (this.visibility === 'visible' || this.status !== 0 || !this.rootLive) return;
-		if (this.lifecycleGeneration < 0 || !this.publishSnapshots(snapshot)) return;
+		if (this.status !== 0 || !this.rootLive || this.lifecycleGeneration < 0) return;
+		if (this.visibility === 'visible') {
+			this.deferredSnapshot = snapshot;
+			return;
+		}
+		this.deferredSnapshot = null;
+		if (!this.publishSnapshots(snapshot)) return;
 		const notify = this.notify;
 		this.notify = () => queueMicrotask(notify);
 		try {
@@ -766,6 +774,11 @@ class HostedIslandController {
 			if (requested === null || this.disposed || this.lifecycleGeneration < 0) return;
 			if (requested !== 'hidden' && this.episode !== null) return;
 			this.visibility = requested;
+			const deferred = this.deferredSnapshot;
+			if (deferred !== null) {
+				this.deferredSnapshot = null;
+				this.publishSnapshots(deferred);
+			}
 			try {
 				this.attachAndFlush();
 			} catch (error) {
