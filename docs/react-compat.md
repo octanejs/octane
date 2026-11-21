@@ -55,8 +55,8 @@ React-owned host. For example, a named icon can use `hostRole="img"`,
 `hostAriaLabel="Status"`, and `hostStyle={{ display: 'inline-block' }}` to give
 the host its own layout box.
 
-When React's `Activity` hides an `OctaneCompat` island, React context changes
-still reach it, as they reach a hidden React child: the island re-renders and
+When React's `Activity` hides an `OctaneCompat` island, prop and React context
+changes still reach it, as they reach a hidden React child: the island re-renders and
 its insertion effects run, so a stylesheet they install for visible siblings
 stays current. Layout effects, passive effects, and refs stay disconnected
 until reveal.

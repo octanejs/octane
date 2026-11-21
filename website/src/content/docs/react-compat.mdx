@@ -201,7 +201,7 @@ nearest committed React provider and updates the island when it changes. With no
 provider, the island receives the React context's default. No mapping is needed
 in this direction.
 
-When React's `Activity` hides the island, React context changes still reach it,
+When React's `Activity` hides the island, prop and React context changes still reach it,
 as they reach a hidden React child: the island re-renders and its insertion
 effects run. Layout effects, passive effects, and refs wait for reveal.
 

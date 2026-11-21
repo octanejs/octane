@@ -447,7 +447,8 @@ class HostedIslandController {
 	private visibility: Visibility = 'visible';
 	/** A disconnect awaits its microtask check; any commit cancels it. */
 	private requestedVisibility: Visibility | null = null;
-	/** The last insertion-phase snapshot, which a hide commit's microtask publishes. */
+	/** The last insertion-phase child and snapshot, which a hide commit's microtask applies. */
+	private insertionChild: TransportedChild | null = null;
 	private insertionSnapshot: ContextSnapshot = EMPTY_SNAPSHOT;
 
 	constructor(private clientSignalOwner: RootOptions['signalOwner']) {}
@@ -676,18 +677,68 @@ class HostedIslandController {
 	/**
 	 * Layout-commit publish (§5 rule 4): synchronously finish the hosted Octane
 	 * commit before the wrapper's layout effect returns, so outer React layout
-	 * effects observe current island DOM. Bails when the parent re-render
-	 * changed nothing (§10 republish policy): the transported child element is
-	 * recreated every parent render, so `React.memo` cannot provide this bail.
+	 * effects observe current island DOM. Bails when `apply` reports no change
+	 * and the island is visible and settled.
 	 */
 	commit(child: TransportedChild, identifierPrefix: string, snapshot: ContextSnapshot): void {
 		if (this.disposed) return;
 		this.identifierPrefix = identifierPrefix;
+		const changed = this.apply(child, snapshot);
+		// A layout commit means the wrapper is visible: cancel a pending hide and reveal.
+		const revealing = this.visibility !== 'visible';
+		this.visibility = 'visible';
+		this.requestedVisibility = null;
+		if (
+			!changed &&
+			!revealing &&
+			this.attached &&
+			this.rootLive &&
+			this.status === 0 &&
+			this.episode === null
+		) {
+			return;
+		}
+		this.attached = true;
+		this.attachAndFlush();
+	}
+
+	/**
+	 * Insertion-phase publish for a hidden island (#2738). React suppresses the
+	 * wrapper's layout effect while Activity hides it, yet still re-renders the
+	 * hidden subtree and commits its insertion effects, so a prop or context
+	 * change reaches the hosted tree here. The hosted Activity stays hidden, so
+	 * only Octane insertion effects run; layout, passive, and ref work waits for
+	 * reveal. React forbids updates from insertion effects, so a notification
+	 * raised by this flush is deferred to a microtask. A commit that also hides
+	 * the island runs this before the hide, so the hide's microtask applies the
+	 * saved child and snapshot.
+	 */
+	publishHidden(child: TransportedChild, snapshot: ContextSnapshot): void {
+		this.insertionChild = child;
+		this.insertionSnapshot = snapshot;
+		if (this.visibility === 'visible' || this.status !== 0 || !this.rootLive) return;
+		if (this.lifecycleGeneration < 0 || !this.apply(child, snapshot)) return;
+		const notify = this.notify;
+		this.notify = () => queueMicrotask(notify);
+		try {
+			this.attachAndFlush();
+		} finally {
+			this.notify = notify;
+		}
+	}
+
+	/**
+	 * Records a committed child and context snapshot. Returns whether the hosted
+	 * root must re-render (§10 republish policy): the transported child element
+	 * is recreated every parent render, so `React.memo` cannot provide this bail.
+	 */
+	private apply(child: TransportedChild, snapshot: ContextSnapshot): boolean {
 		const previous = this.committed;
+		const sameChild = previous !== null && sameIdentity(previous, child);
 		// A child identity/key change replaces the island — and resets context
 		// discovery associated with the former tree (§10): the registry is
 		// monotonic only within one child identity.
-		if (previous !== null && !sameIdentity(previous, child)) {
+		if (previous !== null && !sameChild) {
 			this.entries = [];
 			// React committed the new identity: retire the stage and the old
 			// episode, so a late settlement neither retries nor reports.
@@ -701,50 +752,13 @@ class HostedIslandController {
 		const contextsChanged = this.publishSnapshots(snapshot);
 		const needsContextRetry = this.pendingContextRetry;
 		this.pendingContextRetry = false;
-		// A layout commit means the wrapper is visible: cancel a pending hide and reveal.
-		const revealing = this.visibility !== 'visible';
-		this.visibility = 'visible';
-		this.requestedVisibility = null;
-		if (
-			!revealing &&
-			!contextsChanged &&
-			!needsContextRetry &&
-			this.attached &&
-			this.rootLive &&
-			this.status === 0 &&
-			this.episode === null &&
-			previous !== null &&
-			sameIdentity(previous, child) &&
-			shallowEqualProps(previous.props, child.props)
-		) {
-			return;
-		}
 		this.committed = child;
-		this.attached = true;
-		this.attachAndFlush();
-	}
-
-	/**
-	 * Insertion-phase publish for a hidden island (#2738). React suppresses the
-	 * wrapper's layout effect while Activity hides it, yet still commits the
-	 * hidden subtree's insertion effects, so a context change reaches the hosted
-	 * tree here. The hosted Activity stays hidden, so only Octane insertion
-	 * effects run; layout, passive, and ref work waits for reveal. React forbids
-	 * updates from insertion effects, so a notification raised by this flush is
-	 * deferred to a microtask. A commit that also hides the island runs this
-	 * before the hide, so the hide's microtask publishes the saved snapshot.
-	 */
-	publishHidden(snapshot: ContextSnapshot): void {
-		this.insertionSnapshot = snapshot;
-		if (this.visibility === 'visible' || this.status !== 0 || !this.rootLive) return;
-		if (this.lifecycleGeneration < 0 || !this.publishSnapshots(snapshot)) return;
-		const notify = this.notify;
-		this.notify = () => queueMicrotask(notify);
-		try {
-			this.attachAndFlush();
-		} finally {
-			this.notify = notify;
-		}
+		return (
+			contextsChanged ||
+			needsContextRetry ||
+			!sameChild ||
+			!shallowEqualProps(previous!.props, child.props)
+		);
 	}
 
 	/**
@@ -771,7 +785,7 @@ class HostedIslandController {
 			if (requested !== 'hidden' && this.episode !== null) return;
 			this.visibility = requested;
 			try {
-				this.publishSnapshots(this.insertionSnapshot);
+				if (this.insertionChild !== null) this.apply(this.insertionChild, this.insertionSnapshot);
 				this.attachAndFlush();
 			} catch (error) {
 				reportHostedFault(error);
@@ -958,7 +972,7 @@ function createOctaneCompat(host: 'div' | 'span') {
 		React.useLayoutEffect(() => () => controller.disconnected(false), [controller]);
 		React.useEffect(() => () => controller.disconnected(true), [controller]);
 		React.useInsertionEffect(() => controller.startLifetime(), [controller]);
-		React.useInsertionEffect(() => controller.publishHidden(snapshot));
+		React.useInsertionEffect(() => controller.publishHidden(child, snapshot));
 
 		return React.createElement(host, {
 			'data-octane-compat': '',

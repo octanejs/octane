@@ -1432,7 +1432,7 @@ not `O(islands × global event types)`.
     Octane before React reveals (§7).
     *Answered for hidden context updates (#2738):* React suppresses the
     wrapper's layout publish while hidden but still commits insertion effects,
-    so a wrapper insertion effect publishes changed context into a settled
+    so a wrapper insertion effect applies changed props and context to a settled
     hidden island and flushes it with the hosted Activity still hidden. Only
     Octane insertion effects run; notifications raised by that flush are
     deferred to a microtask because React forbids insertion-effect updates.

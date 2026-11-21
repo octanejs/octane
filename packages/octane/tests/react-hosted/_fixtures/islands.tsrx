@@ -225,6 +225,25 @@ export function HiddenContextIsland({
 	<output>{current}</output>
 }
 
+/** A prop change while React Activity hides the island (#2738). */
+export function HiddenLabelIsland({
+	label,
+	log,
+}: {
+	label: string;
+	log: (message: string) => void;
+}) @{
+	useInsertionEffect(() => {
+		log('insertion setup:' + label);
+		return () => log('insertion cleanup:' + label);
+	}, [label]);
+	useLayoutEffect(() => {
+		log('layout setup:' + label);
+		return () => log('layout cleanup:' + label);
+	}, [label]);
+	<output>{label}</output>
+}
+
 export function BadgeIsland(props) @{
 	<p class="badge">{'badge:' + props.label}</p>
 }
