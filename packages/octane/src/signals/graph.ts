@@ -2798,12 +2798,26 @@ function countLink(dep: ReactiveNode, sub: ReactiveNode, state: Observation): vo
 function changeObservation(node: ReactiveNode, state: Observation, delta: 1 | -1): void {
 	const hooks = collectHooks(node, state, delta, undefined);
 	if (!hooks) return;
-	for (const hooked of hooks) {
-		const hook = getHook(hooked);
-		if (!hook) continue;
-		if (delta === 1 && hook.count > 0) startWatch(hooked, hook);
-		else if (delta === -1 && hook.count === 0) stopWatch(hook);
-	}
+	if (Array.isArray(hooks)) {
+		for (const hooked of hooks) applyHook(hooked, delta);
+	} else applyHook(hooks, delta);
+}
+
+function applyHook(node: ReactiveNode, delta: 1 | -1): void {
+	const hook = getHook(node);
+	if (!hook) return;
+	if (delta === 1 && hook.count > 0) startWatch(node, hook);
+	else if (delta === -1 && hook.count === 0) stopWatch(hook);
+}
+
+/** A single pending hook can use the node itself until a second hook joins it. */
+type HookList = ReactiveNode | ReactiveNode[] | undefined;
+
+function appendHook(hooks: HookList, node: ReactiveNode): HookList {
+	if (hooks === undefined) return node;
+	if (!Array.isArray(hooks)) return [hooks, node];
+	hooks.push(node);
+	return hooks;
 }
 
 /** Only a first or last reader changes its sources' counts. Start sources first, stop them last. */
@@ -2811,19 +2825,19 @@ function collectHooks(
 	node: ReactiveNode,
 	state: Observation,
 	delta: 1 | -1,
-	hooks: ReactiveNode[] | undefined,
-): ReactiveNode[] | undefined {
+	hooks: HookList,
+): HookList {
 	const hasHook = typeof state === 'object';
 	const count = (hasHook ? state.count : state) + delta;
 	if (hasHook) state.count = count;
 	else observations.set(node, count);
 	if (count !== (delta === 1 ? 1 : 0)) return hooks;
-	if (delta === -1 && hasHook) (hooks ??= []).push(node);
+	if (delta === -1 && hasHook) hooks = appendHook(hooks, node);
 	for (let link = node.deps; link; link = link.nextDep) {
 		const depState = observations.get(link.dep);
 		if (depState !== undefined) hooks = collectHooks(link.dep, depState, delta, hooks);
 	}
-	if (delta === 1 && hasHook) (hooks ??= []).push(node);
+	if (delta === 1 && hasHook) hooks = appendHook(hooks, node);
 	return hooks;
 }
 
