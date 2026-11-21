@@ -2814,11 +2814,10 @@ function collectHooks(
 	hooks: ReactiveNode[] | undefined,
 ): ReactiveNode[] | undefined {
 	const hasHook = typeof state === 'object';
-	const before = hasHook ? state.count : state;
-	const count = before + delta;
+	const count = (hasHook ? state.count : state) + delta;
 	if (hasHook) state.count = count;
 	else observations.set(node, count);
-	if (before !== 0 && count !== 0) return hooks;
+	if (count !== (delta === 1 ? 1 : 0)) return hooks;
 	if (delta === -1 && hasHook) (hooks ??= []).push(node);
 	for (let link = node.deps; link; link = link.nextDep) {
 		const depState = observations.get(link.dep);
