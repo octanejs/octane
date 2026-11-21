@@ -26800,24 +26800,14 @@ function inspectableDirectiveValue(directive, ctx) {
 	if (row === null || row === undefined) return null;
 	const keyed = row.type === 'JSXElement' && row.openingElement.attributes.some(isKeyAttribute);
 	if (directive.key != null && !keyed) {
-		// The header key identifies the row, so it needs one element to carry it.
-		if (row.type !== 'JSXElement') return null;
-		row = {
-			...row,
-			openingElement: {
-				...row.openingElement,
-				attributes: [
-					...row.openingElement.attributes,
-					inheritOriginLoc(
-						b.jsx_attribute(b.jsx_id('key'), b.jsx_expression_container(directive.key)),
-						directive.key,
-					),
-				],
-			},
-		};
+		// The header key identifies the row. Hang it on the output element, including
+		// through a render-only nested @if or a fragment's sole child.
+		row = hangInspectableForRowKey(row, directive.key);
 	}
 	const value = inspectableArmValue(row, ctx);
 	if (value === null) return null;
+	// A nested directive that cannot fold would be an unowned value in Array.from.
+	if (value === row && SETUP_VALUE_DIRECTIVE_TYPES.has(row.type)) return null;
 	const params = [directive.left.declarations[0].id];
 	if (directive.index) params.push(directive.index);
 	const rows = inheritOriginLoc(
@@ -26859,6 +26849,66 @@ function inspectableArmValue(arm, ctx) {
 	if (SETUP_VALUE_DIRECTIVE_TYPES.has(output.type))
 		return inspectableDirectiveValue(output, ctx) ?? output;
 	return inspectableTemplateDirectives(output, ctx);
+}
+
+function hangInspectableForRowKey(row, keyExpr) {
+	if (row.type === 'JSXElement') {
+		if (row.openingElement.attributes.some(isKeyAttribute)) return row;
+		return {
+			...row,
+			openingElement: {
+				...row.openingElement,
+				attributes: [
+					...row.openingElement.attributes,
+					inheritOriginLoc(
+						b.jsx_attribute(b.jsx_id('key'), b.jsx_expression_container(keyExpr)),
+						keyExpr,
+					),
+				],
+			},
+		};
+	}
+	if (row.type === 'JSXIfExpression' || row.type === 'IfStatement') {
+		const consequent = hangInspectableForRowKeyInArm(row.consequent, keyExpr);
+		const alternate =
+			row.alternate == null
+				? row.alternate
+				: row.alternate.type === 'IfStatement'
+					? hangInspectableForRowKey(row.alternate, keyExpr)
+					: hangInspectableForRowKeyInArm(row.alternate, keyExpr);
+		if (consequent === row.consequent && alternate === row.alternate) return row;
+		return { ...row, consequent, alternate };
+	}
+	if (row.type === 'JSXFragment' || row.type === 'Fragment') {
+		const children = row.children || [];
+		let index = -1;
+		for (let i = 0; i < children.length; i++) {
+			const child = children[i];
+			if (child == null) continue;
+			if (
+				(child.type === 'JSXText' || child.type === 'Text') &&
+				/^\s*$/.test(child.value != null ? child.value : (child.raw ?? ''))
+			)
+				continue;
+			if (index !== -1) return row;
+			index = i;
+		}
+		if (index === -1) return row;
+		// A sole child is the row's output node; drop the fragment so the header
+		// key hangs on that element instead of a wrapper Children.toArray cannot
+		// see through.
+		return hangInspectableForRowKey(children[index], keyExpr);
+	}
+	return row;
+}
+
+function hangInspectableForRowKeyInArm(arm, keyExpr) {
+	const output = renderOnlyArmOutput(arm);
+	if (output == null) return arm;
+	const next = hangInspectableForRowKey(output, keyExpr);
+	if (next === output) return arm;
+	if (arm.type !== 'BlockStatement') return next;
+	return { ...arm, body: [next] };
 }
 
 // Lower one JSX child node to a `createElement` argument expression (or null to

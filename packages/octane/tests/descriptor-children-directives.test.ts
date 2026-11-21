@@ -7,6 +7,10 @@ import {
 	ForChildren,
 	IfChildren,
 	Item,
+	KeyedFragmentForChildren,
+	KeyedIfForChildren,
+	KeyedNestedForChildren,
+	KeyedNestedListForChildren,
 	NestedForChildren,
 	SetupArmChildren,
 } from './_fixtures/descriptor-children-directives.tsrx';
@@ -84,6 +88,55 @@ describe('descriptorChildren template directives', () => {
 		mounted.unmount();
 	});
 
+	it('hangs a header key on a nested @if row so a marked part sees the inner elements', () => {
+		const items = [
+			{ id: 'a', ok: false },
+			{ id: 'b', ok: true },
+			{ id: 'c', ok: true },
+		];
+		const { seen, inspect } = inspector();
+		const mounted = mount(KeyedIfForChildren, { items, inspect });
+		expect(seen.at(-1)).toEqual(['Item.$b', 'Item.$c']);
+		expect(mounted.container.textContent).toBe('bc');
+
+		flushSync(() =>
+			mounted.root.render(KeyedIfForChildren, {
+				items: [items[2]!, items[0]!, items[1]!],
+				inspect,
+			}),
+		);
+		expect(seen.at(-1)).toEqual(['Item.$c', 'Item.$b']);
+		expect(mounted.container.textContent).toBe('cb');
+		mounted.unmount();
+
+		const nested = inspector();
+		const host = mount(KeyedNestedForChildren, { ids: ['a', 'b', 'c'], inspect: nested.inspect });
+		expect(nested.seen.at(-1)).toEqual(['section.0']);
+		expect(nested.nested.at(-1)).toEqual(['Item.$b', 'Item.$c']);
+		expect(host.container.textContent).toBe('bc');
+		host.unmount();
+	});
+
+	it('passes a keyed @for fragment or nested list row as the elements it renders', () => {
+		const fragment = inspector();
+		const a = mount(KeyedFragmentForChildren, { ids: ['a', 'b'], inspect: fragment.inspect });
+		expect(fragment.seen.at(-1)).toEqual(['Item.$a', 'Item.$b']);
+		expect(a.container.textContent).toBe('ab');
+		a.unmount();
+
+		const nested = inspector();
+		const b = mount(KeyedNestedListForChildren, {
+			groups: [
+				{ id: 'g1', ids: ['a'] },
+				{ id: 'g2', ids: ['b', 'c'] },
+			],
+			inspect: nested.inspect,
+		});
+		expect(nested.seen.at(-1)).toEqual(['Item.0:0', 'Item.1:0', 'Item.1:1']);
+		expect(b.container.textContent).toBe('abc');
+		b.unmount();
+	});
+
 	it('keeps a setup-bearing arm renderable as one compiled fragment', () => {
 		const { seen, inspect } = inspector();
 		const mounted = mount(SetupArmChildren, { shown: true, inspect });
@@ -97,6 +150,30 @@ describe('descriptorChildren template directives', () => {
 			[IfChildren, server.IfChildren, { shown: true, other: false }, ''],
 			[ForChildren, server.ForChildren, { ids: ['a', 'b'] }, 'ab'],
 			[NestedForChildren, server.NestedForChildren, { ids: ['a', 'b', 'c'] }, 'bc'],
+			[
+				KeyedIfForChildren,
+				server.KeyedIfForChildren,
+				{
+					items: [
+						{ id: 'a', ok: false },
+						{ id: 'b', ok: true },
+					],
+				},
+				'b',
+			],
+			[KeyedNestedForChildren, server.KeyedNestedForChildren, { ids: ['a', 'b', 'c'] }, 'bc'],
+			[KeyedFragmentForChildren, server.KeyedFragmentForChildren, { ids: ['a', 'b'] }, 'ab'],
+			[
+				KeyedNestedListForChildren,
+				server.KeyedNestedListForChildren,
+				{
+					groups: [
+						{ id: 'g1', ids: ['a'] },
+						{ id: 'g2', ids: ['b', 'c'] },
+					],
+				},
+				'abc',
+			],
 		] as const) {
 			const serverSeen = inspector(server.Item);
 			const html = renderToString(serverComponent, {

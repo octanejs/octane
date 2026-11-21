@@ -48,6 +48,56 @@ export function NestedForChildren(props: { ids: string[]; inspect: Inspect }) @{
 	</Inspector>
 }
 
+// The same nested @if with a header key, which authoring rules recommend.
+export function KeyedNestedForChildren(props: { ids: string[]; inspect: Inspect }) @{
+	<Inspector inspect={props.inspect}>
+		<section>
+			@for (const id of props.ids; index position; key id) {
+				@if (position > 0) {
+					<Item value={id} />
+				}
+			}
+		</section>
+	</Inspector>
+}
+
+// A marked Select that filters options with @if inside a keyed @for.
+export function KeyedIfForChildren(props: {
+	items: { id: string; ok: boolean }[];
+	inspect: Inspect;
+}) @{
+	<Inspector inspect={props.inspect}>
+		@for (const item of props.items; key item.id) {
+			@if (item.ok) {
+				<Item value={item.id} />
+			}
+		}
+	</Inspector>
+}
+
+export function KeyedFragmentForChildren(props: { ids: string[]; inspect: Inspect }) @{
+	<Inspector inspect={props.inspect}>
+		@for (const id of props.ids; key id) {
+			<>
+				<Item value={id} />
+			</>
+		}
+	</Inspector>
+}
+
+export function KeyedNestedListForChildren(props: {
+	groups: { id: string; ids: string[] }[];
+	inspect: Inspect;
+}) @{
+	<Inspector inspect={props.inspect}>
+		@for (const group of props.groups; key group.id) {
+			@for (const id of group.ids) {
+				<Item value={id} />
+			}
+		}
+	</Inspector>
+}
+
 // An arm with setup owns a render scope, so it stays one compiled fragment.
 export function SetupArmChildren(props: { shown: boolean; inspect: Inspect }) @{
 	<Inspector inspect={props.inspect}>
