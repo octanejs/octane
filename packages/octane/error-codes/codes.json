@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 373,
+  "nextCode": 374,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -2233,6 +2233,12 @@
     },
     "372": {
       "message": "Keyless scopes require a null signal key.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "373": {
+      "message": "Multiple retained signal subscriptions failed to release.",
       "argumentCount": 0,
       "runtime": ["client", "server"],
       "status": "active"

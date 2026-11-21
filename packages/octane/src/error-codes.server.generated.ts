@@ -262,6 +262,7 @@ type ServerErrorArguments = {
 	370: [];
 	371: [];
 	372: [];
+	373: [];
 };
 
 export function formatServerError<Code extends keyof ServerErrorArguments>(
@@ -1076,6 +1077,11 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 				);
 			case 372:
 				return formatDevErrorMessage('Keyless scopes require a null signal key.', args);
+			case 373:
+				return formatDevErrorMessage(
+					'Multiple retained signal subscriptions failed to release.',
+					args,
+				);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

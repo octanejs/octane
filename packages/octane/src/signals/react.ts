@@ -50,7 +50,8 @@ function finishHandoff(handoff: Handoff, phase: 'idle' | 'mounted') {
 			(errors ??= []).push(error);
 		}
 	}
-	if (errors) throw errors.length === 1 ? errors[0] : new AggregateError(errors);
+	if (errors)
+		throw errors.length === 1 ? errors[0] : new AggregateError(errors, formatClientError(373));
 }
 
 function releaseAfterHandoff(handoff: Handoff | undefined, release: () => void) {

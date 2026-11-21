@@ -302,34 +302,38 @@ describe('octane/signals/react', () => {
 		expect(stop).toHaveBeenCalledOnce();
 	});
 
-	it('drains all outgoing subscriptions when a custom cleanup throws during a handoff', async () => {
-		const log: string[] = [];
-		const bad = () => () => {
-			throw new Error('release failed');
-		};
-		const good = () => () => {
-			log.push('released');
-		};
-		function Reader() {
-			React.useSyncExternalStore(useSignalSubscription(bad), () => 0);
-			React.useSyncExternalStore(useSignalSubscription(good), () => 0);
-			return null;
-		}
-		const tree = (next: boolean) =>
-			h(
-				Boundary,
-				null,
+	it.each([1, 2])(
+		'drains all outgoing subscriptions when %i custom cleanups throw',
+		async (failures) => {
+			const log: string[] = [];
+			const bad = () => () => {
+				throw new Error('release failed');
+			};
+			const good = () => () => {
+				log.push('released');
+			};
+			function Reader() {
+				React.useSyncExternalStore(useSignalSubscription(bad), () => 0);
+				React.useSyncExternalStore(useSignalSubscription(failures === 2 ? bad : null), () => 0);
+				React.useSyncExternalStore(useSignalSubscription(good), () => 0);
+				return null;
+			}
+			const tree = (next: boolean) =>
 				h(
-					RetainedSignalProvider,
+					Boundary,
 					null,
-					h(RetainedSignalProvider, { key: String(next) }, next ? null : h(Reader)),
-				),
-			);
-		const { root, container } = mount(tree(false));
-		await act(() => root.render(tree(true)));
-		expect(log).toEqual(['released']);
-		expect(container.textContent).toContain('release failed');
-	});
+					h(
+						RetainedSignalProvider,
+						null,
+						h(RetainedSignalProvider, { key: String(next) }, next ? null : h(Reader)),
+					),
+				);
+			const { root, container } = mount(tree(false));
+			await act(() => root.render(tree(true)));
+			expect(log).toEqual(['released']);
+			expect(container.textContent).toContain(failures === 2 ? 'AggregateError' : 'release failed');
+		},
+	);
 
 	it('keeps a shared source watched when returning to an Activity with retention disabled', async () => {
 		const scope = createScope({ scopeKey: 'activity-handoff' });
