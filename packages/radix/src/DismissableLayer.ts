@@ -216,9 +216,14 @@ export function DismissableLayer(props: any): any {
 				const registry = escapeRegistries.get(ownerDocument);
 				if (registry && registry.layers.at(-1)?.node !== node) return;
 				if (registry) (handledEscapes ??= new WeakSet()).add(event);
-				else if (crossesReactCompat(event.target, node!)) {
+				else if (
+					crossesReactCompat(event.target, node!) &&
+					!node!.closest('[data-octane-compat]')
+				) {
 					// A React layer between the target and this one listens on the document after
-					// us. Answer once those listeners have run, as a parent layer would.
+					// us. Answer once those listeners have run, as a parent layer would. Inside an
+					// OctaneCompat island we already listen on the window, which beats document
+					// listeners, so deferring would hand priority to older React layers above us.
 					deferEscape(ownerDocument, event, handleKeyDown);
 					return;
 				}

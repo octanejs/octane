@@ -26,7 +26,17 @@ function recordEscape(props: LayerProps, event: KeyboardEvent): void {
 	if (props.throwEscape) throw new Error('escape callback failed');
 }
 
-function NativeLayer(props: LayerProps & { reactChild?: LayerProps; nativeChild?: LayerProps }) {
+function PlainReactButton({ id }: { id: string }) {
+	return React.createElement('button', { id }, 'React');
+}
+
+function NativeLayer(
+	props: LayerProps & {
+		reactChild?: LayerProps;
+		nativeChild?: LayerProps;
+		plainReactTarget?: string;
+	},
+) {
 	return (
 		<Dialog.Root
 			defaultOpen
@@ -44,6 +54,9 @@ function NativeLayer(props: LayerProps & { reactChild?: LayerProps; nativeChild?
 				<button id={`${props.id}-target`}>Target</button>
 				{props.reactChild ? <ReactCompat component={ReactLayer} props={props.reactChild} /> : null}
 				{props.nativeChild ? <NativeLayer {...props.nativeChild} /> : null}
+				{props.plainReactTarget ? (
+					<ReactCompat component={PlainReactButton} props={{ id: props.plainReactTarget }} />
+				) : null}
 			</Dialog.Content>
 		</Dialog.Root>
 	);
@@ -236,6 +249,28 @@ describe('cooperative mixed Radix Dialog Escape', () => {
 			expect(document.getElementById('outer')).not.toBeNull();
 		},
 	);
+
+	it('dismisses the native inner when focus is on plain ReactCompat content under a React outer without the bridge', async () => {
+		const log: Log = [];
+		await renderReact(
+			React.createElement(ReactOuter, {
+				log,
+				cooperate: false,
+				inner: { id: 'inner', log, plainReactTarget: 'react-btn' },
+			}),
+		);
+		const target = document.getElementById('react-btn')!;
+		target.focus();
+		let event!: KeyboardEvent;
+		await React.act(async () => {
+			event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+			target.dispatchEvent(event);
+			await settle();
+		});
+		expect(event.defaultPrevented).toBe(true);
+		expect(document.getElementById('inner')).toBeNull();
+		expect(document.getElementById('outer')).not.toBeNull();
+	});
 
 	it('dismisses native inner then React outer, composing the React ref and preserving propagation', async () => {
 		const log: Log = [],
