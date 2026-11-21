@@ -57,3 +57,73 @@ export function SetupArmChildren(props: { shown: boolean; inspect: Inspect }) @{
 		}
 	</Inspector>
 }
+
+// A keyed list whose rows hide behind an @if, as a Select filters its options.
+export function KeyedIfRows(props: { ids: string[]; hidden: string; inspect: Inspect }) @{
+	<Inspector inspect={props.inspect}>
+		@for (const id of props.ids; key id) {
+			@if (id !== props.hidden) {
+				<Item value={id} />
+			}
+		}
+	</Inspector>
+}
+
+// The same rows without the header key.
+export function KeylessIfRows(props: { ids: string[]; hidden: string; inspect: Inspect }) @{
+	<Inspector inspect={props.inspect}>
+		@for (const id of props.ids) {
+			@if (id !== props.hidden) {
+				<Item value={id} />
+			}
+		}
+	</Inspector>
+}
+
+// A keyed list of groups, each row a nested list.
+export function KeyedGroupRows(props: {
+	groups: { id: string; items: string[] }[];
+	inspect: Inspect;
+}) @{
+	<Inspector inspect={props.inspect}>
+		@for (const group of props.groups; key group.id) {
+			@for (const id of group.items; key id) {
+				<Item value={id} />
+			}
+		}
+	</Inspector>
+}
+
+// A keyed list whose row, or one arm of it, renders a fragment.
+export function KeyedFragmentRows(props: { ids: string[]; paired: string; inspect: Inspect }) @{
+	<Inspector inspect={props.inspect}>
+		@for (const id of props.ids; key id) {
+			<>
+				<Item value={id} />
+				<b>{id}</b>
+			</>
+		}
+		@for (const id of props.ids; key id) {
+			@if (id === props.paired) {
+				<>
+					<Item value={id} />
+					<b>{id}</b>
+				</>
+			} @else {
+				<Item value={id} />
+			}
+		}
+	</Inspector>
+}
+
+// A keyed row whose @if arm has setup keeps the list one compiled fragment.
+export function KeyedSetupArmRows(props: { ids: string[]; inspect: Inspect }) @{
+	<Inspector inspect={props.inspect}>
+		@for (const id of props.ids; key id) {
+			@if (id !== 'b') {
+				const label = id + '!';
+				<Item value={label} />
+			}
+		}
+	</Inspector>
+}

@@ -26796,27 +26796,11 @@ function inspectableDirectiveValue(directive, ctx) {
 		directive.left?.declarations?.length !== 1
 	)
 		return null;
-	let row = renderOnlyArmOutput(directive.body);
+	const row = renderOnlyArmOutput(directive.body);
 	if (row === null || row === undefined) return null;
 	const keyed = row.type === 'JSXElement' && row.openingElement.attributes.some(isKeyAttribute);
-	if (directive.key != null && !keyed) {
-		// The header key identifies the row, so it needs one element to carry it.
-		if (row.type !== 'JSXElement') return null;
-		row = {
-			...row,
-			openingElement: {
-				...row.openingElement,
-				attributes: [
-					...row.openingElement.attributes,
-					inheritOriginLoc(
-						b.jsx_attribute(b.jsx_id('key'), b.jsx_expression_container(directive.key)),
-						directive.key,
-					),
-				],
-			},
-		};
-	}
-	const value = inspectableArmValue(row, ctx);
+	const value =
+		directive.key == null ? inspectableArmValue(row, ctx) : keyedRowValue(row, directive.key, ctx);
 	if (value === null) return null;
 	const params = [directive.left.declarations[0].id];
 	if (directive.index) params.push(directive.index);
@@ -26833,6 +26817,53 @@ function inspectableDirectiveValue(directive, ctx) {
 	if (directive.key != null || keyed) return rows;
 	ctx.runtimeNeeded.add('positionalChildren');
 	return inheritOriginLoc(b.call(rtAlias('positionalChildren'), rows), directive);
+}
+
+// The value of a keyed `@for` row, which the header key must identify. An element
+// carries the key unless it has its own, and so does each arm of a render-only
+// `@if`, since one arm renders at a time. A fragment or a render-only nested
+// `@for` is wrapped in a keyed Fragment, as React code writes `<Fragment
+// key={…}>`. Null when the row keeps its compiled fragment.
+function keyedRowValue(arm, key, ctx) {
+	const output = arm.type === 'IfStatement' ? arm : renderOnlyArmOutput(arm);
+	if (output === undefined) return b.literal(null, 'null');
+	if (output === null) return null;
+	const keyAttribute = () =>
+		inheritOriginLoc(b.jsx_attribute(b.jsx_id('key'), b.jsx_expression_container(key)), key);
+	if (output.type === 'JSXElement') {
+		const { attributes } = output.openingElement;
+		if (attributes.some(isKeyAttribute)) return inspectableTemplateDirectives(output, ctx);
+		const openingElement = {
+			...output.openingElement,
+			attributes: [...attributes, keyAttribute()],
+		};
+		return inspectableTemplateDirectives({ ...output, openingElement }, ctx);
+	}
+	if (output.type === 'JSXIfExpression' || output.type === 'IfStatement') {
+		const consequent = keyedRowValue(output.consequent, key, ctx);
+		const alternate =
+			output.alternate == null
+				? b.literal(null, 'null')
+				: keyedRowValue(output.alternate, key, ctx);
+		if (consequent === null || alternate === null) return null;
+		return inheritOriginLoc(b.conditional(output.test, consequent, alternate), output);
+	}
+	let children;
+	if (output.type === 'JSXFragment' || output.type === 'Fragment') {
+		children = inspectableTemplateDirectives(output.children, ctx, true);
+	} else {
+		const rows = output.type === 'JSXForExpression' ? inspectableDirectiveValue(output, ctx) : null;
+		if (rows === null) return null;
+		children = [b.jsx_expression_container(rows, output)];
+	}
+	ctx.runtimeNeeded.add('Fragment');
+	const name = inheritOriginLoc(b.jsx_id(rtAlias('Fragment')), output);
+	return b.jsx_element_fresh(
+		b.jsx_opening_element(name, [keyAttribute()], false, undefined, output),
+		b.jsx_closing_element(name, output),
+		children,
+		output,
+	);
 }
 
 // An arm's single output node, undefined for an empty arm, or null when the arm
