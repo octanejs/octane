@@ -139,7 +139,8 @@ export interface TransformResult {
 	exports: {
 		elementChildren?: { start: number; exported?: string }[];
 		descriptorChildren?: string[];
-		storeHookComponents?: string[];
+		/** Each component and the store hook it calls in native setup. */
+		storeHookComponents?: [string, string][];
 		contexts: string[];
 		reexports: { specifier: string; names: [string, string][] | null }[];
 	};

@@ -604,6 +604,66 @@ it('warns at a direct migrated server call that needs a standalone store provide
 	expect(renderHosted()).toContain('&lt;b&gt;42&lt;/b&gt;');
 });
 
+it('names the adapted store hook at each standalone root rendering its consumer', async () => {
+	const { app } = project({
+		'observer/package.json': JSON.stringify({
+			name: 'observer',
+			version: '1.0.0',
+			peerDependencies: { react: '^19.2.0' },
+			exports: { '.': './entry.ts', './core': './core.ts', './context': './context.ts' },
+		}),
+		'observer/core.ts': 'export function identity<T>(value: T) { return value; }',
+		'observer/context.ts': `import { createContext } from 'react';
+			export const reading = createContext('from React default');`,
+		'observer/hooks.ts': `import { use } from 'react';
+			import { reading } from './context';
+			import { identity } from './core';
+			export function useReading() { return identity(use(reading)); }`,
+		'observer/entry.ts': `export * from './core';
+			export { useReading } from './hooks';`,
+		'app/src/pane.tsx': `import { useReading } from 'observer';
+			export function Pane() {
+				const value = useReading();
+				return <b>{String(value)}</b>;
+			}`,
+		'app/src/react.tsx': `import { renderToString } from 'react-dom/server';
+			import { Pane } from './pane.tsx';
+			export const html = renderToString(<Pane />);`,
+		'app/src/existing.ts': `import { renderToString } from 'octane/server';
+			import { Pane } from './pane.tsx';
+			export const html = renderToString(Pane).html;`,
+		'app/src/client.ts': `import { createRoot } from 'octane';
+			import { Pane } from './pane.tsx';
+			createRoot(document.body).render(Pane);`,
+	});
+	const result = await runCodemod(
+		['react', 'pane'].map((name) => path.join(app, 'src', name + '.tsx')),
+		{ root: app, strong: true, verify: true, write: false },
+	);
+	const notes = (file) => result.files.find((result) => result.file === file).notes;
+	expect(notes('src/pane.tsx')).toContainEqual(
+		expect.objectContaining({ rule: 'store-hook', severity: 'info' }),
+	);
+	const server =
+		/server call runs standalone and reaches the migrated Pane's store hook useReading,/;
+	for (const [file, message] of [
+		['src/react.tsx', server],
+		['src/existing.ts', server],
+		[
+			'src/client.ts',
+			/migrated Pane's store hook useReading reads context.*standalone Octane root/,
+		],
+	])
+		expect(notes(file)).toEqual([
+			expect.objectContaining({
+				rule: 'store-hook',
+				severity: 'warning',
+				line: 3,
+				message: expect.stringMatching(message),
+			}),
+		]);
+});
+
 it.each([true, false])(
 	'warns at migrated module-entry renders (project types: %s)',
 	async (projectTypes) => {
@@ -733,7 +793,7 @@ export function mount(host) { createRoot(host).render(Pane); }`,
 				severity: 'warning',
 				line: 3,
 				message: expect.stringMatching(
-					/If the migrated Pane's store hook reads context.*NativeStoreProvider/,
+					/If the migrated Pane's store hook useSnapshot reads context.*NativeStoreProvider/,
 				),
 			}),
 		);
@@ -974,7 +1034,7 @@ it('warns at existing standalone client roots when the migrated hook reads conte
 			severity: 'warning',
 			line,
 			message: expect.stringMatching(
-				/If the migrated Pane's store hook reads context.*NativeStoreProvider/,
+				/If the migrated Pane's store hook useSnapshot reads context.*NativeStoreProvider/,
 			),
 		})),
 	);
