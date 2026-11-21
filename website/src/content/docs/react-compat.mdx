@@ -201,10 +201,9 @@ nearest committed React provider and updates the island when it changes. With no
 provider, the island receives the React context's default. No mapping is needed
 in this direction.
 
-When React's `Activity` hides the island, the host publishes new React context
-values on reveal, before ancestor React layout effects run. Until reveal, an
-insertion effect inside the island can leave shared styles on their previous
-context value.
+When React's `Activity` hides the island, React context changes still reach it,
+as they reach a hidden React child: the island re-renders and its insertion
+effects run. Layout effects, passive effects, and refs wait for reveal.
 
 <h3 id="octane-context-in-react">Octane context in a React island</h3>
 

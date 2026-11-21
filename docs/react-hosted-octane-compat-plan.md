@@ -1430,6 +1430,12 @@ not `O(islands × global event types)`.
     does. A passive cleanup upgrades the request to a full Activity hide. A
     hide caused by the island's own relay is skipped, because its retry commits
     Octane before React reveals (§7).
+    *Answered for hidden context updates (#2738):* React suppresses the
+    wrapper's layout publish while hidden but still commits insertion effects,
+    so a wrapper insertion effect publishes changed context into a settled
+    hidden island and flushes it with the hosted Activity still hidden. Only
+    Octane insertion effects run; notifications raised by that flush are
+    deferred to a microtask because React forbids insertion-effect updates.
 14. Translation or rejection policy for Octane head resources in hosted SSR,
     including CSP.
 15. ~~Whether React retains a newly discovered context dependency in an

@@ -723,6 +723,27 @@ class HostedIslandController {
 	}
 
 	/**
+	 * Insertion-phase publish for a hidden island (#2738). React suppresses the
+	 * wrapper's layout effect while Activity hides it, yet still commits the
+	 * hidden subtree's insertion effects, so a context change reaches the hosted
+	 * tree here. The hosted Activity stays hidden, so only Octane insertion
+	 * effects run; layout, passive, and ref work waits for reveal. React forbids
+	 * updates from insertion effects, so a notification raised by this flush is
+	 * deferred to a microtask.
+	 */
+	publishHidden(snapshot: ContextSnapshot): void {
+		if (this.visibility === 'visible' || this.status !== 0 || !this.rootLive) return;
+		if (this.lifecycleGeneration < 0 || !this.publishSnapshots(snapshot)) return;
+		const notify = this.notify;
+		this.notify = () => queueMicrotask(notify);
+		try {
+			this.attachAndFlush();
+		} finally {
+			this.notify = notify;
+		}
+	}
+
+	/**
 	 * Wrapper layout and passive cleanups. React runs the layout one on any hide,
 	 * a StrictMode probe, and deletion, and the passive one on all but a Suspense
 	 * hide, which keeps passive effects connected. The microtask runs after the
@@ -932,6 +953,7 @@ function createOctaneCompat(host: 'div' | 'span') {
 		React.useLayoutEffect(() => () => controller.disconnected(false), [controller]);
 		React.useEffect(() => () => controller.disconnected(true), [controller]);
 		React.useInsertionEffect(() => controller.startLifetime(), [controller]);
+		React.useInsertionEffect(() => controller.publishHidden(snapshot));
 
 		return React.createElement(host, {
 			'data-octane-compat': '',
