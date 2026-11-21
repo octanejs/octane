@@ -2146,8 +2146,9 @@ export class SignalObserver implements ReactiveNode {
 			this.flags &= ~REACTIVE_SPECULATIVE;
 			if (watchDriver) watchDriver.link(this.node, this);
 		} else {
-			if (watchDriver) watchDriver.unlink(this.node, this);
+			// A watched cleanup can dispose this reader and unlink the edge again.
 			this.flags |= REACTIVE_SPECULATIVE;
+			if (watchDriver) watchDriver.unlink(this.node, null);
 		}
 	}
 }
@@ -2700,7 +2701,8 @@ export function watchedHook(node: ReactiveNode): WatchHook['watched'] | undefine
 let watchDriver:
 	| {
 			link(dep: ReactiveNode, sub: ReactiveNode): void;
-			unlink(dep: ReactiveNode, sub: ReactiveNode): void;
+			/** null releases an observer already marked speculative. */
+			unlink(dep: ReactiveNode, sub: ReactiveNode | null): void;
 			retire(node: PlainCell | PlainComputed): void;
 	  }
 	| undefined;
@@ -2726,7 +2728,7 @@ export function setWatched(
 				if (observerCounts.has(dep)) countLink(dep, sub);
 			},
 			unlink(dep, sub) {
-				if (observerCounts.has(dep) && observing(sub)) unwatch(dep);
+				if (observerCounts.has(dep) && (sub === null || observing(sub))) unwatch(dep);
 			},
 			// Its readers keep their links until they next read it; its observation ends now.
 			retire(cell) {
