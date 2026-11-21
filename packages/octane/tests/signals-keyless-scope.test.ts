@@ -26,6 +26,31 @@ it('refreshes a subscribed derived value with only the core entry loaded', () =>
 	}
 });
 
+it('tracks action availability while the deferred callback reads the latest draft', async () => {
+	const scope = createKeylessScope({ scopeKey: 'editor' });
+	const busy$ = scope.signal$(null, false);
+	const draft$ = scope.signal$(null, 'Outline');
+	const action$ = scope.derived$(null, () => ({
+		disabled: busy$.get(),
+		readDraft: () => draft$.get(),
+	}));
+	const disabled: boolean[] = [];
+	scope.effect(() => {
+		disabled.push(action$.get().disabled);
+	});
+	try {
+		const { readDraft } = action$.get();
+		expect(await Promise.resolve().then(readDraft)).toBe('Outline');
+		draft$.set('Revision');
+		expect(disabled).toEqual([false]);
+		expect(await Promise.resolve().then(readDraft)).toBe('Revision');
+		busy$.set(true);
+		expect(disabled).toEqual([false, true]);
+	} finally {
+		scope.dispose();
+	}
+});
+
 it('keeps a keyless family live while observed and retires it with the scope', () => {
 	const scope = createKeylessScope({ scopeKey: 'rows' });
 	const lifecycle: string[] = [];

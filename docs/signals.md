@@ -98,6 +98,8 @@ const stop = account.effect(() => {
 
 A `null` key declares a keyless value: `account.signal$(null, 0)` or `account.derived$(null, () => count$.get() * 2)`. A keyless signal is not serialized, seeded, adopted, inspected or staged by a transition, and takes no entry in the scope's key table. A keyless derived value belongs to no scope and records no provenance. Use keys for anything that crosses the server boundary or should appear in `scope.inspect()`; use keyless values for local graphs that only the client computes.
 
+A keyless `derived$` tracks the signals read while its computation runs. If it returns an action such as `{ disabled: busy$.get(), readDraft: () => draft$.get() }`, a change to `busy$` updates the action. The caller can keep `readDraft` and invoke it later to read the current draft. If the draft also determines whether the action is disabled, read it while computing `disabled`, for example `disabled: busy$.get() || draft$.get().length === 0`.
+
 For an application that uses only keyless values, import `createKeylessScope` from `octane/signals/core`. This entry bundles the local signal graph, with effects, synchronous batches, undoable transactions and families. Its handles work with `octane/signals/react` and can participate in computations and transactions alongside handles from `createScope`. Use `createScope` for named values, serialization, adoption and transitions.
 
 ```ts
