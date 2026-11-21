@@ -12,6 +12,7 @@ import {
 	TwoInlineSubscribedReaders,
 	makeRetainedCallbackStore,
 	makeStore,
+	NestedRefReaders,
 	Reader,
 	RenderObservedReader,
 	SwappableReader,
@@ -541,6 +542,19 @@ describe('useSyncExternalStore', () => {
 		b.set(21);
 		await nextPaint();
 		expect(r.find('.value').textContent).toBe('21');
+		r.unmount();
+	});
+
+	it('commits readers of one store in tree order when they sit at different depths', async () => {
+		const store = makeStore(0);
+		const log: string[] = [];
+		const r = mount(NestedRefReaders, { store, log });
+		await nextPaint();
+
+		// React commits the readers' refs in tree order, whatever their depth.
+		store.set(1);
+		await nextPaint();
+		expect(log).toEqual(['ref first', 'ref second', 'ref third']);
 		r.unmount();
 	});
 
