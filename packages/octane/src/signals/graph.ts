@@ -2722,6 +2722,7 @@ export function setWatched(
 ): void {
 	if (!watchDriver) {
 		observations = new WeakMap();
+		pendingHooks = [];
 		watchDriver = {
 			link(dep, sub) {
 				const state = observations.get(dep);
@@ -2794,37 +2795,41 @@ function countLink(dep: ReactiveNode, sub: ReactiveNode, state: Observation): vo
 	}
 }
 
+// Nested transitions append their own hooks after those of the calling transition.
+let pendingHooks: ReactiveNode[];
+
 /** Count the whole dependency tree before a hook can synchronously rewire it. */
 function changeObservation(node: ReactiveNode, state: Observation, delta: 1 | -1): void {
-	const hooks = collectHooks(node, state, delta, undefined);
-	if (!hooks) return;
-	for (const hooked of hooks) {
-		const hook = getHook(hooked);
-		if (!hook) continue;
-		if (delta === 1 && hook.count > 0) startWatch(hooked, hook);
-		else if (delta === -1 && hook.count === 0) stopWatch(hook);
+	const start = pendingHooks.length;
+	try {
+		collectHooks(node, state, delta);
+		for (let i = start; i < pendingHooks.length; i++) {
+			const hooked = pendingHooks[i]!;
+			const hook = getHook(hooked);
+			if (!hook) continue;
+			if (delta === 1 && hook.count > 0) startWatch(hooked, hook);
+			else if (delta === -1 && hook.count === 0) stopWatch(hook);
+		}
+	} finally {
+		// Popping keeps the small backing store reusable. Truncate after a wide traversal.
+		if (pendingHooks.length > 64) pendingHooks.length = start;
+		else while (pendingHooks.length > start) pendingHooks.pop();
 	}
 }
 
 /** Only a first or last reader changes its sources' counts. Start sources first, stop them last. */
-function collectHooks(
-	node: ReactiveNode,
-	state: Observation,
-	delta: 1 | -1,
-	hooks: ReactiveNode[] | undefined,
-): ReactiveNode[] | undefined {
+function collectHooks(node: ReactiveNode, state: Observation, delta: 1 | -1): void {
 	const hasHook = typeof state === 'object';
 	const count = (hasHook ? state.count : state) + delta;
 	if (hasHook) state.count = count;
 	else observations.set(node, count);
-	if (count !== (delta === 1 ? 1 : 0)) return hooks;
-	if (delta === -1 && hasHook) (hooks ??= []).push(node);
+	if (count !== (delta === 1 ? 1 : 0)) return;
+	if (delta === -1 && hasHook) pendingHooks.push(node);
 	for (let link = node.deps; link; link = link.nextDep) {
 		const depState = observations.get(link.dep);
-		if (depState !== undefined) hooks = collectHooks(link.dep, depState, delta, hooks);
+		if (depState !== undefined) collectHooks(link.dep, depState, delta);
 	}
-	if (delta === 1 && hasHook) (hooks ??= []).push(node);
-	return hooks;
+	if (delta === 1 && hasHook) pendingHooks.push(node);
 }
 
 function startWatch(node: ReactiveNode, hook: WatchHook): void {
