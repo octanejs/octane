@@ -2146,8 +2146,9 @@ export class SignalObserver implements ReactiveNode {
 			this.flags &= ~REACTIVE_SPECULATIVE;
 			if (watchDriver) watchDriver.link(this.node, this);
 		} else {
-			if (watchDriver) watchDriver.unlink(this.node, this);
+			// A watched cleanup can dispose this reader and unlink the edge again.
 			this.flags |= REACTIVE_SPECULATIVE;
+			if (watchDriver) watchDriver.unlink(this.node, null);
 		}
 	}
 }
@@ -2684,7 +2685,7 @@ export function leanSource(node: PlainComputed): NativeReadSource | undefined {
 
 /** A node's own `watched` hook, which a family keeps when it adds its own. */
 export function watchedHook(node: ReactiveNode): WatchHook['watched'] | undefined {
-	return watchDriver ? watchHooks.get(node)?.watched : undefined;
+	return watchDriver ? getHook(node)?.watched : undefined;
 }
 
 /**
@@ -2700,14 +2701,17 @@ export function watchedHook(node: ReactiveNode): WatchHook['watched'] | undefine
 let watchDriver:
 	| {
 			link(dep: ReactiveNode, sub: ReactiveNode): void;
-			unlink(dep: ReactiveNode, sub: ReactiveNode): void;
+			/** null releases an observer already marked speculative. */
+			unlink(dep: ReactiveNode, sub: ReactiveNode | null): void;
 			retire(node: PlainCell | PlainComputed): void;
 	  }
 	| undefined;
-let observerCounts: WeakMap<ReactiveNode, number>;
-let watchHooks: WeakMap<ReactiveNode, WatchHook>;
+// Only nodes with a lifecycle need a record. Other nodes just forward observation.
+type Observation = WatchHook | number;
+let observations: WeakMap<ReactiveNode, Observation>;
 
 interface WatchHook {
+	count: number;
 	watched: () => void | (() => void);
 	cleanup: void | (() => void);
 	generation: number;
@@ -2719,28 +2723,39 @@ export function setWatched(
 	watched: WatchHook['watched'],
 ): void {
 	if (!watchDriver) {
-		observerCounts = new WeakMap();
-		watchHooks = new WeakMap();
+		observations = new WeakMap();
+		pendingHooks = [];
 		watchDriver = {
 			link(dep, sub) {
-				if (observerCounts.has(dep)) countLink(dep, sub);
+				const state = observations.get(dep);
+				if (state !== undefined) countLink(dep, sub, state);
 			},
 			unlink(dep, sub) {
-				if (observerCounts.has(dep) && observing(sub)) unwatch(dep);
+				const state = observations.get(dep);
+				if (state !== undefined && (sub === null || observing(sub)))
+					changeObservation(dep, state, -1);
 			},
 			// Its readers keep their links until they next read it; its observation ends now.
 			retire(cell) {
-				stopWatch(cell);
-				watchHooks.delete(cell);
+				const hook = getHook(cell);
+				if (hook) {
+					stopWatch(hook);
+					observations.set(cell, hook.count);
+				}
 			},
 		};
 	}
-	watchHooks.set(node, { watched, cleanup: undefined, generation: 0, active: false });
-	countObservers(node);
+	countObservers(node, { count: 0, watched, cleanup: undefined, generation: 0, active: false });
+}
+
+function getHook(node: ReactiveNode): WatchHook | undefined {
+	const state = observations.get(node);
+	return typeof state === 'object' ? state : undefined;
 }
 
 function observing(sub: ReactiveNode): boolean {
-	const count = observerCounts.get(sub);
+	const state = observations.get(sub);
+	const count = typeof state === 'object' ? state.count : state;
 	return count !== undefined
 		? count > 0
 		: (sub.flags & (REACTIVE_MUTABLE | REACTIVE_WATCHING | REACTIVE_SPECULATIVE)) ===
@@ -2748,19 +2763,20 @@ function observing(sub: ReactiveNode): boolean {
 }
 
 /** Starts counting a node's observers; none of its own dependencies is counted yet. */
-function countObservers(node: ReactiveNode): void {
+function countObservers(node: ReactiveNode, hook?: WatchHook): void {
 	let count = 0;
 	for (let link = node.subs; link; link = link.nextSub) {
 		const sub = link.sub;
-		if (sub.flags & REACTIVE_MUTABLE && !observerCounts.has(sub)) countObservers(sub);
+		if (sub.flags & REACTIVE_MUTABLE && !observations.has(sub)) countObservers(sub);
 		if (observing(sub)) count++;
 	}
-	observerCounts.set(node, count);
-	if (count) startWatch(node);
+	if (hook) hook.count = count;
+	observations.set(node, hook ?? count);
+	if (count && hook) startWatch(node, hook);
 }
 
-function countLink(dep: ReactiveNode, sub: ReactiveNode): void {
-	if (sub.flags & REACTIVE_MUTABLE && !observerCounts.has(sub)) countObservers(sub);
+function countLink(dep: ReactiveNode, sub: ReactiveNode, state: Observation): void {
+	if (sub.flags & REACTIVE_MUTABLE && !observations.has(sub)) countObservers(sub);
 	if (!observing(sub)) return;
 	// A computation has not consumed its newly linked dependency yet. Hide that
 	// edge from recursive-write checks while setup publishes its initial value;
@@ -2769,7 +2785,7 @@ function countLink(dep: ReactiveNode, sub: ReactiveNode): void {
 	const hide = !!(sub.flags & REACTIVE_RECURSED_CHECK) && tail?.dep === dep;
 	if (hide) sub.depsTail = tail!.prevDep;
 	try {
-		watch(dep);
+		changeObservation(dep, state, 1);
 	} finally {
 		if (hide && (tail!.prevDep ? tail!.prevDep.nextDep === tail : sub.deps === tail))
 			sub.depsTail = tail;
@@ -2782,61 +2798,54 @@ function countLink(dep: ReactiveNode, sub: ReactiveNode): void {
 	}
 }
 
+// Nested transitions append their own hooks after those of the calling transition.
+let pendingHooks: ReactiveNode[];
+
 /** Count the whole dependency tree before a hook can synchronously rewire it. */
-function countWatch(node: ReactiveNode, hooks: ReactiveNode[]): void {
-	const count = observerCounts.get(node)!;
-	observerCounts.set(node, count + 1);
-	if (count) return;
-	for (let link = node.deps; link; link = link.nextDep)
-		if (observerCounts.has(link.dep)) countWatch(link.dep, hooks);
-	if (watchHooks.has(node)) hooks.push(node);
-}
-
-function watch(node: ReactiveNode): void {
-	const count = observerCounts.get(node)!;
-	if (count) {
-		observerCounts.set(node, count + 1);
-		return;
+function changeObservation(node: ReactiveNode, state: Observation, delta: 1 | -1): void {
+	const start = pendingHooks.length;
+	try {
+		collectHooks(node, state, delta);
+		for (let i = start; i < pendingHooks.length; i++) {
+			const hooked = pendingHooks[i]!;
+			const hook = getHook(hooked);
+			if (!hook) continue;
+			if (delta === 1 && hook.count > 0) startWatch(hooked, hook);
+			else if (delta === -1 && hook.count === 0) stopWatch(hook);
+		}
+	} finally {
+		// Popping keeps the small backing store reusable. Truncate after a wide traversal.
+		if (pendingHooks.length > 64) pendingHooks.length = start;
+		else while (pendingHooks.length > start) pendingHooks.pop();
 	}
-	const hooks: ReactiveNode[] = [];
-	countWatch(node, hooks);
-	for (const hooked of hooks) if (observerCounts.get(hooked)! > 0) startWatch(hooked);
 }
 
-/** Stop readers before sources, after the whole dependency tree has been released. */
-function countUnwatch(node: ReactiveNode, hooks: ReactiveNode[]): void {
-	const count = observerCounts.get(node)! - 1;
-	observerCounts.set(node, count);
-	if (count) return;
-	if (watchHooks.has(node)) hooks.push(node);
-	for (let link = node.deps; link; link = link.nextDep)
-		if (observerCounts.has(link.dep)) countUnwatch(link.dep, hooks);
-}
-
-function unwatch(node: ReactiveNode): void {
-	const count = observerCounts.get(node)!;
-	if (count > 1) {
-		observerCounts.set(node, count - 1);
-		return;
+/** Only a first or last reader changes its sources' counts. Start sources first, stop them last. */
+function collectHooks(node: ReactiveNode, state: Observation, delta: 1 | -1): void {
+	const hasHook = typeof state === 'object';
+	const count = (hasHook ? state.count : state) + delta;
+	if (hasHook) state.count = count;
+	else observations.set(node, count);
+	if (count !== (delta === 1 ? 1 : 0)) return;
+	if (delta === -1 && hasHook) pendingHooks.push(node);
+	for (let link = node.deps; link; link = link.nextDep) {
+		const depState = observations.get(link.dep);
+		if (depState !== undefined) collectHooks(link.dep, depState, delta);
 	}
-	const hooks: ReactiveNode[] = [];
-	countUnwatch(node, hooks);
-	for (const hooked of hooks) if (observerCounts.get(hooked) === 0) stopWatch(hooked);
+	if (delta === 1 && hasHook) pendingHooks.push(node);
 }
 
-function startWatch(node: ReactiveNode): void {
-	const hook = watchHooks.get(node);
-	if (hook === undefined || hook.active) return;
+function startWatch(node: ReactiveNode, hook: WatchHook): void {
+	if (hook.active) return;
 	hook.active = true;
 	const generation = ++hook.generation;
 	const cleanup = runHook(hook.watched);
-	if (hook.generation === generation && watchHooks.get(node) === hook) hook.cleanup = cleanup;
+	if (hook.generation === generation && observations.get(node) === hook) hook.cleanup = cleanup;
 	else if (typeof cleanup === 'function') runHook(cleanup);
 }
 
-function stopWatch(node: ReactiveNode): void {
-	const hook = watchHooks.get(node);
-	if (hook === undefined || !hook.active) return;
+function stopWatch(hook: WatchHook): void {
+	if (!hook.active) return;
 	hook.active = false;
 	hook.generation++;
 	const cleanup = hook.cleanup;

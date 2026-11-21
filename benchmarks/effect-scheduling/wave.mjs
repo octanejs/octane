@@ -13,8 +13,12 @@ const shapes = ['chain', 'siblings', 'sparse', 'mixed', 'lite'];
 const file = 'packages/octane/src/runtime.ts';
 const baselineRef = process.argv.slice(2).find((arg) => !arg.startsWith('--'));
 const measure = process.argv.includes('--measure');
+// The ancestor-first sort, or the shallow-first one a baseline before it holds.
+const sortName = (source) =>
+	source.includes('function sortRenderWave(') ? 'sortRenderWave' : 'sortWaveByDepth';
 function instantiate(source, counted = true) {
-	const start = source.indexOf('function sortWaveByDepth(');
+	const name = sortName(source);
+	const start = source.indexOf(`function ${name}(`);
 	const end = source.indexOf('// Visibility-owner scheduling', start);
 	assert.ok(start >= 0 && end > start);
 	const code = stripTypeScriptTypes(source.slice(start, end));
@@ -22,7 +26,7 @@ function instantiate(source, counted = true) {
 	const run = Function(
 		'Map',
 		'Set',
-		`${code}\nreturn sortWaveByDepth;`,
+		`${code}\nreturn ${name};`,
 	)(
 		counted
 			? class extends Map {
@@ -43,7 +47,7 @@ function instantiate(source, counted = true) {
 	);
 	return { run, counts };
 }
-function workload(shape, counted) {
+function workload(shape, counted, shallowFirst = false) {
 	let reads = 0;
 	const nodes = [];
 	const wave = [];
@@ -57,7 +61,7 @@ function workload(shape, counted) {
 				},
 			});
 		else block.parentBlock = parent;
-		nodes.push({ block, depth: parent === null ? 0 : nodes[parent.id].depth + 1 });
+		nodes.push({ block, parent, depth: parent === null ? 0 : nodes[parent.id].depth + 1 });
 		if (queued) wave.push(block);
 		return block;
 	}
@@ -86,10 +90,29 @@ function workload(shape, counted) {
 		}
 		wave.reverse();
 	}
-	const expected = wave
-		.slice()
-		.sort((a, b) => nodes[a.id].depth - nodes[b.id].depth)
-		.map((b) => b.id);
+	// Each queued ancestor before its queued descendants, otherwise queue order.
+	const queued = new Set(wave);
+	const placed = new Set();
+	const expected = [];
+	for (const block of wave) {
+		const chain = [block];
+		for (let node = nodes[block.id].parent; node !== null; node = nodes[node.id].parent)
+			if (queued.has(node)) chain.push(node);
+		for (const member of chain.reverse()) {
+			if (placed.has(member)) continue;
+			placed.add(member);
+			expected.push(member.id);
+		}
+	}
+	if (shallowFirst) {
+		expected.length = 0;
+		expected.push(
+			...wave
+				.slice()
+				.sort((a, b) => nodes[a.id].depth - nodes[b.id].depth)
+				.map((b) => b.id),
+		);
+	}
 	return {
 		wave,
 		expected,
@@ -106,7 +129,7 @@ for (const [target, source] of sources) {
 	const metrics = {};
 	for (const shape of shapes) {
 		const runtime = instantiate(source);
-		const sample = workload(shape, true);
+		const sample = workload(shape, true, sortName(source) === 'sortWaveByDepth');
 		assert.equal(runtime.run(sample.wave, 8), sample.wave);
 		assert.deepEqual(
 			sample.wave.map((b) => b.id),

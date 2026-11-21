@@ -18,11 +18,12 @@ node benchmarks/effectful-list/dispatch.mjs 8a45222ab
 
 `wave.mjs` extracts the actual runtime sort, strips TypeScript, and compares it
 with a frozen Git revision. It measures Map/Set construction and parent reads
-separately from uninstrumented helper timings. Stable shallow-first ordering,
-repeated epochs, changed ancestry, and lightweight proxy shapes are semantic
-controls. The fixtures include a reversed 400-node chain, 1,000 siblings,
-1,000 updates beneath 40 unqueued ancestors, mixed roots, and a chain containing
-lightweight ancestry proxies.
+separately from uninstrumented helper timings. Ancestor-first ordering that
+otherwise keeps queue order, repeated epochs, changed ancestry, and lightweight
+proxy shapes are semantic controls. A baseline from before that ordering is
+checked against the shallow-first order it implemented. The fixtures include a
+reversed 400-node chain, 1,000 siblings, 1,000 updates beneath 40 unqueued
+ancestors, mixed roots, and a chain containing lightweight ancestry proxies.
 
 At baseline `8a45222ab`, every multi-block sort constructs one Set and one Map.
 The candidate constructs neither. It also removes the temporary path array and

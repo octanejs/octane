@@ -469,7 +469,7 @@ export const STRONG_DIAGNOSTICS = [
 		section: 'dom',
 		severity: 'error',
 		detects:
-			'`innerHTML`, `outerHTML`, `insertAdjacentHTML()`, or `setHTMLUnsafe()` on an element Octane renders. A direct empty-string `innerHTML` assignment is allowed on a self-closing root `div` with one local object ref and no JSX spread, children, raw HTML, or custom-element props.',
+			'`innerHTML`, `outerHTML`, `insertAdjacentHTML()`, or `setHTMLUnsafe()` on an element Octane renders. A direct empty-string `innerHTML` assignment is allowed on a self-closing HTML element with one local object ref and no JSX spread, children, raw HTML, or custom-element props, when only such elements, never a fragment, component, or directive, sit between it and the component root.',
 		replacement:
 			'Use `dangerouslySetInnerHTML={trustHTML(html)}` for trusted or already sanitized HTML.',
 		primitives: ['trustHTML'],

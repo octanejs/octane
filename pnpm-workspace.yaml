@@ -673,6 +673,19 @@ patchedDependencies:
   # packages/octane/tests/compiler/parser.test.ts. Drop when the adopted release
   # contains #110.
   '@sveltejs/acorn-typescript@1.0.13': patches/@sveltejs__acorn-typescript@1.0.13.patch
+  # Read the virtualizer's own scroll write, reported again when the element
+  # comes to rest, as its own rather than as the user scrolling away. Without
+  # it a scrollToIndex whose target moved while it settled (a correction for a
+  # row above the fold, rows below growing the sizer) ends short whenever the
+  # at-rest report arrives before reconcile's animation frame: the pinned
+  # "scrolls to last item" browser case stopped 19-46 px short in both lanes
+  # (#2718). Backports the `restEcho` classification of TanStack/virtual#1376
+  # (fixes TanStack/virtual#1375, open); its prepend-anchor follow-up is left
+  # out. SCOPE: tests in this repository; the published @octanejs/tanstack-virtual
+  # depends on the unpatched release. Guarded by
+  # packages/tanstack-virtual/tests/conformance/scroll-rest-echo.test.ts. Drop
+  # when the adopted virtual-core release contains #1376.
+  '@tanstack/virtual-core@3.19.11': patches/@tanstack__virtual-core@3.19.11.patch
   # Let type-only output name dynamic tags with a platform-chosen local
   # (`imports.dynamicTypeLocal`), so the Volar print can type `<{Tag}>` against
   # a host-typed alias while keeping the dynamic helper import. Not yet in

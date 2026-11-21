@@ -17,6 +17,36 @@ import {
 } from './_fixtures/signals-resource-transition.tsrx';
 
 describe('pending presentation in signal transitions', () => {
+	it('restarts observation after a watched cleanup unmounts the root replacing its reader', async () => {
+		const scope = createScope({ scopeKey: 'reentrant-reader-replacement' });
+		const selected$ = scope.signal$(null, 'A');
+		const host = document.createElement('div');
+		const root = createRoot(host);
+		const log: string[] = [];
+		const value$ = scope.signal$(null, 'outgoing', {
+			watched() {
+				log.push('start');
+				return () => {
+					log.push('stop');
+					root.unmount();
+				};
+			},
+		});
+		try {
+			await act(() => root.render(Presentation, { selected$, value$, read: 'get' }));
+			expect(host.querySelector('output')?.textContent).toBe('outgoing');
+			await act(() => root.render(Presentation, { selected$, value$: selected$, read: 'get' }));
+			expect(log).toEqual(['start', 'stop']);
+			const release = value$.subscribe(() => {});
+			expect(log).toEqual(['start', 'stop', 'start']);
+			release();
+			expect(log).toEqual(['start', 'stop', 'start', 'stop']);
+		} finally {
+			root.unmount();
+			scope.dispose();
+		}
+	});
+
 	it('catches up when the first committed watcher writes synchronously', async () => {
 		const scope = createScope({ scopeKey: 'watched-commit-write' });
 		const selected$ = scope.signal$('selected', 'A');

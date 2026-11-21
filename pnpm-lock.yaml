@@ -1423,6 +1423,7 @@ packageExtensionsChecksum: sha256-XN5zp/IiFh7oL3uoVIj9kQwS10aRIZS77YifBp5DLNo=
 
 patchedDependencies:
   '@sveltejs/acorn-typescript@1.0.13': d0b06e4e1c663671981b2a666be1812ef129b83de2adc585bd72171bbc979387
+  '@tanstack/virtual-core@3.19.11': 39f5658962917b81f1bad29254b7bc5c61bac4f0d89248f19921c7f237963584
   '@tsrx/core@0.6.3': 77c411e19b7587228cc51f90f9e7e7501821cf15719bd4879f02d16927f688ab
   '@tsrx/oxc@0.24.0': 2bc9ce0f8259870621e3e68fda45a58cd19a3858474abedac4d43a1656cfe94d
   '@vitest/browser-playwright@4.1.10': 1957634122dfa6f4790b66e73a42343637af36d3fb182eb25e07fa261dbc27dd
@@ -10157,7 +10158,7 @@ importers:
     dependencies:
       '@tanstack/virtual-core':
         specifier: 3.19.11
-        version: 3.19.11
+        version: 3.19.11(patch_hash=39f5658962917b81f1bad29254b7bc5c61bac4f0d89248f19921c7f237963584)
     devDependencies:
       '@babel/core':
         specifier: catalog:default
@@ -48802,7 +48803,7 @@ snapshots:
 
   '@tanstack/react-virtual@3.14.26(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
-      '@tanstack/virtual-core': 3.19.11
+      '@tanstack/virtual-core': 3.19.11(patch_hash=39f5658962917b81f1bad29254b7bc5c61bac4f0d89248f19921c7f237963584)
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
 
@@ -49118,7 +49119,7 @@ snapshots:
     dependencies:
       '@tanstack/store': 0.11.2
 
-  '@tanstack/virtual-core@3.19.11': {}
+  '@tanstack/virtual-core@3.19.11(patch_hash=39f5658962917b81f1bad29254b7bc5c61bac4f0d89248f19921c7f237963584)': {}
 
   '@tanstack/virtual-file-routes@1.162.0': {}
 

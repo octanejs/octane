@@ -2,6 +2,68 @@ import { describe, expect, it } from 'vitest';
 import { createScope, derived$, runWithSignalOwner, type WritableSignal } from 'octane/signals';
 
 describe('watched derived stabilization', () => {
+	it('finishes the remaining setups after a hook briefly observes a wide graph', () => {
+		const scope = createScope({ scopeKey: 'nested-watched-setups' });
+		let active = 0;
+		const leaves = Array.from({ length: 100 }, () =>
+			scope.signal$(null, 1, {
+				watched() {
+					active++;
+					return () => active--;
+				},
+			}),
+		);
+		const sum$ = scope.derived$(null, () => leaves.reduce((sum, leaf) => sum + leaf.get(), 0));
+		const seen: number[] = [];
+		const first$ = scope.signal$(null, 1, {
+			watched() {
+				const release = sum$.subscribe(() => {});
+				seen.push(active);
+				release();
+			},
+		});
+		const second$ = scope.signal$(null, 1, {
+			watched() {
+				seen.push(active);
+			},
+		});
+		const both$ = scope.derived$(null, () => first$.get() + second$.get());
+		sum$.get();
+		both$.get();
+		const stop = both$.subscribe(() => {});
+		expect(seen).toEqual([leaves.length, 0]);
+		stop();
+		scope.dispose();
+	});
+
+	it('keeps a shared source running when a watched cleanup attaches a new reader', () => {
+		const scope = createScope({ scopeKey: 'cleanup-handoff' });
+		const events: string[] = [];
+		const source$ = scope.signal$(null, 1, {
+			watched() {
+				events.push('start');
+				return () => events.push('stop');
+			},
+		});
+		const shared$ = scope.derived$(null, () => source$.get() * 2);
+		const values: number[] = [];
+		let release!: () => void;
+		const outgoing$ = scope.derived$(null, () => shared$.get(), {
+			watched: () => () => {
+				release = shared$.subscribe(() => values.push(shared$.get()));
+			},
+		});
+
+		const stop = outgoing$.subscribe(() => {});
+		stop();
+		source$.set(2);
+		expect(values).toEqual([4]);
+		expect(events).toEqual(['start']);
+		release();
+		expect(events).toEqual(['start', 'stop']);
+		scope.dispose();
+	});
+
 	it.each([null, 'selected'] as const)('compares only the stabilized value (%s)', (key) => {
 		const scope = createScope({ scopeKey: 'stable-comparison' });
 		const enabled$ = scope.signal$(null, false);

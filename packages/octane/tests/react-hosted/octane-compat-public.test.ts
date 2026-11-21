@@ -23,6 +23,8 @@ import {
 	BadgeIsland,
 	CleanupThrowIsland,
 	GreetingIsland,
+	HiddenContextIsland,
+	HiddenLabelIsland,
 	InsertionEffectIsland,
 	LocallyGuardedIsland,
 	NotifyIsland,
@@ -1295,6 +1297,155 @@ describe('octane/react — StrictMode, hide/reveal, and teardown discrimination 
 		expect(log.drain().sort()).toEqual(
 			['layout cleanup', 'passive cleanup', 'ref cleanup', 'unsubscribe'].sort(),
 		);
+	});
+
+	it('commits React context updates to a hidden Activity island like a React child (#2738)', async () => {
+		const Context = React.createContext('fallback');
+		const reactLog = createLog();
+		const octaneLog = createLog();
+		function ReactChild({ log }: { log: (message: string) => void }) {
+			const current = React.useContext(Context);
+			React.useInsertionEffect(() => {
+				log('insertion setup:' + current);
+				return () => log('insertion cleanup:' + current);
+			}, [current]);
+			React.useLayoutEffect(() => {
+				log('layout setup:' + current);
+				return () => log('layout cleanup:' + current);
+			}, [current]);
+			return h('output', null, current);
+		}
+		const tree = (mode: 'visible' | 'hidden', value: string) =>
+			h(Context, {
+				value,
+				children: h(React.Activity, {
+					mode,
+					children: [
+						h(ReactChild, { key: 'react', log: reactLog.push }),
+						h(OctaneCompat<{ context: React.Context<string>; log: (m: string) => void }>, {
+							key: 'octane',
+							component: HiddenContextIsland,
+							props: { context: Context, log: octaneLog.push },
+						}),
+					],
+				}),
+			});
+		const consoleError = vi.spyOn(console, 'error');
+		const mounted = await mountReactHost(tree('visible', 'first'));
+		try {
+			flushEffects();
+			const output = mounted.host().querySelector('output')!;
+			const drain = () => ({ react: reactLog.drain(), octane: octaneLog.drain() });
+			expect(drain()).toEqual({
+				react: ['insertion setup:first', 'layout setup:first'],
+				octane: ['insertion setup:first', 'layout setup:first'],
+			});
+
+			await mounted.render(tree('hidden', 'first'));
+			expect(drain()).toEqual({
+				react: ['layout cleanup:first'],
+				octane: ['layout cleanup:first'],
+			});
+
+			// React commits the hidden child's insertion effects; layout stays disconnected.
+			await mounted.render(tree('hidden', 'next'));
+			expect(drain()).toEqual({
+				react: ['insertion cleanup:first', 'insertion setup:next'],
+				octane: ['insertion cleanup:first', 'insertion setup:next'],
+			});
+			expect(output.textContent).toBe('next');
+
+			await mounted.render(tree('visible', 'next'));
+			flushEffects();
+			expect(mounted.host().querySelector('output')).toBe(output);
+			expect(drain()).toEqual({
+				react: ['layout setup:next'],
+				octane: ['layout setup:next'],
+			});
+			// A context change committed together with the hide also reaches the island.
+			await mounted.render(tree('visible', 'first'));
+			flushEffects();
+			drain();
+			await mounted.render(tree('hidden', 'again'));
+			expect(drain()).toEqual({
+				react: ['layout cleanup:first', 'insertion cleanup:first', 'insertion setup:again'],
+				octane: ['layout cleanup:first', 'insertion cleanup:first', 'insertion setup:again'],
+			});
+			expect(consoleError).not.toHaveBeenCalled();
+		} finally {
+			consoleError.mockRestore();
+			await mounted.unmount();
+		}
+	});
+
+	it('commits prop updates to a hidden Activity island like a React child (#2738)', async () => {
+		const reactLog = createLog();
+		const octaneLog = createLog();
+		function ReactChild({ label, log }: { label: string; log: (message: string) => void }) {
+			React.useInsertionEffect(() => {
+				log('insertion setup:' + label);
+				return () => log('insertion cleanup:' + label);
+			}, [label]);
+			React.useLayoutEffect(() => {
+				log('layout setup:' + label);
+				return () => log('layout cleanup:' + label);
+			}, [label]);
+			return h('output', null, label);
+		}
+		const tree = (mode: 'visible' | 'hidden', label: string) =>
+			h(React.Activity, {
+				mode,
+				children: [
+					h(ReactChild, { key: 'react', label, log: reactLog.push }),
+					h(OctaneCompat<{ label: string; log: (m: string) => void }>, {
+						key: 'octane',
+						component: HiddenLabelIsland,
+						props: { label, log: octaneLog.push },
+					}),
+				],
+			});
+		const consoleError = vi.spyOn(console, 'error');
+		const mounted = await mountReactHost(tree('visible', 'first'));
+		try {
+			flushEffects();
+			const output = mounted.host().querySelector('output')!;
+			const drain = () => ({ react: reactLog.drain(), octane: octaneLog.drain() });
+			drain();
+
+			await mounted.render(tree('hidden', 'first'));
+			expect(drain()).toEqual({
+				react: ['layout cleanup:first'],
+				octane: ['layout cleanup:first'],
+			});
+
+			// React re-renders the hidden child with its new props; layout stays disconnected.
+			await mounted.render(tree('hidden', 'next'));
+			expect(drain()).toEqual({
+				react: ['insertion cleanup:first', 'insertion setup:next'],
+				octane: ['insertion cleanup:first', 'insertion setup:next'],
+			});
+			expect(output.textContent).toBe('next');
+
+			await mounted.render(tree('visible', 'next'));
+			flushEffects();
+			expect(mounted.host().querySelector('output')).toBe(output);
+			expect(drain()).toEqual({
+				react: ['layout setup:next'],
+				octane: ['layout setup:next'],
+			});
+
+			// A prop change committed together with the hide also reaches the island.
+			await mounted.render(tree('hidden', 'again'));
+			expect(drain()).toEqual({
+				react: ['layout cleanup:next', 'insertion cleanup:next', 'insertion setup:again'],
+				octane: ['layout cleanup:next', 'insertion cleanup:next', 'insertion setup:again'],
+			});
+			expect(output.textContent).toBe('again');
+			expect(consoleError).not.toHaveBeenCalled();
+		} finally {
+			consoleError.mockRestore();
+			await mounted.unmount();
+		}
 	});
 
 	it('routes a hosted cleanup fault through reportError without scheduling the dead wrapper', async () => {
