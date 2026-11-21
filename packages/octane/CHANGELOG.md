@@ -1,5 +1,20 @@
 # octane
 
+## 0.23.1
+
+### Patch Changes
+
+- 8deb59d: Reduce the work of attaching and releasing readers of watched signals through shared derived values.
+- d870e91: Give `AriaRole`, `HTMLAttributeAnchorTarget`, `HTMLAttributeReferrerPolicy`, and
+  `HTMLInputTypeAttribute` their own declarations in Octane, and use them for the
+  host `role`, `target`, `referrerPolicy`, and `<input type>` props. A library that
+  exports an inferred host prop type now emits declarations that import `octane`,
+  not `react`, so apps without `@types/react` no longer fail with
+  "Cannot find module 'react'" or see those props become `any`. The types still
+  equal React's.
+- 255aff3: Release a closed subtree that rendered JSX children created by a component that stays mounted. A JSX element with expression children, such as `<Item>{label}</Item>`, kept a reference to the render scope that first read its children even when those children read no context. When that scope belonged to a subtree that later closed, such as the items of a popup or menu, the closed scope and its detached DOM stayed reachable for as long as the parent kept the element. In modules that import `octane/signals`, the subtree that read the children last stayed reachable instead. Now a scope is kept only for children that read context, which compare scopes to decide when to rebuild.
+- 720e480: Keep external store notifications connected when a discrete update replaces an inline subscription to the same backing store.
+
 ## 0.23.0
 
 ### Minor Changes
