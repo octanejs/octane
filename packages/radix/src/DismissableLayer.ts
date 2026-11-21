@@ -57,6 +57,17 @@ function crossesReactCompat(target: EventTarget | null, node: HTMLElement): bool
 	return host !== null && host !== node && node.contains(host);
 }
 
+function reactDialogInCompat(target: EventTarget | null, node: HTMLElement): boolean {
+	if (!(target instanceof Element)) return false;
+	let el: Element | null = target;
+	while (el && el !== node) {
+		const role = el.getAttribute('role');
+		if (role === 'dialog' || role === 'alertdialog') return true;
+		el = el.parentElement;
+	}
+	return false;
+}
+
 // Re-run `action` from the root element's capture phase, after every document capture listener.
 function deferEscape(document: Document, event: KeyboardEvent, action: NativeEscapeAction): void {
 	const root = document.documentElement;
@@ -218,11 +229,12 @@ export function DismissableLayer(props: any): any {
 				if (registry) (handledEscapes ??= new WeakSet()).add(event);
 				else if (
 					crossesReactCompat(event.target, node!) &&
-					!node!.closest('[data-octane-compat]')
+					(!node!.closest('[data-octane-compat]') || reactDialogInCompat(event.target, node!))
 				) {
 					// A React layer between the target and this one listens on the document after
 					// us. Answer once those listeners have run, as a parent layer would. Inside an
-					// OctaneCompat island an enclosing React layer would answer first, so don't wait.
+					// OctaneCompat island, only defer when a React dialog exists in the ReactCompat
+					// content; plain content should not delay this layer past an enclosing React one.
 					deferEscape(ownerDocument, event, handleKeyDown);
 					return;
 				}
