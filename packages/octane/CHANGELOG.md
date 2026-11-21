@@ -1,5 +1,32 @@
 # octane
 
+## 0.23.1
+
+### Patch Changes
+
+- a210539: `OctaneCompat` now commits prop and React context changes to an island hidden by React
+  `Activity`, as React does for a hidden React child. The island re-renders and
+  runs its insertion effects while layout effects, passive effects, and refs stay
+  disconnected until reveal.
+- aac91c6: `OctaneCompat` now disconnects an island hidden by React `Activity` before it
+  applies a child identity, prop, or context change committed in the same hiding
+  commit, so a replaced child's layout cleanup runs before its insertion cleanup,
+  as in React.
+- 8deb59d: Reduce the work of attaching and releasing readers of watched signals through shared derived values.
+- d870e91: Give `AriaRole`, `HTMLAttributeAnchorTarget`, `HTMLAttributeReferrerPolicy`, and
+  `HTMLInputTypeAttribute` their own declarations in Octane, and use them for the
+  host `role`, `target`, `referrerPolicy`, and `<input type>` props. A library that
+  exports an inferred host prop type now emits declarations that import `octane`,
+  not `react`, so apps without `@types/react` no longer fail with
+  "Cannot find module 'react'" or see those props become `any`. The types still
+  equal React's.
+- 6a1788a: Restart a watched signal for its next reader after its cleanup synchronously unmounts the root that was replacing it.
+- cdcd0a1: Reduce temporary allocations when attaching and releasing readers of watched signals.
+- 255aff3: Release a closed subtree that rendered JSX children created by a component that stays mounted. A JSX element with expression children, such as `<Item>{label}</Item>`, kept a reference to the render scope that first read its children even when those children read no context. When that scope belonged to a subtree that later closed, such as the items of a popup or menu, the closed scope and its detached DOM stayed reachable for as long as the parent kept the element. In modules that import `octane/signals`, the subtree that read the children last stayed reachable instead. Now a scope is kept only for children that read context, which compare scopes to decide when to rebuild.
+- 720e480: Keep external store notifications connected when a discrete update replaces an inline subscription to the same backing store.
+- 98701e2: Commit components updated together in the order their updates were scheduled, apart from rendering a queued ancestor first, so siblings that read one external store attach refs and run layout effects in tree order even when one of them sits deeper, inside an `@if` arm.
+- 2f8c459: Strong mode now accepts `node.innerHTML = ''` on any self-closing ordinary HTML element (not only a root `div`) whose single local ref proves ownership, when only plain HTML elements sit between it and the component root.
+
 ## 0.23.0
 
 ### Minor Changes

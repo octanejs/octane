@@ -1,5 +1,12 @@
 # @octanejs/cmdk
 
+## 0.1.61
+
+### Patch Changes
+
+- Updated dependencies [b5f81c6]
+  - @octanejs/radix@0.1.77
+
 ## 0.1.60
 
 ### Patch Changes
