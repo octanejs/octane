@@ -3,6 +3,7 @@ import {
 	memo,
 	use,
 	useCallback,
+	useContext,
 	useEffect,
 	useId,
 	useInsertionEffect,
@@ -202,6 +203,45 @@ export function VisibilityProbeIsland({
 		return () => log('passive cleanup');
 	}, []);
 	<output ref={outputRef}>{String(value)}</output>
+}
+
+/** A React context read while React Activity hides the island (#2738). */
+export function HiddenContextIsland({
+	context,
+	log,
+}: {
+	context: any;
+	log: (message: string) => void;
+}) @{
+	const current = useContext(context) as string;
+	useInsertionEffect(() => {
+		log('insertion setup:' + current);
+		return () => log('insertion cleanup:' + current);
+	}, [current]);
+	useLayoutEffect(() => {
+		log('layout setup:' + current);
+		return () => log('layout cleanup:' + current);
+	}, [current]);
+	<output>{current}</output>
+}
+
+/** A prop change while React Activity hides the island (#2738). */
+export function HiddenLabelIsland({
+	label,
+	log,
+}: {
+	label: string;
+	log: (message: string) => void;
+}) @{
+	useInsertionEffect(() => {
+		log('insertion setup:' + label);
+		return () => log('insertion cleanup:' + label);
+	}, [label]);
+	useLayoutEffect(() => {
+		log('layout setup:' + label);
+		return () => log('layout cleanup:' + label);
+	}, [label]);
+	<output>{label}</output>
 }
 
 export function BadgeIsland(props) @{

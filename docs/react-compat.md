@@ -55,11 +55,11 @@ React-owned host. For example, a named icon can use `hostRole="img"`,
 `hostAriaLabel="Status"`, and `hostStyle={{ display: 'inline-block' }}` to give
 the host its own layout box.
 
-When React's `Activity` hides an `OctaneCompat` island, the island keeps its
-last published React context values until reveal. An insertion effect inside
-the hidden island can therefore leave a stylesheet for visible siblings on
-its previous value. On reveal the host publishes the latest committed context
-before ancestor React layout effects run.
+When React's `Activity` hides an `OctaneCompat` island, prop and React context
+changes still reach it, as they reach a hidden React child: the island re-renders and
+its insertion effects run, so a stylesheet they install for visible siblings
+stays current. Layout effects, passive effects, and refs stay disconnected
+until reveal.
 
 When React removes an `OctaneCompat` host, it takes the host out of the DOM
 during the commit. Octane disposes the hosted root afterward, so its ref and
