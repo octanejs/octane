@@ -28,7 +28,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/calendar` | [`packages/calendar`](../packages/calendar) | framework binding | `0.0.31` | 4 |
 | `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.3.6` | 4 |
 | `@octanejs/cmdk` | [`packages/cmdk`](../packages/cmdk) | framework binding | `0.1.60` | 1 |
-| `@octanejs/codemod` | [`packages/codemod`](../packages/codemod) | developer tooling | `0.2.9` | 2 |
+| `@octanejs/codemod` | [`packages/codemod`](../packages/codemod) | developer tooling | `0.2.10` | 2 |
 | `@octanejs/colorful` | [`packages/colorful`](../packages/colorful) | framework binding | `0.0.40` | 1 |
 | `@octanejs/content-loader` | [`packages/content-loader`](../packages/content-loader) | framework binding | `0.0.30` | 2 |
 | `@octanejs/day-picker` | [`packages/day-picker`](../packages/day-picker) | framework binding | `0.0.41` | 12 |
@@ -144,7 +144,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/zag` | [`packages/zag`](../packages/zag) | framework binding | `0.0.41` | 1 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.76` | 8 |
 | `create-octane` | [`packages/create-octane`](../packages/create-octane) | project scaffolder | `0.0.25` | 1 |
-| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.23.0` | 58 |
+| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.23.1` | 58 |
 
 ## Private packages
 
