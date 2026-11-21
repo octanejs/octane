@@ -193,6 +193,144 @@ describe('octane/signals/react', () => {
 		expect(subscribers(scope, 'value')).toBe(0);
 	});
 
+	it('hands off shared watched dependencies between replacement providers in passive effects', async () => {
+		const scope = createScope({ scopeKey: 'replacement' });
+		const stop = vi.fn();
+		const watch = vi.fn(() => stop);
+		const shared$ = scope.signal$(null, 1, { watched: watch });
+		const first$ = scope.derived$(null, () => shared$.get());
+		const second$ = scope.derived$(null, () => shared$.get() * 2);
+		const cold = vi.fn();
+		const cold$ = scope.signal$(null, 0, { watched: cold });
+		function Reader({ next }: { next: boolean }) {
+			const value = useRetainedSignalValue(next ? second$ : first$);
+			useOptionalRetainedSignalValue(next ? cold$ : null);
+			React.useLayoutEffect(() => {
+				expect(cold).not.toHaveBeenCalled();
+			}, []);
+			return h('output', null, value);
+		}
+		const tree = (next: boolean) =>
+			h(
+				RetainedSignalProvider,
+				null,
+				next ? h(RetainedSignalProvider, { key: 'empty' }) : null,
+				h(RetainedSignalProvider, { key: String(next) }, h(Reader, { next })),
+			);
+		const { root, container } = mount(tree(false));
+		await act(() => root.render(tree(true)));
+		expect(cold).toHaveBeenCalledOnce();
+		expect(watch).toHaveBeenCalledOnce();
+		expect(stop).not.toHaveBeenCalled();
+		await act(() => shared$.set(3));
+		expect(container.textContent).toBe('6');
+		flushSync(() => root.render(null));
+		expect(stop).toHaveBeenCalledOnce();
+	});
+
+	it.each(['opt-out', 'independent parents'] as const)(
+		'preserves separate watched lifetimes for %s',
+		async (mode) => {
+			const scope = createScope({ scopeKey: 'separate' });
+			const log: string[] = [];
+			const value$ = scope.signal$(null, 1, {
+				watched() {
+					log.push('start');
+					return () => {
+						log.push('stop');
+					};
+				},
+			});
+			function Reader() {
+				return h('output', null, useRetainedSignalValue(value$, undefined, mode !== 'opt-out'));
+			}
+			const pane = (key: string) => h(RetainedSignalProvider, { key }, h(Reader));
+			const tree = (next: boolean) =>
+				mode === 'opt-out'
+					? h(RetainedSignalProvider, null, pane(String(next)))
+					: h(
+							RetainedSignalProvider,
+							null,
+							h(RetainedSignalProvider, null, next ? null : pane('outgoing')),
+							h(RetainedSignalProvider, null, next ? pane('incoming') : null),
+						);
+			const { root } = mount(tree(false));
+			await act(() => root.render(tree(true)));
+			expect(log).toEqual(['start', 'stop', 'start']);
+			flushSync(() => root.render(null));
+			expect(log).toEqual(['start', 'stop', 'start', 'stop']);
+		},
+	);
+
+	it('releases a departing sibling after a layout-only Suspense reveal', async () => {
+		const scope = createScope({ scopeKey: 'reveal' });
+		const stop = vi.fn();
+		const value$ = scope.signal$(null, 1, { watched: () => stop });
+		const gate = deferred<void>();
+		function Content({ pending }: { pending: boolean }) {
+			if (pending) React.use(gate.promise);
+			return 'visible';
+		}
+		function Reader() {
+			return h('output', null, useRetainedSignalValue(value$));
+		}
+		const tree = (pending: boolean, showReader: boolean) =>
+			h(
+				React.StrictMode,
+				null,
+				h(
+					RetainedSignalProvider,
+					null,
+					h(
+						React.Suspense,
+						{ fallback: h('p', null, 'waiting') },
+						h(RetainedSignalProvider, null, h(Content, { pending })),
+					),
+					showReader ? h(RetainedSignalProvider, null, h(Reader)) : null,
+				),
+			);
+		const { root, container } = mount(tree(false, true));
+		await act(() => {
+			flushSync(() => root.render(tree(true, true)));
+		});
+		expect(container.querySelector('p')?.textContent).toBe('waiting');
+		await act(async () => {
+			gate.resolve();
+		});
+		expect(container.textContent).toBe('visible1');
+		flushSync(() => root.render(tree(true, false)));
+		expect(stop).toHaveBeenCalledOnce();
+	});
+
+	it('drains all outgoing subscriptions when a custom cleanup throws during a handoff', async () => {
+		const log: string[] = [];
+		const bad = () => () => {
+			throw new Error('release failed');
+		};
+		const good = () => () => {
+			log.push('released');
+		};
+		function Reader() {
+			React.useSyncExternalStore(useSignalSubscription(bad), () => 0);
+			React.useSyncExternalStore(useSignalSubscription(good), () => 0);
+			return null;
+		}
+		const tree = (next: boolean) =>
+			h(
+				Boundary,
+				null,
+				h(
+					RetainedSignalProvider,
+					null,
+					h(RetainedSignalProvider, { key: String(next) }, next ? null : h(Reader)),
+				),
+			);
+		const { root, container } = mount(tree(false));
+		await act(() => root.render(tree(true)));
+		expect(log).toEqual(['released']);
+		expect(container.textContent).toContain('release failed');
+	});
+
 	it('keeps a shared source watched when returning to an Activity with retention disabled', async () => {
 		const scope = createScope({ scopeKey: 'activity-handoff' });
 		const stop = vi.fn();
