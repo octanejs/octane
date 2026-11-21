@@ -1,0 +1,168 @@
+diff --git a/dist/cjs/index.cjs b/dist/cjs/index.cjs
+index e08c978a8870d1560c13e30abc3a818823001f0c..959adc05045f656e11fd5fd9e7f2dddfd58c631c 100644
+--- a/dist/cjs/index.cjs
++++ b/dist/cjs/index.cjs
+@@ -248,6 +248,7 @@ class Virtualizer {
+     });
+     this._lastElementOffset = null;
+     this.pendingWrite = null;
++    this._ownWriteAt = null;
+     this._clampedAdjustment = null;
+     this.elementsCache = /* @__PURE__ */ new Map();
+     this._resizeBatch = null;
+@@ -504,6 +505,7 @@ class Virtualizer {
+       this._reportedOverscroll = false;
+       this._clampedAdjustment = null;
+       this.pendingWrite = null;
++      this._ownWriteAt = null;
+       this.scrollElement = null;
+       this.targetWindow = null;
+     };
+@@ -565,6 +567,11 @@ class Virtualizer {
+               this.scrollState = null;
+             }
+             this.pendingWrite = null;
++            if (kind === "readBack" || kind === "clampedReadBack" || kind === "clampedEcho") {
++              this._ownWriteAt = offset;
++            } else if (kind !== "restEcho") {
++              this._ownWriteAt = null;
++            }
+             if (this._clampedAdjustment !== null && Math.abs(offset - this._clampedAdjustment.maxAtWrite) >= 1.5) {
+               this._clampedAdjustment = null;
+             }
+@@ -649,7 +656,8 @@ class Virtualizer {
+         holdOffset: this._holdOffset,
+         scrollOffset: this.scrollOffset,
+         pendingWrite: this.pendingWrite,
+-        clampedMaxAtWrite: ((_a = this._clampedAdjustment) == null ? void 0 : _a.maxAtWrite) ?? null
++        clampedMaxAtWrite: ((_a = this._clampedAdjustment) == null ? void 0 : _a.maxAtWrite) ?? null,
++        ownWriteAt: this._ownWriteAt
+       });
+     };
+     this._retryClampedAdjustment = () => {
+diff --git a/dist/cjs/scroll-classifier.cjs b/dist/cjs/scroll-classifier.cjs
+index e6d6147b54eaa56aaa0dd4e2036349c4cd6a54e5..47356ae4519a6f087634484b75323e17f08d2eb3 100644
+--- a/dist/cjs/scroll-classifier.cjs
++++ b/dist/cjs/scroll-classifier.cjs
+@@ -8,7 +8,8 @@ function classifyScrollEvent({
+   holdOffset,
+   scrollOffset,
+   pendingWrite,
+-  clampedMaxAtWrite
++  clampedMaxAtWrite,
++  ownWriteAt = null
+ }) {
+   var _a;
+   if (isScrolling && pendingWrite === null && offset === scrollOffset) {
+@@ -26,6 +27,9 @@ function classifyScrollEvent({
+   if (clampedMaxAtWrite !== null && Math.abs(offset - clampedMaxAtWrite) < 1.5) {
+     return "clampedEcho";
+   }
++  if (!isScrolling && ownWriteAt !== null && Math.abs(offset - ownWriteAt) < 1.5) {
++    return "restEcho";
++  }
+   return "external";
+ }
+ const isAnimating = (phase) => phase === "smooth" || phase === "smoothFinishing";
+@@ -35,6 +39,8 @@ function externalRetiresCommand({
+   command,
+   target
+ }) {
++  let fresh;
++  const freshTarget = () => fresh ?? (fresh = target());
+   return kind !== "spurious" && kind !== "readBack" && // Our own write, clamped (`clampedReadBack`, #1310): the command is not
+   // retired by it, and reconcile retargets below the new max.
+   kind !== "clampedReadBack" && (command == null ? void 0 : command.index) != null && // Nothing has been written for a command waiting for the tail; these
+@@ -47,7 +53,7 @@ function externalRetiresCommand({
+   // keeps it reconciling (#1294). While a smooth scroll's animation may
+   // still report, its events look like a user's, so it yields only once it
+   // has landed.
+-  !isAnimating(command.phase) && !utils.approxEqual(offset, command.lastTargetOffset) && !utils.approxEqual(offset, target()) && // A compensation write's clamped echo (#1258) keeps the command. The
++  !isAnimating(command.phase) && !utils.approxEqual(offset, command.lastTargetOffset) && !utils.approxEqual(offset, freshTarget()) && (kind !== "restEcho" || freshTarget() === command.lastTargetOffset) && // A compensation write's clamped echo (#1258) keeps the command. The
+   // order is deliberate, not tidiness: this clause stays after `target()`
+   // (and `clampedReadBack` before it) because `target()` can rebuild the
+   // measurements, so it must run for exactly the events it always did.
+diff --git a/dist/esm/index.js b/dist/esm/index.js
+index abe4b4906a110b39d76eb8926db4af5683acc1d2..382230f38cddf5d08d3f9e572bdd8428f38f8eab 100644
+--- a/dist/esm/index.js
++++ b/dist/esm/index.js
+@@ -247,6 +247,7 @@ class Virtualizer {
+     });
+     this._lastElementOffset = null;
+     this.pendingWrite = null;
++    this._ownWriteAt = null;
+     this._clampedAdjustment = null;
+     this.elementsCache = /* @__PURE__ */ new Map();
+     this._resizeBatch = null;
+@@ -503,6 +504,7 @@ class Virtualizer {
+       this._reportedOverscroll = false;
+       this._clampedAdjustment = null;
+       this.pendingWrite = null;
++      this._ownWriteAt = null;
+       this.scrollElement = null;
+       this.targetWindow = null;
+     };
+@@ -564,6 +566,11 @@ class Virtualizer {
+               this.scrollState = null;
+             }
+             this.pendingWrite = null;
++            if (kind === "readBack" || kind === "clampedReadBack" || kind === "clampedEcho") {
++              this._ownWriteAt = offset;
++            } else if (kind !== "restEcho") {
++              this._ownWriteAt = null;
++            }
+             if (this._clampedAdjustment !== null && Math.abs(offset - this._clampedAdjustment.maxAtWrite) >= 1.5) {
+               this._clampedAdjustment = null;
+             }
+@@ -648,7 +655,8 @@ class Virtualizer {
+         holdOffset: this._holdOffset,
+         scrollOffset: this.scrollOffset,
+         pendingWrite: this.pendingWrite,
+-        clampedMaxAtWrite: ((_a = this._clampedAdjustment) == null ? void 0 : _a.maxAtWrite) ?? null
++        clampedMaxAtWrite: ((_a = this._clampedAdjustment) == null ? void 0 : _a.maxAtWrite) ?? null,
++        ownWriteAt: this._ownWriteAt
+       });
+     };
+     this._retryClampedAdjustment = () => {
+diff --git a/dist/esm/scroll-classifier.js b/dist/esm/scroll-classifier.js
+index 6b292971c84f4b10d8d8ed2600e083dcaf99a1c5..d1a2ba97af9d10b037f8a2d030f9cede7ac57503 100644
+--- a/dist/esm/scroll-classifier.js
++++ b/dist/esm/scroll-classifier.js
+@@ -6,7 +6,8 @@ function classifyScrollEvent({
+   holdOffset,
+   scrollOffset,
+   pendingWrite,
+-  clampedMaxAtWrite
++  clampedMaxAtWrite,
++  ownWriteAt = null
+ }) {
+   var _a;
+   if (isScrolling && pendingWrite === null && offset === scrollOffset) {
+@@ -24,6 +25,9 @@ function classifyScrollEvent({
+   if (clampedMaxAtWrite !== null && Math.abs(offset - clampedMaxAtWrite) < 1.5) {
+     return "clampedEcho";
+   }
++  if (!isScrolling && ownWriteAt !== null && Math.abs(offset - ownWriteAt) < 1.5) {
++    return "restEcho";
++  }
+   return "external";
+ }
+ const isAnimating = (phase) => phase === "smooth" || phase === "smoothFinishing";
+@@ -33,6 +37,8 @@ function externalRetiresCommand({
+   command,
+   target
+ }) {
++  let fresh;
++  const freshTarget = () => fresh ?? (fresh = target());
+   return kind !== "spurious" && kind !== "readBack" && // Our own write, clamped (`clampedReadBack`, #1310): the command is not
+   // retired by it, and reconcile retargets below the new max.
+   kind !== "clampedReadBack" && (command == null ? void 0 : command.index) != null && // Nothing has been written for a command waiting for the tail; these
+@@ -45,7 +51,7 @@ function externalRetiresCommand({
+   // keeps it reconciling (#1294). While a smooth scroll's animation may
+   // still report, its events look like a user's, so it yields only once it
+   // has landed.
+-  !isAnimating(command.phase) && !approxEqual(offset, command.lastTargetOffset) && !approxEqual(offset, target()) && // A compensation write's clamped echo (#1258) keeps the command. The
++  !isAnimating(command.phase) && !approxEqual(offset, command.lastTargetOffset) && !approxEqual(offset, freshTarget()) && (kind !== "restEcho" || freshTarget() === command.lastTargetOffset) && // A compensation write's clamped echo (#1258) keeps the command. The
+   // order is deliberate, not tidiness: this clause stays after `target()`
+   // (and `clampedReadBack` before it) because `target()` can rebuild the
+   // measurements, so it must run for exactly the events it always did.
