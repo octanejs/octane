@@ -1,4 +1,9 @@
-import { ATTRIBUTE_ALIASES } from '../dom-tables.js';
+import {
+	ATTRIBUTE_ALIASES,
+	HTML_ONLY_TAGS,
+	RAW_TEXT_CONTENT,
+	VOID_ELEMENTS,
+} from '../dom-tables.js';
 import { analyzeStrongHookBindings } from './hook-deps.js';
 import { REF_HOOKS } from './hook-names.js';
 import { createRendererRegionResolver } from './renderer-boundaries.js';
@@ -52,6 +57,8 @@ const CHILD_METHODS = new Set([
 // Raw markup is checked separately from mutations of template-owned children.
 const RAW_HTML_PROPERTIES = new Set(['innerHTML', 'outerHTML']);
 const RAW_HTML_METHODS = new Set(['insertAdjacentHTML', 'setHTMLUnsafe']);
+// innerHTML on these does not clear the host's own rendered child list.
+const CHILD_PROXY_TAGS = new Set(['template', 'slot']);
 const CLASS_LIST_MUTATORS = new Set(['add', 'remove', 'replace', 'toggle']);
 const ATTRIBUTE_METHODS = new Set(['setAttribute', 'removeAttribute', 'toggleAttribute']);
 const STYLE_METHODS = new Set(['setProperty', 'removeProperty']);
@@ -1022,26 +1029,54 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 		return element.boundary === ref.boundary ? element : null;
 	}
 
-	function isEmptyWidgetHost(element) {
-		const { node, boundary, tag } = element;
-		const { selfClosing, attributes } = node.openingElement;
-		if (tag !== 'div' || boundary?.body?.render !== node || !selfClosing) return false;
-		let ref = false;
+	// An ordinary HTML host with no spread or prop that can supply its children: returns
+	// its ref count, where a non-identifier ref counts twice so it never proves ownership.
+	function plainHost(node) {
+		const { name, attributes } = node.openingElement;
+		if (name.type !== 'JSXIdentifier' || !isDOM(node.openingElement)) return null;
+		const tag = name.name;
+		if (
+			!HTML_ONLY_TAGS.has(tag) ||
+			VOID_ELEMENTS.has(tag) ||
+			RAW_TEXT_CONTENT.has(tag) ||
+			CHILD_PROXY_TAGS.has(tag)
+		)
+			return null;
+		let refs = 0;
 		for (const attribute of attributes) {
-			if (attribute.type !== 'JSXAttribute') return false;
-			const name = attributeName(attribute);
+			if (attribute.type !== 'JSXAttribute') return null;
+			const prop = attributeName(attribute);
+			const lower = prop?.toLowerCase();
 			if (
-				name === 'children' ||
-				name === 'dangerouslySetInnerHTML' ||
-				name?.toLowerCase() === 'innerhtml' ||
-				name?.toLowerCase() === 'is'
+				prop === 'children' ||
+				prop === 'dangerouslySetInnerHTML' ||
+				lower === 'innerhtml' ||
+				lower === 'is'
 			)
-				return false;
-			if (name !== 'ref') continue;
-			if (ref || attribute.value?.expression?.type !== 'Identifier') return false;
-			ref = true;
+				return null;
+			if (prop === 'ref') refs += attribute.value?.expression?.type === 'Identifier' ? 1 : 2;
 		}
-		return ref;
+		return refs;
+	}
+
+	// The template reaches `target` from `node` through plain DOM parents only, so no
+	// fragment, component, Suspense boundary, or directive arm sits above it.
+	function plainPath(node, target) {
+		if (node === target) return true;
+		return (
+			node?.type === 'JSXElement' &&
+			plainHost(node) !== null &&
+			node.children.some((child) => plainPath(child, target))
+		);
+	}
+
+	function isEmptyWidgetHost(element) {
+		const { node, boundary } = element;
+		return (
+			node.openingElement.selfClosing &&
+			plainHost(node) === 1 &&
+			plainPath(boundary?.body?.render, node)
+		);
 	}
 
 	for (const write of writes) {

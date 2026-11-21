@@ -182,7 +182,7 @@ describe('Strong managed DOM writes through refs', () => {
 		expectStrongError(effect(write, element), '/src/App.tsrx', RAW_HTML_WRITE);
 	});
 
-	it('admits plain empty HTML clears only through a childless widget root', () => {
+	it('admits plain empty HTML clears only through a childless widget host', () => {
 		const source = (
 			write: string,
 			root = '<div ref={r} />',
@@ -201,9 +201,19 @@ describe('Strong managed DOM writes through refs', () => {
 		const safe = source(
 			`target.innerHTML = /* widget-owned */ ""; return () => { target.innerHTML = ''; };`,
 		);
-		expectStrongValid(safe, filename);
-		for (const options of MODES) {
-			expect(() => compile(safe, filename, { ...options, strong: true })).not.toThrow();
+		for (const valid of [
+			safe,
+			...[
+				'<span ref={r} />',
+				'<ul ref={r} />',
+				'<section><div ref={r} /></section>',
+				'<main class="app"><header>Title</header><section><div ref={r} /></section></main>',
+			].map((root) => source('target.innerHTML = "";', root)),
+		]) {
+			expectStrongValid(valid, filename);
+			for (const options of MODES) {
+				expect(() => compile(valid, filename, { ...options, strong: true })).not.toThrow();
+			}
 		}
 		for (const [write, root] of [
 			['target.innerHTML = html;'],
@@ -222,7 +232,19 @@ describe('Strong managed DOM writes through refs', () => {
 			['target.innerHTML = "";', '<div ref={r} is="widget-host" />'],
 			['target.innerHTML = "";', '<div ref={r} iS="widget-host" />'],
 			['target.innerHTML = "";', '<><div ref={r} /></>'],
-			['target.innerHTML = "";', '<section><div ref={r} /></section>'],
+			['target.innerHTML = "";', '<div ref={r}></div>'],
+			['target.innerHTML = "";', '<svg ref={r} />'],
+			['target.innerHTML = "";', '<my-widget ref={r} />'],
+			['target.innerHTML = "";', '<template ref={r} />'],
+			['target.innerHTML = "";', '<slot ref={r} />'],
+			['target.innerHTML = "";', '<textarea ref={r} />'],
+			['target.innerHTML = "";', '<input ref={r} />'],
+			['target.innerHTML = "";', '<section {...extra}><div ref={r} /></section>'],
+			['target.innerHTML = "";', '<section children={other}><div ref={r} /></section>'],
+			['target.innerHTML = "";', '<svg><foreignObject><div ref={r} /></foreignObject></svg>'],
+			['target.innerHTML = "";', '<section><><div ref={r} /></></section>'],
+			['target.innerHTML = "";', '<Panel><div ref={r} /></Panel>'],
+			['target.innerHTML = "";', '<section>@if (extra) { <div ref={r} /> }</section>'],
 		] as const) {
 			expectStrongError(source(write, root), filename, RAW_HTML_WRITE);
 		}
