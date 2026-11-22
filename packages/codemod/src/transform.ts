@@ -1062,7 +1062,8 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			}
 		}
 
-		const storeHookComponents = new Set<string>();
+		// Each component's first native setup store hook, for diagnostics at standalone roots.
+		const storeHookComponents = new Map<string, string>();
 		for (const item of this.nativeStoreHooks.keys()) {
 			for (const ref of this.localUses(item.name)) {
 				const call = ref.parent;
@@ -1071,14 +1072,16 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				if (nativeSetupHook(ref, this.localUses, this.checker, undefined, true) !== 'first')
 					continue;
 				const component = ts.findAncestor(ref, ts.isFunctionLike);
+				let name: string | undefined;
 				if (component && ts.isFunctionDeclaration(component)) {
 					if (component.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword))
-						storeHookComponents.add('default');
-					else if (component.name) storeHookComponents.add(component.name.text);
+						name = 'default';
+					else name = component.name?.text;
 				} else if (component && ts.isVariableDeclaration(component.parent)) {
-					const name = component.parent.name;
-					if (ts.isIdentifier(name)) storeHookComponents.add(name.text);
+					const binding = component.parent.name;
+					if (ts.isIdentifier(binding)) name = binding.text;
 				}
+				if (name && !storeHookComponents.has(name)) storeHookComponents.set(name, item.name.text);
 			}
 		}
 

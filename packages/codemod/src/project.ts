@@ -1290,7 +1290,7 @@ export async function runCodemod(
 		}
 	}
 	const results: FileResult[] = [];
-	const storeHookComponents = new Map<string, string[]>();
+	const storeHookComponents = new Map<string, Map<string, string>>();
 	if (options.svgPaths && target === 'tsrx') {
 		// Explicit SVG inputs prepare a native component even if a caller's renderer is unknown.
 		// Directory scans still generate components only for verified JSX uses.
@@ -1693,7 +1693,7 @@ export async function runCodemod(
 		}
 		const result = transform();
 		if (result.exports.storeHookComponents)
-			storeHookComponents.set(file, result.exports.storeHookComponents);
+			storeHookComponents.set(file, new Map(result.exports.storeHookComponents));
 		const blockedTransform = result.notes.find(
 			(note) =>
 				note.rule === BUFFERED_SSR_OPTIONS ||
@@ -1849,15 +1849,26 @@ export async function runCodemod(
 			return false;
 		}
 	}
-	function storeRootNote({ name, line }: { name: string; line: number }, server: boolean): Note {
+	/** A warning at a standalone root rendering a migrated component that calls a store hook. */
+	function storeRootNote(
+		file: string,
+		{ module, name, line }: { module: string; name: string; line: number },
+		server: boolean,
+	): Note | undefined {
+		const leaf = renamed(file, module)?.file;
+		const hook =
+			leaf === path.resolve(path.dirname(file), module)
+				? storeHookComponents.get(leaf)?.get(name)
+				: undefined;
+		if (!hook) return;
 		const component = name === 'default' ? 'default export' : name;
 		return {
 			rule: 'store-hook',
 			severity: 'warning',
 			line,
 			message: server
-				? `If this server call runs standalone and reaches the migrated ${component}'s store hook, it may need NativeStoreProvider with its original store context and value.`
-				: `If the migrated ${component}'s store hook reads context, this standalone Octane root needs NativeStoreProvider with its original store context and value.`,
+				? `If this server call runs standalone and reaches the migrated ${component}'s store hook ${hook}, it may need NativeStoreProvider with its original store context and value.`
+				: `If the migrated ${component}'s store hook ${hook} reads context, this standalone Octane root needs NativeStoreProvider with its original store context and value.`,
 		};
 	}
 	function originalReactEntry(file: string, name: string, options = config) {
@@ -2157,14 +2168,8 @@ export async function runCodemod(
 				(module) => originalReactEntry(file, module),
 				true,
 			)) {
-				const leaf = renamed(file, edge.module)?.file;
-				if (
-					!leaf ||
-					leaf !== path.resolve(path.dirname(file), edge.module) ||
-					!storeHookComponents.get(leaf)?.includes(edge.name)
-				)
-					continue;
-				result.notes.push(storeRootNote(edge, true));
+				const note = storeRootNote(file, edge, true);
+				if (note) result.notes.push(note);
 			}
 		}
 		const paths = rewriteModulePaths(
@@ -2193,17 +2198,11 @@ export async function runCodemod(
 		) {
 			const originalRuntimes = new Map<'octane' | 'octane/server', boolean>();
 			for (const edge of octaneRootComponents(file, source)) {
-				const leaf = renamed(file, edge.module)?.file;
-				if (
-					!leaf ||
-					leaf !== path.resolve(path.dirname(file), edge.module) ||
-					!storeHookComponents.get(leaf)?.includes(edge.name)
-				)
-					continue;
+				const note = storeRootNote(file, edge, edge.runtime === 'octane/server');
+				if (!note) continue;
 				if (!originalRuntimes.has(edge.runtime))
 					originalRuntimes.set(edge.runtime, originalOctaneRuntime(file, edge.runtime));
-				if (originalRuntimes.get(edge.runtime))
-					storeNotes.push(storeRootNote(edge, edge.runtime === 'octane/server'));
+				if (originalRuntimes.get(edge.runtime)) storeNotes.push(note);
 			}
 		}
 		if (selected) continue;
