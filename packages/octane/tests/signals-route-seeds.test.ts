@@ -1,12 +1,21 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act, hydrateRoot, startTransition, type Root } from 'octane';
 import { renderToString } from 'octane/server';
 import { createResource, createScope, query, type Scope, type ScopeSeed } from 'octane/signals';
 import { loadServerFixture } from './_server-fixture.js';
 import { resetStreamRuntimeGlobals } from './_server-stream.js';
-import { deferred, drainProducers, type Deferred } from './_fixtures/signals-async-controls.js';
+import { deferred, type Deferred } from './_fixtures/signals-async-controls.js';
 import * as client from './_fixtures/signals-route-seeds.tsrx';
 import type { RouteMatches } from './_fixtures/signals-route-seeds.tsrx';
+import { installTestClock, type TestClock } from 'octane/testing';
+
+let clock: TestClock;
+beforeEach(() => {
+	clock = installTestClock();
+});
+afterEach(() => {
+	clock.uninstall();
+});
 
 const server = loadServerFixture<typeof client>(
 	'packages/octane/tests/_fixtures/signals-route-seeds.tsrx',
@@ -94,7 +103,7 @@ describe('explicit route:* scope seeds (RFC #3001 R2)', () => {
 	async function serverRender$(): Promise<string> {
 		const serverRouter = router$(async (args) => value(args));
 		serverRouter.matches$(serverRouter.location$.get());
-		await act(() => drainProducers());
+		await act(() => clock.advance(0));
 		const { html } = renderToString(server.Routes, {
 			location$: serverRouter.location$,
 			matches$: serverRouter.matches$,
@@ -121,7 +130,7 @@ describe('explicit route:* scope seeds (RFC #3001 R2)', () => {
 		const resolve = (args: Record<string, string>) =>
 			act(async () => {
 				settle(JSON.stringify(args)).resolve(value(args));
-				await drainProducers();
+				await clock.advance(0);
 			});
 		return { ...browser, requests, resolve };
 	}
@@ -152,7 +161,7 @@ describe('explicit route:* scope seeds (RFC #3001 R2)', () => {
 				} as never,
 			);
 		});
-		await act(() => drainProducers());
+		await act(() => clock.advance(0));
 		return { browser, errors, org, task };
 	}
 

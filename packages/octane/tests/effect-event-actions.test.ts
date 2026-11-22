@@ -1,12 +1,21 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createElement, createRoot, flushSync, requestFormReset, startTransition } from 'octane';
 import { createScope } from 'octane/signals';
-import { act, mount, nextTask } from './_helpers';
+import { act, mount } from './_helpers';
 import {
 	ExternalEffectEvent,
 	ExternalEffectEventUpdates,
 	OptimisticEffectEvent,
 } from './_fixtures/effect-event-actions.tsrx';
+import { installTestClock, type TestClock } from 'octane/testing';
+
+let clock: TestClock;
+beforeEach(() => {
+	clock = installTestClock();
+});
+afterEach(() => {
+	clock.uninstall();
+});
 
 describe('Effect Event transition ownership', () => {
 	it('keeps a post-await Effect Event wrapped in a transition in the same Action as direct updates', async () => {
@@ -141,7 +150,7 @@ describe('Effect Event transition ownership', () => {
 			startTransition(() => pending);
 			flushSync(() => event());
 			expect(r.find('output').textContent).toBe('optimistic');
-			await nextTask();
+			await clock.advance(0);
 			expect(r.find('output').textContent).toBe('idle');
 		} finally {
 			release();

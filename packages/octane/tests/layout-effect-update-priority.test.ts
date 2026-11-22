@@ -1,7 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act, flushSync, startTransition } from '../src/index.js';
 import { mount } from './_helpers.js';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
+import { installTestClock, type TestClock } from 'octane/testing';
+
+let clock: TestClock;
+beforeEach(() => {
+	clock = installTestClock();
+});
+afterEach(() => {
+	clock.uninstall();
+});
 
 // Updates from layout effects and callback refs belong to the commit that ran
 // them, as in React.
@@ -82,18 +91,6 @@ async function settle(): Promise<void> {
 	for (let index = 0; index < 10; index++) await Promise.resolve();
 }
 
-/** Wait for a host task posted now, after every task the runtime posted before it. */
-function nextTask(): Promise<void> {
-	return new Promise((resolve) => {
-		const channel = new MessageChannel();
-		channel.port1.onmessage = () => {
-			channel.port1.close();
-			resolve();
-		};
-		channel.port2.postMessage(null);
-	});
-}
-
 describe.each([true, false])('layout effect updates during an async Action (dev: %s)', (dev) => {
 	const fixture = () =>
 		loadCompiledFixtureSource(source, {
@@ -130,7 +127,7 @@ describe.each([true, false])('layout effect updates during an async Action (dev:
 			await settle();
 			// The settled Action commits in a later host task (#1864).
 			expect(view.find('output').textContent).toBe('idle');
-			await nextTask();
+			await clock.advance(0);
 			expect(view.find('output').textContent).toBe('continued');
 		} finally {
 			finishFirst();

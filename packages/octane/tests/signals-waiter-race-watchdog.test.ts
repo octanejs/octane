@@ -1,8 +1,17 @@
-import { expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createScope } from 'octane/signals';
 import { act, mount } from './_helpers.js';
-import { deferred, drainProducers } from './_fixtures/signals-async-controls.js';
+import { deferred } from './_fixtures/signals-async-controls.js';
 import { SwitchedPending } from './_fixtures/signals-waiter-public.tsrx';
+import { installTestClock, type TestClock } from 'octane/testing';
+
+let clock: TestClock;
+beforeEach(() => {
+	clock = installTestClock();
+});
+afterEach(() => {
+	clock.uninstall();
+});
 
 it('does not repeatedly wake an async reader when a displaced pending source settles', async () => {
 	const first = deferred<void>();
@@ -23,7 +32,7 @@ it('does not repeatedly wake an async reader when a displaced pending source set
 		});
 		try {
 			await act(() => first.resolve(undefined));
-			await drainProducers();
+			await clock.advance(0);
 			expect(retries).toBeLessThan(100);
 			expect(root.find('span').textContent).toBe('pending');
 		} finally {
@@ -34,7 +43,7 @@ it('does not repeatedly wake an async reader when a displaced pending source set
 			ready$.set(true);
 			next.resolve(undefined);
 		});
-		await drainProducers();
+		await clock.advance(0);
 		expect(root.find('span').textContent).toBe('ready');
 	} finally {
 		root.unmount();

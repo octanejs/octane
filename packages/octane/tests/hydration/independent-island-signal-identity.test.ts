@@ -1,4 +1,4 @@
-import { expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { compile } from 'octane/compiler';
 import { flushSync } from '../../src/index.js';
 import { prerender } from '../../src/runtime.server.js';
@@ -7,7 +7,15 @@ import { bootstrapStreamedSignalHydration } from '../../src/hydration/streamed-s
 import * as signals from '../../src/signals/index.js';
 import { evaluateCompiledFixtureCode } from '../_server-fixture.js';
 import { activateStreamedMarkup, resetStreamRuntimeGlobals } from '../_server-stream.js';
-import { drainProducers } from '../_fixtures/signals-async-controls.js';
+import { installTestClock, type TestClock } from 'octane/testing';
+
+let clock: TestClock;
+beforeEach(() => {
+	clock = installTestClock();
+});
+afterEach(() => {
+	clock.uninstall();
+});
 
 const sources = {
 	direct: '<Inner />',
@@ -90,7 +98,7 @@ it.each(Object.keys(sources) as (keyof typeof sources)[])(
 				onError: (error) => errors.push(error),
 			});
 			await vi.waitFor(() => expect(loaded).toBe(true));
-			await drainProducers();
+			await clock.advance(0);
 			flushSync(() => {});
 			expect(browserFetch).not.toHaveBeenCalled();
 			expect(host.querySelector('output')).toBe(output);

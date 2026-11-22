@@ -2,11 +2,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, createRoot, flushSync, hydrateRoot, startTransition } from 'octane';
 import { initializeHydrationEventCapture } from 'octane/hydration';
 import { renderToString } from 'octane/server';
-import { flushEffects, mount, nextTask } from '../_helpers.js';
+import { flushEffects, mount } from '../_helpers.js';
 import { loadServerFixture } from '../_server-fixture.js';
 import { LayoutReadinessApp } from '../_fixtures/view-transition-matching.tsrx';
 import { installViewTransitionMocks } from '../conformance/_helpers/view-transition-mocks.js';
 import * as client from './_fixtures/deferred-controlled-editor.tsrx';
+import { installTestClock, type TestClock } from 'octane/testing';
+
+let clock: TestClock;
+beforeEach(() => {
+	clock = installTestClock();
+});
+afterEach(() => {
+	clock.uninstall();
+});
 
 const server = loadServerFixture<typeof client>(
 	'packages/octane/tests/hydration/_fixtures/deferred-controlled-editor.tsrx',
@@ -178,8 +187,8 @@ describe('deferred controlled editor', () => {
 			const input = editor.container.querySelector('input')!;
 			try {
 				startTransition(() => setPage(1));
+				await clock.advance(0);
 				await firstStarted;
-				await nextTask();
 				expect(editor.container.querySelector('p')!.textContent).toBe('First animated page');
 				startTransition(() => setPage(2));
 				input.value = 'typed during animation';
@@ -338,9 +347,9 @@ describe('deferred controlled editor', () => {
 			};
 			await act(() => transitionRoot.render(LayoutReadinessApp, { ...props, text: 'before' }));
 			startTransition(() => transitionRoot.render(LayoutReadinessApp, { ...props, text: 'after' }));
+			await clock.advance(0);
 			await entered;
 			await firstReady;
-			await nextTask();
 			expect(captured).toEqual(earlier ? ['older outside edit', draft] : [draft]);
 			expect(input.value).toBe(draft);
 			// The live handler commits immediately; a stopped event leaves the
@@ -547,8 +556,8 @@ describe('deferred controlled editor', () => {
 				await act(() => root.render(client.ResourceHold, { ...props, text: 'before' }));
 				armed = true;
 				startTransition(() => root.render(client.ResourceHold, { ...props, text: 'after' }));
+				await clock.advance(0);
 				await nativeStarted;
-				await nextTask();
 				expect(mutations).toBe(1);
 				expect(container.textContent).toBe('after');
 				expect(layouts).toEqual(['before']);

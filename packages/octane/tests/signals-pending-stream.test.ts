@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { hydrateRoot } from 'octane';
 import { bootstrapStreamedSignalHydration } from 'octane/hydration/streamed-signals';
 import { renderToPipeableStream } from 'octane/server';
@@ -12,8 +12,17 @@ import {
 	deferred,
 	resetStreamRuntimeGlobals,
 } from './_server-stream.js';
-import { controlledStream, drainProducers } from './_fixtures/signals-async-controls.js';
+import { controlledStream } from './_fixtures/signals-async-controls.js';
 import * as client from './_fixtures/signals-pending-stream.tsrx';
+import { installTestClock, type TestClock } from 'octane/testing';
+
+let clock: TestClock;
+beforeEach(() => {
+	clock = installTestClock();
+});
+afterEach(() => {
+	clock.uninstall();
+});
 
 const server = loadServerFixture<typeof client>(
 	'packages/octane/tests/_fixtures/signals-pending-stream.tsrx',
@@ -130,7 +139,7 @@ describe('pending native streams', () => {
 			try {
 				rendering.pipe(collector.destination);
 				await shellReady.promise;
-				await drainProducers();
+				await clock.advance(0);
 				container.innerHTML = collector.chunks.join('');
 				document.body.append(container);
 				activateStreamedMarkup(container);
@@ -180,7 +189,7 @@ describe('pending native streams', () => {
 				expect(serverErrors).toEqual([]);
 				if (changed) {
 					root.unmount();
-					await drainProducers();
+					await clock.advance(0);
 					expect(requests[0]!.signal.aborted).toBe(true);
 				}
 			} finally {

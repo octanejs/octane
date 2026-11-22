@@ -80,7 +80,8 @@ describe('stream-closure mutation gate', () => {
 				expectedIds: normal.targetIds,
 				testMutation: {
 					find: 'const owners: Scope[] = [];',
-					replace: `${hook === 'beforeEach' ? "import { beforeEach } from 'vitest';\n" : ''}${hook}(() => { expect(false).toBe(true); });\nconst owners: Scope[] = [];`,
+					// The target already imports both hooks from vitest.
+					replace: `${hook}(() => { expect(false).toBe(true); });\nconst owners: Scope[] = [];`,
 				},
 			});
 			expect(result.status, JSON.stringify(result)).toBe('runner-error');

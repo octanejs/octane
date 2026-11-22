@@ -1,8 +1,15 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { TestClock } from '../../src/testing.js';
 import { compile } from 'octane/compiler';
 // Compile-tooling setup is separate from the behavior checks. Each scenario
 // still loads a fresh runtime graph and fixture helper after resetModules().
 import '../_server-fixture.js';
+
+// Each cold scenario installs a clock on its own fresh runtime graph.
+const clocks: TestClock[] = [];
+afterEach(() => {
+	for (const clock of clocks.splice(0)) clock.uninstall();
+});
 
 // A component's directive arms, nested boundaries, keyed rows, nested `@{ … }`
 // blocks and the children it passes to other components are part of its
@@ -168,7 +175,8 @@ async function mountClient(
 	const client = await import('../../src/runtime.js');
 	const signals = await import('../../src/signals/index.js');
 	const { loadPlainHookFixtureSource } = await import('../_server-fixture.js');
-	const { drainProducers } = await import('../_fixtures/signals-async-controls.js');
+	const clock = (await import('../../src/testing.js')).installTestClock();
+	clocks.push(clock);
 	const runtimeModules: Record<string, Record<string, unknown>> = { 'octane/signals': signals };
 	for (const [request, source] of Object.entries(plainModules))
 		runtimeModules[request] = loadPlainHookFixtureSource(source, {
@@ -193,7 +201,7 @@ async function mountClient(
 		settleAll: (value: string) =>
 			client.act(async () => {
 				for (const resolve of requests) resolve(value);
-				await drainProducers();
+				await clock.advance(0);
 			}),
 		click: (selector: string) =>
 			client.flushSync(() => container.querySelector<HTMLElement>(selector)!.click()),
@@ -201,9 +209,9 @@ async function mountClient(
 		clickAndSettle: (selector: string) =>
 			client.act(async () => {
 				container.querySelector<HTMLElement>(selector)!.click();
-				await drainProducers();
+				await clock.advance(0);
 			}),
-		flush: () => client.act(drainProducers),
+		flush: () => client.act(() => clock.advance(0)),
 		update: (next: Record<string, unknown>) =>
 			client.flushSync(() => root.render(module.App, { ...PROPS, load, ...props, ...next })),
 		unmount: () => {
@@ -235,7 +243,8 @@ async function hydrateServerOutput(
 	const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
 	const { activateStreamedMarkup, resetStreamRuntimeGlobals } =
 		await import('../_server-stream.js');
-	const { drainProducers } = await import('../_fixtures/signals-async-controls.js');
+	const clock = (await import('../../src/testing.js')).installTestClock();
+	clocks.push(clock);
 	const compileOptions = {
 		id: '/src/signal-declaration-owner.tsrx',
 		compileOptions: { dev: options.dev, strong: options.strong, hmr: false },
@@ -273,7 +282,7 @@ async function hydrateServerOutput(
 			onRecoverableError: (error) => errors.push(error),
 			onUncaughtError: (error) => errors.push(error),
 		});
-		await drainProducers();
+		await clock.advance(0);
 		client.flushSync(() => {});
 		if (options.deferred)
 			await client.act(() => root!.render(clientModule.App, { ...props, when: condition(true) }));
@@ -1201,7 +1210,8 @@ export function App(props) @{
 			const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
 			const { activateStreamedMarkup, resetStreamRuntimeGlobals } =
 				await import('../_server-stream.js');
-			const { drainProducers } = await import('../_fixtures/signals-async-controls.js');
+			const clock = (await import('../../src/testing.js')).installTestClock();
+			clocks.push(clock);
 			const text = producerSource(
 				PRODUCERS[kind as keyof typeof PRODUCERS],
 				2,
@@ -1248,7 +1258,7 @@ export function App(props) @{
 					onRecoverableError: (error) => errors.push(error),
 					onUncaughtError: (error) => errors.push(error),
 				});
-				await drainProducers();
+				await clock.advance(0);
 				client.flushSync(() => {});
 				expect(browserLoad).not.toHaveBeenCalled();
 				expect(errors).toEqual([]);
@@ -1257,7 +1267,7 @@ export function App(props) @{
 				expect(nodes.map((node) => node.textContent)).toEqual(expected);
 
 				client.flushSync(() => root!.render(clientModule.App, { ...props, label: 'updated' }));
-				await drainProducers();
+				await clock.advance(0);
 				expect(container.querySelector('small')).toBe(label);
 				expect(label.textContent).toBe('updated');
 				expect([...container.querySelectorAll('output')]).toEqual(nodes);

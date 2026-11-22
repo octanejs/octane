@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
 	createResource,
 	createScope,
@@ -12,10 +12,18 @@ import {
 import {
 	capturePending$,
 	deferred,
-	drainProducers,
 	nextSnapshot$,
 	type Deferred,
 } from './_fixtures/signals-async-controls';
+import { installTestClock, type TestClock } from 'octane/testing';
+
+let clock: TestClock;
+beforeEach(() => {
+	clock = installTestClock();
+});
+afterEach(() => {
+	clock.uninstall();
+});
 
 const owners: Scope[] = [];
 function owner(key = `async-${owners.length}`): Scope {
@@ -65,7 +73,7 @@ describe('scoped promise resources', () => {
 		const resource$ = createResource(scope, 'resource', () => load(undefined));
 		const doubled$ = scope.derived$('doubled', () => resource$.get() * 2);
 		replies[0]!.resolve(21);
-		await drainProducers();
+		await clock.advance(0);
 		expect(doubled$.snapshot()).toMatchObject({ status: 'ready', value: 42, refreshing: false });
 		const heard: boolean[] = [];
 		const stop = doubled$.subscribe(() => heard.push(doubled$.snapshot().refreshing));
@@ -75,7 +83,7 @@ describe('scoped promise resources', () => {
 		expect(doubled$.snapshot()).toMatchObject({ status: 'ready', value: 42, refreshing: true });
 		// The same value arriving ends the refresh, which is a change too.
 		replies[1]!.resolve(21);
-		await drainProducers();
+		await clock.advance(0);
 		expect(heard).toEqual([true, false]);
 		expect(doubled$.snapshot()).toMatchObject({ status: 'ready', value: 42, refreshing: false });
 		stop();
@@ -195,7 +203,7 @@ describe('scoped promise resources', () => {
 		expect(attempts.map(({ signal }) => signal.aborted)).toEqual([true, false]);
 		attempts[0].completion.resolve('obsolete');
 		attempts[1].completion.resolve('nested current');
-		await drainProducers();
+		await clock.advance(0);
 		expect(resource$.get()).toBe('nested current');
 		resource$.retry();
 		scope.dispose();
@@ -306,7 +314,7 @@ describe('scoped promise resources', () => {
 		selected$.set(false);
 		expect(starts).toEqual([{ a: { x: 1, y: 2 }, z: [undefined, -0] }, 'replacement']);
 		expect(signals[0].aborted).toBe(false);
-		await drainProducers();
+		await clock.advance(0);
 		expect(detachedAwake).toBe(true);
 		expect(sharedAwake).toBe(false);
 		completion.resolve('shared result');
@@ -566,7 +574,7 @@ describe('scoped promise resources', () => {
 		expect(attempts.map(({ id }) => id)).toEqual(['a', 'b']);
 		expect(attempts[0].signal.aborted).toBe(true);
 		attempts[0].gate.resolve('obsolete a');
-		await drainProducers();
+		await clock.advance(0);
 		expect(resource$.snapshot().status).toBe('pending');
 		const ready = nextSnapshot$(resource$, (snapshot) => snapshot.status === 'ready');
 		attempts[1].gate.resolve('current b');
@@ -602,7 +610,7 @@ describe('scoped promise resources', () => {
 			let accepted = false;
 			for (const index of order) {
 				attempts[index].gate.resolve(index === 2 ? 'current a' : `obsolete ${index}`);
-				await drainProducers();
+				await clock.advance(0);
 				accepted ||= index === 2;
 				if (accepted) expect(resource$.get()).toBe('current a');
 				else expect(resource$.snapshot().status).toBe('pending');
@@ -628,7 +636,7 @@ describe('scoped promise resources', () => {
 		expect(attempts.map(({ signal }) => signal.aborted)).toEqual([true, true, false]);
 		attempts[0].gate.reject(new Error('obsolete rejection'));
 		attempts[1].gate.resolve('obsolete success');
-		await drainProducers();
+		await clock.advance(0);
 		expect(resource$.snapshot().status).toBe('pending');
 		const ready = nextSnapshot$(resource$, (snapshot) => snapshot.status === 'ready');
 		attempts[2].gate.resolve('current result');
@@ -697,7 +705,7 @@ describe('scoped promise resources', () => {
 		expect(scope.isPending(() => label$.get())).toBe(false);
 
 		attempts[0].resolve('first result');
-		await drainProducers();
+		await clock.advance(0);
 		result$.retry();
 		expect(result$.snapshot()).toMatchObject({
 			status: 'ready',
@@ -713,7 +721,7 @@ describe('scoped promise resources', () => {
 		expect(scope.isPending(() => label$.get())).toBe(false);
 		const failure = new Error('new answer failed');
 		attempts[2].reject(failure);
-		await drainProducers();
+		await clock.advance(0);
 		expect(() => scope.isPending(() => result$.get())).toThrow(failure);
 		expect(label$.get()).toBe('first result');
 		expect(scope.isPending(() => label$.get())).toBe(false);
@@ -730,12 +738,12 @@ describe('scoped promise resources', () => {
 		});
 		const result$ = createResource(scope, 'result', () => load(selected$.get()));
 		attempts[0].result.resolve('first a');
-		await drainProducers();
+		await clock.advance(0);
 		expect(result$.get()).toBe('first a');
 		selected$.set('b');
 		expect(result$.latest(null)).toBe('first a');
 		attempts[1].result.resolve('current b');
-		await drainProducers();
+		await clock.advance(0);
 		expect(result$.get()).toBe('current b');
 
 		selected$.set('a');
@@ -744,7 +752,7 @@ describe('scoped promise resources', () => {
 		expect(result$.latest(null)).toBe('current b');
 		expect(attempts.at(-1)?.id).toBe('a');
 		attempts.at(-1)!.result.resolve('fresh a');
-		await drainProducers();
+		await clock.advance(0);
 		expect(result$.get()).toBe('fresh a');
 	});
 
@@ -764,7 +772,7 @@ describe('scoped promise resources', () => {
 			return { ...record, activate: () => actedOn.push(record.id) };
 		});
 		attempts.get('a')!.resolve({ id: 'a', title: 'First card' });
-		await drainProducers();
+		await clock.advance(0);
 		expect(card$.get()).toMatchObject({ id: 'a', title: 'First card' });
 		selected$.set('b');
 		const held = card$.latest(null)!;
@@ -773,7 +781,7 @@ describe('scoped promise resources', () => {
 		held.activate();
 		expect(actedOn).toEqual(['a']);
 		attempts.get('b')!.resolve({ id: 'b', title: 'Second card' });
-		await drainProducers();
+		await clock.advance(0);
 		const current = card$.get();
 		expect(current).toMatchObject({ id: 'b', title: 'Second card' });
 		current.activate();
@@ -797,7 +805,7 @@ describe('scoped promise resources', () => {
 			load(selectReplacement$.get() ? replacementId$.get() : previousId$.get()),
 		);
 		attempts[0].result.resolve('private a');
-		await drainProducers();
+		await clock.advance(0);
 		expect(result$.get()).toBe('private a');
 		selectReplacement$.set(true);
 		expect(result$.latest(null)).toBe('private a');
@@ -808,13 +816,13 @@ describe('scoped promise resources', () => {
 		});
 
 		previous.dispose();
-		await drainProducers();
+		await clock.advance(0);
 
 		expect(awakened).toBe(true);
 		expect(() => result$.latest(null)).toThrow(ScopeDisposedError);
 		expect(attempts[1].signal.aborted).toBe(false);
 		attempts[1].result.resolve('current b');
-		await drainProducers();
+		await clock.advance(0);
 		expect(result$.get()).toBe('current b');
 		replacement.dispose();
 		expect(() => result$.latest(null)).toThrow(ScopeDisposedError);
@@ -835,7 +843,7 @@ describe('scoped promise resources', () => {
 			return phase === 'first' ? originalQuery(id$.get()) : replacementQuery(undefined);
 		});
 		first.resolve('old private result');
-		await drainProducers();
+		await clock.advance(0);
 		expect(result$.get()).toBe('old private result');
 		phase$.set('blocked');
 		expect(result$.latest(null)).toBe('old private result');
@@ -846,7 +854,7 @@ describe('scoped promise resources', () => {
 
 		expect(view.isPending(() => result$.get())).toBe(true);
 		second.resolve('different result');
-		await drainProducers();
+		await clock.advance(0);
 		expect(result$.get()).toBe('different result');
 	});
 
@@ -915,12 +923,12 @@ describe('scoped promise resources', () => {
 		right$.snapshot();
 		expect(card$.latest(null)).toBe(original);
 		attempts.get('b:left')!.resolve('b left');
-		await drainProducers();
+		await clock.advance(0);
 		expect(card$.latest(null)).toBe(original);
 		expect(card$.snapshot().status).toBe('pending');
 		const failure = new Error('b right failed');
 		attempts.get('b:right')!.reject(failure);
-		await drainProducers();
+		await clock.advance(0);
 		expect(card$.latest(null)).toBe(original);
 		expect(card$.snapshot()).toMatchObject({ status: 'error', error: failure });
 		expect(() => scope.isPending(() => card$.get())).toThrow(failure);
@@ -951,7 +959,7 @@ describe('scoped promise resources', () => {
 			});
 			for (const [step, index] of order.entries()) {
 				gates[index].resolve(index * 10);
-				await drainProducers();
+				await clock.advance(0);
 				if (step < order.length - 1) expect(projection$.latest(null)).toBeNull();
 			}
 			expect(projection$.get()).toEqual([0, 10, 20]);
@@ -1016,7 +1024,7 @@ describe('scoped promise resources', () => {
 			expect(signal?.aborted).toBe(true);
 			if (completion === 'resolve') gate.resolve('must not publish');
 			else gate.reject(new Error('must not publish'));
-			await drainProducers();
+			await clock.advance(0);
 			expect(observed).toEqual([]);
 			for (const read of [
 				() => resource$.get(),

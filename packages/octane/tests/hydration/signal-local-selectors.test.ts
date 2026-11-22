@@ -1,11 +1,19 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act, hydrateRoot } from '../../src/index.js';
 import { prerender } from '../../src/runtime.server.js';
 import { bootstrapStreamedSignalHydration } from '../../src/hydration/streamed-signals.js';
 import * as signals from '../../src/signals/index.js';
 import { loadCompiledFixtureSource } from '../_server-fixture.js';
 import { activateStreamedMarkup, resetStreamRuntimeGlobals } from '../_server-stream.js';
-import { drainProducers } from '../_fixtures/signals-async-controls.js';
+import { installTestClock, type TestClock } from 'octane/testing';
+
+let clock: TestClock;
+beforeEach(() => {
+	clock = installTestClock();
+});
+afterEach(() => {
+	clock.uninstall();
+});
 
 // The octane project covers the dev compile; octane-prod covers prod and strong.
 const modes =
@@ -82,7 +90,7 @@ describe.each(modes)('redeclared local query selectors after hydration (%j)', (m
 			},
 		);
 		try {
-			await drainProducers();
+			await clock.advance(0);
 			await act(async () => {});
 			const paragraph = container.querySelector('p');
 			expect(text()).toBe('server a');
