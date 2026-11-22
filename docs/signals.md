@@ -544,6 +544,8 @@ Styled native returned fragments use an inspectable `Fragment` descriptor, inclu
 - A read that throws throws from the component: a pending async handle suspends, and a failed one reaches the error boundary.
 - `SignalScopeProvider` passes a scope to `useSignalScope()`. It borrows the scope and never disposes it. The application creates one per root or request and disposes it after unmounting the tree that reads it. React does not own scopes here: a scope created during render is lost when StrictMode or Suspense discards that render, and one created in an effect is missing from the first render and from SSR.
 
+When React replaces nested `RetainedSignalProvider` subtrees under the same surviving provider in one commit, retained readers hand off their shared watched dependencies. A departing reader stops notifying React on unsubscribe. Its producer can stay connected through the incoming subtree's passive effects, including when that subtree reads a different handle. This keeps shared sources running across the switch. The last incoming provider drains those releases in the same passive pass. A custom cleanup that throws during the handoff reaches the error boundary above that provider. Set `retainOnHide` to `false` on an outgoing reader if its cleanup must precede incoming subscriptions. A removal with no replacement keeps its usual cleanup timing.
+
 For a seeded scope, an adoption frame supplies that historical read without rewinding live state:
 
 ```tsx
