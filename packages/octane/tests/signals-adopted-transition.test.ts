@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act, flushSync, hydrateRoot, startTransition, type Root } from 'octane';
 import { renderToString } from 'octane/server';
 import { bootstrapStreamedSignalHydration } from 'octane/hydration/streamed-signals';
@@ -18,8 +18,17 @@ import {
 	createPipeableCollector,
 	resetStreamRuntimeGlobals,
 } from './_server-stream.js';
-import { deferred, drainProducers, type Deferred } from './_fixtures/signals-async-controls.js';
+import { deferred, type Deferred } from './_fixtures/signals-async-controls.js';
 import * as client from './_fixtures/signals-adopted-transition.tsrx';
+import { installTestClock, type TestClock } from 'octane/testing';
+
+let clock: TestClock;
+beforeEach(() => {
+	clock = installTestClock();
+});
+afterEach(() => {
+	clock.uninstall();
+});
 
 const server = loadServerFixture<typeof client>(
 	'packages/octane/tests/_fixtures/signals-adopted-transition.tsrx',
@@ -97,13 +106,13 @@ describe('transitions over server-adopted query state', () => {
 		const resolve = async (key: string, value: string) => {
 			await act(async () => {
 				settle(key).resolve(value);
-				await drainProducers();
+				await clock.advance(0);
 			});
 		};
 		const reject = async (key: string, error: Error) => {
 			await act(async () => {
 				settle(key).reject(error);
-				await drainProducers();
+				await clock.advance(0);
 			});
 		};
 		return { load, requests, resolve, reject };
@@ -209,7 +218,7 @@ describe('transitions over server-adopted query state', () => {
 				{ signalOwner: hydration.signalOwner },
 			);
 		});
-		await act(() => drainProducers());
+		await act(() => clock.advance(0));
 		return { ...browser, location$, errors, output };
 	}
 

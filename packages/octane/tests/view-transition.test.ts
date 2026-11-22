@@ -7,8 +7,8 @@ import { loadCompiledFixtureSource } from './_server-fixture.js';
  * pseudo-element handles, cleanup-on-finish, and share viewport decay.
  * jsdom environment via the shared conformance mock helper.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { act, nextTask } from './_helpers';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { act } from './_helpers';
 import { createRoot, startTransition, addTransitionType, type Root } from '../src/index.js';
 import { compile } from '../src/compiler/compile.js';
 import * as ServerRuntime from '../src/server/index.js';
@@ -32,6 +32,15 @@ import {
 	BoundaryRowsApp,
 	CaptureFreeBoundaryRows,
 } from './_fixtures/view-transition-features.tsrx';
+import { installTestClock, type TestClock } from 'octane/testing';
+
+let clock: TestClock;
+beforeEach(() => {
+	clock = installTestClock();
+});
+afterEach(() => {
+	clock.uninstall();
+});
 
 function evalServer(source: string, filename: string): Record<string, any> {
 	return loadCompiledFixtureSource(source, {
@@ -632,10 +641,10 @@ describe('ViewTransition features', () => {
 		button.click();
 		await Promise.resolve();
 		expect(vt.calls).toHaveLength(0);
-		await nextTask();
+		await clock.advance(0);
 		expect(vt.calls).toHaveLength(1);
 		button.click();
-		await nextTask();
+		await clock.advance(0);
 		// The second transition waits for the first to finish rather than
 		// interrupting it.
 		expect(vt.calls).toHaveLength(1);

@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it } from 'vitest';
 import {
 	__declared,
 	__queryAt,
@@ -14,7 +14,16 @@ import {
 	type ServerSignalQueryAttempt,
 } from '../src/signals/query-attempt-observer.js';
 import { createServerSignalQueryAttemptObservations } from '../src/server/signal-query-observation.js';
-import { controlledStream, drainProducers } from './_fixtures/signals-async-controls';
+import { controlledStream } from './_fixtures/signals-async-controls';
+import { installTestClock, type TestClock } from 'octane/testing';
+
+let clock: TestClock;
+beforeEach(() => {
+	clock = installTestClock();
+});
+afterEach(() => {
+	clock.uninstall();
+});
 
 it('mirrors each current server stream attempt once and fences a retry', async () => {
 	const documentOwner = createScope({ scopeKey: 'document:query-attempt-observer' });
@@ -61,7 +70,7 @@ it('mirrors each current server stream attempt once and fences a retry', async (
 	const firstValue = firstMirror.next();
 	streams[0]!.emit('first');
 	await expect(firstValue).resolves.toEqual({ done: false, value: 'first' });
-	await drainProducers();
+	await clock.advance(0);
 	expect(streams[0]!.nextCalls).toBe(1);
 
 	// A second rendered reader joins the existing producer, with independent
@@ -80,10 +89,10 @@ it('mirrors each current server stream attempt once and fences a retry', async (
 	await expect(sharedValue).resolves.toEqual({ done: false, value: 'shared' });
 
 	const obsoleteRead = firstMirror.next();
-	await drainProducers();
+	await clock.advance(0);
 	expect(streams[0]!.nextCalls).toBe(2);
 	await joinedMirror.return?.();
-	await drainProducers();
+	await clock.advance(0);
 	expect(streams[0]!.nextCalls).toBe(3);
 	expect(streams[0]!.cancellations).toBe(0);
 	expect(observed[0]!.isCurrent()).toBe(true);
@@ -160,7 +169,7 @@ it("observes a lexical read under its declaring owner, only in the declaring own
 		attempt: 1,
 		kind: 'promise',
 	});
-	await drainProducers();
+	await clock.advance(0);
 	expect(render(declaring, () => record$.get())).toBe('value');
 	observed[0]!.release();
 	document.dispose();

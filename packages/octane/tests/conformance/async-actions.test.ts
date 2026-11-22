@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, flushEffects } from '../_helpers';
 import { flushSync } from '../../src/index.js';
 import {
@@ -6,6 +6,15 @@ import {
 	OptimisticRebase,
 	OptimisticRepeated,
 } from './_fixtures/async-actions.tsrx';
+import { installTestClock, type TestClock } from 'octane/testing';
+
+let clock: TestClock;
+beforeEach(() => {
+	clock = installTestClock();
+});
+afterEach(() => {
+	clock.uninstall();
+});
 
 function deferred<T = void>() {
 	let resolve!: (v: T) => void;
@@ -21,25 +30,13 @@ async function tick() {
 async function settle() {
 	for (let i = 0; i < 30; i++) await Promise.resolve();
 	// A settled Action renders in the transition task, and isPending falls after it.
-	await nextTask();
+	await clock.advance(0);
 	flushSync(() => {});
 	flushEffects();
 }
 
 async function microtasks() {
 	for (let i = 0; i < 5; i++) await Promise.resolve();
-}
-
-/** Wait for a host task posted now, after every task the runtime posted before it. */
-function nextTask(): Promise<void> {
-	return new Promise((resolve) => {
-		const channel = new MessageChannel();
-		channel.port1.onmessage = () => {
-			channel.port1.close();
-			resolve();
-		};
-		channel.port2.postMessage(null);
-	});
 }
 
 describe('conformance: delegated events during async actions', () => {
@@ -114,7 +111,7 @@ describe('conformance: delegated events during async actions', () => {
 			expect(r.find('#event-count').textContent).toBe(transition ? '0' : '1');
 			expect(r.find('#event-pending').textContent).toBe('pending');
 			expect(r.find('#event-saved').textContent).toBe('initial');
-			await nextTask();
+			await clock.advance(0);
 			expect(r.find('#event-count').textContent).toBe('1');
 			expect(r.find('#event-pending').textContent).toBe('idle');
 			expect(r.find('#event-saved').textContent).toBe('finished');
@@ -156,7 +153,7 @@ describe('conformance: delegated events during async actions', () => {
 			finish.resolve();
 			await microtasks();
 			expect(r.find('#event-saved').textContent).toBe('initial');
-			await nextTask();
+			await clock.advance(0);
 			expect(r.find('#event-saved').textContent).toBe('finished');
 			expect(r.find('#event-pending').textContent).toBe('idle');
 		} finally {

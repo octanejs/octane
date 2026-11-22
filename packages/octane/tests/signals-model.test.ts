@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
 	createResource,
 	createScope,
@@ -6,8 +6,17 @@ import {
 	ScopeDisposedError,
 	type AdoptionFrame,
 } from 'octane/signals';
-import { deferred, drainProducers, type Deferred } from './_fixtures/signals-async-controls';
+import { deferred, type Deferred } from './_fixtures/signals-async-controls';
 import { makeRng, makeRootRng } from './conformance/_helpers/fuzz-prng';
+import { installTestClock, type TestClock } from 'octane/testing';
+
+let clock: TestClock;
+beforeEach(() => {
+	clock = installTestClock();
+});
+afterEach(() => {
+	clock.uninstall();
+});
 
 type Result = { readonly request: number; readonly value: string };
 type View = { readonly title: string; readonly result: Result | 'local' };
@@ -153,7 +162,7 @@ describe('scoped signals against an independent operation model', () => {
 									: { status: 'error', error, refreshing: false, complete: false };
 						}
 						attempt.settled = true;
-						await drainProducers();
+						await clock.advance(0);
 					} else if (command === 4) {
 						local = !local;
 						title = `title:${step}`;
@@ -186,7 +195,7 @@ describe('scoped signals against an independent operation model', () => {
 					if (!attempt.settled) expect(attempt.signal.aborted).toBe(true);
 					attempt.resolve({ request: attempt.request, value: 'after-retirement' });
 				}
-				await drainProducers();
+				await clock.advance(0);
 				expect(() => result$.latest(null)).toThrow(ScopeDisposedError);
 				expect(() => view$.get()).toThrow(ScopeDisposedError);
 				expect(frames.every(({ frame }) => frame.released)).toBe(true);

@@ -1,4 +1,4 @@
-import { expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { flushSync, hydrateRoot, type Root } from '../../src/index.js';
 import { prerender, renderToPipeableStream, type StreamOptions } from '../../src/runtime.server.js';
 import { bootstrapStreamedSignalHydration } from '../../src/hydration/streamed-signals.js';
@@ -10,8 +10,17 @@ import {
 	deferred,
 	resetStreamRuntimeGlobals,
 } from '../_server-stream.js';
-import { controlledStream, drainProducers } from '../_fixtures/signals-async-controls.js';
+import { controlledStream } from '../_fixtures/signals-async-controls.js';
 import * as client from '../_fixtures/automatic-signal-stream.tsrx';
+import { installTestClock, type TestClock } from 'octane/testing';
+
+let clock: TestClock;
+beforeEach(() => {
+	clock = installTestClock();
+});
+afterEach(() => {
+	clock.uninstall();
+});
 
 const server = loadServerFixture<typeof client>(
 	'packages/octane/tests/_fixtures/automatic-signal-stream.tsrx',
@@ -65,7 +74,7 @@ it.each(
 			await producer.started;
 			producer.emit('accepted server result');
 			producer.end();
-			await drainProducers();
+			await clock.advance(0);
 			gate.resolve();
 			const html = rendering ? (await rendering).html : await collector.ended;
 			expect(serverLoad).toHaveBeenCalledTimes(1);
@@ -92,7 +101,7 @@ it.each(
 					onUncaughtError: (error) => diagnostics.push(error),
 				},
 			);
-			await drainProducers();
+			await clock.advance(0);
 			flushSync(() => {});
 			expect(browserLoad).not.toHaveBeenCalled();
 			expect(container.querySelector('output')).toBe(output);
@@ -146,7 +155,7 @@ it.each(['', 'query-app-'])(
 			stream.pipe(collector.destination);
 			await producer.started;
 			// Drain the initial selection announcement before activating the shell.
-			await drainProducers();
+			await clock.advance(0);
 			container.innerHTML = collector.chunks.join('');
 			activateStreamedMarkup(container);
 			expect(container.querySelector('.streamed-query-pending')?.textContent).toBe('waiting');
@@ -166,7 +175,7 @@ it.each(['', 'query-app-'])(
 					onUncaughtError: (error) => diagnostics.push(error),
 				},
 			);
-			await drainProducers();
+			await clock.advance(0);
 			flushSync(() => {});
 			expect(container.querySelector('main')?.textContent).toBe('waiting');
 			expect(container.querySelector('.streamed-query-view')).toBeNull();
@@ -222,11 +231,11 @@ it.each([
 			// A later yield travels as data after the boundary's HTML.
 			for (let turn = 0; !collector.chunks.join('').includes('<output>'); turn++) {
 				expect(turn).toBeLessThan(20);
-				await drainProducers();
+				await clock.advance(0);
 			}
 			if (later) producer.emit('later server result');
 			producer.end();
-			await drainProducers();
+			await clock.advance(0);
 			container.innerHTML = await collector.ended;
 			activateStreamedMarkup(container);
 			const output = container.querySelector('output');
@@ -248,7 +257,7 @@ it.each([
 				},
 				{ signalOwner: hydration.signalOwner },
 			);
-			await drainProducers();
+			await clock.advance(0);
 			flushSync(() => {});
 			expect(renders).toEqual(expected);
 			expect(container.querySelector('output')).toBe(output);

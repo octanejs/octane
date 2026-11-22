@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { act, nextTask } from './_helpers';
+import { installTestClock, type TestClock } from 'octane/testing';
+import { act } from './_helpers';
 import {
 	addTransitionType,
 	createRoot,
@@ -52,6 +53,7 @@ describe('ViewTransition activation and matching', () => {
 	let root: Root;
 	let container: HTMLDivElement;
 	let captures: Array<{ old: string[]; next: string[] }>;
+	let installedClock: TestClock | null = null;
 	const capture = () =>
 		Array.from(container.querySelectorAll<HTMLElement>('[data-vt-target]'), (el) =>
 			el.style.getPropertyValue('view-transition-class'),
@@ -75,6 +77,8 @@ describe('ViewTransition activation and matching', () => {
 		root.unmount();
 		container.remove();
 		mocks.restore();
+		installedClock?.uninstall();
+		installedClock = null;
 	});
 
 	it('combines classes from every active transition type', async () => {
@@ -367,6 +371,7 @@ describe('ViewTransition activation and matching', () => {
 				otherRoot.render(MatchingApp, { text: 'zero', transition: {} });
 			});
 			let duringFirst = '';
+			const clock = (installedClock = installTestClock());
 			await act(async () => {
 				startTransition(() =>
 					root.render(LayoutReadinessApp, {
@@ -375,13 +380,14 @@ describe('ViewTransition activation and matching', () => {
 						requestFont: fonts.request,
 					}),
 				);
+				await clock.advance(0);
 				await nativeStarted;
 				expect(calls).toBe(1);
 				startTransition(() => otherRoot.render(MatchingApp, { text: 'later', transition: {} }));
-				await nextTask();
+				await clock.advance(0);
 				fonts.release();
 				await firstReady;
-				await nextTask();
+				await clock.advance(0);
 				duringFirst = otherContainer.textContent!;
 				finish();
 			});

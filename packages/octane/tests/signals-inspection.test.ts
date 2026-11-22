@@ -1,6 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createResource, createScope, query } from 'octane/signals';
-import { controlledStream, deferred, drainProducers } from './_fixtures/signals-async-controls';
+import { controlledStream, deferred } from './_fixtures/signals-async-controls';
+import { installTestClock, type TestClock } from 'octane/testing';
+
+let clock: TestClock;
+beforeEach(() => {
+	clock = installTestClock();
+});
+afterEach(() => {
+	clock.uninstall();
+});
 
 describe('scoped signal inspection', () => {
 	it('reports unevaluated nodes without running their computations', () => {
@@ -124,7 +133,7 @@ describe('scoped signal inspection', () => {
 		createResource(scope, 'result', () => load(undefined));
 		expect(scope.inspect()).toMatchObject({ activeRequests: 1, adoptionLeases: 0, retired: false });
 		pending.resolve('ready');
-		await drainProducers();
+		await clock.advance(0);
 		expect(scope.inspect().activeRequests).toBe(0);
 		const frame = scope.beginAdoption(scope.serialize());
 		const retained = frame.retain();
@@ -175,7 +184,7 @@ describe('scoped signal inspection', () => {
 				complete: false,
 			});
 			first.emit('private-payload');
-			await drainProducers();
+			await clock.advance(0);
 			expect(scope.inspect().nodes[0]).toMatchObject({
 				status: 'ready',
 				retained: true,
@@ -193,7 +202,7 @@ describe('scoped signal inspection', () => {
 			});
 			second.emit('replacement-payload');
 			second.end();
-			await drainProducers();
+			await clock.advance(0);
 			expect(scope.inspect().nodes[0]).toMatchObject({
 				status: 'ready',
 				retained: true,

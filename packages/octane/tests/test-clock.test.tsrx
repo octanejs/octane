@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useEffect, useState, useTransition } from 'octane';
 import { installTestClock, type TestClock } from 'octane/testing';
-import { act, mount, nextTask, type MountResult } from './_helpers';
+import { act, mount, type MountResult } from './_helpers';
 import { BasicSuspense } from './_fixtures/suspense.tsrx';
 
 function Counter(props: { log: string[] }) @{
@@ -20,6 +20,19 @@ function Counter(props: { log: string[] }) @{
 			{'transition'}
 		</button>
 	</div>
+}
+
+// A real host task, which the clock does not own: work the clock holds must
+// still be waiting after it runs.
+function realHostTask(): Promise<void> {
+	return new Promise((resolve) => {
+		const channel = new MessageChannel();
+		channel.port1.onmessage = () => {
+			channel.port1.close();
+			resolve();
+		};
+		channel.port2.postMessage(null);
+	});
 }
 
 let clock: TestClock | null = null;
@@ -48,8 +61,8 @@ describe('installTestClock', () => {
 
 		press('#transition');
 		// Real host tasks pass; the transition's task is the clock's.
-		await nextTask();
-		await nextTask();
+		await realHostTask();
+		await realHostTask();
 		expect(text('#n')).toBe('0');
 		expect(text('#pending')).toBe('pending');
 
@@ -118,7 +131,7 @@ describe('installTestClock', () => {
 		clock = installTestClock();
 
 		press('#transition');
-		await nextTask();
+		await realHostTask();
 		expect(text('#n')).toBe('0');
 
 		clock.uninstall();

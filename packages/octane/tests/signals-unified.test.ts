@@ -1,6 +1,6 @@
 import { setFlagsFromString } from 'node:v8';
 import { runInNewContext } from 'node:vm';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
 	createResource,
 	__derivedAt,
@@ -29,9 +29,17 @@ import {
 	capturePending$,
 	controlledStream,
 	deferred,
-	drainProducers,
 	nextSnapshot$,
 } from './_fixtures/signals-async-controls';
+import { installTestClock, type TestClock } from 'octane/testing';
+
+let clock: TestClock;
+beforeEach(() => {
+	clock = installTestClock();
+});
+afterEach(() => {
+	clock.uninstall();
+});
 
 const scopes: Scope[] = [];
 
@@ -151,7 +159,7 @@ describe('unified readonly derived declarations', () => {
 		runWithSignalOwner(local, () => expect(value$.snapshot().status).toBe('pending'));
 		const signal = context.signal;
 		local.dispose();
-		await drainProducers();
+		await clock.advance(0);
 		expect(settled).toBe(true);
 		expect(signal.aborted).toBe(true);
 		expect(context.signal.aborted).toBe(true);
@@ -159,7 +167,7 @@ describe('unified readonly derived declarations', () => {
 		expect(producerSignal.aborted).toBe(false);
 		expect(source$.snapshot().status).toBe('pending');
 		producer.resolve('foreign still current');
-		await drainProducers();
+		await clock.advance(0);
 		expect(source$.get()).toBe('foreign still current');
 	});
 
@@ -235,13 +243,13 @@ describe('unified readonly derived declarations', () => {
 
 		runWithSignalOwner(scope, () => expect(scope.isPending(() => value$.get())).toBe(true));
 		gates[0].resolve();
-		await drainProducers();
+		await clock.advance(0);
 		runWithSignalOwner(scope, () => selected$.set('second'));
 		expect(attempts[0].aborted).toBe(true);
 		gates[1].resolve();
 		results[0].resolve('obsolete');
 		results[1].resolve('accepted');
-		await drainProducers();
+		await clock.advance(0);
 		expect(runWithSignalOwner(scope, () => value$.get())).toBe('second:accepted');
 		expect(runWithSignalOwner(scope, () => value$.snapshot())).toMatchObject({
 			status: 'ready',
@@ -271,10 +279,10 @@ describe('unified readonly derived declarations', () => {
 		);
 		expect(runWithSignalOwner(scope, () => stream$.get())).toBe('first:one');
 		runWithSignalOwner(scope, () => selected$.set('second'));
-		await drainProducers();
+		await clock.advance(0);
 		expect(first.cancellations).toBe(1);
 		second.emit('two');
-		await drainProducers();
+		await clock.advance(0);
 		expect(runWithSignalOwner(scope, () => stream$.get())).toBe('second:two');
 		expect(runWithSignalOwner(scope, () => stream$.snapshot())).toMatchObject({
 			status: 'ready',
@@ -282,7 +290,7 @@ describe('unified readonly derived declarations', () => {
 			complete: false,
 		});
 		second.end();
-		await drainProducers();
+		await clock.advance(0);
 		expect(runWithSignalOwner(scope, () => stream$.snapshot())).toMatchObject({
 			status: 'ready',
 			value: 'second:two',
@@ -303,9 +311,9 @@ describe('unified readonly derived declarations', () => {
 		const scope = owner('document:promised-stream');
 
 		runWithSignalOwner(scope, () => stream$.snapshot());
-		await drainProducers();
+		await clock.advance(0);
 		stream.emit('value');
-		await drainProducers();
+		await clock.advance(0);
 		expect(runWithSignalOwner(scope, () => stream$.snapshot())).toMatchObject({
 			status: 'ready',
 			value: 'value',
@@ -316,7 +324,7 @@ describe('unified readonly derived declarations', () => {
 			prefix$.snapshot();
 			explicit$.snapshot();
 		});
-		await drainProducers();
+		await clock.advance(0);
 		expect(runWithSignalOwner(scope, () => [prefix$.snapshot(), explicit$.snapshot()])).toEqual([
 			expect.objectContaining({
 				status: 'ready',
@@ -332,7 +340,7 @@ describe('unified readonly derived declarations', () => {
 			}),
 		]);
 		stream.end();
-		await drainProducers();
+		await clock.advance(0);
 		for (const handle$ of [stream$, prefix$, explicit$]) {
 			expect(runWithSignalOwner(scope, () => handle$.snapshot())).toMatchObject({
 				status: 'ready',
@@ -357,7 +365,7 @@ describe('unified readonly derived declarations', () => {
 		expect(runWithSignalOwner(scope, () => status$.get())).toBe('pending');
 		loaded = 'loaded';
 		load.resolve();
-		await drainProducers();
+		await clock.advance(0);
 		expect(runWithSignalOwner(scope, () => status$.get())).toBe('ready');
 		expect(runWithSignalOwner(scope, () => value$.get())).toBe('loaded');
 	});
@@ -443,12 +451,12 @@ describe('unified readonly derived declarations', () => {
 		const waiting = runWithSignalOwner(scope, () => capturePending$(() => value$.get()));
 		const settled = await Promise.race([
 			Promise.resolve(waiting).then(() => true),
-			drainProducers().then(() => false),
+			clock.advance(0).then(() => false),
 		]);
 		expect(settled).toBe(false);
 		expect(runWithSignalOwner(scope, () => reader$.snapshot().status)).toBe('pending');
 		runWithSignalOwner(scope, () => ready$.set(true));
-		await drainProducers();
+		await clock.advance(0);
 		expect(runWithSignalOwner(scope, () => reader$.get())).toBe('ready');
 	});
 });
@@ -488,7 +496,7 @@ describe('keyed query declarations', () => {
 			expect.objectContaining({ status: 'pending' }),
 		]);
 		completions[0].resolve('ready');
-		await drainProducers();
+		await clock.advance(0);
 		expect(runWithSignalOwner(scope, () => value$.get())).toBe('ready');
 		for (const handle$ of [projected$, synchronous$]) {
 			expect(runWithSignalOwner(scope, () => handle$.get())).toBe('READY');
@@ -509,7 +517,7 @@ describe('keyed query declarations', () => {
 			});
 		}
 		completions[1].resolve('refetched');
-		await drainProducers();
+		await clock.advance(0);
 		for (const handle$ of [projected$, synchronous$]) {
 			expect(runWithSignalOwner(scope, () => handle$.get())).toBe('REFETCHED');
 		}
@@ -523,7 +531,7 @@ describe('keyed query declarations', () => {
 			expect(runWithSignalOwner(scope, () => handle$.latest(null))).toBe('REFETCHED');
 		}
 		completions[2].resolve('reset');
-		await drainProducers();
+		await clock.advance(0);
 		expect(runWithSignalOwner(scope, () => value$.get())).toBe('reset');
 		for (const handle$ of [projected$, synchronous$]) {
 			expect(runWithSignalOwner(scope, () => handle$.get())).toBe('RESET');
@@ -531,7 +539,7 @@ describe('keyed query declarations', () => {
 		runWithSignalOwner(scope, () => selected$.set('failure'));
 		const failure = new Error('The source failed.');
 		completions[3].reject(failure);
-		await drainProducers();
+		await clock.advance(0);
 		for (const handle$ of [projected$, synchronous$]) {
 			expect(runWithSignalOwner(scope, () => handle$.snapshot())).toMatchObject({
 				status: 'error',
@@ -622,10 +630,10 @@ describe('keyed query declarations', () => {
 		).toBe(false);
 		detach();
 		runWithSignalOwner(rendererOwner, () => selected$.set('two'));
-		await drainProducers();
+		await clock.advance(0);
 		expect(runWithSignalOwner(rendererOwner, () => value$.get())).toBe('browser');
 		runWithSignalOwner(rendererOwner, () => selected$.set('one'));
-		await drainProducers();
+		await clock.advance(0);
 		expect(starts).toBe(2);
 		expect(runWithSignalOwner(rendererOwner, () => value$.get())).toBe('browser');
 
@@ -744,13 +752,13 @@ describe('optimistic actions', () => {
 			await op.until(() => visible$.get());
 		});
 		runWithSignalOwner(scope, () => source$.snapshot());
-		await drainProducers();
+		await clock.advance(0);
 		const result = runWithSignalOwner(scope, () => save()).then(
 			() => 'confirmed',
 			(error) => error,
 		);
 		runWithSignalOwner(scope, () => selected$.set('b'));
-		await drainProducers();
+		await clock.advance(0);
 		expect(await result).toMatchObject({ message: expect.stringMatching(/selection/) });
 		expect(operation.status).toBe('rejected');
 		expect(runWithSignalOwner(scope, () => source$.get())).toBe(true);
@@ -826,7 +834,7 @@ describe('optimistic actions', () => {
 			outcome = error;
 		});
 		operation.reject();
-		await drainProducers();
+		await clock.advance(0);
 		expect(outcome).toBeInstanceOf(Error);
 		await pending;
 	});
@@ -849,15 +857,15 @@ describe('optimistic actions', () => {
 				return op.uncertain();
 			});
 			runWithSignalOwner(scope, () => source$.snapshot());
-			await drainProducers();
+			await clock.advance(0);
 			runWithSignalOwner(scope, () => save());
 			if (change === 'retire') scope.dispose();
 			else {
 				runWithSignalOwner(scope, () => selected$.set('b'));
-				await drainProducers();
+				await clock.advance(0);
 				if (change === 'reselect') {
 					runWithSignalOwner(scope, () => selected$.set('a'));
-					await drainProducers();
+					await clock.advance(0);
 				}
 			}
 			expect(() => operation.adopt('wrong')).toThrow(/selection|disposed/);
@@ -895,22 +903,22 @@ describe('optimistic actions', () => {
 		});
 		runWithSignalOwner(scope, () => source$.snapshot());
 		stream.emit({ revision: 0, text: 'before' });
-		await drainProducers();
+		await clock.advance(0);
 		runWithSignalOwner(scope, () => save());
 		expect(runWithSignalOwner(scope, () => visible$.get()).text).toBe('accepted');
 		expect(stream.cancellations).toBe(0);
 		runWithSignalOwner(scope, () => pendingSave());
 		stream.emit({ revision: 3, text: 'newer watch value' });
-		await drainProducers();
+		await clock.advance(0);
 		operation.adopt({ revision: 2, text: 'late receipt' });
 		expect(operation.status).toBe('confirmed');
 		expect(runWithSignalOwner(scope, () => visible$.get()).text).toBe('newer watch value');
 		expect(stream.cancellations).toBe(0);
 		stream.emit({ revision: 4, text: 'completed' });
-		await drainProducers();
+		await clock.advance(0);
 		expect(runWithSignalOwner(scope, () => visible$.get()).text).toBe('completed');
 		stream.end();
-		await drainProducers();
+		await clock.advance(0);
 		expect(runWithSignalOwner(scope, () => source$.snapshot()).complete).toBe(true);
 
 		runWithSignalOwner(scope, () => pendingSave());
@@ -920,10 +928,10 @@ describe('optimistic actions', () => {
 		expect(operation.status).toBe('confirmed');
 		expect(runWithSignalOwner(scope, () => visible$.latest())?.text).toBe('completed');
 		stream.emit({ revision: 5, text: 'resumed watch' });
-		await drainProducers();
+		await clock.advance(0);
 		expect(runWithSignalOwner(scope, () => visible$.get()).text).toBe('resumed watch');
 		stream.end();
-		await drainProducers();
+		await clock.advance(0);
 		expect(runWithSignalOwner(scope, () => source$.snapshot()).complete).toBe(true);
 	});
 
@@ -1064,7 +1072,7 @@ describe('optimistic actions', () => {
 
 		runWithSignalOwner(scope, () => source$.snapshot());
 		initial.resolve({ revision: 0, text: 'old' });
-		await drainProducers();
+		await clock.advance(0);
 		expect(runWithSignalOwner(scope, () => shared$.get()).text).toBe('old');
 		const first = deferred<Saved>();
 		const second = deferred<Saved>();
@@ -1103,7 +1111,7 @@ describe('optimistic actions', () => {
 
 		const other = owner('document:action-adopt-other');
 		runWithSignalOwner(other, () => source$.snapshot());
-		await drainProducers();
+		await clock.advance(0);
 		await runWithSignalOwner(other, () =>
 			save('other draft', Promise.resolve({ revision: 1, text: 'other accepted' })),
 		);
@@ -1192,7 +1200,7 @@ describe('optimistic actions', () => {
 		});
 
 		await waiting.promise;
-		await drainProducers();
+		await clock.advance(0);
 		expect(settled).toBe(false);
 		runWithSignalOwner(scope, () => source$.set(2));
 		await pending;
@@ -1217,17 +1225,17 @@ describe('optimistic actions', () => {
 
 		runWithSignalOwner(scope, () => source$.snapshot());
 		responses[0].resolve('server-a-1');
-		await drainProducers();
+		await clock.advance(0);
 		runWithSignalOwner(scope, () => save());
 		expect(runWithSignalOwner(scope, () => visible$.get())).toBe('draft-a');
 
 		runWithSignalOwner(scope, () => selected$.set('b'));
 		responses[1].resolve('server-b');
-		await drainProducers();
+		await clock.advance(0);
 		expect(runWithSignalOwner(scope, () => visible$.get())).toBe('server-b');
 		runWithSignalOwner(scope, () => selected$.set('a'));
 		responses[2].resolve('server-a-2');
-		await drainProducers();
+		await clock.advance(0);
 		expect(runWithSignalOwner(scope, () => visible$.get())).toBe('server-a-2');
 	});
 });
