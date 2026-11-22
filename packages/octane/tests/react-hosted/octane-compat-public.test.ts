@@ -1553,6 +1553,108 @@ describe('octane/react — StrictMode, hide/reveal, and teardown discrimination 
 		}
 	});
 
+	it.each(['prop', 'context'] as const)(
+		'defers a %s update to a Suspense-hidden island until reveal like a React child (#2738)',
+		async (kind) => {
+			const Context = React.createContext('fallback');
+			const reactLog = createLog();
+			const octaneLog = createLog();
+			function Sibling({ wait }: { wait: Promise<void> | null }) {
+				if (wait !== null) React.use(wait);
+				return null;
+			}
+			function ReactChild(props: { label: string; log: (message: string) => void }) {
+				const context = React.useContext(Context);
+				const current = kind === 'prop' ? props.label : context;
+				const log = props.log;
+				React.useInsertionEffect(() => {
+					log('insertion setup:' + current);
+					return () => log('insertion cleanup:' + current);
+				}, [current]);
+				React.useLayoutEffect(() => {
+					log('layout setup:' + current);
+					return () => log('layout cleanup:' + current);
+				}, [current]);
+				return h('output', null, current);
+			}
+			const island = (value: string) =>
+				kind === 'prop'
+					? h(OctaneCompat<{ label: string; log: (m: string) => void }>, {
+							key: 'octane',
+							component: HiddenLabelIsland,
+							props: { label: value, log: octaneLog.push },
+						})
+					: h(OctaneCompat<{ context: React.Context<string>; log: (m: string) => void }>, {
+							key: 'octane',
+							component: HiddenContextIsland,
+							props: { context: Context, log: octaneLog.push },
+						});
+			const tree = (value: string, wait: Promise<void> | null) =>
+				h(Context, {
+					value,
+					children: h(
+						React.Suspense,
+						{ fallback: h('p', null, 'react pending') },
+						h(ReactChild, { key: 'react', label: value, log: reactLog.push }),
+						island(value),
+						h(Sibling, { key: 'sibling', wait }),
+					),
+				});
+			const resolve = async (gate: ReturnType<typeof deferred<void>>) => {
+				await reactAct(async () => {
+					gate.resolve();
+					await gate.promise;
+				});
+				flushEffects();
+			};
+			const both = (log: string[]) => ({ react: log, octane: log });
+			const consoleError = vi.spyOn(console, 'error');
+			const mounted = await mountReactHost(tree('a', null));
+			try {
+				flushEffects();
+				const output = mounted.host().querySelector('output')!;
+				const drain = () => ({ react: reactLog.drain(), octane: octaneLog.drain() });
+				drain();
+
+				// A sibling suspends; the fallback hides the island.
+				const first = deferred<void>();
+				await mounted.render(tree('a', first.promise));
+				flushEffects();
+				expect(drain()).toEqual(both(['layout cleanup:a']));
+
+				// React discards an update that suspends again: nothing commits while hidden.
+				await mounted.render(tree('b', first.promise));
+				flushEffects();
+				expect(drain()).toEqual(both([]));
+				expect(output.textContent).toBe('a');
+
+				await resolve(first);
+				expect(drain()).toEqual(
+					both(['insertion cleanup:a', 'insertion setup:b', 'layout setup:b']),
+				);
+				expect(mounted.host().querySelector('output')).toBe(output);
+				expect(output.textContent).toBe('b');
+
+				// An update that suspends in the same commit keeps the previous value hidden.
+				const second = deferred<void>();
+				await mounted.render(tree('c', second.promise));
+				flushEffects();
+				expect(drain()).toEqual(both(['layout cleanup:b']));
+				expect(output.textContent).toBe('b');
+
+				await resolve(second);
+				expect(drain()).toEqual(
+					both(['insertion cleanup:b', 'insertion setup:c', 'layout setup:c']),
+				);
+				expect(output.textContent).toBe('c');
+				expect(consoleError).not.toHaveBeenCalled();
+			} finally {
+				consoleError.mockRestore();
+				await mounted.unmount();
+			}
+		},
+	);
+
 	it('routes a hosted cleanup fault through reportError without scheduling the dead wrapper', async () => {
 		// jsdom does not implement reportError; stub the global the module
 		// feature-detects (browsers and Node both provide it).
