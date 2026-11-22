@@ -218,7 +218,7 @@ export function useSignalSubscription<T>(
 function useActivitySubscription<T>(
 	source: SignalHandle<T> | Subscribe | null,
 	defaults: RetainedSignalDefaults,
-	retainOnHide = defaults.retainOnHide,
+	retainOnHide?: boolean,
 ): Subscribe {
 	const binding = useMemo(() => {
 		if (source === null) return null;
@@ -226,9 +226,8 @@ function useActivitySubscription<T>(
 			typeof source === 'function' ? source : (notify) => source[SIGNAL_BINDING_SUBSCRIBE](notify),
 		);
 	}, [source]);
-	useInsertionEffect(() => {
-		return binding?.retain(retainOnHide, defaults.handoff);
-	}, [binding, retainOnHide, defaults.handoff]);
+	const retention = (retainOnHide ?? defaults.retainOnHide) && (defaults.handoff ?? true);
+	useInsertionEffect(() => binding?.retain(retention), [binding, retention]);
 	useLayoutEffect(binding?.prepare ?? noop, [binding]);
 	return binding?.subscribe ?? subscribeToNothing;
 }
@@ -253,9 +252,9 @@ function activityBinding(subscribe: Subscribe) {
 	};
 	return {
 		// Insertion effects survive an Activity hide.
-		retain(enabled: boolean, provider: Handoff | undefined) {
-			handoff = enabled ? provider : undefined;
-			if (!enabled) return;
+		retain(retention: boolean | Handoff) {
+			handoff = typeof retention === 'object' ? retention : undefined;
+			if (!retention) return;
 			retained = true;
 			return () => {
 				retained = false;
