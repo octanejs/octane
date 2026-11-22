@@ -228,7 +228,7 @@ describe('octane/signals/react', () => {
 		expect(stop).toHaveBeenCalledOnce();
 	});
 
-	it.each(['opt-out', 'independent parents'] as const)(
+	it.each(['opt-out', 'updated provider opt-out', 'independent parents'] as const)(
 		'preserves separate watched lifetimes for %s',
 		async (mode) => {
 			const scope = createScope({ scopeKey: 'separate' });
@@ -242,12 +242,16 @@ describe('octane/signals/react', () => {
 				},
 			});
 			function Reader() {
-				return h('output', null, useRetainedSignalValue(value$, undefined, mode !== 'opt-out'));
+				return h(
+					'output',
+					null,
+					useRetainedSignalValue(value$, undefined, mode === 'opt-out' ? false : undefined),
+				);
 			}
 			const pane = (key: string) => h(RetainedSignalProvider, { key }, h(Reader));
-			const tree = (next: boolean) =>
-				mode === 'opt-out'
-					? h(RetainedSignalProvider, null, pane(String(next)))
+			const tree = (next: boolean, retainOnHide = true) =>
+				mode !== 'independent parents'
+					? h(RetainedSignalProvider, { retainOnHide }, pane(String(next)))
 					: h(
 							RetainedSignalProvider,
 							null,
@@ -255,6 +259,10 @@ describe('octane/signals/react', () => {
 							h(RetainedSignalProvider, null, next ? pane('incoming') : null),
 						);
 			const { root } = mount(tree(false));
+			if (mode === 'updated provider opt-out') {
+				await act(() => root.render(tree(false, false)));
+				expect(log).toEqual(['start']);
+			}
 			await act(() => root.render(tree(true)));
 			expect(log).toEqual(['start', 'stop', 'start']);
 			flushSync(() => root.render(null));
