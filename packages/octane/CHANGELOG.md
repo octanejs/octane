@@ -1,5 +1,12 @@
 # octane
 
+## 0.23.2
+
+### Patch Changes
+
+- bf99307: Reduce temporary allocations when React re-renders retained signal readers.
+- 0bdf623: Keep shared watched sources connected when React replaces sibling retained signal providers in one commit. Outgoing retained subscriptions release after incoming readers attach in the same passive pass.
+
 ## 0.23.1
 
 ### Patch Changes

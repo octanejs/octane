@@ -1,5 +1,14 @@
 # @octanejs/codemod
 
+## 0.2.11
+
+### Patch Changes
+
+- ca878fd: Name the adapted store hook in the warning at a standalone Octane root that renders a migrated component needing `NativeStoreProvider`.
+- Updated dependencies [bf99307]
+- Updated dependencies [0bdf623]
+  - octane@0.23.2
+
 ## 0.2.10
 
 ### Patch Changes
