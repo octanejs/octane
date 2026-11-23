@@ -882,6 +882,24 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 		}
 	});
 
+	it('uses project default intrinsics for unmarked files without overriding authored pragmas', () => {
+		const source = 'export function Panel() { return <div />; }';
+		const authored = '/** @jsxImportSource fixture-file */\n' + source;
+		const options = { defaultIntrinsics: 'fixture-project' };
+		expect(compileToVolarMappings(source, 'Panel.tsrx', options).code).toContain(
+			'@jsxImportSource fixture-project',
+		);
+		expect(compileToVolarMappings(authored, 'Panel.tsrx', options).code).toContain(
+			'@jsxImportSource fixture-file',
+		);
+		for (const input of [source, authored]) {
+			const overrides = { ...options, intrinsics: 'fixture-override' };
+			expect(compileToVolarMappings(input, 'Panel.tsrx', overrides).code).toContain(
+				'@jsxImportSource fixture-override',
+			);
+		}
+	});
+
 	it('checks a portable JSX surface independently of the runtime renderer and authored pragma', () => {
 		const root = mkdtempSync(join(tmpdir(), 'octane-volar-portable-intrinsics-'));
 		try {

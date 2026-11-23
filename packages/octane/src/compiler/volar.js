@@ -661,7 +661,8 @@ function markNativeTemplateBodies(root) {
  *
  * The optional `intrinsics` selects the virtual TSX's JSX type namespace
  * independently of the runtime renderer and any authored pragma.
- * @param {{ loose?: boolean, renderers?: unknown, intrinsics?: string, strong?: boolean, knownAttributeSpreads?: readonly import('./index.js').KnownAttributeSpread[] }} [options]
+ * `defaultIntrinsics` supplies the project JSX source for files without an authored pragma.
+ * @param {{ loose?: boolean, renderers?: unknown, intrinsics?: string, defaultIntrinsics?: string, strong?: boolean, knownAttributeSpreads?: readonly import('./index.js').KnownAttributeSpread[] }} [options]
  * @returns {import('./index.js').VolarCompileResult}
  */
 export function compileToVolarMappings(source, filename, options) {
@@ -725,7 +726,12 @@ export function compileToVolarMappings(source, filename, options) {
 	const strongDOM = strongAnalysis?.enabled === true && renderer.target === 'dom';
 	const rendererPragma = authoredPragma
 		? null
-		: createRendererTypePragma(renderer, ast, strongDOM, options?.intrinsics);
+		: createRendererTypePragma(
+				renderer,
+				ast,
+				strongDOM,
+				options?.intrinsics ?? options?.defaultIntrinsics,
+			);
 	const replacePragma =
 		authoredPragma &&
 		(options?.intrinsics !== undefined ||
