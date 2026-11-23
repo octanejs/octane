@@ -553,7 +553,7 @@ export function stampSources(
 		for (let i = 0; i < path.length && node !== null; i++) {
 			// An HTML <template>'s parsed children live in its `.content` fragment;
 			// an SVG or MathML <template> is an ordinary element with no `.content`.
-			const content = (node as HTMLTemplateElement).content;
+			const content: DocumentFragment | undefined = (node as HTMLTemplateElement).content;
 			node = child(
 				(node as Element).localName === 'template' && content instanceof DocumentFragment
 					? content
