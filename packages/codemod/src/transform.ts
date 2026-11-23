@@ -23,7 +23,12 @@ import {
 	unchangedContextProviderUse,
 	walkLocalValues,
 } from './local-uses.js';
-import { isWrapper, literalCondition, skipWrappers } from './expression-wrappers.js';
+import {
+	isPrimitiveLiteral,
+	isWrapper,
+	literalCondition,
+	skipWrappers,
+} from './expression-wrappers.js';
 import ts from 'typescript';
 import {
 	atInitializedModuleHandle,
@@ -569,26 +574,6 @@ function nodeSpanning(sf: ts.SourceFile, start: number, end: number): ts.Node | 
 		if (child.getStart(sf) === start && child.end === end) return child;
 		node = child;
 	}
-}
-
-function isPrimitiveLiteral(node: ts.Expression) {
-	node = skipWrappers(node);
-	if (ts.isPrefixUnaryExpression(node)) {
-		const operand = skipWrappers(node.operand);
-		if (node.operator === ts.SyntaxKind.PlusToken) return ts.isNumericLiteral(operand);
-		return (
-			node.operator === ts.SyntaxKind.MinusToken &&
-			(ts.isNumericLiteral(operand) || ts.isBigIntLiteral(operand))
-		);
-	}
-	return (
-		ts.isStringLiteralLike(node) ||
-		ts.isNumericLiteral(node) ||
-		ts.isBigIntLiteral(node) ||
-		node.kind === ts.SyntaxKind.TrueKeyword ||
-		node.kind === ts.SyntaxKind.FalseKeyword ||
-		node.kind === ts.SyntaxKind.NullKeyword
-	);
 }
 
 /**
@@ -8432,6 +8417,16 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					if (!isPrimitiveLiteral(expression)) return false;
 				}
 				return false;
+			}
+			if (ts.isTaggedTemplateExpression(read)) {
+				const tag = skipWrappers(read.tag);
+				if (readsOrdinal(tag)) return true;
+				// An inline tag is evaluated first, then receives the uncoerced values.
+				return (
+					(ts.isArrowFunction(tag) || ts.isFunctionExpression(tag)) &&
+					ts.isTemplateExpression(read.template) &&
+					readsInOrder(read.template.templateSpans.map(({ expression }) => expression))
+				);
 			}
 			if (ts.isArrayLiteralExpression(read))
 				return readsInOrder(read.elements.filter((element) => !ts.isOmittedExpression(element)));
