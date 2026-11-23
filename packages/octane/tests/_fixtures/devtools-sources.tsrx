@@ -23,6 +23,11 @@ export function SourcesApp(props: { show: boolean }) @{
 			</section>
 		}
 		<footer>end</footer>
+		<svg>
+			<template>
+				<g />
+			</template>
+		</svg>
 		<template>
 			<u>inert</u>
 		</template>

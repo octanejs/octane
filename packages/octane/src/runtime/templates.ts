@@ -551,10 +551,12 @@ export function stampSources(
 	for (const [path, line, col] of entries) {
 		let node: Node | null = root;
 		for (let i = 0; i < path.length && node !== null; i++) {
-			// A <template>'s parsed children live in its `.content` fragment.
+			// An HTML <template>'s parsed children live in its `.content` fragment;
+			// an SVG or MathML <template> is an ordinary element with no `.content`.
+			const content = (node as HTMLTemplateElement).content;
 			node = child(
-				(node as HTMLTemplateElement).localName === 'template'
-					? (node as HTMLTemplateElement).content
+				(node as Element).localName === 'template' && content instanceof DocumentFragment
+					? content
 					: node,
 			);
 			if (node !== null && path[i] > 0) node = sibling(node, path[i]);

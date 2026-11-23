@@ -21,7 +21,9 @@ function hook(): OctaneDevtoolsHook {
 function expectEveryElementLocated(container: Element): void {
 	// A <template>'s children live in its content fragment, out of the tree.
 	const elements = [...container.querySelectorAll('*')];
-	elements.push(...container.querySelector('template')!.content.querySelectorAll('*'));
+	elements.push(
+		...container.querySelector(':scope > main > template')!.content.querySelectorAll('*'),
+	);
 	expect(elements.map((el) => el.localName)).toEqual([
 		'main',
 		'h1',
@@ -33,6 +35,9 @@ function expectEveryElementLocated(container: Element): void {
 		'section',
 		'b',
 		'footer',
+		'svg',
+		'template',
+		'g',
 		'template',
 		'u',
 	]);
