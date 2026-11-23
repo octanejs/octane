@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import os from 'node:os';
+import { join } from 'node:path';
 import { build } from 'esbuild';
 import { chromium } from 'playwright';
-import { version as react } from 'react';
 import { countNamedFunctions } from '../../lib/precise-work.mjs';
 import { summarizeSamples, timingStatForJson } from '../../lib/stats.mjs';
 
@@ -19,6 +20,8 @@ const warmups = 2;
 const viewport = { width: 1024, height: 768 };
 const origin = 'http://127.0.0.1/';
 const html = readFileSync(new URL('./index.html', import.meta.url), 'utf8');
+const requireReact = createRequire(new URL('../react/package.json', import.meta.url));
+const { version: react } = requireReact('react/package.json');
 
 // An explicit oracle independent of the application's LRU. Oldest first.
 const schedule = [
@@ -48,6 +51,7 @@ async function runPass(profile) {
 	const { outputFiles } = await build({
 		absWorkingDir: import.meta.dirname,
 		entryPoints: ['app.jsx'],
+		nodePaths: [join(import.meta.dirname, '../react/node_modules')],
 		bundle: true,
 		format: 'esm',
 		jsx: 'automatic',

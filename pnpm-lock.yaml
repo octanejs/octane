@@ -1766,21 +1766,9 @@ importers:
 
   benchmarks/chat-stream:
     dependencies:
-      esbuild:
-        specifier: catalog:default
-        version: 0.28.1
-      octane:
-        specifier: workspace:*
-        version: link:../../packages/octane
       playwright:
         specifier: ^1.61.1
         version: 1.61.1
-      react:
-        specifier: catalog:default
-        version: 19.2.7
-      react-dom:
-        specifier: catalog:default
-        version: 19.2.7(react@19.2.7)
 
   benchmarks/chat-stream/inferno:
     dependencies:

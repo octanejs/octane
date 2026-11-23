@@ -12,10 +12,6 @@
     "bench:descriptors": "node descriptor-stream.mjs"
   },
   "dependencies": {
-    "esbuild": "catalog:default",
-    "octane": "workspace:*",
-    "playwright": "catalog:default",
-    "react": "catalog:default",
-    "react-dom": "catalog:default"
+    "playwright": "catalog:default"
   }
 }
