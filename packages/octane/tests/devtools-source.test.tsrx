@@ -9,6 +9,8 @@ import { SourcesApp } from './_fixtures/devtools-sources.tsrx';
 import { act, mount } from './_helpers';
 
 const FIXTURE = 'packages/octane/tests/_fixtures/devtools-sources.tsrx';
+// The octane-prod project compiles without dev, which stamps nothing.
+const dev = process.env['OCTANE_TEST_COMPILE_MODE'] !== 'prod';
 
 function hook(): OctaneDevtoolsHook {
 	installDevtoolsGlobal();
@@ -45,6 +47,10 @@ function expectEveryElementLocated(container: Element): void {
 	]);
 	for (const el of elements) {
 		const source = hook().sourceFor(el);
+		if (!dev) {
+			expect(source, el.localName).toBeNull();
+			continue;
+		}
 		expect(source, el.localName).not.toBeNull();
 		// The bundler's canonical id: root-relative, so it is the Vite URL too.
 		expect(source!.file).toBe(`/${FIXTURE}`);
