@@ -19,7 +19,9 @@ function hook(): OctaneDevtoolsHook {
 // opening tag starts: static elements, component output, @if arms and
 // multi-root fragments included.
 function expectEveryElementLocated(container: Element): void {
+	// A <template>'s children live in its content fragment, out of the tree.
 	const elements = [...container.querySelectorAll('*')];
+	elements.push(...container.querySelector('template')!.content.querySelectorAll('*'));
 	expect(elements.map((el) => el.localName)).toEqual([
 		'main',
 		'h1',
@@ -31,6 +33,8 @@ function expectEveryElementLocated(container: Element): void {
 		'section',
 		'b',
 		'footer',
+		'template',
+		'u',
 	]);
 	for (const el of elements) {
 		const source = hook().sourceFor(el);

@@ -540,7 +540,8 @@ export function clone<T extends Node>(node: T, loc?: string, partialStyles?: str
  * element of the template with `__oct_src = "file:line:col"`, the authored
  * position devtools `sourceFor()` reports. Each entry is `[path, line, col]`,
  * the template path the compiler's own element walk uses; child()/sibling()
- * keep it hole-aware while hydrating. Never emitted in production.
+ * keep it hole-aware while hydrating, and a <template> is entered through its
+ * `.content`. Never emitted in production.
  */
 export function stampSources(
 	root: Node,
@@ -550,7 +551,12 @@ export function stampSources(
 	for (const [path, line, col] of entries) {
 		let node: Node | null = root;
 		for (let i = 0; i < path.length && node !== null; i++) {
-			node = child(node);
+			// A <template>'s parsed children live in its `.content` fragment.
+			node = child(
+				(node as HTMLTemplateElement).localName === 'template'
+					? (node as HTMLTemplateElement).content
+					: node,
+			);
 			if (node !== null && path[i] > 0) node = sibling(node, path[i]);
 		}
 		if (node !== null && node.nodeType === 1) (node as any).__oct_src = `${file}:${line}:${col}`;

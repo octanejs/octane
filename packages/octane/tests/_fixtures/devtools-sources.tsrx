@@ -23,5 +23,8 @@ export function SourcesApp(props: { show: boolean }) @{
 			</section>
 		}
 		<footer>end</footer>
+		<template>
+			<u>inert</u>
+		</template>
 	</main>
 }
