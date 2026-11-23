@@ -49,7 +49,8 @@ describe('dev hydration source-LOC plumbing (P1)', () => {
 	it('prod output == dev output with the dev-only LOC artifacts removed', () => {
 		// The ONLY differences dev introduces are: the `__s.locs`/`__s.locFile` table, the
 		// per-element `__oct_loc` stamps, the `clone(tpl, "loc")` structural-mismatch loc
-		// argument, and source-aware HTML-nesting import/calls — all strictly dev-gated.
+		// argument, the per-template `stampSources` call (#3132), and source-aware
+		// HTML-nesting import/calls — all strictly dev-gated.
 		// Normalize those exact diagnostics away and the outputs must be byte-identical,
 		// proving production carries neither LOC nor nesting overhead.
 		// Strip is statement-shaped, not line-shaped: the locs stash prints as one
@@ -81,7 +82,9 @@ describe('dev hydration source-LOC plumbing (P1)', () => {
 					l.includes('__s.locs') ||
 					l.includes('__oct_loc') ||
 					/^\s*devHtmlNesting as _\$devHtmlNesting,\s*$/.test(l) ||
-					/^\s*_\$devHtmlNesting\([^;]*\);\s*$/.test(l)
+					/^\s*_\$devHtmlNesting\([^;]*\);\s*$/.test(l) ||
+					/^\s*stampSources as _\$stampSources,\s*$/.test(l) ||
+					/^\s*_\$stampSources\([^;]*\);\s*$/.test(l)
 				)
 					continue;
 				if (l.trim() === '') continue;
@@ -94,6 +97,8 @@ describe('dev hydration source-LOC plumbing (P1)', () => {
 		expect(development).toContain('devHtmlNesting as _$devHtmlNesting');
 		expect(development).toContain('_$devHtmlNesting("li", [], "App.tsrx:4:43")');
 		expect(production).not.toContain('devHtmlNesting');
+		expect(development).toContain('_$stampSources(_root, "App.tsrx", [[[], 2, 2]]);');
+		expect(production).not.toContain('stampSources');
 		expect(strip(production)).toBe(strip(development));
 	});
 

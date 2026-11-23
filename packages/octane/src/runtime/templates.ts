@@ -534,6 +534,29 @@ export function clone<T extends Node>(node: T, loc?: string, partialStyles?: str
 	return node.cloneNode(true) as T;
 }
 
+/**
+ * DEV: compiler-emitted right after a template's clone(), while the clone is
+ * still intact (no hole filled, multi-root not yet drained). Stamps every host
+ * element of the template with `__oct_src = "file:line:col"`, the authored
+ * position devtools `sourceFor()` reports. Each entry is `[path, line, col]`,
+ * the template path the compiler's own element walk uses; child()/sibling()
+ * keep it hole-aware while hydrating. Never emitted in production.
+ */
+export function stampSources(
+	root: Node,
+	file: string,
+	entries: ReadonlyArray<readonly [readonly number[], number, number]>,
+): void {
+	for (const [path, line, col] of entries) {
+		let node: Node | null = root;
+		for (let i = 0; i < path.length && node !== null; i++) {
+			node = child(node);
+			if (node !== null && path[i] > 0) node = sibling(node, path[i]);
+		}
+		if (node !== null && node.nodeType === 1) (node as any).__oct_src = `${file}:${line}:${col}`;
+	}
+}
+
 /** Whether a template starts with a host, an element or text, rather than a hole. */
 export function startsWithHost(template: Node): boolean {
 	const first = (template as any).__oct_frag === true ? getFirstChild(template) : template;
