@@ -186,6 +186,7 @@ import {
 	isLowerableTemplateFunction,
 	portalImportBinding,
 	soleRenderPropChild,
+	unwrapTsExpr,
 } from './descriptor-lowering.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
@@ -9204,6 +9205,14 @@ function isJsxReturningMapCall(node) {
 function mapCallbackHasEffects(node) {
 	if (isRenderWrite(node)) return true;
 	if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') return true;
+	if (node.type === 'UnaryExpression') {
+		const { operator } = node;
+		if (operator !== '+' && operator !== '-' && operator !== '~') return false;
+		const argument = unwrapTsExpr(node.argument);
+		return (
+			!isInvariantLiteral(argument) || (operator === '+' && typeof argument.value === 'bigint')
+		);
+	}
 	if (node.type === 'TemplateLiteral') {
 		return node.expressions.some((expression) => !isInvariantLiteral(unwrapTsExpr(expression)));
 	}
@@ -20673,21 +20682,6 @@ function replaceTsInner(node, inner, replacement) {
 	return node === inner
 		? replacement
 		: { ...node, expression: replaceTsInner(node.expression, inner, replacement) };
-}
-
-// Strip TS value-preserving wrappers (`x as T`, `x!`, `<T>x`, `x satisfies T`).
-function unwrapTsExpr(n) {
-	while (
-		n &&
-		(n.type === 'TSAsExpression' ||
-			n.type === 'TSNonNullExpression' ||
-			n.type === 'TSTypeAssertion' ||
-			n.type === 'TSSatisfiesExpression' ||
-			n.type === 'ParenthesizedExpression')
-	) {
-		n = n.expression;
-	}
-	return n;
 }
 
 // ESTree represents RegExp syntax as a Literal too, but evaluating `/x/`
