@@ -26,8 +26,13 @@ Everything else is shared:
   `module server` function that answers every store request, and `events`,
   which streams the shelf's changes. In the browser each is the compiler's
   stub, which calls the server; there is no data route.
-- [`src/shared/session.ts`](src/shared/session.ts) opens a store per account
-  over `serverTransport(data)`, injects network faults, and settles uncertain
+- [`src/shared/worker.ts`](src/shared/worker.ts) is the data worker. It makes
+  every request, validates each read's reply, and holds the feed connection
+  and the encrypted cache for all of an account's tabs, off the pages' main
+  thread.
+- [`src/shared/session.ts`](src/shared/session.ts) opens a store per account,
+  a replica of the data worker's owner, over `serverTransport(data)`. It
+  injects network faults into a page's own store, and settles uncertain
   writes by receipt lookup. Its account cookie stands in for a sign-in.
 - [`src/server/index.ts`](src/server/index.ts) answers calls to `data` and
   renders the pages, through `createServerFunctions` from
@@ -39,6 +44,10 @@ Everything else is shared:
   redirects back to the page or renders it again with the form's issues.
 
 ## What to try
+
+Every page connects to the data worker. The Network panel and the fault
+switches act on a page's own store, so add `?owner=local` to the URL to try
+the items that use them.
 
 - **Load `/` or `/react.html` with JavaScript turned off.** The shelf and its
   counts are in the HTML. With JavaScript on, the Network panel stays empty

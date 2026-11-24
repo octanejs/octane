@@ -120,13 +120,13 @@ export function openSession(account: Account, namespace = '', seed?: string | nu
 	};
 	// Another tab's or device's change arrives as an event, so this page shows it without loading.
 	const listen = serverListener(events);
-	// With `?owner=shared`, the account's tabs share the data worker's owner, which makes their
-	// requests. A tab the owner cannot serve, such as one from another deploy, carries on with
-	// these same options as its own store; the fault switches and network log act only then.
+	// The account's tabs share the data worker's owner, which makes their requests. A tab the
+	// owner cannot serve, such as one from another deploy, carries on with these same options as
+	// its own store; the fault switches and network log act only then, or with `?owner=local`.
 	const store =
-		new URLSearchParams(location.search).get('owner') === 'shared'
-			? createReplica(sharedOwner(partition), { transport, seed, persist, listen, contracts })
-			: createDataStore({ transport, seed, persist, listen });
+		new URLSearchParams(location.search).get('owner') === 'local'
+			? createDataStore({ transport, seed, persist, listen })
+			: createReplica(sharedOwner(partition), { transport, seed, persist, listen, contracts });
 	return sessionFor(account, store, faults, network);
 }
 

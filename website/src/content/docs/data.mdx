@@ -37,8 +37,8 @@ has more advice on working with contracts, stores and writes.
 
 <h2 id="the-pieces">How the pieces fit</h2>
 
-With `octane/data`, there are five parts to getting a book from the server
-onto the page. You'll use all five in the first example.
+With `octane/data`, there are six parts to getting a book from the server
+onto the page. You'll use all six in the first example.
 
 - A **contract** describes an operation. A **read** loads data, a **write**
   changes it, a **view** defines a sorted list and a **feed** describes a
@@ -48,8 +48,12 @@ onto the page. You'll use all five in the first example.
   for the reading list, the store makes one request and caches the result
   for both. It also applies edits as soon as you make them and undoes them
   if the server refuses the write.
-- A **transport** is the function the store calls to reach the server. It
-  might use `fetch`, call a `module server` function or send the request
+- A **data worker** does the store's work that doesn't have to happen on the
+  page. It makes each request, checks each reply against its contract, and
+  holds the feed connections and the cache, all off the page's main thread.
+  Tabs signed in to the same account share one data worker.
+- A **transport** is the function the data worker calls to reach the server.
+  It might use `fetch`, call a `module server` function or send the request
   another way.
 - A **handler** on the server matches each contract to the function you
   wrote for it. It checks the input before passing it to your function.
@@ -58,11 +62,12 @@ onto the page. You'll use all five in the first example.
   their respective renderers.
 
 <FlowDiagram
-	label="One request: a component asks the store, the store asks the transport, and the server's handler answers."
+	label="One request: a component asks the store, the store asks its data worker, the worker asks the transport, and the server's handler answers."
 	columns={[
 		{ nodes: [{ title: 'Contracts', detail: 'read, write, view, feed' }], arrow: 'describe' },
 		{ nodes: [{ title: 'Components', detail: 'useRead, useForm' }], arrow: 'binding' },
-		{ nodes: [{ title: 'Store', detail: 'cache, edits, rollback' }], arrow: 'request' },
+		{ nodes: [{ title: 'Store', detail: 'cache, edits, rollback' }], arrow: 'message port' },
+		{ nodes: [{ title: 'Data worker', detail: 'requests, validation, feeds' }], arrow: 'request' },
 		{ nodes: [{ title: 'Transport', detail: 'serverTransport or httpTransport' }], arrow: 'wire' },
 		{ nodes: [{ title: 'Handler', detail: 'createDataHandler validates and runs' }] },
 	]}
@@ -176,21 +181,92 @@ HTTP endpoint, see [Serve over HTTP](#http-endpoint).
 
 <h3 id="first-store">3. Create a store</h3>
 
-Now the store needs to know how to reach the handler. Give it
-`serverTransport(data)` as its transport, and it will send each request
-through the `data` function we just wrote.
+The store lives in the page, but it hands its requests to a data worker,
+so loading and checking the shelf never competes with rendering it. Setting
+it up takes three pieces: the worker module, a build option that tells the
+plugin where to find it, and the store in the page.
+
+**The worker module.** Give `serveDataOwner` the transport, here
+`serverTransport(data)`, which sends each request through the `data` function
+we just wrote. Give it your build's `contracts` too, so the worker can check
+each reply against the read's schema before it reaches the page.
+
+```ts
+// data.worker.ts
+import { serveDataOwner, serverTransport } from 'octane/data';
+import { contracts } from 'octane/data/manifest';
+import { data } from './data.tsrx';
+
+serveDataOwner({ transport: serverTransport(data), contracts });
+```
+
+`octane/data/manifest` lists every contract your `*.data.ts` modules declare.
+The build [generates it](#contract-manifest).
+
+**The build option.** Set `dataWorker` to the path of your module. The
+plugin emits it at `/_octane/data-worker.js` across deploys, so tabs opened
+before and after a deploy use the same worker URL. The dev server serves it
+there too. In Vite, you can set the option on the compiler plugin from
+`octane/compiler/vite` or on `octane()` from `@octanejs/vite-plugin`.
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite';
+import { octane } from 'octane/compiler/vite';
+
+export default defineConfig({
+	plugins: [octane({ dataWorker: 'src/data.worker.ts' })],
+});
+```
+
+With Rspack, set `dataWorker` on `@octanejs/rspack-plugin`. It emits a
+separate entry named `octane-data-worker`; leave that entry out of your
+pages' HTML.
+
+```ts
+// rspack.config.mjs
+import { OctaneRspackPlugin } from '@octanejs/rspack-plugin';
+
+export default {
+	plugins: [new OctaneRspackPlugin({ dataWorker: './src/data.worker.ts' })],
+};
+```
+
+**The store.** Call `sharedOwner(account)` with the ID of the signed-in
+account, such as the user's ID, and pass the result to `createReplica` with
+the same transport and contracts.
 
 ```ts
 // store.ts
-import { createDataStore, serverTransport } from 'octane/data';
+import { createReplica, serverTransport, sharedOwner } from 'octane/data';
+import { contracts } from 'octane/data/manifest';
 import { data } from './data.tsrx';
+import { session } from './session.ts';
 
-export const store = createDataStore({ transport: serverTransport(data) });
+export const store = createReplica(sharedOwner(session.account), {
+	transport: serverTransport(data),
+	contracts,
+});
 ```
+
+Every tab that passes the same account ID connects to the same worker, so
+the shelf loads once however many tabs show it. Where a browser has no
+SharedWorker, as in Chrome on Android, the tab runs the same module as a
+worker of its own. The page's `transport` is a fallback. If no worker can
+start, or the worker can't serve this tab, the store makes its requests
+itself, so the shelf still works. [Sharing across tabs](#cross-tab) covers
+when that happens.
 
 Create a store for each signed-in account and reuse it for as long as that
 account is signed in. The cache belongs to the store, so every new store
 starts with an empty one.
+
+Where there's no page to keep free, such as on the server, in a test or in a
+script, create a plain store with `createDataStore({ transport })` instead. It
+takes the same options and does all its work where it runs. The rest of this
+guide uses `createDataStore` to show a store's options. In the browser, pass
+them to `createReplica`, and give the worker the ones it uses as well:
+`transport`, `listen` and `persist`.
 
 <h3 id="first-component">4. Show it in a component</h3>
 
@@ -1763,18 +1839,25 @@ the store before calling `hydrateRoot`.
 ```ts
 // main.ts — the browser entry.
 import { hydrateRoot } from 'octane';
-import { createDataStore, serverTransport } from 'octane/data';
+import { createReplica, serverTransport, sharedOwner } from 'octane/data';
+import { contracts } from 'octane/data/manifest';
 import { App } from './App.tsrx';
 import { data } from './data.tsrx';
+import { session } from './session.ts';
 
 const seed = document.getElementById('data-seed')?.textContent ?? null;
-const store = createDataStore({ transport: serverTransport(data), seed });
+const store = createReplica(sharedOwner(session.account), {
+	transport: serverTransport(data),
+	seed,
+	contracts,
+});
 
 hydrateRoot(document.getElementById('root')!, App, { store });
 ```
 
-The first time a component asks for a seeded value, the store can give it the
-server's result immediately. The clock for `fresh` and `expire` starts when
+The store hydrates from its seed without waiting for the data worker. The first
+time a component asks for a seeded value, the store can give it the server's
+result immediately. The clock for `fresh` and `expire` starts when
 the server loads the value and keeps running through hydration. If the HTML
 spent time in a cache and you know how long, pass that duration in
 milliseconds as `seedAge`.
@@ -1963,6 +2046,10 @@ export const store = createDataStore({
 });
 ```
 
+In the browser, give the same `listen` to the data worker's `serveDataOwner`
+as well. The worker holds the connections, one for every tab listening to a
+feed with the same parameters, as in [Sharing across tabs](#cross-tab).
+
 <h3 id="use-feed">Listen while a component is mounted</h3>
 
 A feed only needs a connection while it has listeners. The badge below uses
@@ -2047,7 +2134,10 @@ export const store = createDataStore({
 ```
 
 In this example, the session supplies both the account and its cache key, and
-the device determines how much to keep. A few details matter when you're
+the device determines how much to keep. In the browser, give the data worker's
+`serveDataOwner` the same options as a function of the account, as in
+[One cache for every tab](#cross-tab-cache), so the worker does the
+encryption and the saving. A few details matter when you're
 deciding what to save.
 
 - **Each account's cache is private.** The store encrypts values with `key`
@@ -2154,14 +2244,9 @@ Retiring the shared store signs the account out across tabs, as described in
 
 <h2 id="cross-tab">Sharing across tabs</h2>
 
-Open the shelf in two tabs. With a store in each tab, you'll load the same
-list twice and open two connections to the feed. If you mark a book as read in
-one tab, you'll have to wait for a feed event or reload the other tab to see
-the edit there.
-
-You can have the tabs for an account share an **owner** in a
-[SharedWorker](https://developer.mozilla.org/en-US/docs/Web/API/SharedWorker).
-Each tab keeps a local store, called a **replica**, so it can render, evaluate
+Open the shelf in two tabs. With the setup from [Create a store](#first-store),
+both tabs share one data worker for the account, called its **owner**. Each
+tab keeps a local store, called a **replica**, so it can render, evaluate
 views and show your edit as soon as you click. The owner handles the requests
 and feed connections for all the replicas. When two tabs ask for the same
 list, it makes one request. When you edit a book, it tells the other tabs
@@ -2169,7 +2254,7 @@ about the pending edit, and if the server refuses the edit, every tab rolls it
 back.
 
 <FlowDiagram
-	label="Tabs keep replicas; one SharedWorker owner per account makes every request and holds every feed connection."
+	label="Tabs keep replicas; one data worker owner per account makes every request and holds every feed connection."
 	columns={[
 		{
 			nodes: [
@@ -2187,20 +2272,13 @@ back.
 	]}
 />
 
-To set this up, you'll need a worker module, a build option that tells the
-plugin where to find it, and a connection from each tab.
-
-**1. Write the worker module.** Give `serveDataOwner` the transport and
-listener you used in the tab. If you keep an encrypted cache, move its setup
-into the worker too. The `persist` function takes the signed-in account. The
-worker handles all writes to that account's cache and journal, so the tabs
-share a single cache and size limit. Pass the build's `contracts` too: the
-worker then runs each read's output schema on the reply itself, and a tab of
-the same build takes the validated value without running the schema on the
-page.
+The worker takes the options that do its work. Give it the listener for your
+[feeds](#feeds), so the tabs share one connection, and the setup of an
+encrypted [cache](#persistence), so it handles every write to that cache. Its
+`persist` is a function of the signed-in account.
 
 ```ts
-// worker.ts
+// data.worker.ts
 import { indexedDBStorage, serveDataOwner, serverListener, serverTransport } from 'octane/data';
 import { contracts } from 'octane/data/manifest';
 import { data, events } from './data.tsrx';
@@ -2220,46 +2298,8 @@ serveDataOwner({
 
 Here `cacheKeyFor` stands for a helper you'd write to fetch the signed-in
 user's secret. The worker gets the key directly, so the page never has to pass
-it across.
-
-**2. Tell the build where to find the worker.** Set `dataWorker` to the path
-of your module. The plugin emits it at `/_octane/data-worker.js` across
-deploys, so tabs opened before and after a deploy use the same worker URL. In
-Vite, you can set the option on the compiler plugin from
-`octane/compiler/vite` or on `octane()` from `@octanejs/vite-plugin`.
-
-```ts
-// vite.config.ts
-import { defineConfig } from 'vite';
-import { octane } from 'octane/compiler/vite';
-
-export default defineConfig({
-	plugins: [octane({ dataWorker: 'src/worker.ts' })],
-});
-```
-
-The dev server uses the same worker URL. If you use Rspack, set `dataWorker`
-on `@octanejs/rspack-plugin`.
-
-```ts
-// rspack.config.mjs
-import { OctaneRspackPlugin } from '@octanejs/rspack-plugin';
-
-export default {
-	plugins: [new OctaneRspackPlugin({ dataWorker: './src/worker.ts' })],
-};
-```
-
-Rspack emits a separate entry named `octane-data-worker`. Leave that entry out
-of your pages' HTML.
-
-**3. Connect each tab.** Call `sharedOwner(account)` with the account ID your
-server authenticates, such as the signed-in user's ID. Tabs that pass the same
-ID connect to the same owner. Pass the result to `createReplica` along with
-the options you'd give an ordinary store. You'll also need `contracts`, the
-list of contracts for all the reads, writes and feeds your app uses. You can
-import the list from the generated
-[`octane/data/manifest`](#contract-manifest).
+it across. The tab's store takes the same options it would as an ordinary
+store, along with `contracts`:
 
 ```ts
 import { createReplica, serverListener, serverTransport, sharedOwner } from 'octane/data';
@@ -2295,7 +2335,8 @@ in any of these cases.
 
 Both sides use `contracts`. The replica needs the write declarations to show
 edits from other tabs as they happen. The owner checks the full list to make
-sure the tabs agree on the contracts they're sharing. In the meantime, the
+sure the tabs agree on the contracts they're sharing, and checks each read's
+reply against its schema for them, so the tabs take the value as it comes. In the meantime, the
 replica can hydrate from its page's seed without waiting for the worker.
 
 If you just opened a tab, the server may have sent you a more recent copy of

@@ -43,9 +43,9 @@ function storeRequest(request: Request): string | null {
 	return body.includes('books.changes') ? null : body;
 }
 
-/** Open a page on server data no other test shares. */
+/** Open a page on server data no other test shares, with its own store, whose faults and requests a test can see. */
 async function open(page: Page, path: string): Promise<void> {
-	await page.goto(`${path}?ns=${Date.now()}-${++namespace}`);
+	await page.goto(`${path}?ns=${Date.now()}-${++namespace}&owner=local`);
 	await expect(page.getByRole('list', { name: 'Books' })).toBeVisible();
 	await expect(page.getByText('3 books · 0 read')).toBeVisible();
 }
@@ -81,7 +81,7 @@ for (const { name, path, serverRendered } of PAGES) {
 				page,
 				browser,
 			}) => {
-				const url = `${path}?ns=${Date.now()}-${++namespace}`;
+				const url = `${path}?ns=${Date.now()}-${++namespace}&owner=local`;
 
 				// Without JavaScript the server's page is the whole page.
 				const context = await browser.newContext({ javaScriptEnabled: false });
@@ -169,7 +169,8 @@ for (const { name, path, serverRendered } of PAGES) {
 		}
 
 		test("shows another tab's edits as they happen, without loading them", async ({ page }) => {
-			const url = `${path}?ns=${Date.now()}-${++namespace}`;
+			// Each page's own store and feed connection, so the page's requests are the store's.
+			const url = `${path}?ns=${Date.now()}-${++namespace}&owner=local`;
 			await page.goto(url);
 			await expect(page.getByText('Live', { exact: true })).toBeVisible();
 			const other = await page.context().newPage();
@@ -470,7 +471,7 @@ for (const { name, path } of [PAGES[2]!, PAGES[1]!])
 		page,
 	}) => {
 		const ns = `${Date.now()}-${++namespace}`;
-		const url = `${path}?ns=${ns}&owner=shared`;
+		const url = `${path}?ns=${ns}`;
 		const keeper = await page.context().newPage();
 		const worker = await dataWorker(keeper, ns);
 
@@ -514,7 +515,7 @@ for (const { name, path } of [PAGES[2]!, PAGES[0]!])
 			delete (globalThis as { SharedWorker?: unknown }).SharedWorker;
 		});
 		const ns = `${Date.now()}-${++namespace}`;
-		await page.goto(`${path}?ns=${ns}&owner=shared`);
+		await page.goto(`${path}?ns=${ns}`);
 		await expect(page.getByText('3 books · 0 read')).toBeVisible();
 		await expect
 			.poll(() => page.workers().map((worker) => new URL(worker.url()).pathname))
@@ -532,7 +533,7 @@ for (const { name, path } of [PAGES[2]!, PAGES[0]!])
 test('signs every shared tab of an account out when another account signs in, even one that was frozen', async ({
 	page,
 }) => {
-	const url = `/?ns=${Date.now()}-${++namespace}&owner=shared`;
+	const url = `/?ns=${Date.now()}-${++namespace}`;
 	const other = await page.context().newPage();
 	for (const tab of [page, other]) {
 		await tab.goto(url);
@@ -568,7 +569,7 @@ test('reconnects every shared tab to a new data worker after the worker crashes,
 }) => {
 	test.setTimeout(90_000);
 	const ns = `${Date.now()}-${++namespace}`;
-	const url = `/?ns=${ns}&owner=shared`;
+	const url = `/?ns=${ns}`;
 	const keeper = await page.context().newPage();
 	const worker = await dataWorker(keeper, ns);
 	const other = await page.context().newPage();
@@ -615,7 +616,7 @@ test('starts a shared tab from the data worker’s cache after a reload, without
 	const ns = `${Date.now()}-${++namespace}`;
 	const keeper = await page.context().newPage();
 	const worker = await dataWorker(keeper, ns);
-	await page.goto(`/mixed.html?ns=${ns}&owner=shared`);
+	await page.goto(`/mixed.html?ns=${ns}`);
 	await expect(page.getByText('3 books · 0 read')).toBeVisible();
 	await book(page, 'Kindred').getByRole('checkbox').click();
 	await expect(page.getByText('3 books · 1 read')).toBeVisible();
