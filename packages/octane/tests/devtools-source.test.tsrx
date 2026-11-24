@@ -4,7 +4,12 @@ import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { hydrateRoot } from 'octane';
 import { renderToString } from 'octane/server';
-import { installDevtoolsGlobal, type OctaneDevtoolsHook } from '../src/devtools-hook';
+import {
+	__devtoolsSetSourceComponents,
+	installDevtoolsGlobal,
+	type OctaneDevtoolsHook,
+} from '../src/devtools-hook';
+import { sourceComponents } from '../src/runtime/engine';
 import { SourcesApp } from './_fixtures/devtools-sources.tsrx';
 import { act, mount } from './_helpers';
 
@@ -13,13 +18,17 @@ const FIXTURE = 'packages/octane/tests/_fixtures/devtools-sources.tsrx';
 const dev = process.env['OCTANE_TEST_COMPILE_MODE'] !== 'prod';
 
 function hook(): OctaneDevtoolsHook {
+	// What a profile build's runtime does; this project compiles dev without profile.
 	installDevtoolsGlobal();
+	__devtoolsSetSourceComponents(sourceComponents);
 	return globalThis.__OCTANE_DEVTOOLS__!;
 }
 
 // Each element resolves to the full fixture path, at the column where its own
 // opening tag starts: static elements, component output, @if arms and
-// multi-root fragments included.
+// multi-root fragments included. Its components chain names the hookless
+// (Badge) or hookful (Stat) child that wrote it, then any wrapper (the hookless
+// Panel), then SourcesApp, skipping the @if arm in between.
 function expectEveryElementLocated(container: Element): void {
 	// A <template>'s children live in its content fragment, out of the tree.
 	const elements = [...container.querySelectorAll('*')];
@@ -38,6 +47,8 @@ function expectEveryElementLocated(container: Element): void {
 		'a',
 		'section',
 		'b',
+		'aside',
+		'var',
 		'footer',
 		'svg',
 		'template',
@@ -54,8 +65,27 @@ function expectEveryElementLocated(container: Element): void {
 		expect(source, el.localName).not.toBeNull();
 		// The bundler's canonical id: root-relative, so it is the Vite URL too.
 		expect(source!.file).toBe(`/${FIXTURE}`);
-		const line = readFileSync(`.${source!.file}`, 'utf8').split('\n')[source!.line - 1];
+		const lines = readFileSync(`.${source!.file}`, 'utf8').split('\n');
+		const line = lines[source!.line - 1];
 		expect(line.slice(source!.column), el.localName).toMatch(new RegExp(`^<${el.localName}[ >]`));
+		const owner =
+			el.localName === 'em' || el.localName === 'i'
+				? ['Badge']
+				: el.localName === 'aside'
+					? ['Panel']
+					: el.localName === 'var'
+						? ['Stat', 'Panel']
+						: [];
+		expect(
+			source!.components.map((c) => c.name),
+			el.localName,
+		).toEqual([...owner, 'SourcesApp']);
+		for (const component of source!.components) {
+			expect(component.file).toBe(source!.file);
+			expect(lines[component.line! - 1].slice(component.column)).toMatch(
+				new RegExp(`^(export )?function ${component.name}\\(`),
+			);
+		}
 	}
 	expect(hook().sourceFor(document.createElement('div'))).toBeNull();
 }

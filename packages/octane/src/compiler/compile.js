@@ -11312,16 +11312,29 @@ function encodeMappings(decodedLines) {
  * @param {any} node — an AST node (or anything with `.loc.start`)
  * @returns {[number, number] | undefined}
  */
+/** A `mapSourceName:line:col` location as a literal, re-rooted at the full module path. */
+function devSrcLiteral(ctx, loc) {
+	const src = ctx.devSourceFile + loc.slice(ctx.mapSourceName.length);
+	return b.literal(src, JSON.stringify(src));
+}
+
 function devLoc(ctx, node) {
 	if (!ctx.dev) return undefined;
 	const l = node && node.loc && node.loc.start;
 	return l ? [l.line, l.column | 0] : undefined;
 }
 
-function componentLocationStamp(target, value, origin) {
+/**
+ * DEV: `<target>.__oct_loc = value` (the basename location warnings print) and
+ * `<target>.__oct_src = src` (the full-path one devtools sourceFor() reports).
+ */
+function componentLocationStamp(target, value, src, origin) {
 	return inheritOriginLoc(
 		b.try(
-			b.block([b.stmt(b.assignment('=', b.member(b.id(target), '__oct_loc'), value))]),
+			b.block([
+				b.stmt(b.assignment('=', b.member(b.id(target), '__oct_loc'), value)),
+				b.stmt(b.assignment('=', b.member(b.id(target), '__oct_src'), src)),
+			]),
 			// A frozen component object can reject the stamp.
 			b.catch_clause(null, null, b.block([])),
 		),
@@ -14462,6 +14475,7 @@ function compileInternal(
 				componentLocationStamp(
 					entry.name,
 					b.literal(entry.loc, JSON.stringify(entry.loc)),
+					devSrcLiteral(ctx, entry.loc),
 					moduleOrigin,
 				),
 			);
@@ -14473,6 +14487,9 @@ function compileInternal(
 					entry.source === undefined
 						? b.literal(entry.loc, JSON.stringify(entry.loc))
 						: b.member(b.id(entry.source), '__oct_loc'),
+					entry.source === undefined
+						? devSrcLiteral(ctx, entry.loc)
+						: b.member(b.id(entry.source), '__oct_src'),
 					moduleOrigin,
 				),
 			);
@@ -14783,6 +14800,7 @@ function compileServer(
 		),
 		mapSource: source,
 		mapSourceName: (filename || 'module.tsrx').split(/[\\/]/).pop(),
+		devSourceFile: (filename || 'module.tsrx').replace(/\\/g, '/'),
 		output: options?.output,
 		typescriptWeb: options?.output === 'ts',
 		// Scaffolding without a more precise authored construct maps here.
@@ -19258,7 +19276,12 @@ function compileComponent(node, ctx, options) {
 		const loc = devLoc(ctx, node);
 		if (loc !== undefined)
 			nodes.push(
-				componentLocationStamp(name, b.literal(`${ctx.mapSourceName}:${loc[0]}:${loc[1]}`), node),
+				componentLocationStamp(
+					name,
+					b.literal(`${ctx.mapSourceName}:${loc[0]}:${loc[1]}`),
+					devSrcLiteral(ctx, `${ctx.mapSourceName}:${loc[0]}:${loc[1]}`),
+					node,
+				),
 			);
 		if (pendingWarm)
 			nodes.push(

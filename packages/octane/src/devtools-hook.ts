@@ -82,6 +82,16 @@ export interface DevtoolsSource {
 	line: number;
 	/** 0-based, as `__oct_loc` uses. */
 	column: number;
+	/** The components whose render wrote `el`, innermost first. */
+	components: DevtoolsSourceComponent[];
+}
+
+export interface DevtoolsSourceComponent {
+	name: string;
+	/** Where the component is declared, when a dev compile stamped it. */
+	file?: string;
+	line?: number;
+	column?: number;
 }
 
 export interface OctaneDevtoolsHook {
@@ -110,6 +120,23 @@ let childWalker:
 	((scope: DevtoolsScopeLike, visit: (child: DevtoolsScopeLike) => void) => void) | null = null;
 let nativeReadInspector:
 	((scope: DevtoolsScopeLike) => DevtoolsNativeReadInspection | null) | null = null;
+
+// Registered by the runtime's dev stampSources(), so it needs no profile build.
+let sourceComponents: ((scope: unknown) => ReadonlyArray<{ name: string; loc: unknown }>) | null =
+	null;
+
+/** `file:line:col`, split at its last two colons since a path may hold one. */
+function parseSource(loc: unknown): Omit<DevtoolsSource, 'components'> | null {
+	if (typeof loc !== 'string') return null;
+	const colAt = loc.lastIndexOf(':');
+	const lineAt = loc.lastIndexOf(':', colAt - 1);
+	if (lineAt < 0) return null;
+	return {
+		file: loc.slice(0, lineAt),
+		line: Number(loc.slice(lineAt + 1, colAt)),
+		column: Number(loc.slice(colAt + 1)),
+	};
+}
 
 let transitionPendingCount = 0;
 const boundaries = new Map<number, DevtoolsBoundary>();
@@ -278,15 +305,14 @@ const hook: OctaneDevtoolsHook = {
 		return detail;
 	},
 	sourceFor(el) {
-		const loc = (el as Element & { __oct_src?: unknown }).__oct_src;
-		if (typeof loc !== 'string') return null;
-		const colAt = loc.lastIndexOf(':');
-		const lineAt = loc.lastIndexOf(':', colAt - 1);
-		return {
-			file: loc.slice(0, lineAt),
-			line: Number(loc.slice(lineAt + 1, colAt)),
-			column: Number(loc.slice(colAt + 1)),
-		};
+		const stamped = el as Element & { __oct_src?: unknown; __oct_scope?: unknown };
+		const source = parseSource(stamped.__oct_src);
+		if (source === null) return null;
+		const components: DevtoolsSourceComponent[] = [];
+		for (const { name, loc } of sourceComponents?.(stamped.__oct_scope) ?? []) {
+			components.push({ name, ...parseSource(loc) });
+		}
+		return { ...source, components };
 	},
 	subscribe(listener) {
 		subscribers.add(listener);
@@ -322,6 +348,10 @@ export function __devtoolsSetNameResolver(fn: (block: any) => string): void {
 
 export function __devtoolsSetChildWalker(walk: typeof childWalker): void {
 	childWalker = walk;
+}
+
+export function __devtoolsSetSourceComponents(walk: typeof sourceComponents): void {
+	sourceComponents = walk;
 }
 
 export function __devtoolsSetNativeReadInspector(inspect: typeof nativeReadInspector): void {

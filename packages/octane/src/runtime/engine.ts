@@ -2046,9 +2046,39 @@ export function componentName(block: Block): string {
 	return body.displayName || body.name || 'Unknown';
 }
 
-/** DEV-only: the body that each hookless child's scope renders (componentSlotLite). */
+/**
+ * DEV-only: the body that each hookless child's scope, and its LiteBlockImpl
+ * stand-in, renders (componentSlotLite).
+ */
 export const LITE_BODIES: WeakMap<Scope, ComponentBody> | null =
 	process.env.NODE_ENV === 'production' ? null : /* @__PURE__ */ new WeakMap();
+
+/**
+ * DEV-only, for devtools sourceFor(): the components enclosing `scope`, innermost
+ * first, each with its dev-compiled `__oct_src` declaration site. Control-flow
+ * arms and portals are skipped: only root and component blocks and hookless
+ * child scopes render a component body.
+ */
+export function sourceComponents(scope: unknown): Array<{ name: string; loc: unknown }> {
+	const chain: Array<{ name: string; loc: unknown }> = [];
+	for (let s = scope as Scope | null; s != null;) {
+		const block = s as Partial<Block>;
+		const body =
+			LITE_BODIES?.get(s) ??
+			(block.kind === 'root' || block.kind === 'dynamic' ? block.body : undefined);
+		if (body !== undefined) {
+			let loc: unknown;
+			try {
+				loc = (body as any).__oct_src ?? (body as any)[HMR]?.fn.__oct_src;
+			} catch {
+				// A user proxy/getter must not break a devtools lookup.
+			}
+			chain.push({ name: componentName({ body } as Block), loc });
+		}
+		s = s.parent ?? block.parentBlock ?? null;
+	}
+	return chain;
+}
 
 function warnCrossComponentRenderUpdate(target: Block, source: Block): void {
 	if (process.env.NODE_ENV === 'production') return;

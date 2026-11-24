@@ -1016,7 +1016,11 @@ export function componentSlotLite<P>(
 		}
 		scope.block = new LiteBlockImpl(host, endMarker, parentScope.block) as unknown as Block;
 		if (host.nodeType === 11) noteFrontierMember(host, scope);
-		if (process.env.NODE_ENV !== 'production') LITE_BODIES!.set(scope, comp as ComponentBody);
+		if (process.env.NODE_ENV !== 'production') {
+			LITE_BODIES!.set(scope, comp as ComponentBody);
+			// A full child Block reaches this component through parentBlock, the stand-in.
+			LITE_BODIES!.set(scope.block, comp as ComponentBody);
+		}
 		stampSignalInstance(scope, parentScope, invocationSite);
 		parentScope.slots[slotKey] = scope;
 		// Register on parent.children so unmountScope(parent) walks into us.
