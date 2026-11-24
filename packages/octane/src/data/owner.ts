@@ -7,7 +7,8 @@
  * edits and the same rollbacks.
  *
  * Owner and replicas talk over message ports: a `MessageChannel` in one
- * realm, or a SharedWorker's ports across tabs. Messages are structured-cloned.
+ * realm, a SharedWorker's ports across tabs, or a dedicated Worker's port for
+ * one page. Messages are structured-cloned.
  *
  * Invariants:
  * - The owner sends each write once, for the replica that made it. Every other
@@ -1303,6 +1304,7 @@ export function createReplica(
 	function connect(next: OwnerPort) {
 		port = next;
 		unanswered = 0;
+		opened.get(next)?.failed(() => port === next && becomeLocal(true));
 		// What an earlier owner kept went with it.
 		kept = new WeakMap();
 		next.addEventListener('message', ({ data }) => {
@@ -1417,8 +1419,14 @@ const REFUSED: ToReplica = { t: 'refused' };
 /** How often a tab and its owner check on each other; three silent intervals means gone. */
 const HEARTBEAT_MS = 5_000;
 const LOST = 'octane/data: the connection to the shared owner was lost';
-/** What `sharedOwner` knows of each port it opened: the account, and how to open another. */
-const opened = new WeakMap<OwnerPort, { account: string; reopen(): OwnerPort | null }>();
+/**
+ * What `sharedOwner` knows of each port it opened: the account, how to open
+ * another, and how to hear that its worker could not load.
+ */
+const opened = new WeakMap<
+	OwnerPort,
+	{ account: string; reopen(): OwnerPort | null; failed(then: () => void): void }
+>();
 /** How long a tab waits for its owner to confirm a sign-out before asking again. */
 const SIGN_OUT_RETRY_MS = 5_000;
 /** Where fencing owners record the origin's account, and announce a new one. */
@@ -1430,22 +1438,60 @@ const EXPLICIT_ACCOUNT_CHANNEL = 'octane-data:account-explicit';
 /**
  * Connect to the owner every tab sharing `name` uses, such as the account's
  * partition, through the data worker the build plugins emit. Pass the port to
- * `createReplica`. Returns `null` where SharedWorker is missing or cannot
- * start, and `createReplica` then makes the tab a local store.
+ * `createReplica`. Where SharedWorker is missing or cannot start, the page
+ * runs the worker as a dedicated Worker of its own instead, which its
+ * replicas of `name` share, so the owner's work stays off the page's thread
+ * but is not shared with other tabs. Returns `null` where neither can start,
+ * and `createReplica` then makes the tab a local store, as it does once a
+ * worker that failed to load reports it.
  */
 export function sharedOwner(name: string, url: string | URL = DATA_WORKER_PATH): OwnerPort | null {
-	if (typeof SharedWorker !== 'function') return null;
+	const options = { type: 'module', name: `octane-data:${PROTOCOL}:${name}` } as const;
+	let port: MessagePort | null = null;
+	let worker: SharedWorker | Worker;
 	try {
-		const { port } = new SharedWorker(url, {
-			type: 'module',
-			name: `octane-data:${PROTOCOL}:${name}`,
-		});
-		opened.set(port, { account: name, reopen: () => sharedOwner(name, url) });
-		return port;
-	} catch {
-		return null;
+		if (typeof SharedWorker === 'function') port = (worker = new SharedWorker(url, options)).port;
+	} catch {}
+	const key = `${url}\n${options.name}`;
+	if (!port) {
+		if (typeof Worker !== 'function') return null;
+		try {
+			worker = dedicated.get(key) ?? new Worker(url, options);
+		} catch {
+			return null;
+		}
+		dedicated.set(key, worker);
+		const channel = new MessageChannel();
+		worker.postMessage(null, [channel.port2]);
+		port = channel.port1;
 	}
+	// One that cannot load, unlike an error it throws, serves nobody: its tabs carry on alone.
+	let unloadable = false;
+	let tell = () => {};
+	worker!.addEventListener('error', (event) => {
+		if (typeof ErrorEvent === 'function' && event instanceof ErrorEvent) return;
+		if (dedicated.get(key) === worker) dedicated.delete(key);
+		unloadable = true;
+		tell();
+	});
+	const reopen = () => {
+		// A dedicated worker that stopped answering is replaced, once, for every replica it served.
+		if (dedicated.get(key) === worker) {
+			dedicated.delete(key);
+			(worker as Worker).terminate();
+		}
+		return sharedOwner(name, url);
+	};
+	opened.set(port, {
+		account: name,
+		reopen,
+		failed: (then) => (unloadable ? then() : (tell = then)),
+	});
+	return port;
 }
+
+/** Each partition's dedicated data worker, where the page has no SharedWorker. */
+const dedicated = new Map<string, Worker>();
 
 /** Serve an owner to every tab that connects: what the app's data worker module calls. */
 export function serveDataOwner(options: Parameters<typeof createDataOwner>[0]): DataOwner {
@@ -1456,5 +1502,10 @@ export function serveDataOwner(options: Parameters<typeof createDataOwner>[0]): 
 	globalThis.addEventListener('connect', (event) =>
 		owner.connect((event as MessageEvent).ports[0]!),
 	);
+	// As a dedicated worker, each replica's page sends its port in a message.
+	globalThis.addEventListener('message', (event) => {
+		const port = (event as MessageEvent).ports?.[0];
+		if (port) owner.connect(port);
+	});
 	return owner;
 }

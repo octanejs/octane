@@ -100,9 +100,12 @@ if a stable URL turns out to be impossible on some host.
 
 ### 3. Fallback: a store per tab, as today (recommended)
 
-Where `SharedWorker` is missing, construction throws, or the handshake refuses
-the tab, the tab opens a full local store exactly as now. No cross-tab
-guarantees, and the app code doesn't change.
+Where the handshake refuses the tab, or no worker can start, the tab opens a
+full local store exactly as now. No cross-tab guarantees, and the app code
+doesn't change. Where only `SharedWorker` is missing or its construction
+throws, the tab runs the same worker module as a dedicated `Worker` of its own:
+its owner's work stays off the main thread, with the cross-tab guarantees of a
+store per tab.
 
 **Alternative: leader election.** Web Locks plus BroadcastChannel can elect a
 tab as the owner. That works without SharedWorker, but every tab stalls when

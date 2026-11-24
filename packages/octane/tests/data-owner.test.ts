@@ -574,9 +574,10 @@ function sharedWorkers(transport: Transport, local: Transport = unshared) {
 	const owners = new Map<string, DataOwner>();
 	vi.stubGlobal(
 		'SharedWorker',
-		class {
+		class extends EventTarget {
 			port: MessagePort;
 			constructor(_url: string, { name }: { name: string }) {
+				super();
 				let owner = owners.get(name);
 				if (!owner) owners.set(name, (owner = createDataOwner({ transport, fence: true })));
 				const channel = new MessageChannel();
@@ -661,9 +662,10 @@ describe('octane/data owners across builds and crashes', () => {
 		const workers: Array<{ channel: MessageChannel; hang: boolean }> = [];
 		vi.stubGlobal(
 			'SharedWorker',
-			class {
+			class extends EventTarget {
 				port: MessagePort;
 				constructor() {
+					super();
 					// Each construction after a crash starts a new worker, with a new owner.
 					const worker = { channel: new MessageChannel(), hang: false };
 					workers.push(worker);
@@ -800,9 +802,10 @@ describe('octane/data in a SharedWorker', () => {
 		serveDataOwner({ transport: server.transport });
 		vi.stubGlobal(
 			'SharedWorker',
-			class {
+			class extends EventTarget {
 				port: MessagePort;
 				constructor() {
+					super();
 					const channel = new MessageChannel();
 					globalThis.dispatchEvent(new MessageEvent('connect', { ports: [channel.port1] }));
 					this.port = channel.port2;
@@ -837,9 +840,10 @@ describe('octane/data in a SharedWorker', () => {
 		const held: Array<() => void> = [];
 		vi.stubGlobal(
 			'SharedWorker',
-			class {
+			class extends EventTarget {
 				port: OwnerPort;
 				constructor() {
+					super();
 					const channel = new MessageChannel();
 					owner.connect(channel.port1);
 					this.port = {
@@ -882,9 +886,10 @@ describe('octane/data in a SharedWorker', () => {
 		const owner = createDataOwner({ transport: server.transport, fence: 'explicit' });
 		vi.stubGlobal(
 			'SharedWorker',
-			class {
+			class extends EventTarget {
 				port: MessagePort;
 				constructor() {
+					super();
 					const channel = new MessageChannel();
 					owner.connect(channel.port1);
 					this.port = channel.port2;
@@ -936,9 +941,10 @@ describe('octane/data in a SharedWorker', () => {
 			let current = first;
 			vi.stubGlobal(
 				'SharedWorker',
-				class {
+				class extends EventTarget {
 					port: MessagePort;
 					constructor() {
+						super();
 						const channel = new MessageChannel();
 						current.connect(channel.port1);
 						this.port = channel.port2;
@@ -989,9 +995,10 @@ describe('octane/data in a SharedWorker', () => {
 		let owner = make();
 		vi.stubGlobal(
 			'SharedWorker',
-			class {
+			class extends EventTarget {
 				port: MessagePort;
 				constructor() {
+					super();
 					const channel = new MessageChannel();
 					owner.connect(channel.port1);
 					this.port = channel.port2;
@@ -1108,9 +1115,10 @@ describe('octane/data in a SharedWorker', () => {
 		let owner = createDataOwner({ transport: oldServer.transport, fence: 'explicit', persist });
 		vi.stubGlobal(
 			'SharedWorker',
-			class {
+			class extends EventTarget {
 				port: MessagePort;
 				constructor() {
+					super();
 					const channel = new MessageChannel();
 					owner.connect(channel.port1);
 					this.port = channel.port2;
@@ -1180,9 +1188,10 @@ describe('octane/data in a SharedWorker', () => {
 		let owner = make();
 		vi.stubGlobal(
 			'SharedWorker',
-			class {
+			class extends EventTarget {
 				port: MessagePort;
 				constructor() {
+					super();
 					const channel = new MessageChannel();
 					owner.connect(channel.port1);
 					this.port = channel.port2;
@@ -1229,9 +1238,10 @@ describe('octane/data in a SharedWorker', () => {
 		let explicit = createDataOwner({ transport: server.transport, fence: 'explicit', persist });
 		vi.stubGlobal(
 			'SharedWorker',
-			class {
+			class extends EventTarget {
 				port: MessagePort;
 				constructor() {
+					super();
 					const channel = new MessageChannel();
 					explicit.connect(channel.port1);
 					this.port = channel.port2;
@@ -1414,15 +1424,145 @@ describe('octane/data in a SharedWorker', () => {
 		}
 	});
 
+	/**
+	 * A stand-in dedicated Worker: each page message carrying a port connects
+	 * it to this worker's own owner, as `serveDataOwner` does in a real one.
+	 */
+	function dedicatedWorkers(transport: Transport) {
+		const workers: Array<{
+			name: string;
+			terminated: boolean;
+			ports: MessagePort[];
+			fail(): void;
+		}> = [];
+		vi.stubGlobal(
+			'Worker',
+			class extends EventTarget {
+				readonly owner = createDataOwner({ transport, fence: true });
+				readonly record;
+				constructor(_url: string, { name }: { name: string }) {
+					super();
+					this.record = {
+						name,
+						terminated: false,
+						ports: [] as MessagePort[],
+						fail: () => this.dispatchEvent(new Event('error')),
+					};
+					workers.push(this.record);
+				}
+				postMessage(_message: unknown, [port]: [MessagePort]) {
+					this.owner.connect(port);
+					this.record.ports.push(port);
+					closers.push(() => port.close());
+				}
+				terminate() {
+					this.record.terminated = true;
+				}
+			},
+		);
+		return workers;
+	}
+
+	it('runs the data worker as the page’s own dedicated Worker where SharedWorker is missing, one per partition', async () => {
+		const server = createServer();
+		const workers = dedicatedWorkers(server.transport);
+		const open = (account: string) => {
+			const store = createReplica(sharedOwner(account), replicaOptions);
+			closers.push(() => void store.dispose());
+			return store;
+		};
+		const [first, second] = [open('ada'), open('ada')];
+		const lists = await Promise.all([first, second].map((store) => observed(store.read(todos))));
+		// Both replicas of the partition share one worker, so its owner loads the list once.
+		expect(lists.map((list) => list()[0]!.title)).toEqual(['Tides', 'Tides']);
+		expect(server.log).toEqual(['list']);
+		await observed(open('grace').read(todos));
+		expect(workers.map((worker) => worker.name)).toEqual([
+			'octane-data:5:ada',
+			'octane-data:5:grace',
+		]);
+	});
+
+	it('carries on as a local store when the dedicated data worker cannot load', async () => {
+		const server = createServer();
+		const workers = dedicatedWorkers(() => new Promise<DataReply>(() => {}));
+		const store = createReplica(sharedOwner('bea'), {
+			...replicaOptions,
+			transport: server.transport,
+		});
+		closers.push(() => void store.dispose());
+		workers[0]!.fail();
+		expect((await observed(store.read(todos)))()[0]!.title).toBe('Tides');
+		// The next replica starts a new worker rather than the one that failed.
+		const next = createReplica(sharedOwner('bea'), replicaOptions);
+		closers.push(() => void next.dispose());
+		expect(workers).toHaveLength(2);
+	});
+
+	it('replaces a dedicated data worker that stops answering, without sending a write twice', async () => {
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+		try {
+			const server = createServer();
+			let hang = false;
+			const workers = dedicatedWorkers((request, signal) =>
+				hang ? new Promise<DataReply>(() => {}) : server.transport(request, signal),
+			);
+			const store = createReplica(sharedOwner('cy'), replicaOptions);
+			closers.push(() => void store.dispose());
+			const list = store.read(todos);
+			await observed(list);
+			// The worker stops answering with a write in flight.
+			hang = true;
+			const write = store.write(setDone, { id: 'a', done: true }).catch((error: unknown) => error);
+			for (const port of workers[0]!.ports) port.close();
+			await vi.advanceTimersByTimeAsync(20_000);
+			hang = false;
+			await vi.waitFor(() => expect(workers).toHaveLength(2));
+			expect(workers[0]!.terminated).toBe(true);
+			expect(await write).toBeInstanceOf(DataUncertainError);
+			await list.refresh();
+			expect(list.getSnapshot().status).toBe('ready');
+			expect(writeCount(server.log)).toBe(0);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('serves a page that connects to the worker as a dedicated Worker', async () => {
+		const server = createServer();
+		// This worker's global alone, so owners other tests served do not hear the page.
+		const listeners = new Map<string, (event: { ports: MessagePort[] }) => void>();
+		vi.spyOn(globalThis, 'addEventListener').mockImplementation((type, listener) => {
+			listeners.set(type, listener as never);
+		});
+		serveDataOwner({ transport: server.transport });
+		vi.restoreAllMocks();
+		vi.stubGlobal(
+			'Worker',
+			class extends EventTarget {
+				postMessage(_message: unknown, ports: MessagePort[]) {
+					listeners.get('message')!({ ports });
+					closers.push(() => ports[0]!.close());
+				}
+			},
+		);
+		const store = createReplica(sharedOwner('dee'), replicaOptions);
+		closers.push(() => void store.dispose());
+		expect((await observed(store.read(todos)))()[0]!.title).toBe('Tides');
+		expect(server.log).toEqual(['list']);
+	});
+
 	it('connects a tab to the worker named for its protocol and partition, or reports that it cannot', () => {
+		vi.stubGlobal('Worker', undefined);
 		expect(sharedOwner('ada')).toBeNull();
 		const constructed: unknown[] = [];
 		const port = new MessageChannel().port1;
 		vi.stubGlobal(
 			'SharedWorker',
-			class {
+			class extends EventTarget {
 				port = port;
 				constructor(...args: unknown[]) {
+					super();
 					constructed.push(args);
 				}
 			},
@@ -1434,8 +1574,9 @@ describe('octane/data in a SharedWorker', () => {
 			]);
 			vi.stubGlobal(
 				'SharedWorker',
-				class {
+				class extends EventTarget {
 					constructor() {
+						super();
 						throw new DOMException('blocked', 'SecurityError');
 					}
 				},

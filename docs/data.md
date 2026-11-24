@@ -431,7 +431,7 @@ dependency that shows every edit at once is not built in.
   store's options plus `contracts`, every read, write and feed the app uses.
   It renders, evaluates views and shows its own edits in the same task. It
   carries on as a local store, with its own `transport`, `listen` and
-  `persist`, when `owner` is `null`, the owner refuses its build, cannot record
+  `persist`, when `owner` is `null`, its worker fails to load, the owner refuses its build, cannot record
   the account, or is lost and cannot be reopened.
 - The owner sends each write once. Other replicas show it from the moment it is
   sent and settle it the same way. Equal reads in flight are one request,
@@ -447,7 +447,13 @@ dependency that shows every edit at once is not built in.
   option of `octane()` from `octane/compiler/vite` or `@octanejs/vite-plugin`,
   and of `OctaneRspackPlugin`, emits it at `/_octane/data-worker.js`.
   `sharedOwner(name, url?)` returns that SharedWorker's port, named by protocol
-  version and `name`, or `null` where SharedWorker is unavailable.
+  version and `name`. Where SharedWorker is missing or cannot start, it runs
+  the same module as a dedicated `Worker` of the page, which the page's
+  replicas of `name` share: the owner's requests, feeds and persistence stay
+  off the page's thread, but each tab has its own owner, as each has its own
+  store without one. It returns `null` where neither can start. A worker that
+  fails to load makes each of its replicas a local store; a dedicated worker
+  that stops answering is terminated and replaced.
 - `createDataOwner({ fence: true })`, which `serveDataOwner` always sets,
   fences accounts. The origin has one account at a time, recorded in IndexedDB
   (`octane-data-account`) with a generation that increases on every sign-in

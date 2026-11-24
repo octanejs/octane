@@ -2276,8 +2276,12 @@ the worker has both. They're what lets the shelf keep working if sharing falls
 through. The replica becomes an ordinary store and uses those options directly
 in any of these cases.
 
-- The browser lacks SharedWorker support or couldn't start the worker, so
-  `sharedOwner` returned `null`.
+- The browser could start neither a SharedWorker nor a dedicated Worker, so
+  `sharedOwner` returned `null`, or the worker module failed to load. Where
+  only SharedWorker is missing, as in Chrome on Android, `sharedOwner` runs
+  the same module as the tab's own dedicated Worker instead. Its requests,
+  feeds and cache still stay off the page's main thread, but that tab doesn't
+  share them with the others.
 - The tab and the owner came from incompatible deploys. There's more on that
   below.
 - The owner couldn't record the signed-in account. This can happen if
@@ -2587,7 +2591,7 @@ lost reply. You can also try it offline or with JavaScript turned off.
 | `autoBudget`         | A storage budget sized by the device's memory, data saver and quota.                                                          |
 | `createDataOwner`    | An owner that serves replicas over message ports.                                                                             |
 | `createReplica`      | A store whose requests and feeds go through an owner.                                                                         |
-| `sharedOwner`        | Connect to the account's owner in the app's data worker, or `null` without SharedWorker.                                      |
+| `sharedOwner`        | Connect to the account's owner in the app's data worker: a SharedWorker, else the tab's own dedicated Worker, else `null`.    |
 | `serveDataOwner`     | Serve an owner to every tab that connects: what the data worker module calls.                                                 |
 | `contractIdentity`   | What `createReplica` compares to tell whether two builds can share an owner; `octane/data/manifest` exports it as `identity`. |
 
