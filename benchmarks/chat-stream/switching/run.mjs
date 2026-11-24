@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import { join } from 'node:path';
 import { build } from 'esbuild';
+import { compile } from 'octane/compiler';
 import { chromium } from 'playwright';
 import { countNamedFunctions } from '../../lib/precise-work.mjs';
 import { summarizeSamples, timingStatForJson } from '../../lib/stats.mjs';
@@ -34,28 +35,34 @@ const schedule = [
 	['remount_evict', [1, 0]],
 ];
 
-const metrics = [
+const graphMetrics = [
 	'attachObserver',
 	'stopObserver',
 	'runObserver',
 	'refreshLean',
 	'recomputeLean',
-	'subscribeToStore',
-	'checkIfSnapshotChanged',
 	'connectChannel',
 	'disconnectChannel',
 	'receiveChannel',
 ];
 
-async function runPass(profile) {
+function octaneEntry() {
+	const sourcefile = 'octane.tsrx';
+	const source = readFileSync(new URL(sourcefile, import.meta.url), 'utf8');
+	const result = compile(source, sourcefile, { mode: 'client', dev: false, hmr: false });
+	assert.deepEqual(result.diagnostics ?? [], []);
+	return { stdin: { contents: result.code, resolveDir: import.meta.dirname, sourcefile } };
+}
+
+async function runPass(entry, metrics, profile) {
 	const { outputFiles } = await build({
 		absWorkingDir: import.meta.dirname,
-		entryPoints: ['app.jsx'],
+		...entry,
 		nodePaths: [join(import.meta.dirname, '../react/node_modules')],
 		bundle: true,
 		format: 'esm',
 		jsx: 'automatic',
-		define: { 'process.env.NODE_ENV': '"production"' },
+		define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
 		minify: !profile,
 		write: false,
 	});
@@ -157,58 +164,71 @@ async function runPass(profile) {
 	}
 }
 
-const timing = await runPass(false);
-const diagnostic = await runPass(true);
-const { work } = diagnostic;
-const total = (metric) => work.reduce((count, row) => count + row[metric], 0);
-for (const metric of metrics) assert.ok(total(metric) > 0, `Missing call coverage for ${metric}`);
-assert.equal(total('attachObserver'), total('stopObserver'), 'unbalanced graph observations');
-assert.equal(total('connectChannel'), total('disconnectChannel'), 'unbalanced external channels');
+async function runTarget(renderer, entry, metrics) {
+	const timing = await runPass(entry, metrics, false);
+	const diagnostic = await runPass(entry, metrics, true);
+	const { work } = diagnostic;
+	const total = (metric) => work.reduce((count, row) => count + row[metric], 0);
+	for (const metric of metrics) assert.ok(total(metric) > 0, `Missing call coverage for ${metric}`);
+	assert.equal(total('attachObserver'), total('stopObserver'), 'unbalanced graph observations');
+	assert.equal(total('connectChannel'), total('disconnectChannel'), 'unbalanced external channels');
 
-const ops = {};
-const summary = [];
-for (const [kind, samples] of Object.entries(timing.samples)) {
-	const row = {
-		kind,
-		samples: samples.length,
-		staleAtCommit: samples.filter((s) => s.staleAtCommit).length,
-	};
-	for (const key of ['commit', 'ready', 'frame']) {
-		const name = key === 'frame' ? 'frame_proxy' : key;
-		const times = samples.map((s) => s[key]);
-		const stat = timingStatForJson(summarizeSamples(times, { scoreMode: 'mean' }));
-		ops[`${kind}_press_to_${name}`] = stat;
-		row[`${name}_median`] = stat.median.toFixed(1);
-		row[`${name}_p95`] = stat.p95.toFixed(1);
+	const ops = {};
+	const summary = [];
+	for (const [kind, samples] of Object.entries(timing.samples)) {
+		const row = {
+			kind,
+			samples: samples.length,
+			staleAtCommit: samples.filter((s) => s.staleAtCommit).length,
+		};
+		for (const key of ['commit', 'ready', 'frame']) {
+			const name = key === 'frame' ? 'frame_proxy' : key;
+			const times = samples.map((s) => s[key]);
+			const stat = timingStatForJson(summarizeSamples(times, { scoreMode: 'mean' }));
+			ops[`${kind}_press_to_${name}`] = stat;
+			row[`${name}_median`] = stat.median.toFixed(1);
+			row[`${name}_p95`] = stat.p95.toFixed(1);
+		}
+		summary.push(row);
 	}
-	summary.push(row);
+	const meta = {
+		throttle,
+		iterations,
+		warmups,
+		schedule,
+		viewport,
+		chromium: timing.chromium,
+		node: process.version,
+		react: renderer === 'react' ? react : undefined,
+		platform: process.platform,
+		arch: process.arch,
+		cpu: os.cpus()[0].model,
+		timingSha256: timing.sha256,
+		diagnosticSha256: diagnostic.sha256,
+		samples: timing.samples,
+		work,
+	};
+	console.log(
+		`PASS chat-switching/${renderer} at ${throttle}× CPU slowdown, ${iterations} measured rounds (ms)`,
+	);
+	console.table(summary);
+	console.log('Function entries in a separate unthrottled coverage run');
+	console.table(work);
+	return { name: `${renderer}-signals-${throttle}x`, ops, meta };
 }
-const meta = {
-	throttle,
-	iterations,
-	warmups,
-	schedule,
-	viewport,
-	chromium: timing.chromium,
-	node: process.version,
-	react,
-	platform: process.platform,
-	arch: process.arch,
-	cpu: os.cpus()[0].model,
-	timingSha256: timing.sha256,
-	diagnosticSha256: diagnostic.sha256,
-	samples: timing.samples,
-	work,
-};
+
 const result = {
 	suite: 'chat-switching',
 	iterations,
-	targets: [{ name: `react-signals-${throttle}x`, ops, meta }],
+	targets: [
+		await runTarget('react', { entryPoints: ['app.jsx'] }, [
+			...graphMetrics,
+			'subscribeToStore',
+			'checkIfSnapshotChanged',
+		]),
+		await runTarget('octane', octaneEntry(), graphMetrics),
+	],
 };
-console.log(`PASS chat-switching at ${throttle}× CPU slowdown, ${iterations} measured rounds (ms)`);
-console.table(summary);
-console.log('Function entries in a separate unthrottled coverage run');
-console.table(work);
 if (process.env.BENCH_JSON) {
 	writeFileSync(process.env.BENCH_JSON, JSON.stringify(result, null, '\t') + '\n');
 }

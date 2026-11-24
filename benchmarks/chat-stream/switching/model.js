@@ -199,6 +199,7 @@ export function createModel() {
 			id,
 			scope,
 			rows,
+			preview$,
 			subscribePreview: (notify) => preview$.subscribe(notify),
 			readPreview: () => preview$.get(),
 		};

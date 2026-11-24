@@ -2,8 +2,8 @@
 
 This companion to [chat-stream](../README.md) measures how long a pointer
 press takes to reveal a conversation **with the latest reply in the DOM**.
-It runs a production React Activity tree over the workspace versions of
-`octane/signals` and `octane/signals/react` in headless Chromium. The
+It compares React and compiled Octane Activity trees over the same
+`octane/signals` model in headless Chromium. The
 [signal-chat example](../../../examples/signal-chat) covers initial document
 streaming and hydration. Here the document is already interactive when the
 first press arrives.
@@ -19,8 +19,9 @@ CHAT_SWITCH_THROTTLE=4 node benchmarks/bench.mjs --results-dir=/tmp/switch-4x ch
 CHAT_SWITCH_THROTTLE=4 BENCH_JSON=/tmp/switch.json node benchmarks/chat-stream/switching/run.mjs 12
 ```
 
-The runner builds both scripts in memory and serves the page through
-Playwright request interception. The full run measures 12 rounds after two
+The runner builds the scripts in memory and serves the page through
+Playwright request interception. It runs React first, then Octane, with a
+fresh browser for each timing and coverage pass. Each target measures 12 rounds after two
 warmups in the same page (`--quick` measures three). Each round mounts a fresh
 root with fresh feeds. The unified runner writes `chat-switching.json` under
 `benchmarks/results` by default. Use `--repeat=3` for independent browser
@@ -37,10 +38,20 @@ families share its projections across panes. Each pane owns a scope with
 message families keyed by the local row index. These indexes overlap across
 rooms. `createFamily` maps each logical key to a keyless handle.
 
-Each row has four `useRetainedSignalValue` readers (author, presence, body,
-status) and one `useSignalValue` reader (reactions). A word-count preview
-uses the public handle’s `.subscribe()` and `.get()` through
-`useSyncExternalStore`. The visible pane has 1,121 readers. A hidden pane
+The React view uses `octane/signals/react`. Each row has four
+`useRetainedSignalValue` readers (author, presence, body, status) and one
+`useSignalValue` reader (reactions). A word-count preview uses the public
+handle’s `.subscribe()` and `.get()` through `useSyncExternalStore`.
+
+The Octane view uses compiled `.tsrx` with four tracked `.get()` calls per
+row. Reactions and the preview use Octane’s `useSyncExternalStore` with
+`.subscribe()` and `readSignalBinding` so these reads belong to the store
+effect and disconnect on hide. For reactions, the native public subscriber
+checks for changed values inside the graph. The React binding receives
+renderer invalidations and checks its store snapshot. This difference
+contributes to the refresh and evaluation counts.
+
+In both views the visible pane has 1,121 readers. A hidden pane
 keeps 896 readers observing the graph while its reactions and preview
 disconnect. Watched feeds connect on demand and deliver their current value
 on reconnect.
@@ -101,32 +112,49 @@ errors fail the run. Compare timings on the same machine and switch schedule.
 ## Sample results
 
 Two serial runs with Octane at `ff40d6aa6c88`, React 19.2.7, Node 26.12.1
-and Chromium 149.0.7827.55 on an Apple M5 Max (macOS, 1024 × 768). Each run
-measured 84 presses over 12 rounds. Values are milliseconds from the press.
+and Chromium 149.0.7827.55 on an Apple M5 Max (macOS, 1024 × 768).
+Each renderer handled 84 measured presses at each CPU setting. Values are
+milliseconds from the press. The full distributions are in the JSON.
 
-| CPU | Switch | Presses | Commit median | Ready median | Ready p95 | Frame proxy median |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| 1× | First fill | 12 | 1.9 | 1.9 | 2.2 | 16.0 |
-| 1× | Retained | 24 | 0.5 | 1.0 | 1.2 | 15.9 |
-| 1× | Cold with eviction | 24 | 2.1 | 2.1 | 2.7 | 16.0 |
-| 1× | Remount after eviction | 24 | 2.2 | 2.2 | 2.5 | 15.8 |
-| 4× | First fill | 12 | 8.6 | 8.6 | 9.2 | 41.1 |
-| 4× | Retained | 24 | 2.5 | 5.0 | 8.1 | 36.6 |
-| 4× | Cold with eviction | 24 | 9.6 | 9.6 | 11.5 | 46.9 |
-| 4× | Remount after eviction | 24 | 10.3 | 10.3 | 12.4 | 46.2 |
+| CPU | Switch | Renderer | Presses | Commit median | Ready median | Ready p95 | Frame proxy median |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: |
+| 1× | First fill | React | 12 | 1.8 | 1.8 | 2.2 | 16.0 |
+| 1× | First fill | Octane | 12 | 2.2 | 2.2 | 2.7 | 15.9 |
+| 1× | Retained | React | 24 | 0.5 | 1.0 | 1.3 | 16.1 |
+| 1× | Retained | Octane | 24 | 0.8 | 0.8 | 0.9 | 16.0 |
+| 1× | Cold with eviction | React | 24 | 2.1 | 2.1 | 3.2 | 16.0 |
+| 1× | Cold with eviction | Octane | 24 | 2.6 | 2.6 | 3.1 | 16.0 |
+| 1× | Remount after eviction | React | 24 | 2.3 | 2.3 | 2.9 | 16.0 |
+| 1× | Remount after eviction | Octane | 24 | 2.7 | 2.7 | 3.1 | 16.0 |
+| 4× | First fill | React | 12 | 7.6 | 7.6 | 8.5 | 35.5 |
+| 4× | First fill | Octane | 12 | 7.6 | 7.6 | 8.8 | 35.2 |
+| 4× | Retained | React | 24 | 2.0 | 3.8 | 4.4 | 30.2 |
+| 4× | Retained | Octane | 24 | 2.9 | 2.9 | 3.5 | 31.1 |
+| 4× | Cold with eviction | React | 24 | 8.5 | 8.5 | 9.3 | 38.8 |
+| 4× | Cold with eviction | Octane | 24 | 8.7 | 8.7 | 10.2 | 38.9 |
+| 4× | Remount after eviction | React | 24 | 8.6 | 8.6 | 9.6 | 39.3 |
+| 4× | Remount after eviction | Octane | 24 | 9.3 | 9.3 | 10.3 | 38.9 |
 
-All 48 retained reveals needed a follow-up commit for the press-time reply.
-All 120 fresh mounts and remounts had that reply in their first commit.
-The two diagnostic runs returned identical counts at every step.
+In React, all 48 retained reveals needed a follow-up commit for the
+press-time reply. In Octane, all 48 were current at the first commit.
+Both had current replies on all fresh mounts and remounts. Octane
+can update hidden content before the press. The background ticks in
+the work pass capture some of that cost.
 
-| Step | React registrations | Graph attaches / stops | Derived refreshes / evaluations | External connects / disconnects |
-| --- | ---: | ---: | ---: | ---: |
-| Retained 1 → 0 | 1,121 | 225 / 225 | 702 / 706 | 1 / 1 |
-| Remount 2 → 1 | 1,121 | 1,121 / 1,121 | 1,146 / 1,148 | 225 / 225 |
-| Final unmount | 0 | 0 / 2,017 | 0 / 0 | 0 / 450 |
+| Step | Renderer | Graph attaches / stops | Derived refreshes / evaluations | External connects / disconnects |
+| --- | --- | ---: | ---: | ---: |
+| Background tick 4 | React | 0 / 0 | 228 / 229 | 0 / 0 |
+| Background tick 4 | Octane | 0 / 0 | 232 / 233 | 0 / 0 |
+| Retained 1 → 0 | React | 225 / 225 | 702 / 706 | 1 / 1 |
+| Retained 1 → 0 | Octane | 225 / 225 | 702 / 479 | 1 / 1 |
+| Remount 2 → 1 | React | 1,121 / 1,121 | 1,146 / 1,148 | 225 / 225 |
+| Remount 2 → 1 | Octane | 1,121 / 1,121 | 1,370 / 1,147 | 225 / 225 |
+| Final unmount | React | 0 / 2,017 | 0 / 0 | 0 / 450 |
+| Final unmount | Octane | 0 / 2,017 | 0 / 0 | 0 / 450 |
 
-On reveal, React reconnected its store readers. The 896 retained graph
-subscriptions per pane stayed attached through hiding. The 224 reaction
-readers and one preview switched subscriptions. A remount also constructs
-the pane’s graph and DOM and retires an evicted scope, so the latency
-difference includes those costs.
+The two diagnostic runs returned identical counts within each renderer.
+Both kept 896 graph subscriptions attached per hidden pane. The 224
+reaction readers and one preview switched graph subscriptions on reveal.
+React registered all 1,121 store readers again. A remount also constructs
+the pane’s graph and DOM and retires an evicted scope. These timings include
+those costs and each renderer’s scheduling policy.
