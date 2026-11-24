@@ -51,6 +51,59 @@ describe('Valdi deferred child ownership', () => {
 		expect(compile(source, '/src/Scene.tsrx', { renderer, hmr: false }).diagnostics).toEqual([]);
 	});
 
+	it.each([
+		[
+			'hooks',
+			'function row() { const [n] = useState(0); return <label value={n}/>; }',
+			'row()',
+			/hooks inside/,
+		],
+		[
+			'hooks in defaults',
+			'function row(n = useState(0)[0]) { return <label value={n}/>; }',
+			'row()',
+			/hooks inside/,
+		],
+		['async helpers', 'async function row() { return <label />; }', 'row()', /synchronous/],
+		['missing arguments', 'const row = (n) => <label value={n} />;', 'row', /arguments/],
+		['reassignment', 'function row() { return <label/>; } row = null;', 'row', /reassigned/],
+		['mutable bindings', 'let row = () => <label/>;', 'row', /const/],
+		[
+			'nested self tags',
+			'const row = function Self() { return <Self/>; };',
+			'row()',
+			/nested component/,
+		],
+	])('diagnoses %s in local JSX helpers', (_, declaration, call, error) => {
+		const source = `import { useState } from 'octane'; export function Scene() @{ ${declaration} <view>{${call}}</view> }`;
+		expect(() => compile(source, '/Scene.tsrx', { renderer, hmr: false })).toThrow(error);
+	});
+
+	it('rejects a nested helper used as a tag through a const alias', () => {
+		const source =
+			'export function Scene() @{ const row = () => <label/>; const Local = row; <Local/> }';
+		expect(() => compile(source, '/Scene.tsrx', { renderer, hmr: false })).toThrow(
+			/nested component declarations/,
+		);
+	});
+
+	it('rejects calling a tagged descriptor through a const alias', () => {
+		const source = `function row() { return <label/>; }
+			const Row = row;
+			export function Scene() @{ <view><Row/>{row()}</view> }`;
+		expect(() => compile(source, '/Scene.tsrx', { renderer, hmr: false })).toThrow(/descriptor/);
+	});
+
+	it('retains the earlier writer restriction without component-runtime', () => {
+		const source = 'export function Scene() @{ const row = () => <label/>; <view>{row()}</view> }';
+		expect(() =>
+			compile(source, '/Scene.tsrx', {
+				renderer: { ...renderer, capabilities: ['host-text-site'] },
+				hmr: false,
+			}),
+		).toThrow(/JSX in JavaScript setup/);
+	});
+
 	it('does not classify ordinary runtime APIs as hooks', () => {
 		const source = `import { flushSync } from 'octane'; import { Child } from './child';
 		export function Scene() @{ <Child><label value={flushSync(() => 1)} /></Child> }`;

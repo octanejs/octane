@@ -319,8 +319,8 @@ Component tags may refer to a descriptor passed through props or a member
 expression, including context providers and lazy components. The compiler
 evaluates a dynamic descriptor once and includes its identity in the writer key,
 so replacing the descriptor cannot reuse a different component's instance.
-Locally declared functions containing JSX remain unsupported: components must be
-registered with `defineValdiComponent` before the adapter can resolve them.
+A function used as a component tag needs module-level registration with
+`defineValdiComponent` before the adapter can resolve it.
 
 For TypeScript output and editor projections, component-facing types and values
 are resolved from the adapter's native declarations. For example, `OctaneNode`
@@ -346,6 +346,47 @@ The adapter also owns component instances, scheduling, error recovery, unmount,
 hook state, and effect cleanup. Writer calls are not a transaction or a native
 renderer implementation supplied by this compiler. If rendering throws, the
 adapter must restore its writer and hook scopes.
+
+### Synchronous JSX helpers in ABI 4
+
+Call a module-local helper to build a child value. Its parameters, setup,
+branches and early returns behave as ordinary JavaScript. Each returned JSX
+expression captures a writer body, which runs where the child renders. The
+same applies to local helpers inside a component, render callbacks passed as
+props, and callbacks supplied to `.map()`.
+
+```tsrx
+function label(name: string, prefix: string) {
+	if (!name) return null;
+	const text = prefix + name;
+	return <span>{text}</span>;
+}
+
+export function Greeting(props: { name: string }) @{
+	const title = label(props.name, 'Hello ');
+	const fallback = () => @{ <span>Guest</span> };
+	<div>
+		@if (title) { <>{title}</> }
+		@else { <>{fallback}</> }
+	</div>
+}
+```
+
+A bare child such as `{fallback}` in a host or fragment invokes the local
+helper when its binding resolves to a parameterless JSX function. In a
+component prop, the function stays callable. Pass `fallback()` when the
+receiver expects a child value. Call parameterized helpers with their
+arguments. Helpers must be synchronous and hook-free. A component can read
+hooks during setup and pass the resulting values to a helper.
+
+The compiler recognizes a module helper from a direct call, `.call()`,
+`.apply()`, `.map(helper)`, or a bare host or fragment child. It follows
+local bindings and their `const` aliases. A module function passed only as
+a prop can represent a component descriptor. Use
+`row={item => label(item, prefix)}` to pass a callback invoking a module
+helper. Exported components and functions rendered through tags keep their
+descriptor contract. Keep helpers in the same module as their callers and
+use a distinct binding for a registered component.
 
 ### Hooks
 

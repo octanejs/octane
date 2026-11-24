@@ -20,6 +20,7 @@ import {
 	analyzeRendererBoundaries,
 	assertRendererBoundaryAnalysis,
 } from './renderer-boundaries.js';
+import { directlyCalledName } from './descriptor-lowering.js';
 
 /** Bump when the generated Valdi runtime contract changes. */
 export const VALDI_COMPILER_ABI_VERSION = 1;
@@ -333,8 +334,10 @@ function componentShape(node) {
 }
 
 function collectComponents(ast, state) {
+	const called = new WeakSet();
 	const referenced = new Set();
 	walk(ast, (node) => {
+		if (state.componentRuntime) recordFunctionUse(node, state, called);
 		const name = node.openingElement?.name;
 		if (name?.type === 'JSXIdentifier' && !/^[a-z]/.test(name.name)) referenced.add(name.name);
 	});
@@ -349,6 +352,17 @@ function collectComponents(ast, state) {
 		) {
 			continue;
 		}
+		if (called.has(shape.fn)) {
+			if (state.descriptors.has(shape.fn) || shape.exportKind !== null) {
+				throw valdiError(
+					state,
+					shape.fn,
+					'a Valdi component descriptor cannot also be called as a JSX helper.',
+				);
+			}
+			continue;
+		}
+		state.descriptors.add(shape.fn);
 		const declaration = node.declaration ?? node;
 		if (declaration.type === 'VariableDeclaration' && declaration.kind !== 'const') {
 			throw valdiError(state, declaration, 'component function bindings must use const.');
@@ -376,9 +390,26 @@ function forEachAssignmentBinding(pattern, visit) {
 	}
 }
 
+function hasParameter(fn, name) {
+	let found = false;
+	for (const parameter of fn.params) {
+		forEachAssignmentBinding(parameter, (binding) => {
+			if (binding.name === name) found = true;
+		});
+	}
+	return found;
+}
+
 function validateComponentBindings(ast, state) {
 	const lexical = state.lexical;
 	const assertStable = (identifier) => {
+		if (state.componentRuntime && templateFunction(identifier, state)) {
+			throw valdiError(
+				state,
+				identifier,
+				'component and JSX helper bindings must not be reassigned.',
+			);
+		}
 		const shape = state.components.get(identifier.name);
 		if (shape === undefined) return;
 		const scope = lexical.resolveBinding(
@@ -394,12 +425,7 @@ function validateComponentBindings(ast, state) {
 			shape.fn.id?.name === identifier.name &&
 			scope === lexical.nodeScopes.get(shape.fn.id)
 		) {
-			componentBinding = true;
-			for (const parameter of shape.fn.params ?? []) {
-				forEachAssignmentBinding(parameter, (binding) => {
-					if (binding.name === identifier.name) componentBinding = false;
-				});
-			}
+			componentBinding = !hasParameter(shape.fn, identifier.name);
 		}
 		if (componentBinding) {
 			throw valdiError(state, identifier, 'component bindings must not be reassigned.');
@@ -439,21 +465,33 @@ function writerBody(fn, state) {
 }
 
 function lowerRenderCallback(fn, state) {
+	if (state.descriptors.has(fn))
+		throw valdiError(state, fn, 'nested component declarations cannot be registered.');
 	if (fn.async || fn.generator)
 		throw valdiError(state, fn, 'render callbacks must be synchronous.');
-	walk(fn.body, (node) => {
-		if (FUNCTION_TYPES.has(node.type)) return false;
+	walk(state.componentRuntime ? fn : fn.body, (node) => {
+		if (!state.componentRuntime && FUNCTION_TYPES.has(node.type)) return false;
 		if (node.type === 'CallExpression' && ownerHookName(node, state) !== null) {
 			throw valdiError(state, node, 'hooks inside render callbacks require a child component.');
 		}
 	});
 	for (const parameter of fn.params)
 		assertNoTemplate(parameter, state, 'render callback parameters');
-	const statements = writerBody(fn, state);
-	const body = state.componentRuntime
-		? [b.return(deferredChildren(statements, state, fn.body))]
-		: statements;
-	return { ...fn, body: withOrigin(b.block(body), fn.body), expression: false };
+	if (!state.componentRuntime) {
+		return { ...fn, body: withOrigin(b.block(writerBody(fn, state)), fn.body), expression: false };
+	}
+	// A helper is an ordinary function. Its setup and scalar returns run on the
+	// call, while each JSX value is written in the scope that receives it.
+	if (fn.body.type === 'JSXCodeBlock') {
+		const statements = [...lowerChildValues(fn.body.body, state)];
+		if (fn.body.render) {
+			statements.push(
+				withOrigin(b.return(lowerChildValues(fn.body.render, state)), fn.body.render),
+			);
+		}
+		return { ...fn, body: withOrigin(b.block(statements), fn.body), expression: false };
+	}
+	return { ...fn, body: lowerChildValues(fn.body, state) };
 }
 
 function deferredChildren(statements, state, origin) {
@@ -476,12 +514,12 @@ function deferredChildren(statements, state, origin) {
 
 // Child values retain their authored closures; the adapter owns where they render.
 // Local component functions cannot be descriptors until registered at module scope.
-function lowerChildValues(node, state, renderCallbacks = false) {
+function lowerChildValues(node, state) {
 	if (node === null || typeof node !== 'object') return node;
 	if (Array.isArray(node)) {
 		let result = node;
 		for (let index = 0; index < node.length; index++) {
-			const child = lowerChildValues(node[index], state, renderCallbacks);
+			const child = lowerChildValues(node[index], state);
 			if (child !== node[index]) {
 				if (result === node) result = node.slice();
 				result[index] = child;
@@ -491,13 +529,12 @@ function lowerChildValues(node, state, renderCallbacks = false) {
 	}
 	if (isTemplate(node)) return deferredChildren(emitRenderable(node, state, []), state, node);
 	if (FUNCTION_TYPES.has(node.type) && hasOwnTemplate(node.body)) {
-		if (!renderCallbacks) return assertNoTemplate(node, state, 'nested component declarations');
 		return lowerRenderCallback(node, state);
 	}
 	let result = node;
 	for (const [key, child] of Object.entries(node)) {
 		if (AST_SKIP_KEYS.has(key)) continue;
-		const value = lowerChildValues(child, state, renderCallbacks);
+		const value = lowerChildValues(child, state);
 		if (value !== child) {
 			if (result === node) result = { ...node };
 			result[key] = value;
@@ -519,7 +556,7 @@ function componentProp(value, state, element, prop) {
 	const fn = unwrap(value);
 	let lowered;
 	if (state.componentRuntime) {
-		lowered = lowerChildValues(value, state, true);
+		lowered = lowerChildValues(value, state);
 	} else if (FUNCTION_TYPES.has(fn?.type) && hasOwnTemplate(fn.body)) {
 		// Preserve authored assertions around a render callback when lowering its template.
 		const wrap = (node) =>
@@ -670,39 +707,105 @@ function suppliedAttributeKind(expression, state) {
 	return state.writerFacts.get(`${expression.start}:${expression.end}`)?.effectiveType ?? null;
 }
 
-// Only immutable bindings with proven initializers are followed. A mutable
-// local, imported value, parameter, or shadowing loop item must not inherit an
-// outer binding's type. These records live for one compilation, not at runtime.
-function collectAttributeBindings(ast, lexical) {
+// The tag and attribute proofs share lexical bindings. Variable initializers
+// are reliable only for consts. validateComponentBindings checks function writes.
+function collectValueBindings(ast, state) {
+	const { lexical } = state;
 	const bindings = new WeakMap();
+	const record = (scope, name, initializer) => {
+		let locals = bindings.get(scope);
+		if (locals === undefined) bindings.set(scope, (locals = new Map()));
+		locals.set(name, { initializer, kind: undefined, resolving: false });
+	};
 	walk(ast, (node) => {
-		if (node.type !== 'VariableDeclaration' || node.kind !== 'const' || node.declare) return;
+		if (state.componentRuntime && node.id) {
+			if (node.type === 'FunctionDeclaration') {
+				record(lexical.nodeScopes.get(node) ?? lexical.rootScope, node.id.name, node);
+			} else if (node.type === 'FunctionExpression' && !hasParameter(node, node.id.name)) {
+				record(lexical.nodeScopes.get(node.id), node.id.name, node);
+			}
+		}
+		if (node.type !== 'VariableDeclaration' || node.declare) return;
 		for (const declaration of node.declarations ?? []) {
 			if (declaration.id?.type !== 'Identifier' || declaration.init == null) continue;
+			if (node.kind !== 'const') {
+				const fn = unwrap(declaration.init);
+				if (state.componentRuntime && FUNCTION_TYPES.has(fn.type) && hasOwnTemplate(fn.body)) {
+					throw valdiError(state, declaration, 'component and JSX helper bindings must use const.');
+				}
+				continue;
+			}
 			const name = declaration.id.name;
 			const scope = lexical.resolveBinding(
 				lexical.nodeScopes.get(declaration.id) ?? lexical.rootScope,
 				name,
 			)?.scope;
 			if (scope === undefined) continue;
-			let locals = bindings.get(scope);
-			if (locals === undefined) bindings.set(scope, (locals = new Map()));
-			locals.set(name, { initializer: declaration.init, kind: undefined, resolving: false });
+			record(scope, name, declaration.init);
 		}
 	});
 	return bindings;
 }
 
-function attributeBindingKind(identifier, state) {
+function valueBinding(node, name, state) {
 	const lexical = state.lexical;
 	const scope = lexical.resolveBinding(
-		lexical.nodeScopes.get(identifier) ?? lexical.rootScope,
-		identifier.name,
+		lexical.nodeScopes.get(node) ?? lexical.rootScope,
+		name,
 	)?.scope;
-	const binding =
-		scope === undefined
-			? undefined
-			: state.attributeFacts.bindings.get(scope)?.get(identifier.name);
+	return state.bindings.get(scope)?.get(name);
+}
+
+function templateFunction(expression, state, name) {
+	const node = unwrap(expression);
+	if (FUNCTION_TYPES.has(node?.type)) return hasOwnTemplate(node.body) ? node : null;
+	if (!name && node?.type !== 'JSXIdentifier' && node?.type !== 'Identifier') return null;
+	const binding = valueBinding(node, name ?? node.name, state);
+	if (!binding || binding.resolving) return null;
+	if (binding.template === undefined) {
+		binding.resolving = true;
+		binding.template = templateFunction(binding.initializer, state);
+		binding.resolving = false;
+	}
+	return binding.template;
+}
+
+function recordFunctionUse(node, state, called) {
+	const name = directlyCalledName(node);
+	if (name !== null) {
+		const fn = templateFunction(node, state, name);
+		if (fn) called.add(fn);
+	}
+	let descriptor;
+	if (node.openingElement && intrinsicTag(node) === null) {
+		const tag = elementName(node);
+		descriptor = tag?.type === 'JSXExpressionContainer' ? tag.expression : tag;
+	} else if (node.children) {
+		for (const child of node.children) {
+			if (child.type !== 'JSXExpressionContainer') continue;
+			const fn = templateFunction(child.expression, state);
+			if (fn) called.add(fn);
+		}
+	} else if (node.type === 'ExportDefaultDeclaration') {
+		descriptor = node.declaration;
+	} else if (node.type === 'ExportNamedDeclaration' && !node.source && node.exportKind !== 'type') {
+		for (const entry of node.declaration?.declarations ?? node.specifiers ?? []) {
+			const local = unwrap(entry.local ?? entry.init);
+			if (entry.exportKind === 'type' || local?.type !== 'Identifier') continue;
+			const fn = templateFunction(local, state);
+			if (fn) state.descriptors.add(fn);
+		}
+	} else if (node.type === 'CallExpression' && importedHookName(node, state) === 'memo') {
+		descriptor = node.arguments[0];
+	}
+	if (descriptor) {
+		const fn = templateFunction(descriptor, state);
+		if (fn) state.descriptors.add(fn);
+	}
+}
+
+function attributeBindingKind(identifier, state) {
+	const binding = valueBinding(identifier, identifier.name, state);
 	if (binding === undefined || binding.resolving) return null;
 	if (binding.kind !== undefined) return binding.kind;
 	binding.resolving = true;
@@ -1278,6 +1381,17 @@ function emitRenderable(node, state, keys) {
 		return emitNodes(value.children ?? [], state, keys, false);
 	if (value?.type === 'JSXForExpression') return emitFor(value, state, keys);
 	if (value?.type === 'JSXIfExpression') return emitIf(value, state, keys);
+	if (state.componentRuntime && !isTemplate(value)) {
+		let child = lowerChildValues(node, state);
+		const body = templateFunction(value, state);
+		if (body && !state.descriptors.has(body)) {
+			if (body.params.length !== 0) {
+				throw valdiError(state, node, 'call a JSX helper with its arguments before rendering it.');
+			}
+			child = withOrigin(b.call(child), node);
+		}
+		return emitHostText(child, state, keys, node);
+	}
 	if (state.renderer.text === 'host') {
 		return emitHostText(assertNoTemplate(node, state, 'JSX within host text'), state, keys, node);
 	}
@@ -1322,7 +1436,7 @@ function rewriteComponentStatement(node, state, keys, allowReturn) {
 			node,
 		);
 	}
-	if (FUNCTION_TYPES.has(node?.type)) {
+	if (!state.componentRuntime && FUNCTION_TYPES.has(node?.type)) {
 		return assertNoTemplate(node, state, 'nested component declarations');
 	}
 	if (node?.type === 'BlockStatement') {
@@ -1449,11 +1563,12 @@ export function compileValdi(
 		jsxFacade: null,
 		prototypes: [],
 		components: new Map(),
+		descriptors: new WeakSet(),
 		componentNodes: new Map(),
 		currentComponent: null,
 		runtimeImports: new Map(),
 		lexical: createLexicalAnalysis(ast),
-		attributeFacts: null,
+		bindings: null,
 		writerFacts: normalizeWriterFacts(options.valdiWriterFacts, source.length, filename),
 		textSites: renderer.capabilities?.includes('host-text-site') === true,
 		componentRuntime: renderer.capabilities?.includes('component-runtime') === true,
@@ -1493,15 +1608,14 @@ export function compileValdi(
 	});
 	validateRuntimeImports(ast, state);
 	validateRendererAst(ast, filename, renderer);
-	state.attributeFacts = {
-		bindings: collectAttributeBindings(ast, state.lexical),
-	};
+	state.bindings = collectValueBindings(ast, state);
 	collectComponents(ast, state);
 	validateComponentBindings(ast, state);
 	const body = [];
 	for (const node of projectValdiRuntimeImports(ast, renderer, false).body ?? []) {
 		const shape = state.componentNodes.get(node);
 		if (shape !== undefined) body.push(...emitComponent(shape, state));
+		else if (state.componentRuntime) body.push(lowerChildValues(node, state));
 		else body.push(assertNoTemplate(node, state, 'JSX outside a component'));
 	}
 	const origin = ast.body?.[0] ?? ast;
