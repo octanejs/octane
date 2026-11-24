@@ -321,6 +321,12 @@ contract; callbacks return a child value instead of writing into their caller's
 active scope. Hooks within render callbacks or deferred JSX remain unsupported;
 evaluate parent hooks in component setup and pass their results into the child.
 
+A template block passed as a prop, such as `marker={@{ <label /> }}`,
+runs its setup and renders its output each time the receiver renders the
+value. A template `@switch` evaluates its condition once. Only the first
+strictly matching arm, or the default when none matches, runs. Bindings
+declared in an arm stay local to it.
+
 Component tags may select a registered descriptor through props, a member
 expression or a computed TSRX tag such as `<{rows[variant]} />`. The selected
 descriptor supplies the contextual type of callback props and children. The compiler
@@ -462,9 +468,10 @@ parameter’s type depends on the generic.
 
 Unsupported constructs fail with diagnostics rather than falling back to DOM
 code. These include server rendering/hydration, HMR, Octane profiling,
-cross-renderer boundaries, dynamic or namespace component tags, ordinary JSX
-component children and component refs, authored host `children` props, `@try`, `@switch`, and
-`style`/`slot`/`slotted` elements. Host refs require the `host-ref` capability;
+cross-renderer boundaries, namespace component tags, authored host `children`
+props, `@try`, and `style`/`slot`/`slotted` elements. Dynamic component tags,
+ordinary JSX component children, block props and template switches require
+ABI 4. Host refs require the `host-ref` capability;
 component refs remain unsupported. Unsupported spread `ref` and host `children` values are checked at
 execution time. Unkeyed or asynchronous template loops and slot-keyed hooks
 directly inside loops are rejected; put hooks in a keyed child component.

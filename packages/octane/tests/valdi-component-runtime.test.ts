@@ -70,6 +70,58 @@ describe.each([false, true])('Valdi component runtime in dev=%s', (dev) => {
 		]);
 	});
 
+	it('runs block prop setup at each outlet the receiving component renders', () => {
+		const { module, render } = fixture(
+			`function Slots({ show, content }) @{
+				if (!show) return null;
+				<frame><left>{content}</left><right>{content}</right></frame>
+			 }
+			 export function Scene({ show, next }) @{
+				<Slots show={show} content={@{
+					const value = next();
+					<label value={value} />
+				}} />
+			 }`,
+			dev,
+		);
+		let count = 0;
+		const next = () => ++count;
+		expect(render(module['Scene'], { show: false, next })).toEqual([]);
+		expect(count).toBe(0);
+		expect(render(module['Scene'], { show: true, next })).toMatchObject([
+			{
+				tag: 'frame',
+				children: [
+					{ tag: 'left', children: [{ tag: 'label', props: { value: 1 } }] },
+					{ tag: 'right', children: [{ tag: 'label', props: { value: 2 } }] },
+				],
+			},
+		]);
+	});
+
+	it('keeps @switch arm bindings local when they shadow a sibling’s helper', () => {
+		const { module, render } = fixture(
+			`export function Scene({ read }) @{
+				const value = () => <label value="outer" />;
+				<frame>
+					@switch (read()) {
+						@case 1: { const value = () => <label value="first" />; <>{value}</> }
+						@case 2: { const value = 'second'; @{ <label value={value} /> } }
+						@default: { <label value="other" /> }
+					}
+					{value}
+				</frame>
+			 }`,
+			dev,
+		);
+		const values = [1, 2, '1'];
+		const read = () => values.shift();
+		for (const expected of ['first', 'second', 'other']) {
+			const [frame] = render(module['Scene'], { read });
+			expect(frame.children.map((node) => node.props['value'])).toEqual([expected, 'outer']);
+		}
+	});
+
 	it('retains each initial value from its first render, even at a conditional site', () => {
 		const { module, render } = fixture(
 			`import { useInitialValue as initial } from 'octane';
