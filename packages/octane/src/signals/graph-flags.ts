@@ -11,16 +11,14 @@ export const REACTIVE_PENDING = 32;
  * Assignments of a node's whole flags word keep it.
  */
 export const REACTIVE_SLOW = 64;
-/** Octane's own: a keyless cell (PlainCell) has a revision and native channel to keep. */
-export const REACTIVE_TRACKED_CELL = 128;
 /** Octane's own: a keyless derived value (PlainComputed) holds the error its computation threw. */
 export const REACTIVE_FAILED = 256;
 /** Octane's own: an effect waiting in the batch's queue. */
 export const REACTIVE_QUEUED = 512;
 /** Octane's own: a keyless cell (PlainCell), whose readers its owner's retirement must reach. */
 export const REACTIVE_KEYLESS_CELL = 1024;
-/** Octane's own: a keyless cell with an entry in its owner's held list. */
-export const REACTIVE_LISTED = 2048;
+/** Octane's own: a keyless computation with forward-only dependencies. */
+export const REACTIVE_DETACHED = 2048;
 /** Octane's own: a keyless cell (PlainCell) whose writes also consult its `equals`. */
 export const REACTIVE_CUSTOM_EQUALS = 4096;
 

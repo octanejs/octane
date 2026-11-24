@@ -23,11 +23,10 @@ import {
 	REACTIVE_NONE,
 	REACTIVE_PENDING,
 	REACTIVE_SLOW,
-	REACTIVE_TRACKED_CELL,
 	REACTIVE_FAILED,
 	REACTIVE_QUEUED,
 	REACTIVE_KEYLESS_CELL,
-	REACTIVE_LISTED,
+	REACTIVE_DETACHED,
 	REACTIVE_CUSTOM_EQUALS,
 	REACTIVE_SPECULATIVE,
 	REACTIVE_RECURSED,
@@ -120,9 +119,7 @@ export interface GraphOwner {
 	readonly readBarrier?: Promise<void> | undefined;
 	readonly observers: Set<SignalObserver>;
 	/** Keyless cells that gained a reader, whose readers retirement must reach. */
-	heldCells: PlainCell[] | undefined;
-	/** Held cells that have since lost every reader, not yet compacted away. */
-	heldReleased: number;
+	heldCells: Set<PlainCell> | undefined;
 	readonly seedable: boolean;
 	/** Trace events retained; zero when tracing is off. */
 	readonly traceLimit: number;
@@ -329,18 +326,15 @@ function addLink(
 	nextDep: Link | undefined,
 	prevSub: Link | undefined,
 ): void {
-	const newLink =
-		(sub.depsTail =
-		dep.subsTail =
-			{
-				version,
-				dep,
-				sub,
-				prevDep,
-				nextDep,
-				prevSub,
-				nextSub: undefined,
-			});
+	const newLink = (sub.depsTail = {
+		version,
+		dep,
+		sub,
+		prevDep,
+		nextDep,
+		prevSub,
+		nextSub: undefined,
+	});
 	if (nextDep !== undefined) {
 		nextDep.prevDep = newLink;
 	}
@@ -349,12 +343,18 @@ function addLink(
 	} else {
 		sub.deps = newLink;
 	}
-	// A keyless cell's first reader: rarer than any read, so the check lives here.
-	if (
-		prevSub === undefined &&
-		(dep.flags & (REACTIVE_KEYLESS_CELL | REACTIVE_LISTED)) === REACTIVE_KEYLESS_CELL
-	)
-		holdCell(dep as PlainCell);
+	if (dep.flags & REACTIVE_DETACHED) reconnect(dep as PlainComputed);
+	attachLink(newLink, prevSub);
+}
+
+function attachLink(newLink: Link, prevSub: Link | undefined): void {
+	const { dep, sub } = newLink;
+	dep.subsTail = newLink;
+	newLink.prevSub = prevSub;
+	if (!prevSub && dep.flags & REACTIVE_KEYLESS_CELL) {
+		const cell = dep as PlainCell;
+		(cell.owner.heldCells ??= new Set()).add(cell);
+	}
 	if (prevSub !== undefined) {
 		prevSub.nextSub = newLink;
 	} else {
@@ -365,7 +365,7 @@ function addLink(
 }
 
 function unlink(link: Link, sub = link.sub): Link | undefined {
-	const { dep, prevDep, nextDep, nextSub, prevSub } = link;
+	const { prevDep, nextDep } = link;
 	if (nextDep !== undefined) {
 		nextDep.prevDep = prevDep;
 	} else {
@@ -376,6 +376,13 @@ function unlink(link: Link, sub = link.sub): Link | undefined {
 	} else {
 		sub.deps = nextDep;
 	}
+	detachLink(link, sub);
+	if (!link.dep.subs && link.dep instanceof PlainComputed) disconnect(link.dep);
+	return nextDep;
+}
+
+function detachLink(link: Link, sub: ReactiveNode): void {
+	const { dep, nextSub, prevSub } = link;
 	if (nextSub !== undefined) {
 		nextSub.prevSub = prevSub;
 	} else {
@@ -386,10 +393,12 @@ function unlink(link: Link, sub = link.sub): Link | undefined {
 	} else {
 		// Scopes retain their producers independently of subscriber count.
 		dep.subs = nextSub;
-		if (nextSub === undefined && dep.flags & REACTIVE_KEYLESS_CELL) releaseCell(dep as PlainCell);
+		if (nextSub === undefined && dep.flags & REACTIVE_KEYLESS_CELL) {
+			const cell = dep as PlainCell;
+			cell.owner.heldCells?.delete(cell);
+		}
 	}
 	if (watchDriver) watchDriver.unlink(dep, sub);
-	return nextDep;
 }
 
 /** Finish obsolete dependencies while the computation still rejects recursive reads. */
@@ -2297,6 +2306,7 @@ export class PlainCell<T = any> implements ReactiveNode {
 	declare subs: ReactiveNode['subs'];
 	declare subsTail: ReactiveNode['subsTail'];
 	declare flags: ReactiveFlags;
+	declare revision: number;
 	declare last: T;
 	declare readonly owner: GraphOwner;
 	declare readonly valueOnly: true;
@@ -2311,6 +2321,7 @@ export class PlainCell<T = any> implements ReactiveNode {
 		this.flags = REACTIVE_MUTABLE | REACTIVE_KEYLESS_CELL;
 		this.subs = undefined;
 		this.subsTail = undefined;
+		this.revision = 0;
 		this.last = last;
 		(this as { owner: GraphOwner }).owner = owner;
 	}
@@ -2333,13 +2344,13 @@ export class PlainCell<T = any> implements ReactiveNode {
 
 	set(value: T | ((previous: T) => T)): void {
 		// The common write, kept small so propagate inlines into it: a value, outside
-		// any computation, guard or effect, to a live cell no render has read.
+		// any computation, guard or effect, to a live cell with default equality.
 		if (
 			signalMode === 0 &&
 			pureDepth === 0 &&
 			activeNode === undefined &&
 			typeof value !== 'function' &&
-			!(this.flags & (REACTIVE_TRACKED_CELL | REACTIVE_CUSTOM_EQUALS)) &&
+			!(this.flags & REACTIVE_CUSTOM_EQUALS) &&
 			!this.owner.retired
 		) {
 			if (
@@ -2349,6 +2360,8 @@ export class PlainCell<T = any> implements ReactiveNode {
 			)
 				return;
 			this.last = value;
+			this.revision++;
+			inputVersion++;
 			const subs = this.subs;
 			if (subs === undefined) return;
 			batchDepth++;
@@ -2442,9 +2455,10 @@ function writeCell<T>(cell: PlainCell<T>, value: T | ((previous: T) => T)): void
 	) {
 		if (journal !== undefined && !journal.has(cell)) journal.set(cell, cell.last);
 		cell.last = next;
+		cell.revision++;
+		inputVersion++;
 		if (signalMode & CHANGE_OBSERVED)
 			reportChange(cell as unknown as SignalHandle<unknown>, 'change');
-		if (cell.flags & REACTIVE_TRACKED_CELL) cellChannels.get(cell)!.revision++;
 		const subs = cell.subs;
 		if (subs !== undefined) {
 			batchDepth++;
@@ -2563,73 +2577,106 @@ export function setEquals<T>(cell: ScopedNode<T> | PlainCell<T>, equals: SignalE
 	cell.flags |= cell instanceof PlainCell ? REACTIVE_CUSTOM_EQUALS : REACTIVE_SLOW;
 }
 
-/** A keyless cell's revision and native read channel, once a render has read it. */
-interface CellChannel {
-	revision: number;
-	readonly source: NativeReadSource;
-}
 function matchesKeylessNativeDomHandle(this: NativeReadSource, handle: unknown): boolean {
 	return (
 		(handle instanceof PlainCell &&
 			handle[NATIVE_DOM_VALUE] === PlainCell.prototype[NATIVE_DOM_VALUE] &&
-			cellChannels.get(handle)?.source === this) ||
+			cellChannels.get(handle) === this) ||
 		(handle instanceof PlainComputed &&
 			handle[NATIVE_DOM_VALUE] === PlainComputed.prototype[NATIVE_DOM_VALUE] &&
-			leanChannels.get(handle)?.source === this)
+			leanChannels.get(handle) === this)
 	);
 }
-const cellChannels = new WeakMap<PlainCell, CellChannel>();
+// An entirely keyless idle graph cannot change until a write or retirement.
+let inputVersion = 0;
+const cellChannels = new WeakMap<PlainCell, NativeReadSource>();
 
-function cellChannel(cell: PlainCell): CellChannel {
+function cellChannel(cell: PlainCell): NativeReadSource {
 	let channel = cellChannels.get(cell);
 	if (channel === undefined) {
 		channel = {
-			revision: 0,
-			source: {
-				__matchesNativeDomHandle: matchesKeylessNativeDomHandle,
-				getVersion: () => channel!.revision,
-				subscribe(notify, speculative) {
-					assertAlive(cell.owner);
-					return attachObserver(cell as unknown as ScopedNode, notify, true, speculative);
-				},
-				retired: () => cell.owner.retired,
-			} as NativeReadSource & { __matchesNativeDomHandle: typeof matchesKeylessNativeDomHandle },
-		};
+			__matchesNativeDomHandle: matchesKeylessNativeDomHandle,
+			getVersion: () => cell.revision,
+			subscribe(notify, speculative) {
+				assertAlive(cell.owner);
+				return attachObserver(cell as unknown as ScopedNode, notify, true, speculative);
+			},
+			retired: () => cell.owner.retired,
+		} as NativeReadSource & { __matchesNativeDomHandle: typeof matchesKeylessNativeDomHandle };
 		cellChannels.set(cell, channel);
-		cell.flags |= REACTIVE_TRACKED_CELL;
 	}
 	return channel;
 }
 
 /**
- * A keyless cell's read while something presents other values or collects reads.
- * It is never staged, seeded or historical, so it presents its live value.
+ * Without a downstream reader, only the forward dependencies belong to the
+ * cached computation. Their link versions record what it read until it rejoins
+ * the push graph. Drop sibling pointers too, so they cannot retain other readers.
  */
-/**
- * Its owner's retirement reaches a keyless cell's readers only through the cells
- * it lists: a cell joins the list when it gains its first reader.
- */
-function holdCell(cell: PlainCell): void {
-	cell.flags |= REACTIVE_LISTED;
-	(cell.owner.heldCells ??= []).push(cell);
+function disconnect(node: PlainComputed): void {
+	if (node.flags & REACTIVE_DETACHED) return;
+	const root = node;
+	// A retirement hook may disconnect a reader before its source is invalidated.
+	root.checkedAt = retirement ? -1 : inputVersion;
+	let pending: PlainComputed[] | undefined;
+	do {
+		if (node.deps && !(node.flags & (REACTIVE_DETACHED | REACTIVE_RECURSED_CHECK))) {
+			node.flags |= REACTIVE_DETACHED;
+			for (let link: Link | undefined = node.deps; link; link = link.nextDep) {
+				const dep = link.dep;
+				link.version = (dep as ScopedNode).revision;
+				detachLink(link, node);
+				link.prevSub = link.nextSub = undefined;
+				if (!dep.subs && dep instanceof PlainComputed) {
+					if (dep.flags & (REACTIVE_DIRTY | REACTIVE_PENDING)) root.checkedAt = -1;
+					dep.checkedAt = -1;
+					(pending ??= []).push(dep);
+				} else if (!(dep.flags & REACTIVE_KEYLESS_CELL)) {
+					// Keyed or still connected inputs can change independently of keyless writes.
+					root.checkedAt = -1;
+				}
+			}
+		}
+		if (!pending?.length) return;
+		node = pending.pop()!;
+	} while (true);
 }
 
-/**
- * A cell with no readers left has none for retirement to reach. Its entry goes
- * once released entries are half the list, so a long-lived scope lists at most
- * twice the cells something still reads.
- */
-function releaseCell(cell: PlainCell): void {
-	const owner = cell.owner;
-	const held = owner.heldCells;
-	// Retirement already let go of the whole list.
-	if (held === undefined || ++owner.heldReleased * 2 < held.length) return;
-	owner.heldReleased = 0;
-	owner.heldCells = held.filter((entry) => {
-		if (entry.subs !== undefined) return true;
-		entry.flags &= ~REACTIVE_LISTED;
-		return false;
-	});
+// Restore inputs before readers, so pending changes and watched counts propagate
+// up the chain. Use an explicit stack like checkDirty for deep dependency graphs.
+function reconnect(node: PlainComputed): void {
+	let stack: Link[] | undefined;
+	node.flags &= ~REACTIVE_DETACHED;
+	let link = node.deps;
+	while (link) {
+		const dep = link.dep as ScopedNode;
+		if (dep.flags & REACTIVE_DETACHED) {
+			dep.flags &= ~REACTIVE_DETACHED;
+			(stack ??= []).push(link);
+			link = dep.deps;
+			continue;
+		}
+		attachLink(link, dep.subsTail);
+		if (dep.revision !== link.version || dep.owner?.retired) link.sub.flags |= REACTIVE_DIRTY;
+		else if (dep.flags & (REACTIVE_PENDING | REACTIVE_DIRTY)) link.sub.flags |= REACTIVE_PENDING;
+		link.version = -1;
+		link = link.nextDep ?? stack?.pop();
+	}
+}
+
+// The common idle read has only live, unchanged inputs. It needs no graph edits.
+function inputsCurrent(node: PlainComputed): boolean {
+	if (node.checkedAt === inputVersion) return true;
+	for (let link = node.deps; link; link = link.nextDep) {
+		const dep = link.dep as ScopedNode;
+		if (
+			dep.flags & (REACTIVE_DETACHED | REACTIVE_DIRTY | REACTIVE_PENDING) ||
+			dep.revision !== link.version ||
+			dep.owner?.retired
+		)
+			return false;
+	}
+	return true;
 }
 
 /**
@@ -2666,21 +2713,25 @@ export function retireKeyless(
 	// Its observation has ended; a retained handle must not keep its hooks, or what they hold.
 	if (watchDriver) watchDriver.retire(node);
 	if (node instanceof PlainCell) {
+		inputVersion++;
 		(node as { owner: GraphOwner }).owner = retired;
 		node.last = undefined;
 		return;
 	}
-	while (node.deps) unlink(node.deps, node);
+	if (node.flags & REACTIVE_DETACHED) node.deps = node.depsTail = undefined;
+	else while (node.deps) unlink(node.deps, node);
+	inputVersion++;
+	node.revision++;
 	node.getter = () => {
 		throw new ScopeDisposedError(scopeKey);
 	};
 	node.last = undefined;
-	node.flags = (node.flags & REACTIVE_TRACKED_CELL) | REACTIVE_MUTABLE | REACTIVE_DIRTY;
+	node.flags = REACTIVE_MUTABLE | REACTIVE_DIRTY;
 }
 
 /** The native read source a render took from a keyless derived value, if one did. */
 export function leanSource(node: PlainComputed): NativeReadSource | undefined {
-	return leanChannels.get(node)?.source;
+	return leanChannels.get(node);
 }
 
 /** A node's own `watched` hook, which a family keeps when it adds its own. */
@@ -2693,7 +2744,7 @@ export function watchedHook(node: ReactiveNode): WatchHook['watched'] | undefine
  * everything that reads it, directly or through derived values. Every reader of a
  * counted node is counted too, from the link that makes it one. A node counts the
  * readers that observe: effects and subscribers, and counted derived values that
- * something observes. Derived values keep their links when unobserved, as scopes
+ * something observes. Keyed derived values keep their links when unobserved, as scopes
  * own their producers, so this count rather than a link decides `watched`.
  * Installed by the first hook, so a graph without one checks a driver per link
  * and unlink and ships none of this.
@@ -2888,7 +2939,7 @@ function readCellOther<T>(cell: PlainCell<T>): T {
 	}
 	if (getNativeReadObserver()) {
 		const channel = cellChannel(cell);
-		reportNativeRead(channel.source, channel.revision);
+		reportNativeRead(channel, cell.revision);
 	}
 	return cell.last;
 }
@@ -2907,6 +2958,8 @@ export class PlainComputed<T = any> implements ReactiveNode {
 	declare subs: ReactiveNode['subs'];
 	declare subsTail: ReactiveNode['subsTail'];
 	declare flags: ReactiveFlags;
+	declare revision: number;
+	declare checkedAt: number;
 	declare last: unknown;
 	declare getter: () => T;
 	declare readonly valueOnly: true;
@@ -2921,6 +2974,8 @@ export class PlainComputed<T = any> implements ReactiveNode {
 		this.subsTail = undefined;
 		this.deps = undefined;
 		this.depsTail = undefined;
+		this.revision = 0;
+		this.checkedAt = -1;
 		this.last = undefined;
 		this.getter = getter;
 	}
@@ -2932,7 +2987,11 @@ export class PlainComputed<T = any> implements ReactiveNode {
 	get(): T {
 		if (
 			this.flags &
-			(REACTIVE_DIRTY | REACTIVE_PENDING | REACTIVE_RECURSED_CHECK | REACTIVE_FAILED)
+			(REACTIVE_DETACHED |
+				REACTIVE_DIRTY |
+				REACTIVE_PENDING |
+				REACTIVE_RECURSED_CHECK |
+				REACTIVE_FAILED)
 		)
 			refreshLean(this, true);
 		const reader = activeNode;
@@ -3003,35 +3062,41 @@ Object.defineProperties(PlainComputed.prototype, {
 	plain: { value: undefined },
 });
 
-const leanChannels = new WeakMap<PlainComputed, CellChannel>();
+const leanChannels = new WeakMap<PlainComputed, NativeReadSource>();
 
-function leanChannel(node: PlainComputed): CellChannel {
+function leanChannel(node: PlainComputed): NativeReadSource {
 	let channel = leanChannels.get(node);
 	if (channel === undefined) {
 		channel = {
-			revision: 0,
-			source: {
-				__matchesNativeDomHandle: matchesKeylessNativeDomHandle,
-				// Not told of a change, so while one may have reached it no earlier read is reusable.
-				getVersion: () =>
-					node.flags & (REACTIVE_DIRTY | REACTIVE_PENDING) ? NaN : channel!.revision,
-				subscribe: (notify, speculative) =>
-					attachObserver(node as unknown as ScopedNode, notify, true, speculative),
-			} as NativeReadSource & { __matchesNativeDomHandle: typeof matchesKeylessNativeDomHandle },
-		};
+			__matchesNativeDomHandle: matchesKeylessNativeDomHandle,
+			// Not told of a change, so while one may have reached it no earlier read is reusable.
+			getVersion: () => {
+				if (node.flags & REACTIVE_DETACHED && !inputsCurrent(node)) {
+					reconnect(node);
+					disconnect(node);
+				}
+				return node.flags & (REACTIVE_DIRTY | REACTIVE_PENDING) ? NaN : node.revision;
+			},
+			subscribe: (notify, speculative) =>
+				attachObserver(node as unknown as ScopedNode, notify, true, speculative),
+		} as NativeReadSource & { __matchesNativeDomHandle: typeof matchesKeylessNativeDomHandle };
 		leanChannels.set(node, channel);
-		node.flags |= REACTIVE_TRACKED_CELL;
 	}
 	return channel;
 }
 
 function reportLeanRead(node: PlainComputed): void {
 	const channel = leanChannel(node);
-	reportNativeRead(channel.source, channel.revision);
+	reportNativeRead(channel, node.revision);
 }
 
 /** Bring a keyless derived value up to date, or rethrow what its computation threw. */
 function refreshLean(node: PlainComputed, trackFailure = false): void {
+	if (
+		node.flags & REACTIVE_DETACHED &&
+		(node.flags & (REACTIVE_DIRTY | REACTIVE_PENDING) || !inputsCurrent(node))
+	)
+		reconnect(node);
 	const flags = node.flags;
 	if (flags & REACTIVE_RECURSED_CHECK) throw new SignalCycleError('');
 	if (flags & (REACTIVE_DIRTY | REACTIVE_PENDING)) {
@@ -3047,6 +3112,7 @@ function refreshLean(node: PlainComputed, trackFailure = false): void {
 		}
 		if (dirty && updateLean(node) && node.subs !== undefined) shallowPropagate(node.subs);
 	}
+	if (!node.subs && !(trackFailure && activeNode)) disconnect(node);
 	if (node.flags & REACTIVE_FAILED) {
 		if (trackFailure) {
 			if (activeNode !== undefined) linkDependency(node, activeNode, trackingCycle);
@@ -3069,10 +3135,9 @@ function stabilizeLean(node: PlainComputed, previous: unknown): boolean {
 
 /** Compute a keyless derived value, in the shape of alien-signals' update. */
 function updateLean(node: PlainComputed): boolean {
-	// A tracked channel, an earlier failure or a render collecting reads takes the
+	// An earlier failure or a render collecting reads takes the
 	// wrapper, which keeps this common recomputation small enough to inline.
-	return node.flags & (REACTIVE_FAILED | REACTIVE_TRACKED_CELL) ||
-		signalMode & (READ_OBSERVED | CHANGE_OBSERVED)
+	return node.flags & REACTIVE_FAILED || signalMode & (READ_OBSERVED | CHANGE_OBSERVED)
 		? updateLeanTracked(node)
 		: recomputeLean(node);
 }
@@ -3106,15 +3171,15 @@ function recomputeLean(node: PlainComputed, inStabilization?: boolean): boolean 
 			? value !== 0 || 1 / (previous as number) === 1 / (value as number)
 			: value !== value && previous !== previous);
 	if (changed) node.last = value;
-	return node.flags & REACTIVE_RECURSED && !inStabilization
-		? stabilizeLean(node, previous)
-		: changed;
+	if (inStabilization) return changed;
+	const committed = node.flags & REACTIVE_RECURSED ? stabilizeLean(node, previous) : changed;
+	if (committed) node.revision++;
+	return committed;
 }
 
 function updateLeanTracked(node: PlainComputed): boolean {
-	const kept = node.flags & (REACTIVE_FAILED | REACTIVE_TRACKED_CELL);
 	// After a failure any result is a change: the held error equals no value.
-	if (kept & REACTIVE_FAILED) node.last = NO_FAILURE;
+	if (node.flags & REACTIVE_FAILED) node.last = NO_FAILURE;
 	// A render collecting reads must not see this computation's own reads.
 	const observer = (signalMode & READ_OBSERVED) !== 0 ? setNativeReadObserver(null) : null;
 	let changed: boolean;
@@ -3122,9 +3187,7 @@ function updateLeanTracked(node: PlainComputed): boolean {
 		changed = recomputeLean(node);
 	} finally {
 		if (observer !== null) setNativeReadObserver(observer);
-		node.flags |= kept & REACTIVE_TRACKED_CELL;
 	}
-	if (changed && kept & REACTIVE_TRACKED_CELL) leanChannels.get(node)!.revision++;
 	if (changed && signalMode & CHANGE_OBSERVED)
 		reportChange(node as unknown as SignalHandle<unknown>, 'change');
 	return changed;
@@ -3508,6 +3571,7 @@ export function releaseDeclarationView(view: ScopedNode): void {
 }
 
 export function retireGraph(owner: GraphOwner, nodes: Iterable<ScopedNode>): void {
+	inputVersion++;
 	const previous = retirement;
 	retirement = { snapshot: new RetiredSnapshot(owner.scopeKey) };
 	try {
