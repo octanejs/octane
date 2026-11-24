@@ -17,6 +17,17 @@ const source = `import { useEffect } from 'octane';
 export function Scene() @{ useEffect(() => {}); <view /> }`;
 
 describe('Valdi component runtime capability', () => {
+	it('rejects a switch arm exit that would skip closing the surrounding host', () => {
+		const source = `export function Scene(props) @{
+			<view>@switch (props.kind) {
+				@case 1: { @if (props.visible) { try { if (props.skip) return null; } finally {} <label /> } }
+			}</view>
+		}`;
+		expect(() => compile(source, '/src/Scene.tsrx', { renderer, hmr: false })).toThrow(
+			/early returns inside template regions/,
+		);
+	});
+
 	it('accepts supported runtime APIs only after the adapter opts in', () => {
 		expect(compile(source, '/src/Scene.tsrx', { renderer, hmr: false }).diagnostics).toEqual([]);
 		expect(() =>

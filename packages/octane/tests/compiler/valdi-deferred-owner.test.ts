@@ -24,6 +24,11 @@ describe('Valdi deferred child ownership', () => {
 			'<Child fallback={<label value={read(ctx)} />} />',
 		],
 		[
+			'block prop setup',
+			'import { useContext as read } from "octane";',
+			'<Child fallback={@{ const value = read(ctx); <label value={value} /> }} />',
+		],
+		[
 			'custom hooks',
 			'function useValue() { return 1; }',
 			'<Child><label value={useValue()} /></Child>',

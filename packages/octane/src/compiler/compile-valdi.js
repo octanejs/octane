@@ -13,6 +13,7 @@ import {
 	createLexicalAnalysis,
 	isIdentifierReference,
 	isJsxBindingReference,
+	lowerArmExitsAst,
 	validateRendererAst,
 } from './compile-universal.js';
 import { HOOK_NAMES } from './hook-names.js';
@@ -479,13 +480,15 @@ function hasRenderTimeCalls(fn) {
 	return found;
 }
 
+function emitCodeBlock(node, state, keys, allowReturn) {
+	return [
+		...emitNodes(node.body, state, keys, allowReturn),
+		...emitRenderable(node.render, state, keys),
+	];
+}
+
 function writerBody(fn, state) {
-	if (fn.body.type === 'JSXCodeBlock') {
-		return [
-			...emitNodes(fn.body.body, state, [], true),
-			...emitRenderable(fn.body.render, state, []),
-		];
-	}
+	if (fn.body.type === 'JSXCodeBlock') return emitCodeBlock(fn.body, state, [], true);
 	if (fn.body.type === 'BlockStatement') return emitNodes(fn.body.body, state, [], true);
 	return emitRenderable(fn.body, state, []);
 }
@@ -1307,6 +1310,16 @@ function emitIf(node, state, keys) {
 	];
 }
 
+function emitSwitch(node, state, keys) {
+	const test = assertNoTemplate(node.discriminant, state, '@switch conditions containing JSX');
+	const cases = node.cases.map((arm) => ({
+		...arm,
+		test: assertNoTemplate(arm.test, state, '@case conditions containing JSX'),
+		consequent: [b.block(emitNodes(arm.consequent, state, keys, false)), b.break],
+	}));
+	return [withOrigin(b.switch(test, cases), node)];
+}
+
 function isNullishOutput(node, state) {
 	const value = unwrap(node);
 	return (
@@ -1410,6 +1423,10 @@ function emitRenderable(node, state, keys) {
 		return emitNodes(value.children ?? [], state, keys, false);
 	if (value?.type === 'JSXForExpression') return emitFor(value, state, keys);
 	if (value?.type === 'JSXIfExpression') return emitIf(value, state, keys);
+	if (state.componentRuntime && value?.type === 'JSXCodeBlock')
+		return [withOrigin(b.block(emitCodeBlock(value, state, keys, false)), value)];
+	if (state.componentRuntime && value?.type === 'JSXSwitchExpression')
+		return emitSwitch(value, state, keys);
 	if (state.componentRuntime && !isTemplate(value)) {
 		let child = lowerChildValues(node, state);
 		const body = templateFunction(value, state);
@@ -1488,6 +1505,17 @@ function rewriteComponentStatement(node, state, keys, allowReturn) {
 			'JavaScript jumps inside template regions are not supported yet.',
 		);
 	}
+	// Jumps buried in a try, loop or switch must not skip the enclosing endRender.
+	if (
+		!allowReturn &&
+		state.componentRuntime &&
+		node.type.endsWith('Statement') &&
+		node.type !== 'ExpressionStatement'
+	) {
+		lowerArmExitsAst(node, state, (exit) => {
+			throw valdiError(state, exit, 'early returns inside template regions are not supported yet.');
+		});
+	}
 	return state.componentRuntime
 		? lowerChildValues(node, state)
 		: assertNoTemplate(node, state, 'JSX in JavaScript setup');
@@ -1509,7 +1537,12 @@ function emitNodes(nodes, state, keys, allowReturn) {
 				'authored text children are unsupported; use <label value={...} />.',
 			);
 		}
-		if (node.type === 'JSXExpressionContainer') {
+		if (
+			node.type === 'JSXExpressionContainer' ||
+			(state.componentRuntime &&
+				node.type === 'ExpressionStatement' &&
+				node.expression.type === 'JSXCodeBlock')
+		) {
 			output.push(...emitRenderable(node.expression, state, keys));
 		} else if (isTemplate(node)) {
 			output.push(...emitRenderable(node, state, keys));

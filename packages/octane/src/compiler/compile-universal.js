@@ -1007,6 +1007,15 @@ export function createLexicalAnalysis(ast) {
 			visitScopes(node.body, catchScope);
 			return;
 		}
+		if (node.type === 'JSXSwitchExpression') {
+			visitScopes(node.discriminant, scope);
+			for (const arm of node.cases) {
+				nodeScopes.set(arm, scope);
+				visitScopes(arm.test, scope);
+				visitScopes(arm.consequent, createLexicalScope(scope));
+			}
+			return;
+		}
 		if (node.type === 'JSXForExpression') {
 			visitScopes(node.right, scope);
 			const itemScope = createLexicalScope(scope);
@@ -3667,9 +3676,10 @@ const LOOP_STATEMENT_TYPES = new Set([
  * loop owns becomes `return;`. A value return and a `break` that targets the
  * directive throw the DOM compiler's diagnostics. Nested functions own their
  * jumps, and templates and directives compile their own arms. The walk only
- * reads the authored AST; rewriteSourceAst swaps the replacement in.
+ * reads the authored AST. rewriteSourceAst swaps the replacement in.
+ * A writer without an arm closure can reject exits via onExit.
  */
-function lowerArmExitsAst(setup, state) {
+export function lowerArmExitsAst(setup, state, onExit) {
 	const visit = (node, loop, breakable) => {
 		if (!node || typeof node !== 'object') return;
 		if (Array.isArray(node)) {
@@ -3697,6 +3707,7 @@ function lowerArmExitsAst(setup, state) {
 		if (jump === 'break')
 			throw universalError('OCTANE_ARM_BREAK', state.filename, node, ARM_BREAK_MESSAGE);
 		if (jump === 'exit') {
+			if (onExit) return onExit(node);
 			if (type === 'ContinueStatement') {
 				state.astNodeReplacements ??= new WeakMap();
 				state.astNodeReplacements.set(node, inheritGeneratedOrigin(b.return(), node));

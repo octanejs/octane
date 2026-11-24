@@ -212,6 +212,26 @@ export function Scene({ mode }: { mode: keyof typeof rows }) @{
 			]);
 		});
 
+		it('narrows each template switch arm inside a deferred block prop', () => {
+			parser.javascript = parserName === 'javascript';
+			const scene = compile(
+				`import type { OctaneNode } from 'octane';
+function Slot(props: { marker: OctaneNode }) @{ <view>{props.marker}</view> }
+type Item = { kind: 'amount'; value: number } | { kind: 'name'; value: string };
+export function Scene({ item }: { item: Item }) @{
+	<Slot marker={@{
+		@switch (item.kind) {
+			@case 'amount': { const text = item.value.toFixed(); <label value={text} /> }
+			@default: { const text = item.value.trim(); <label value={text} /> }
+		}
+	}} />
+}`,
+				'/src/Scene.tsrx',
+				componentOptions,
+			);
+			expect(typecheck(scene.code, '', {}, COMPONENT_ADAPTER)).toEqual([]);
+		});
+
 		it('accepts the component-runtime adapter registration signature', () => {
 			const consumer = `import type { ValdiComponent, ValdiComponentRuntimeAdapter } from 'octane/compiler/valdi';
 type Element = { readonly native: true };
