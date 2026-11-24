@@ -969,8 +969,8 @@ export function contractIdentity(contracts: ReadonlyArray<Contract>): string {
 			contract.kind === 'read'
 				? `read ${contract.name} ${contract.version} ${shape(contract)}`
 				: contract.kind === 'write'
-					? `write ${contract.name} ${contract.output ? `output ${schemaShape(contract.output)}` : 'none'}`
-					: `feed ${contract.name} ${schemaShape(contract.event)}`,
+					? `write ${contract.name} ${contract.version} ${contract.output ? `output ${schemaShape(contract.output)}` : 'none'}`
+					: `feed ${contract.name} ${contract.version} ${schemaShape(contract.event)}`,
 		)
 		.sort()
 		.join('\n');

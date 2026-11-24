@@ -48,10 +48,10 @@ the same task as the event that caused it.
 | Contract | Options | Notes |
 | --- | --- | --- |
 | `read` | `name`, `input?`, `output`, `entities?`, `tags?`, `fresh = 0`, `keep = 300000`, `expire = Infinity`, `persist = true`, `cancel = false`, `version = ''` | Times are milliseconds; a `keep` of 2³¹ ms or more (such as `Infinity`) keeps the value for the session. `entities(output)` returns `Entity.from(...)` selections. `tags` is a list, or `tags(input)` for each input. `cancel` aborts a load when its last fetching subscriber leaves and nothing else needs the result. |
-| `write` | `name`, `input`, `output?`, one of `creates`/`patches`/`removes`, `draft?`, `serverId?`, `record?`, `form?`, `invalidates?` | `draft(input, id)` defaults to the input plus the new ID. `record(output)` locates the saved record so views take it without reloading. `invalidates` is a list, or `invalidates(input)` from the validated input. |
+| `write` | `name`, `input`, `output?`, one of `creates`/`patches`/`removes`, `draft?`, `serverId?`, `record?`, `form?`, `invalidates?`, `version = ''` | `draft(input, id)` defaults to the input plus the new ID. `record(output)` locates the saved record so views take it without reloading. `invalidates` is a list, or `invalidates(input)` from the validated input. |
 | `entity` | `name`, `schema`, `key = 'id'` | `id(value)` is `String(value[key])`. `one` and `list` are output schemas of one record and of a list, validated by `schema`: a read whose `output` is one of them selects the entity without `entities`, and a `creates` or `patches` write to the entity whose `output` is `one` takes its reply as the saved record without `record`. An output of `schema` itself selects nothing. |
 | `view` | `name`, `of`, `order`, `where?`, `with?`, `input?`, `limit = 20`, `max = 500`, plus the read options | A read whose input is `{ ...params, offset, limit }` and whose value is that window's rows. `view.view.where` and `view.view.compare` are exposed for handlers. `with: { name: [Entity, key] }` joins each row to the record its `key` points at. |
-| `feed` | `name`, `params?`, `event`, `changes(event, params)`, `covers` | `changes` returns `{ put, value }`, `{ remove, id }`, `{ read, input?, value }` or `{ invalidates }`, or an array of them. |
+| `feed` | `name`, `params?`, `event`, `changes(event, params)`, `covers`, `version = ''` | `changes` returns `{ put, value }`, `{ remove, id }`, `{ read, input?, value }` or `{ invalidates }`, or an array of them. A write's or feed's `version` is part of the contract identity only: tabs of builds that declare different versions never share a data worker's owner. |
 
 Contracts declared in `*.data.ts` modules can be checked by the build: the
 Vite and Rspack plugins and `octane analyze` report a used contract no handler
@@ -503,8 +503,9 @@ dependency that shows every edit at once is not built in.
 - A replica's reads show pending while its page is frozen. On `resume` it asks
   the owner, and shows them again only once the account is confirmed.
 - A tab's `hello` carries its contract identity: each contract's kind and
-  name, each read's `version` and output schema shape, whether each write
-  has an output schema and its shape, and each feed's event schema shape. The first build served sets the owner's;
+  name, each contract's `version`, each read's output schema shape, whether
+  each write has an output schema and its shape, and each feed's event schema
+  shape. The first build served sets the owner's;
   a tab of another build is refused and carries on as a local store.
 - Tabs and owners check on each other every 5 seconds; three silent intervals
   mean gone. A tab whose owner is gone fences its reads, reopens the worker,

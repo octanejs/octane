@@ -965,6 +965,50 @@ describe('octane/data contract identity', () => {
 		expect(contractIdentity(move(opaque))).not.toBe(contractIdentity(move()));
 		expect(contractIdentity(move(opaque))).toBe(contractIdentity(move(opaque)));
 	});
+
+	it('tells builds apart by each write’s and each feed’s version, where their schemas describe nothing', () => {
+		const opaque: StandardSchema<unknown, unknown> = {
+			'~standard': { version: 1, vendor: 'test', validate: (value: unknown) => ({ value }) },
+		};
+		const versioned = (writeVersion: string, feedVersion: string) => [
+			write({ name: 'meeting.move', input: opaque, output: opaque, version: writeVersion }),
+			feed({
+				name: 'meeting.moved',
+				event: opaque,
+				changes: () => [],
+				covers: [],
+				version: feedVersion,
+			}),
+		];
+		expect(contractIdentity(versioned('', ''))).toBe(contractIdentity(versioned('', '')));
+		expect(contractIdentity(versioned('2', ''))).not.toBe(contractIdentity(versioned('', '')));
+		expect(contractIdentity(versioned('', '2'))).not.toBe(contractIdentity(versioned('', '')));
+	});
+
+	it('keeps a tab whose build declares another version of a write on its own store', async () => {
+		const server = createServer();
+		const owner = createDataOwner({ transport: server.transport });
+		const own: string[] = [];
+		const tab = (list: typeof contracts) => {
+			const channel = new MessageChannel();
+			owner.connect(channel.port1);
+			closers.push(() => (channel.port1.close(), channel.port2.close()));
+			const store = createReplica(channel.port2, {
+				transport: (request, signal) => (own.push(request.name), server.transport(request, signal)),
+				contracts: list,
+			});
+			closers.push(() => void store.dispose());
+			return store;
+		};
+		const nextDeploy = contracts.map((contract) =>
+			contract === setDone ? { ...setDone, version: '2' } : contract,
+		);
+		await observed(tab(contracts).read(todos));
+		await observed(tab(nextDeploy).read(todos));
+		// The first build set the owner's contracts; the other deploy loaded on its own.
+		expect(own).toEqual(['todos.list']);
+		expect(server.log).toEqual(['list', 'list']);
+	});
 });
 
 describe('octane/data owners across builds and crashes', () => {

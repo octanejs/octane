@@ -166,6 +166,8 @@ export interface Write<Input, Output> {
 	readonly form: FormFields | undefined;
 	/** Tags of the reads a confirmed write marks stale, or the tags for one input. */
 	readonly invalidates: Tags<Input>;
+	/** Builds that declare another version of this write never share a data worker's owner. */
+	readonly version: string;
 }
 
 /**
@@ -584,6 +586,12 @@ interface WriteOptions<Input, Output> {
 	 */
 	form?: { readonly [K in keyof Input & string]?: FieldCodec };
 	invalidates?: Tags<Input>;
+	/**
+	 * Change it when a build changes what this contract's schemas accept or
+	 * return in a way their JSON Schema shape cannot show, such as a transform.
+	 * Tabs of builds whose versions differ never share a data worker's owner.
+	 */
+	version?: string;
 }
 
 export function write<Input, Output = unknown>(
@@ -618,6 +626,7 @@ export function write<Input, Output>(
 			(options.output === (creates ?? patches)?.one ? (output: Output) => output : undefined),
 		form: options.form as FormFields | undefined,
 		invalidates: options.invalidates ?? [],
+		version: options.version ?? '',
 	});
 }
 
@@ -642,6 +651,8 @@ export interface Feed<Params, Event> {
 	readonly changes: (event: Event, params: Params) => FeedChange | readonly FeedChange[];
 	/** Tags and entity names of the reads this feed keeps current; missed events mark them stale. */
 	readonly covers: readonly string[];
+	/** Builds that declare another version of this feed never share a data worker's owner. */
+	readonly version: string;
 }
 
 /**
@@ -659,6 +670,12 @@ interface FeedOptions<Event, Params> {
 	event: StandardSchema<unknown, Event>;
 	changes: (event: Event, params: Params) => FeedChange | readonly FeedChange[];
 	covers: readonly string[];
+	/**
+	 * Change it when a build changes what this contract's schemas accept or
+	 * return in a way their JSON Schema shape cannot show, such as a transform.
+	 * Tabs of builds whose versions differ never share a data worker's owner.
+	 */
+	version?: string;
 }
 
 export function feed<Event, Params = void>(
@@ -680,6 +697,7 @@ export function feed<Event, Params>(
 		event: options.event,
 		changes: options.changes,
 		covers: options.covers,
+		version: options.version ?? '',
 	});
 }
 
