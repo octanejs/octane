@@ -139,15 +139,17 @@ function Outcome(props: { session: Session }) @{
 }
 
 function Faults(props: { session: Session }) @{
-	const faults = props.session.faults;
+	const switches = props.session.faults;
+	const faults = useExternal(switches);
 	<fieldset class="faults">
 		<legend>Network faults</legend>
 		<label>
 			<input
 				type="checkbox"
-				defaultChecked={faults.dropNextReply}
+				checked={faults.dropNextReply}
 				onChange={(event: Event) => {
-					faults.dropNextReply = (event.currentTarget as HTMLInputElement).checked;
+					const dropNextReply = (event.currentTarget as HTMLInputElement).checked;
+					switches.set({ ...switches.get(), dropNextReply });
 				}}
 			/>
 			Lose the next reply
@@ -155,9 +157,10 @@ function Faults(props: { session: Session }) @{
 		<label>
 			<input
 				type="checkbox"
-				defaultChecked={faults.offline}
+				checked={faults.offline}
 				onChange={(event: Event) => {
-					faults.offline = (event.currentTarget as HTMLInputElement).checked;
+					const offline = (event.currentTarget as HTMLInputElement).checked;
+					switches.set({ ...switches.get(), offline });
 				}}
 			/>
 			Offline

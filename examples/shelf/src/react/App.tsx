@@ -146,16 +146,17 @@ function Outcome({ session }: { session: Session }) {
 }
 
 function Faults({ session }: { session: Session }) {
-	const { faults } = session;
+	const switches = session.faults;
+	const faults = useExternal(switches);
 	return (
 		<fieldset className="faults">
 			<legend>Network faults</legend>
 			<label>
 				<input
 					type="checkbox"
-					defaultChecked={faults.dropNextReply}
+					checked={faults.dropNextReply}
 					onChange={(event) => {
-						faults.dropNextReply = event.currentTarget.checked;
+						switches.set({ ...switches.get(), dropNextReply: event.currentTarget.checked });
 					}}
 				/>
 				Lose the next reply
@@ -163,9 +164,9 @@ function Faults({ session }: { session: Session }) {
 			<label>
 				<input
 					type="checkbox"
-					defaultChecked={faults.offline}
+					checked={faults.offline}
 					onChange={(event) => {
-						faults.offline = event.currentTarget.checked;
+						switches.set({ ...switches.get(), offline: event.currentTarget.checked });
 					}}
 				/>
 				Offline
