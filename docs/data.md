@@ -18,6 +18,16 @@ each invariant listed here.
 | `octane/data/octane` | `DataProvider`, `useDataStore`, `useRead`, `usePages`, `useForm`, `useFeed` | Octane components. The server compiler retargets it to `octane/data/octane/server`. |
 | `octane/data/react` | The same names, over React's hooks | React 19 components. Marked `'use client'`. |
 
+In the browser, the default store is a replica of the app's data worker:
+`createReplica(sharedOwner(account), { transport, contracts, ... })`, with a
+worker module that calls `serveDataOwner({ transport, contracts, listen?,
+persist? })`, built through the plugins' `dataWorker` option (see
+[Cross-tab owner](#cross-tab-owner)). The worker makes the requests,
+validates read replies and holds feed connections and the cache, off the
+main thread. `createDataStore` is the store for the server, tests, scripts
+and pages built without a data worker; a replica becomes one when it cannot
+reach a worker.
+
 Both bindings read snapshots through `useSyncExternalStore`, so a store given to
 an Octane tree and a React tree (for example across `ReactCompat` or
 `OctaneCompat`) shows the same values, pending edits and rollbacks in both.

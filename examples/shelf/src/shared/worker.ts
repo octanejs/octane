@@ -1,8 +1,8 @@
 /**
  * The shelf's data worker. The build emits it at `/_octane/data-worker.js`,
- * and a page opened with `?owner=shared` connects to it, so every such tab
- * shares one owner: one request per read, one feed connection, one cache,
- * and each other's pending edits and rollbacks.
+ * and every page connects to it, unless opened with `?owner=local`, so an
+ * account's tabs share one owner: one request per read, one feed
+ * connection, one cache, and each other's pending edits and rollbacks.
  */
 import { indexedDBStorage, serveDataOwner, serverListener, serverTransport } from 'octane/data';
 // The build's contracts: with them, the worker validates each read's reply, so a tab of this
