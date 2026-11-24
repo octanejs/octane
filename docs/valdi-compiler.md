@@ -375,6 +375,7 @@ export function Greeting(props: { name: string }) @{
 A bare child such as `{fallback}` invokes a parameterless JSX helper in a
 host, a fragment, or a component body with siblings. A lone expression in
 `<Slot>{fallback}</Slot>` passes `fallback` directly as the `children` prop.
+Source typechecking sees the function type of `fallback` even in a sequence.
 Pass `fallback()` when the receiver expects a child value. Call parameterized
 helpers with their arguments. Helpers must be synchronous and hook-free. A
 component can read hooks during setup and pass the resulting values to a helper.

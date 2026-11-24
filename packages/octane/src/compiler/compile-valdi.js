@@ -1122,10 +1122,20 @@ function emitElement(node, state, keys) {
 	const entries = attributeEntries(node, state);
 	if (!intrinsic) {
 		const children = componentChildren(node, state);
-		if (children) {
-			const expression = Array.isArray(children) ? null : children.expression;
-			if (!state.componentRuntime) {
-				const fn = unwrap(expression);
+		if (children !== null) {
+			const child = Array.isArray(children) ? null : children;
+			if (state.componentRuntime) {
+				const only = child?.expression ?? null;
+				entries.push({
+					name: 'children',
+					value:
+						only !== null
+							? componentProp(only, state, node, 'children')
+							: deferredChildren(emitNodes(children, state, [], false), state, node),
+					origin: node,
+				});
+			} else {
+				const fn = unwrap(child?.expression);
 				if (!(
 					FUNCTION_TYPES.has(fn?.type) ||
 					fn?.type === 'Identifier' ||
@@ -1133,14 +1143,12 @@ function emitElement(node, state, keys) {
 				)) {
 					throw valdiError(state, node, 'component children must be a single render callback.');
 				}
+				entries.push({
+					name: 'children',
+					value: componentProp(child.expression, state, node, 'children'),
+					origin: child,
+				});
 			}
-			entries.push({
-				name: 'children',
-				value: expression
-					? componentProp(expression, state, node, 'children')
-					: deferredChildren(emitNodes(children, state, [], false), state, node),
-				origin: state.componentRuntime ? node : children,
-			});
 		}
 	}
 	const attrs = prepareAttributes(entries, state, node);
