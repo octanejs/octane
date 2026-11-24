@@ -19,6 +19,7 @@ import * as nodePath from 'node:path';
 import * as nodeUrl from 'node:url';
 import { parseModule } from '@tsrx/core';
 import { DATA_WORKER_PATH } from '../data/worker-path.js';
+import { DATA_CLIENT_MODULE, dataClientModule, dataClientWorker } from './data-client.js';
 import {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
 	INDEPENDENT_HYDRATION_MANIFEST_FILENAME,
@@ -50,6 +51,8 @@ const DESCRIPTOR_CHILDREN_EXPORTS_META = 'octane:descriptor-children-exports';
 const CLIENT_REFERENCE_META = 'octane:client-reference';
 const INDEPENDENT_WIDGETS_META = 'octane:independent-widgets';
 const DATA_MANIFEST_ID = '\0octane:data-manifest';
+const DATA_CLIENT_ID = '\0octane:data-client';
+const DATA_CLIENT_WORKER_ID = '\0octane:data-client-worker';
 const DESCRIPTOR_PREFLIGHT_AUTHORITY = Symbol('octane.descriptor-preflight');
 const NODE_MODULES_PATH = /(?:^|[\\/])node_modules(?:[\\/]|$)/;
 
@@ -1105,6 +1108,22 @@ export function octane(options = {}) {
 	// before the import is resolved, so the first module that mentions
 	// octane/data asks the program, once per watch generation, whether any
 	// source imports it. An app that never mentions octane/data never scans.
+	const dataClientOption = options.dataClient;
+	if (options.dataClient && options.dataWorker)
+		throw new Error('octane: pass `dataClient` or `dataWorker`, not both.');
+	if (options.dataClient && options.data === false)
+		throw new Error(
+			'octane: `dataClient` needs the generated `octane/data/manifest`; drop `data: false`.',
+		);
+	/** The data worker's entry: the app's own module, or the one generated from its data client. */
+	const dataWorkerEntry = () =>
+		options.dataWorker
+			? nodePath.resolve(projectRoot, options.dataWorker)
+			: options.dataClient
+				? DATA_CLIENT_WORKER_ID
+				: null;
+	const dataClientFile = () =>
+		nodePath.resolve(projectRoot, options.dataClient).replaceAll('\\', '/');
 	let dataProgram = options.data === false ? null : createDataProgram(projectRoot);
 	let manifestResolved = false;
 	let dataEnabled = null;
@@ -1307,7 +1326,7 @@ export function octane(options = {}) {
 				},
 				ssr: { noExternal: sourceDependencies },
 				// Vite's preload helper inserts <link> elements, and a worker has no document.
-				...(options.dataWorker && config.build?.modulePreload !== false
+				...((options.dataWorker || options.dataClient) && config.build?.modulePreload !== false
 					? {
 							build: {
 								modulePreload: {
@@ -1335,9 +1354,13 @@ export function octane(options = {}) {
 				server.watcher.on('add', refresh);
 				server.watcher.on('unlink', refresh);
 			}
-			if (!options.dataWorker) return;
-			const file = nodePath.resolve(projectRoot, options.dataWorker).replaceAll('\\', '/');
-			const source = `import ${JSON.stringify(`/@fs/${file.replace(/^\/+/, '')}`)};\n`;
+			const entry = dataWorkerEntry();
+			if (entry === null) return;
+			const url =
+				entry === DATA_CLIENT_WORKER_ID
+					? `/@id/__x00__${DATA_CLIENT_WORKER_ID.slice(1)}`
+					: `/@fs/${entry.replaceAll('\\', '/').replace(/^\/+/, '')}`;
+			const source = `import ${JSON.stringify(url)};\n`;
 			server.middlewares.use((request, response, next) => {
 				if (request.url?.split('?')[0] !== DATA_WORKER_PATH) return next();
 				response.setHeader('content-type', 'text/javascript');
@@ -1390,16 +1413,9 @@ export function octane(options = {}) {
 		},
 		buildStart() {
 			// The data worker keeps one path across deploys, so every tab shares one SharedWorker.
-			if (
-				options.dataWorker &&
-				resolvedConfig?.command === 'build' &&
-				emitClientReferenceManifest
-			) {
-				this.emitFile({
-					type: 'chunk',
-					id: nodePath.resolve(projectRoot, options.dataWorker),
-					fileName: DATA_WORKER_PATH.slice(1),
-				});
+			const entry = dataWorkerEntry();
+			if (entry !== null && resolvedConfig?.command === 'build' && emitClientReferenceManifest) {
+				this.emitFile({ type: 'chunk', id: entry, fileName: DATA_WORKER_PATH.slice(1) });
 			}
 			if (this.environment === undefined) {
 				cssModuleProofStates.clear();
@@ -1466,7 +1482,7 @@ export function octane(options = {}) {
 		},
 		generateBundle(_outputOptions, bundle) {
 			if (!emitClientReferenceManifest) return;
-			if (options.dataWorker) {
+			if (dataWorkerEntry() !== null) {
 				dataWorkerChunks.clear();
 				const add = (fileName) => {
 					const chunk = bundle[fileName];
@@ -1515,6 +1531,9 @@ export function octane(options = {}) {
 			}
 		},
 		async resolveId(source, importer, resolveOptions) {
+			if (dataClientOption && (source === DATA_CLIENT_MODULE || source === DATA_CLIENT_ID))
+				return DATA_CLIENT_ID;
+			if (dataClientOption && source === DATA_CLIENT_WORKER_ID) return DATA_CLIENT_WORKER_ID;
 			if (source === DATA_MANIFEST_MODULE && dataProgram !== null) {
 				manifestResolved = true;
 				return DATA_MANIFEST_ID;
@@ -1579,6 +1598,8 @@ export function octane(options = {}) {
 			);
 		},
 		load(id) {
+			if (id === DATA_CLIENT_ID) return dataClientModule(dataClientFile());
+			if (id === DATA_CLIENT_WORKER_ID) return dataClientWorker(dataClientFile());
 			if (id !== DATA_MANIFEST_ID) return null;
 			const { code, files } = dataProgram.manifest();
 			for (const file of files) this.addWatchFile(file);

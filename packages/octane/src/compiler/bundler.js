@@ -74,6 +74,7 @@ export {
 export { HYDRATE_QUERY_PARAM } from './hydrate-boundaries.js';
 export { DATA_WORKER_PATH } from '../data/worker-path.js';
 export { createDataProgram, DATA_MANIFEST_MODULE, formatDataDiagnostic } from './data-contracts.js';
+export { DATA_CLIENT_MODULE, dataClientModule, dataClientWorker } from './data-client.js';
 import { stripDataImplementations } from './data-contracts.js';
 export { analyzeIslandsShell } from './islands-shell.js';
 export {

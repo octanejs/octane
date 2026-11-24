@@ -1100,8 +1100,9 @@ export function renderProbe() {
 	// not a CommonJS-resolved file URL, so conditional `import` branches remain
 	// part of the packed contract. React-hosted entries require their intentionally
 	// optional React peer and remain covered by the package build's fresh imports.
-	// `./data/manifest` is a placeholder the build plugins replace; its import
-	// throws by design, which the package build's smoke check asserts.
+	// `./data/manifest` and `./data/client` are placeholders the build plugins
+	// replace; their imports throw by design, which the package build's smoke
+	// check asserts.
 	const packedRuntimeSpecifiers = Object.keys(REQUIRED_PUBLIC_VALUE_EXPORTS)
 		.filter(
 			(subpath) =>
@@ -1112,6 +1113,7 @@ export function renderProbe() {
 					'./signals/react',
 					'./signals/core',
 					'./data/manifest',
+					'./data/client',
 				].includes(subpath),
 		)
 		.map((subpath) => [subpath, subpath === '.' ? 'octane' : `octane/${subpath.slice(2)}`]);

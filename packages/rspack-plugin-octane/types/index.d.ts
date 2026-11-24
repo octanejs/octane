@@ -186,6 +186,15 @@ export interface OctaneRspackPluginOptions extends OctaneRspackLoaderOptions {
 	 */
 	dataWorker?: string;
 	/**
+	 * The app's data client module, whose default export is
+	 * `defineDataClient({ transport, listen?, persist? })` from `octane/data`.
+	 * The plugin generates the data worker from it, emitted as `dataWorker` is,
+	 * and `octane/data/client`, whose `openDataStore(account, options?)` opens a
+	 * page's store over that worker. Not with `dataWorker`, and not with
+	 * `data: false`. A path resolved from the compiler's context.
+	 */
+	dataClient?: string;
+	/**
 	 * The `octane/data` contract check and the generated `octane/data/manifest`.
 	 * On once the app imports `octane/data/manifest`; `true` turns the check on
 	 * without it, and `false` turns both off.

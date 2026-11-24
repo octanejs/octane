@@ -104,6 +104,7 @@
     "./data/octane": "./src/data/octane.ts",
     "./data/octane/server": "./src/data/octane.server.ts",
     "./data/manifest": "./src/data/manifest.ts",
+    "./data/client": "./src/data/client.ts",
     "./signals": "./src/signals/index.ts",
     "./signals/core": "./src/signals/core.ts",
     "./signals/client": "./src/signals/client.ts",
@@ -355,6 +356,11 @@
         "types": "./dist/data/manifest.d.ts",
         "node": "./dist/node/data/manifest.js",
         "default": "./dist/data/manifest.js"
+      },
+      "./data/client": {
+        "types": "./dist/data/client.d.ts",
+        "node": "./dist/node/data/client.js",
+        "default": "./dist/data/client.js"
       },
       "./signals": {
         "types": "./dist/signals/index.d.ts",

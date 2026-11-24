@@ -319,7 +319,14 @@ export const docsMeta: DocMeta[] = [
 			{
 				id: 'first-read',
 				title: 'Your first read',
-				searchTerms: ['createDataStore', 'DataProvider', 'useRead', 'serverTransport'],
+				searchTerms: [
+					'createDataStore',
+					'DataProvider',
+					'useRead',
+					'serverTransport',
+					'defineDataClient',
+					'openDataStore',
+				],
 			},
 			{
 				id: 'reading',
