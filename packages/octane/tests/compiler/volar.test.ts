@@ -900,6 +900,18 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 		}
 	});
 
+	it('keeps renderer intrinsics and Strong DOM types ahead of project default intrinsics', () => {
+		const options = { defaultIntrinsics: 'fixture-project', renderers: OBJECT_RENDERERS };
+		const scene = 'export function Scene() @{ <mesh /> }';
+		expect(compileToVolarMappings(scene, '/src/Scene.object.tsrx', options).code).toContain(
+			'@jsxImportSource @fixture/object-intrinsics',
+		);
+		const strong = `'use strong';\nexport function App() @{ <div>hi</div> }`;
+		expect(compileToVolarMappings(strong, '/src/App.tsrx', options).code).toContain(
+			'@jsxImportSource octane/strong',
+		);
+	});
+
 	it('checks a portable JSX surface independently of the runtime renderer and authored pragma', () => {
 		const root = mkdtempSync(join(tmpdir(), 'octane-volar-portable-intrinsics-'));
 		try {

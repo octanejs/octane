@@ -503,7 +503,13 @@ function authoredLeadingPragma(ast, comments) {
 	);
 }
 
-function createRendererTypePragma(renderer, ast, strong = false, typeIntrinsics = undefined) {
+function createRendererTypePragma(
+	renderer,
+	ast,
+	strong = false,
+	typeIntrinsics = undefined,
+	defaultIntrinsics = undefined,
+) {
 	// A `.tsrx` file's JSX is octane's dialect BY DEFINITION, so the built-in
 	// DOM renderer pins the virtual TSX to octane's jsx-runtime types even when
 	// the registry entry declares no `intrinsics`. Without the pragma the host
@@ -513,13 +519,16 @@ function createRendererTypePragma(renderer, ast, strong = false, typeIntrinsics 
 	// `react-jsx` tsconfig) every island would be typed against REACT's JSX and
 	// reject octane's real contract (`class`, native event payloads, …).
 	// An authored leading pragma wins unless tooling explicitly selects a
-	// separate type-only surface (checked by the caller).
+	// separate type-only surface (checked by the caller). The project's JSX
+	// source fills in only where neither the renderer nor Strong chose one.
 	const intrinsics =
 		typeIntrinsics ??
 		renderer.intrinsics ??
-		(renderer.module === DOM_RENDERER_MODULE && renderer.target === 'dom'
+		(renderer.module === DOM_RENDERER_MODULE &&
+		renderer.target === 'dom' &&
+		(strong || defaultIntrinsics === undefined)
 			? DOM_RENDERER_MODULE
-			: undefined);
+			: defaultIntrinsics);
 	if (intrinsics === undefined) return null;
 	const start = ast.loc?.start ?? { line: 1, column: 0 };
 	return {
@@ -730,7 +739,8 @@ export function compileToVolarMappings(source, filename, options) {
 				renderer,
 				ast,
 				strongDOM,
-				options?.intrinsics ?? options?.defaultIntrinsics,
+				options?.intrinsics,
+				options?.defaultIntrinsics,
 			);
 	const replacePragma =
 		authoredPragma &&
