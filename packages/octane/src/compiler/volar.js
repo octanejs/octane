@@ -503,7 +503,13 @@ function authoredLeadingPragma(ast, comments) {
 	);
 }
 
-function createRendererTypePragma(renderer, ast, strong = false, typeIntrinsics = undefined) {
+function createRendererTypePragma(
+	renderer,
+	ast,
+	strong = false,
+	typeIntrinsics = undefined,
+	defaultIntrinsics = undefined,
+) {
 	// A `.tsrx` file's JSX is octane's dialect BY DEFINITION, so the built-in
 	// DOM renderer pins the virtual TSX to octane's jsx-runtime types even when
 	// the registry entry declares no `intrinsics`. Without the pragma the host
@@ -513,13 +519,16 @@ function createRendererTypePragma(renderer, ast, strong = false, typeIntrinsics 
 	// `react-jsx` tsconfig) every island would be typed against REACT's JSX and
 	// reject octane's real contract (`class`, native event payloads, …).
 	// An authored leading pragma wins unless tooling explicitly selects a
-	// separate type-only surface (checked by the caller).
+	// separate type-only surface (checked by the caller). The project's JSX
+	// source fills in only where neither the renderer nor Strong chose one.
 	const intrinsics =
 		typeIntrinsics ??
 		renderer.intrinsics ??
-		(renderer.module === DOM_RENDERER_MODULE && renderer.target === 'dom'
+		(renderer.module === DOM_RENDERER_MODULE &&
+		renderer.target === 'dom' &&
+		(strong || defaultIntrinsics === undefined)
 			? DOM_RENDERER_MODULE
-			: undefined);
+			: defaultIntrinsics);
 	if (intrinsics === undefined) return null;
 	const start = ast.loc?.start ?? { line: 1, column: 0 };
 	return {
@@ -661,7 +670,8 @@ function markNativeTemplateBodies(root) {
  *
  * The optional `intrinsics` selects the virtual TSX's JSX type namespace
  * independently of the runtime renderer and any authored pragma.
- * @param {{ loose?: boolean, renderers?: unknown, intrinsics?: string, strong?: boolean, knownAttributeSpreads?: readonly import('./index.js').KnownAttributeSpread[] }} [options]
+ * `defaultIntrinsics` supplies the project JSX source for files without an authored pragma.
+ * @param {{ loose?: boolean, renderers?: unknown, intrinsics?: string, defaultIntrinsics?: string, strong?: boolean, knownAttributeSpreads?: readonly import('./index.js').KnownAttributeSpread[] }} [options]
  * @returns {import('./index.js').VolarCompileResult}
  */
 export function compileToVolarMappings(source, filename, options) {
@@ -725,7 +735,13 @@ export function compileToVolarMappings(source, filename, options) {
 	const strongDOM = strongAnalysis?.enabled === true && renderer.target === 'dom';
 	const rendererPragma = authoredPragma
 		? null
-		: createRendererTypePragma(renderer, ast, strongDOM, options?.intrinsics);
+		: createRendererTypePragma(
+				renderer,
+				ast,
+				strongDOM,
+				options?.intrinsics,
+				options?.defaultIntrinsics,
+			);
 	const replacePragma =
 		authoredPragma &&
 		(options?.intrinsics !== undefined ||
