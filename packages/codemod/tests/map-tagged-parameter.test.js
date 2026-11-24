@@ -16,6 +16,8 @@ it.each([false, true])(
 	async (projectTypes) => {
 		/** @param {string} expression */
 		const list = (expression) => `function fail(): never { throw Error('prior evaluation'); }
+function tag(_: TemplateStringsArray, value: number) { return value; }
+const tags = { tag };
 export function List({ show }: { show: boolean }) {
 	return <ul>{show && [{ id: 1 }, { id: 2 }].map(({ id, label = ${expression} }, index) => <li key={id}>{label}</li>)}</ul>;
 }`;
@@ -28,6 +30,10 @@ export function List({ show }: { show: boolean }) {
 			'((_: TemplateStringsArray, prefix: never, value: number) => value)`${fail()}${index}`',
 		);
 		const throwingTag = list('(fail() as () => number)`${index}`');
+		const identifierTag = list('tag`${index}`');
+		// An uninitialized later binding throws first, and a member getter may.
+		const laterTag = list('tag`${index}`').replace(' }, index)', ', later: tag }, index)');
+		const memberTag = list('tags.tag`${index}`');
 		const literal = list('((_: TemplateStringsArray, value: number) => value)`${7}`');
 		const sources = {
 			'package.json': '{"name":"codemod-test","type":"module","private":true}',
@@ -40,6 +46,9 @@ export function List({ show }: { show: boolean }) {
 			'TagRead.tsx': tagRead,
 			'EarlierThrow.tsx': earlierThrow,
 			'ThrowingTag.tsx': throwingTag,
+			'IdentifierTag.tsx': identifierTag,
+			'LaterTag.tsx': laterTag,
+			'MemberTag.tsx': memberTag,
 			'Literal.tsx': literal,
 		};
 		const root = mkdtempSync(join(tmpdir(), 'octane-codemod-tagged-'));
@@ -55,13 +64,24 @@ export function List({ show }: { show: boolean }) {
 			const blocked = expect.objectContaining({ rule: 'map-parameter-tdz', severity: 'error' });
 			const preview = await runCodemod(inputs, { ...options, write: false });
 			const files = new Map(preview.files.map((file) => [file.file, file]));
-			for (const file of ['List.tsx', 'LaterSubstitution.tsx', 'TagRead.tsx']) {
+			for (const file of [
+				'List.tsx',
+				'LaterSubstitution.tsx',
+				'TagRead.tsx',
+				'IdentifierTag.tsx',
+			]) {
 				expect(files.get(file), file).toMatchObject({
 					code: expect.stringContaining('@for'),
 					notes: [blocked],
 				});
 			}
-			for (const file of ['EarlierThrow.tsx', 'ThrowingTag.tsx', 'Literal.tsx']) {
+			for (const file of [
+				'EarlierThrow.tsx',
+				'ThrowingTag.tsx',
+				'LaterTag.tsx',
+				'MemberTag.tsx',
+				'Literal.tsx',
+			]) {
 				expect(files.get(file)?.notes, file).not.toContainEqual(blocked);
 				expect(files.get(file)?.code, file).toContain('@for');
 			}

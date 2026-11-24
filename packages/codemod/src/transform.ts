@@ -8389,6 +8389,23 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			}
 			return false;
 		};
+		// Whether evaluating `callee` for `read` is proven to finish. A member
+		// getter can throw first.
+		const reachesCall = (callee: ts.Expression, read: ts.Expression) => {
+			if (ts.isArrowFunction(callee)) return true;
+			if (!ts.isIdentifier(callee)) return false;
+			// A binding in the current parameter list may still be uninitialized.
+			const declaration = this.declarationOf(callee);
+			if (
+				declaration &&
+				(ts.isParameter(declaration) || ts.isBindingElement(declaration)) &&
+				ts.findAncestor(declaration, ts.isParameter)?.parent === ordinal.parent
+			) {
+				const element = ts.findAncestor(read, ts.isBindingElement);
+				return !!element && declaration.end <= element.pos;
+			}
+			return true;
+		};
 		const readsOrdinal = (expr: ts.Expression | undefined): boolean => {
 			if (!expr) return false;
 			const read = skipWrappers(expr);
@@ -8421,9 +8438,9 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			if (ts.isTaggedTemplateExpression(read)) {
 				const tag = skipWrappers(read.tag);
 				if (readsOrdinal(tag)) return true;
-				// An inline tag is evaluated first, then receives the uncoerced values.
+				// The tag is evaluated first, then the substitutions, uncoerced.
 				return (
-					(ts.isArrowFunction(tag) || ts.isFunctionExpression(tag)) &&
+					(ts.isFunctionExpression(tag) || reachesCall(tag, read)) &&
 					ts.isTemplateExpression(read.template) &&
 					readsInOrder(read.template.templateSpans.map(({ expression }) => expression))
 				);
@@ -8491,21 +8508,10 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					const [statement] = callee.body.statements;
 					return ts.isReturnStatement(statement) && readsOrdinal(statement.expression);
 				}
-				// Optional calls can skip their arguments, and earlier arguments or a
-				// member getter can interrupt evaluation before the ordinal read.
-				if (!ts.isArrowFunction(callee) && (ts.isOptionalChain(read) || !ts.isIdentifier(callee)))
-					return false;
-				// A binding in the current parameter list may still be uninitialized.
-				const declaration = ts.isIdentifier(callee) && this.declarationOf(callee);
-				if (
-					declaration &&
-					(ts.isParameter(declaration) || ts.isBindingElement(declaration)) &&
-					ts.findAncestor(declaration, ts.isParameter)?.parent === ordinal.parent
-				) {
-					const element = ts.findAncestor(read, ts.isBindingElement);
-					if (!element || declaration.end > element.pos) return false;
-				}
-				return readsInOrder(read.arguments);
+				// Optional calls can skip their arguments, and earlier arguments can
+				// interrupt evaluation before the ordinal read.
+				if (!ts.isArrowFunction(callee) && ts.isOptionalChain(read)) return false;
+				return reachesCall(callee, read) && readsInOrder(read.arguments);
 			}
 			if (!ts.isBinaryExpression(read)) return false;
 			const op = read.operatorToken.kind;
