@@ -18,6 +18,7 @@ import {
 	query,
 	retireSignalOwnerIdentity,
 	runWithSignalOwner,
+	SignalCycleError,
 	SignalStreamError,
 	skip,
 	type Scope,
@@ -448,10 +449,18 @@ describe('unified readonly derived declarations', () => {
 			const inner$ = scope.derived$(null, () => shared$.get());
 			const outer$ = scope.derived$(null, () => inner$.get());
 			outer$.subscribe(() => {})();
-			return [private$, readOnce$, inner$, outer$].map((value) => new WeakRef(value));
+			const enabled$ = scope.signal$(null, false);
+			const child$ = scope.derived$(null, () => shared$.get());
+			const branch$ = scope.derived$(null, () => (enabled$.get() ? child$.get() : -1));
+			expect(branch$.get()).toBe(-1);
+			enabled$.set(true);
+			expect(branch$.get()).toBe(0);
+			return [private$, readOnce$, inner$, outer$, child$, branch$].map(
+				(value) => new WeakRef(value),
+			);
 		})();
 		await collectGarbage();
-		expect(dropped.map((ref) => ref.deref() === undefined)).toEqual([true, true, true, true]);
+		for (const ref of dropped) expect(ref.deref()).toBeUndefined();
 		shared$.set(1);
 		expect(values).toEqual([0, 1]);
 	});
@@ -486,6 +495,70 @@ describe('unified readonly derived declarations', () => {
 		const stop = reader$.subscribe(() => {});
 		scope.dispose();
 		expect(() => reader$.get()).toThrow(/disposed/i);
+	});
+
+	it('keeps live readers when an idle computation changes inputs under custom equality', () => {
+		const scope = owner('idle-branch');
+		const first$ = scope.signal$(null, 1);
+		const second$ = scope.signal$(null, 2);
+		const chooseFirst$ = scope.signal$(null, true);
+		const selected$ = scope.derived$(null, () => (chooseFirst$.get() ? first$ : second$).get(), {
+			equals: Object.is,
+		});
+		const seen: number[] = [];
+		first$.subscribe(() => seen.push(first$.get()));
+		expect(selected$.get()).toBe(1);
+		chooseFirst$.set(false);
+		expect(selected$.get()).toBe(2);
+		first$.set(3);
+		expect(seen).toEqual([3]);
+		second$.set(4);
+		expect(selected$.get()).toBe(4);
+	});
+
+	it('rejects a circular branch reached through a cached idle parent and recovers', () => {
+		const scope = owner('idle-cycle');
+		const enabled$ = scope.signal$(null, false);
+		const other$ = scope.signal$(null, 0);
+		const input$ = scope.derived$(null, (): number => (enabled$.get() ? result$.get() : 1));
+		const result$ = scope.derived$(null, (): number => input$.get() + 1);
+		expect(result$.get()).toBe(2);
+		enabled$.set(true);
+		expect(() => result$.get()).toThrow(SignalCycleError);
+		other$.set(1);
+		expect(() => result$.get()).toThrow(SignalCycleError);
+		enabled$.set(false);
+		expect(result$.get()).toBe(2);
+	});
+
+	it('refreshes an idle branch when its new input retries a thrown promise', async () => {
+		const scope = owner('idle-retry');
+		const enabled$ = scope.signal$(null, false);
+		const value$ = scope.signal$(null, 4);
+		let ready = false;
+		const pending = Promise.resolve().then(() => {
+			ready = true;
+		});
+		const child$ = scope.derived$(null, () => {
+			const value = value$.get();
+			if (!ready) throw pending;
+			return value;
+		});
+		const parent$ = scope.derived$(null, () => {
+			if (!enabled$.get()) return 0;
+			try {
+				return child$.get();
+			} catch (error) {
+				if (error !== pending) throw error;
+				return -1;
+			}
+		});
+		expect(parent$.get()).toBe(0);
+		enabled$.set(true);
+		expect(parent$.get()).toBe(-1);
+		await pending;
+		expect(child$.get()).toBe(4);
+		expect(parent$.get()).toBe(4);
 	});
 
 	it('disconnects and restores a deep chain of keyless readers', () => {
