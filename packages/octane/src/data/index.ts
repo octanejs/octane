@@ -17,7 +17,7 @@ export {
 	sharedOwner,
 } from './owner.js';
 export type { DataOwner, OwnerPort } from './owner.js';
-export { defineDataClient, openDataClient, serveDataClient } from './data-client.js';
+export { defineDataClient } from './data-client.js';
 export type { DataClient, OpenDataStoreOptions } from './data-client.js';
 export { pages } from './pages.js';
 export { autoBudget, indexedDBStorage, memoryStorage } from './persist.js';

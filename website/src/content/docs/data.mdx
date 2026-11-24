@@ -2653,8 +2653,6 @@ lost reply. You can also try it offline or with JavaScript turned off.
 | `sharedOwner`        | Connect to the account's owner in the app's data worker: a SharedWorker, else the tab's own dedicated Worker, else `null`.              |
 | `serveDataOwner`     | Serve an owner to every tab that connects: what the data worker module calls.                                                           |
 | `defineDataClient`   | Declare the app's data client, `{ transport, listen?, persist? }`, as the default export of the module `dataClient` names.              |
-| `serveDataClient`    | What the data worker the plugins generate from `dataClient` calls; an app doesn't call it.                                              |
-| `openDataClient`     | What `openDataStore` in the generated `octane/data/client` calls; an app doesn't call it.                                               |
 | `contractIdentity`   | What `createReplica` compares to tell whether two builds can share an owner; `octane/data/manifest` exports it as `identity`.           |
 
 The store exposes `read`, `prefetch`, `write`, `form`, `invalidate`, `settle`,
