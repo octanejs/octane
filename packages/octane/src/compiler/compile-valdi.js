@@ -1553,9 +1553,13 @@ export function compileValdi(
 	};
 	collectComponents(ast, state);
 	validateComponentBindings(ast, state);
-	const body = [];
+	const hoisted = [];
+	const statements = [];
 	for (const node of projectValdiRuntimeImports(ast, renderer, false).body ?? []) {
 		const shape = state.componentNodes.get(node);
+		// A module initializer such as memo(Row) can precede the declaration of Row.
+		const body =
+			state.componentRuntime && shape?.fn.type === 'FunctionDeclaration' ? hoisted : statements;
 		if (shape !== undefined) body.push(...emitComponent(shape, state));
 		else body.push(assertNoTemplate(node, state, 'JSX outside a component'));
 	}
@@ -1587,7 +1591,10 @@ export function compileValdi(
 			: [withOrigin(b.const(state.jsxFacade, helper(state, 'jsx')), origin)];
 	const imports = [withOrigin(b.imports([...state.helpers], renderer.module), origin)];
 	return compileClient(
-		{ ...ast, body: [...imports, ...writerPrelude, ...state.prototypes, ...body] },
+		{
+			...ast,
+			body: [...imports, ...writerPrelude, ...state.prototypes, ...hoisted, ...statements],
+		},
 		guard,
 	);
 }

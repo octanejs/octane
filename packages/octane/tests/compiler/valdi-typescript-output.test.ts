@@ -192,8 +192,8 @@ Row({ label: 1 });`;
 			const scene = compile(
 				`import { memo, type OctaneNode } from 'octane';
 type Props<T> = { value: T; row: (item: T) => OctaneNode; children: (item: T) => OctaneNode };
-function Leaf<T>(props: Props<T>) @{ <view>{props.row(props.value)}{props.children(props.value)}</view> }
 const Row = memo(Leaf);
+function Leaf<T>(props: Props<T>) @{ <view>{props.row(props.value)}{props.children(props.value)}</view> }
 const rows = { wide: Row<number>, compact: Row<number> };
 export function Scene({ mode }: { mode: keyof typeof rows }) @{
 	<{rows[mode]} value={1} row={item => <label value={item.toFixed()} />}>

@@ -86,13 +86,13 @@ describe.each([false, true])('Valdi component runtime in dev=%s', (dev) => {
 		expect(show(4, true)).toMatchObject({ first: 3, second: 2 });
 	});
 
-	it('registers memo bodies and keeps recursive names local to the default export', () => {
+	it('registers hoisted memo bodies and keeps recursive names local to the default export', () => {
 		const { module, render } = fixture(
 			`import { memo as cache } from 'octane';
 			 export const equal = (a, b) => a.n === b.n;
-			 function Row() @{ <badge /> }
 			 const Empty = cache(() => null);
 			 export const registry = { Empty, Row: cache(Row) };
+			 function Row() @{ <badge /> }
 			 export default cache(function Row(props) @{
 				 <frame n={props.n}>@if (props.n > 1) { <Row n={props.n - 1} /> }</frame>
 			 }, equal);`,
