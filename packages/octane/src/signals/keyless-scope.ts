@@ -76,8 +76,7 @@ export class ScopeLifetime implements GraphOwner {
 	disposed = false;
 	/** Effects this scope stops when it retires. */
 	effects: EffectNode | undefined = undefined;
-	heldCells: PlainCell[] | undefined = undefined;
-	heldReleased = 0;
+	heldCells: Set<PlainCell> | undefined = undefined;
 
 	constructor(
 		protected readonly key: string,

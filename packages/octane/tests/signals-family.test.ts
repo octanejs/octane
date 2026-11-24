@@ -63,6 +63,18 @@ describe('signal families', () => {
 		};
 	}
 
+	it('invalidates an idle value read by a retiring member’s cleanup', () => {
+		const scope = owner();
+		const family = createFamily(scope, (id: number) =>
+			scope.signal$(null, id, { watched: () => () => void reader$.get() }),
+		);
+		const member$ = family.get(4);
+		const reader$ = scope.derived$(null, () => member$.get());
+		member$.subscribe(() => {});
+		family.delete(4);
+		expect(() => reader$.get()).toThrow(ScopeDisposedError);
+	});
+
 	it('hydrates only selected members without mixing family namespaces or requests', () => {
 		const server = owner('seeded-family');
 		const otherRequest = owner('seeded-family');

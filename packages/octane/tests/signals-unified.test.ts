@@ -430,6 +430,81 @@ describe('unified readonly derived declarations', () => {
 		expect(released.deref()).toBeUndefined();
 	});
 
+	it('collects unused keyless computations and cells while other subscribers stay live', async () => {
+		const scope = owner('long-lived');
+		const shared$ = scope.signal$(null, 0);
+		const values: number[] = [];
+		scope.effect(() => {
+			values.push(shared$.get());
+		});
+		const active$ = scope.signal$(null, 0);
+		scope.effect(() => void active$.get());
+
+		const dropped = (() => {
+			const private$ = scope.signal$(null, {});
+			private$.subscribe(() => {})();
+			const readOnce$ = scope.derived$(null, () => shared$.get());
+			readOnce$.get();
+			const inner$ = scope.derived$(null, () => shared$.get());
+			const outer$ = scope.derived$(null, () => inner$.get());
+			outer$.subscribe(() => {})();
+			return [private$, readOnce$, inner$, outer$].map((value) => new WeakRef(value));
+		})();
+		await collectGarbage();
+		expect(dropped.map((ref) => ref.deref() === undefined)).toEqual([true, true, true, true]);
+		shared$.set(1);
+		expect(values).toEqual([0, 1]);
+	});
+
+	it('refreshes idle keyless readers after input writes, resubscription and scope retirement', () => {
+		const scope = owner('idle-reader');
+		const input$ = scope.signal$(null, 1);
+		const parity$ = scope.derived$(null, () => input$.get() % 2);
+		const result$ = scope.derived$(null, () => ({ parity: parity$.get() }));
+		const original = result$.get();
+		input$.set(3);
+		expect(result$.get()).toBe(original);
+		input$.set(4);
+		expect(result$.get()).toEqual({ parity: 0 });
+		const values: number[] = [];
+		const stop = result$.subscribe(() => values.push(result$.get().parity));
+		input$.set(5);
+		stop();
+		input$.set(6);
+		expect(values).toEqual([1]);
+		expect(result$.get()).toEqual({ parity: 0 });
+		scope.dispose();
+		expect(() => result$.get()).toThrow(/disposed/i);
+	});
+
+	it('invalidates a reader disconnected by another cleanup during scope disposal', () => {
+		const scope = owner('retiring');
+		const input$ = scope.signal$(null, 4);
+		const reader$ = scope.derived$(null, () => input$.get());
+		const trigger$ = scope.signal$(null, 0, { watched: () => () => stop() });
+		trigger$.subscribe(() => {});
+		const stop = reader$.subscribe(() => {});
+		scope.dispose();
+		expect(() => reader$.get()).toThrow(/disposed/i);
+	});
+
+	it('disconnects and restores a deep chain of keyless readers', () => {
+		const scope = owner('deep-readers');
+		const input$ = scope.signal$(null, 0);
+		let head$ = scope.derived$(null, () => input$.get());
+		let stop = head$.subscribe(() => {});
+		for (let i = 0; i < 5000; i++) {
+			const previous$ = head$;
+			head$ = scope.derived$(null, () => previous$.get() + 1);
+			const nextStop = head$.subscribe(() => {});
+			stop();
+			stop = nextStop;
+		}
+		stop();
+		input$.set(1);
+		expect(head$.get()).toBe(5001);
+	});
+
 	it('keeps an async reader waiting on a computation that rethrows a settled thenable (#1763)', async () => {
 		const ready$ = __signalAt('module.ts#settled-ready', false);
 		const thrown = deferred<void>();

@@ -120,10 +120,13 @@ describe('watched derived stabilization', () => {
 				},
 			);
 			const committed = selected$.get();
+			const wrapper$ = scope.derived$(null, () => ({ value: selected$.get() }));
+			const wrapped = wrapper$.get();
 			let notices = 0;
 			const stop = selected$.subscribe(() => notices++);
 			enabled$.set(true);
 			expect(selected$.get()).toBe(committed);
+			expect(wrapper$.get()).toBe(wrapped);
 			expect(comparisons).toBe(1);
 			expect(notices).toBe(0);
 			stop();
