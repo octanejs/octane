@@ -225,6 +225,30 @@ Scene({ label: 'visible' });`;
 			expect(typecheck('', consumer, {}, COMPONENT_ADAPTER)).toEqual([]);
 		});
 
+		it('preserves JSX helper signatures and early returns in typed writer output', () => {
+			parser.javascript = parserName === 'javascript';
+			const source = `import type { OctaneNode } from 'octane';
+function row<T>(value: T, format: (value: T) => string): OctaneNode {
+	if (value == null) return null;
+	return <label value={format(value)} />;
+}
+function Slot(props: { render: () => OctaneNode }) @{ <view>{props.render()}</view> }
+export function Scene(props: { value: number }) @{
+	const fallback = () => @{ <view>{row(props.value, x => x.toFixed())}</view> };
+	<view>{fallback}<Slot render={fallback}/></view>
+}`;
+			const result = compile(source, '/Scene.tsrx', {
+				renderer: {
+					...renderer,
+					text: 'host',
+					capabilities: ['host-text-site', 'component-runtime'],
+				},
+				hmr: false,
+				output: 'ts',
+			});
+			expect(typecheck(result.code, '', {}, COMPONENT_ADAPTER)).toEqual([]);
+		});
+
 		it.each([false, true])(
 			'preserves component and hook types for a strict TypeScript consumer in dev=%s',
 			(dev) => {

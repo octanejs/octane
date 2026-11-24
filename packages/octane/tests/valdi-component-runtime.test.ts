@@ -24,7 +24,9 @@ function fixture(source: string, dev: boolean, abi = 4) {
 		beginComponent(component, prototype, key);
 	};
 	recorder.adapter.jsx.renderText = (prototype, value, key) => {
-		if (value !== null && typeof value === 'object' && 'render' in value) {
+		if (Array.isArray(value)) {
+			for (const item of value) recorder.adapter.jsx.renderText(prototype, item, key);
+		} else if (value !== null && typeof value === 'object' && 'render' in value) {
 			(value as Deferred).render();
 		} else {
 			renderText(prototype, value, key);
@@ -166,5 +168,116 @@ describe.each([false, true])('Valdi component runtime in dev=%s', (dev) => {
 		expect(() =>
 			fixture('export function Scene() @{ function Local() @{ <view /> } <Local /> }', dev),
 		).toThrow(/nested component declarations|JSX in JavaScript setup/);
+	});
+
+	it.each([
+		`function row(value, read) {
+			log.push(value);
+			if (!value) return null;
+			return <label value={read(value)} />;
+		}`,
+		`const row = (value, read) => @{
+			log.push(value);
+			if (!value) return null;
+			<label value={read(value)} />
+		};`,
+	])('runs helper setup at the call and resolves its JSX at each outlet', (declaration) => {
+		const { module, render } = fixture(
+			`export const log = [];
+			 ${declaration}
+			 function Slots(props) @{ <view>{props.child}{props.child}</view> }
+			 export function Scene(props) @{
+				const empty = row('', props.read);
+				const child = row(props.label, props.read);
+				log.push(empty === null);
+				<Slots child={child} />
+			 }`,
+			dev,
+		);
+		const log = module['log'] as unknown[];
+		const read = (value: string) => {
+			log.push('read');
+			return value;
+		};
+		const view = render(module['Scene'], { label: 'visible', read })[0];
+		expect(log).toEqual(['', 'visible', true, 'read', 'read']);
+		expect(view.children.map((child) => child.props['value'])).toEqual(['visible', 'visible']);
+	});
+
+	it('renders a local template body in a fragment and passes it as a callable prop', () => {
+		const { module, render } = fixture(
+			`function prefix() @{ <prefix /> }
+			 function Slot(props) @{ <frame>{props.render()}</frame> }
+			 export function Scene(props) @{
+				const fallback = () => @{ <label value={props.value} /> };
+				<view>{prefix}<>{fallback}</><Slot render={fallback} /></view>
+			 }`,
+			dev,
+		);
+		for (const value of ['first', 'second']) {
+			const [prefix, direct, slot] = render(module['Scene'], { value })[0].children;
+			expect(prefix.tag).toBe('prefix');
+			expect(direct).toMatchObject({ tag: 'label', props: { value } });
+			expect(slot.children[0]).toMatchObject({ tag: 'label', props: { value } });
+		}
+	});
+
+	it('renders a module helper among component children and forwards a lone expression as a prop', () => {
+		const { module, render } = fixture(
+			`function prefix() @{ <prefix /> }
+			 function Group(props) @{ <group>{props.children}</group> }
+			 function Slot(props) @{ <frame>{props.children()}</frame> }
+			 export function Scene() @{
+				<view>
+					<Group>{prefix}<suffix /></Group>
+					<Slot>
+						{/* callback */}
+						{prefix}
+					</Slot>
+				</view>
+			 }`,
+			dev,
+		);
+		const [group, slot] = render(module['Scene'], {})[0].children;
+		expect(group.children.map((child) => child.tag)).toEqual(['prefix', 'suffix']);
+		expect(slot.children.map((child) => child.tag)).toEqual(['prefix']);
+	});
+
+	it('preserves a lowercase descriptor and its alias when a local helper shadows it', () => {
+		const { module, render } = fixture(
+			`function row(props) @{ <label value={props.label} /> }
+			 const Item = row;
+			 export { row as Row };
+			 export function Scene() @{
+				function row(name) { return <badge value={name} />; }
+				<view><Item label="tag" />{row('helper')}</view>
+			 }`,
+			dev,
+		);
+		expect(render(module['Row'], { label: 'export' })[0].props['value']).toBe('export');
+		expect(render(module['Scene'], {})[0].children).toMatchObject([
+			{ tag: 'label', props: { value: 'tag' } },
+			{ tag: 'badge', props: { value: 'helper' } },
+		]);
+	});
+
+	it('renders JSX returned by inline and named map callbacks', () => {
+		const { module, render } = fixture(
+			`function label(value) { return <label value={value} />; }
+			 export function Scene(props) @{
+				const badges = props.items.map(value => <badge value={value} />);
+				<view>{props.items.map(label)}{badges}{props.items.map(value => <icon value={value} />)}</view>
+			 }`,
+			dev,
+		);
+		const [view] = render(module['Scene'], { items: ['a', 'b'] });
+		expect(view.children.map((node) => [node.tag, node.props['value']])).toEqual([
+			['label', 'a'],
+			['label', 'b'],
+			['badge', 'a'],
+			['badge', 'b'],
+			['icon', 'a'],
+			['icon', 'b'],
+		]);
 	});
 });
