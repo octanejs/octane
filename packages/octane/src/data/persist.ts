@@ -30,7 +30,7 @@
  */
 import * as devalue from 'devalue';
 import { clearHostTimeout, hostDateNow, postHostTask, setHostTimeout } from '../host-task.js';
-import type { Read, Write } from './contracts.js';
+import type { Read, StandardSchema, Write } from './contracts.js';
 
 /** What the store keeps in memory about each saved value. */
 export interface StoredMeta {
@@ -296,9 +296,14 @@ async function createCipher(source: PersistOptions['key']) {
 
 /** The output schema's shape, where its validator describes one. */
 export function shape(read: Read<any, any>): string {
+	return schemaShape(read.output);
+}
+
+/** A schema's output shape, where its validator describes one. */
+export function schemaShape(schema: StandardSchema<unknown, unknown> | undefined): string {
 	try {
 		return (
-			JSON.stringify(read.output['~standard'].jsonSchema?.output({ target: 'draft-2020-12' })) ?? ''
+			JSON.stringify(schema?.['~standard'].jsonSchema?.output({ target: 'draft-2020-12' })) ?? ''
 		);
 	} catch {
 		return '';

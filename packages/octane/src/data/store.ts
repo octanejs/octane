@@ -600,10 +600,13 @@ export function rewrite(value: unknown, replace: Map<unknown, unknown>): unknown
 export const requestTimes = new WeakMap<DataReply, number>();
 
 /**
- * @internal Replies whose value the shared owner validated with this build's
- * output schema, so a load adopts it as it came.
+ * @internal Replies, previews and feed frames whose values the shared owner
+ * validated with this build's schemas, so the store adopts them as they came.
  */
-export const validatedReplies = new WeakSet<DataReply>();
+export const validatedReplies = new WeakSet<object>();
+/** Whether the shared owner validated `value`, a reply, preview or feed frame. */
+export const ownerValidated = (value: unknown): boolean =>
+	typeof value === 'object' && value !== null && validatedReplies.has(value);
 
 /** How a store saves: its own persistence, or one a replica forwards to its owner. */
 export type PersistenceFactory = (
@@ -1702,7 +1705,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 						touch(entry);
 					};
 					try {
-						const value = parse(read.output, raw);
+						const value = ownerValidated(raw) ? raw : parse(read.output, raw);
 						if (value instanceof Promise) void value.then(show, () => {});
 						else show(value);
 					} catch {
@@ -1717,7 +1720,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			.then((reply) => {
 				if (!reply.ok) throw new DataError(reply.code, reply.data, reply.issues);
 				requestedAt = requestTimes.get(reply);
-				return validatedReplies.has(reply) ? reply.value : parse(read.output, reply.value);
+				return ownerValidated(reply) ? reply.value : parse(read.output, reply.value);
 			})
 			.then(
 				(value) => {
@@ -2012,7 +2015,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			};
 			pending.push(
 				Promise.resolve()
-					.then(() => parse(entry.read.output, item.value))
+					.then(() => (ownerValidated(reply) ? item.value : parse(entry.read.output, item.value)))
 					.then(
 						(value) => () => {
 							if (!current()) return undefined;
@@ -2266,7 +2269,10 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				}
 				let output: unknown;
 				try {
-					output = write.output ? await parse(write.output, reply.value) : reply.value;
+					output =
+						write.output && !ownerValidated(reply)
+							? await parse(write.output, reply.value)
+							: reply.value;
 				} catch (error) {
 					// The server applied the write; only its reply is unreadable.
 					if (!retired) confirm(operation, reply, undefined, dispatchedAt);

@@ -438,14 +438,18 @@ dependency that shows every edit at once is not built in.
 - `createDataOwner({ transport, listen?, contracts? })` makes every request and
   holds every feed connection for its replicas; `connect(port)` serves one.
 - With `contracts`, every read, write and feed the app uses (the data worker
-  imports them from `octane/data/manifest`), the owner validates each read's
-  reply with its output schema when its contracts' identity is the one its
-  tabs share, and a tab adopts that value without validating it again. It
-  leaves the reply to the tab's own validator when validation fails (the tab
-  reports the issues) and when the validated value holds anything a
-  structured clone would change: a class instance, a function, a symbol or a
-  null-prototype object. Previews, seeds, cached values and the reads a write
-  returns are validated in the tab as before.
+  imports them from `octane/data/manifest`), the owner validates what the
+  server sends with the build's schemas when its contracts' identity is the
+  one its tabs share, and a tab adopts it without validating it again: each
+  read's reply (output schema), each preview (in the order the transport sent
+  them), each write's reply (its `output` and every read in `refreshed`, all
+  or none), and each feed event (`event` schema, in order). It leaves a value
+  to the tab's own validator when validation fails (the tab reports the
+  issues) and when the validated value holds anything a structured clone
+  would change: a class instance, a function, a symbol or a null-prototype
+  object. A write's input, seeds, cached values and values offered by other
+  tabs are validated in the tab, as is everything when the owner has no
+  `contracts`.
 - `createReplica(owner, { ...storeOptions, contracts })` takes an ordinary
   store's options plus `contracts`, every read, write and feed the app uses.
   It renders, evaluates views and shows its own edits in the same task. It
@@ -488,8 +492,9 @@ dependency that shows every edit at once is not built in.
 - For trusted host account lifecycle, opt into `createDataOwner({ fence: 'explicit' })` or `serveDataOwner({ fence: 'explicit' })`. Explicit mode uses a separate account database/channel and a separate persistence partition for each durable account generation, so migration starts with a cold cache and late prior-generation commits cannot appear in a new grant. Only trusted code holding the owner object calls `activate(account)` or `activate(null)`; activation rotates the durable generation, clears the prior generation, and publishes the grant only after that cleanup succeeds. A separate old owner can still finish a previously started commit into its isolated old partition before receiving revocation; the new grant cannot restore it. For physical deletion to be complete when activation resolves, the trusted host must stop and await all old owners before activating the replacement. Replica hello/reopen only joins the active grant. Replica `retire()` and raw persistence-clear messages cannot revoke or erase peers in this mode. Never expose `activate` over an untrusted replica port; explicit mode does not itself authenticate the host, and the host must serialize its account transitions and revoke old windows. The trusted host must authenticate port/account admission and keep one live owner per grant; a fresh owner may adopt the durable grant only when replacing a stopped worker.
 - A replica's reads show pending while its page is frozen. On `resume` it asks
   the owner, and shows them again only once the account is confirmed.
-- A tab's `hello` carries its contract identity: each contract's kind, name,
-  `version` and output schema shape. The first build served sets the owner's;
+- A tab's `hello` carries its contract identity: each contract's kind and
+  name, each read's `version` and output schema shape, whether each write
+  has an output schema and its shape, and each feed's event schema shape. The first build served sets the owner's;
   a tab of another build is refused and carries on as a local store.
 - Tabs and owners check on each other every 5 seconds; three silent intervals
   mean gone. A tab whose owner is gone fences its reads, reopens the worker,
