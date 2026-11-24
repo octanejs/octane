@@ -1,5 +1,23 @@
 # @octanejs/codemod
 
+## 0.2.12
+
+### Patch Changes
+
+- 2248608: Enable the React Intl and scoped-store migration adapters for projects using stable Octane 0.24.x releases.
+- 4d90552: Block JSX map migrations that would change an eager read of an uninitialized index through a tagged template.
+- Updated dependencies [0a71dc2]
+- Updated dependencies [683ae6f]
+- Updated dependencies [2209592]
+- Updated dependencies [e5a7d65]
+- Updated dependencies [be45e99]
+- Updated dependencies [29a1fc2]
+- Updated dependencies [cdc0785]
+- Updated dependencies [b4485f6]
+- Updated dependencies [a9f89b6]
+- Updated dependencies [c9d063a]
+  - octane@0.24.0
+
 ## 0.2.11
 
 ### Patch Changes

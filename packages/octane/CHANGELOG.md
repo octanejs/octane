@@ -1,5 +1,34 @@
 # octane
 
+## 0.24.0
+
+### Minor Changes
+
+- 0a71dc2: `sharedOwner` runs the data worker as the page's own dedicated `Worker` where SharedWorker is missing or cannot start, such as in Chrome on Android, so the owner's requests, feeds and persistence stay off the main thread there too. The page's replicas of one partition share that worker; a tab's owner is not shared with other tabs. `serveDataOwner` now serves a page that connects to it as a dedicated Worker. A data worker that fails to load makes each of its replicas a local store at once, instead of after the heartbeat gives up, and a dedicated worker that stops answering is terminated and replaced.
+- 683ae6f: `createDataOwner` and `serveDataOwner` take `contracts`, the build's reads, writes and feeds (`import { contracts } from 'octane/data/manifest'` in the data worker). With them the owner validates each read's reply with its output schema in the worker, for tabs of the same build, and the tab adopts the validated value without running the schema on the page. A reply that fails validation, or whose validated value a structured clone would change (a class instance, for one), is still validated in the tab. A refresh of 5,000 zod-validated rows took 1.24 ms of the page's main thread instead of 4.25 ms in Chromium.
+- 2209592: A data worker given `contracts` now also validates a read's previews (in the order they were sent), a write's output and the reads its reply returns, and each feed event, for tabs of the same build, which adopt them without running the schemas on the page. A value that fails validation in the worker, or that a structured clone would change, is still validated in the tab. `contractIdentity` now also covers the shape of each write's output and each feed's event, so a worker from a build whose write or feed schemas differ refuses the tab, which runs on its own store, as it already did for a changed read.
+- be45e99: Report the source location of every host element in development.
+
+  Dev-compiled templates now stamp each element they create, static ones
+  included, with the full module id and the line and column of its opening tag.
+  The devtools hook reads it back with `__OCTANE_DEVTOOLS__.sourceFor(element)`,
+  which returns `{ file, line, column, components }`, or `null` for elements no
+  template created. `components` lists the enclosing components innermost first,
+  each with its name and declaration site, so a tool can show which component
+  wrote an element without inferring it from the file name. Under the Vite plugin `file` is relative to the project root, so files
+  with the same name in different folders are told apart. Inspectors and visual
+  editors can map any element to the line that wrote it without guessing from a
+  neighbouring element. Production output is unchanged.
+
+### Patch Changes
+
+- e5a7d65: Pass the elements of render-only `@if` arms and `@for` rows to a `descriptorChildren` component, so `Children.toArray` and child walks see them as they see `{cond && <X />}` and `.map()`, instead of one opaque compiled fragment.
+- 29a1fc2: Release unused keyless signal cells and computations when the last reader leaves. Idle computations keep their cached values and check for changed inputs on the next read.
+- cdc0785: Preserve the evaluation order of numeric unary operators in JSX map callbacks.
+- b4485f6: Support synchronous JSX helpers in the Valdi component runtime. Helper calls preserve setup and early returns, and their JSX renders where the child is used.
+- a9f89b6: Support `useInitialValue`, `memo`, and computed component tags with the Valdi component runtime. Typed render callbacks use the selected descriptor's prop types.
+- c9d063a: Let TypeScript integrations supply a project JSX import source to the Volar compiler for files without an authored pragma.
+
 ## 0.23.2
 
 ### Patch Changes

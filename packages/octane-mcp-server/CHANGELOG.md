@@ -1,5 +1,11 @@
 # @octanejs/mcp-server
 
+## 0.3.15
+
+### Patch Changes
+
+- e036eff: Accept `chat-switching` in the benchmark runner tool.
+
 ## 0.3.14
 
 ### Patch Changes

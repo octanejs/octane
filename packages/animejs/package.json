@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/animejs",
-  "version": "0.0.45",
+  "version": "0.0.46",
   "license": "MIT",
   "type": "module",
   "sideEffects": [
@@ -52,7 +52,7 @@
   },
   "peerDependencies": {
     "@types/three": ">=0.156.0",
-    "octane": "workspace:^0.23.0",
+    "octane": "workspace:^0.24.0",
     "three": ">=0.156.0"
   },
   "peerDependenciesMeta": {
