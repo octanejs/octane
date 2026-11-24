@@ -133,6 +133,7 @@ export {
 	setEventHandler,
 	devEventListener,
 	devHtmlNesting,
+	stampSources,
 	htext,
 	htextSwap,
 	textareaText,

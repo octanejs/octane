@@ -448,6 +448,7 @@ export {
 	bindingText,
 	child,
 	sibling,
+	stampSources,
 } from './runtime/templates.js';
 export {
 	requestFormReset,
