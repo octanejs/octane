@@ -20,8 +20,8 @@ function hook(): OctaneDevtoolsHook {
 // Each element resolves to the full fixture path, at the column where its own
 // opening tag starts: static elements, component output, @if arms and
 // multi-root fragments included. Its components chain names the hookless
-// (Badge) or hookful (Stat) child that wrote it, then SourcesApp, skipping the
-// @if arm in between.
+// (Badge) or hookful (Stat) child that wrote it, then any wrapper (the hookless
+// Panel), then SourcesApp, skipping the @if arm in between.
 function expectEveryElementLocated(container: Element): void {
 	// A <template>'s children live in its content fragment, out of the tree.
 	const elements = [...container.querySelectorAll('*')];
@@ -40,6 +40,7 @@ function expectEveryElementLocated(container: Element): void {
 		'a',
 		'section',
 		'b',
+		'aside',
 		'var',
 		'footer',
 		'svg',
@@ -63,9 +64,11 @@ function expectEveryElementLocated(container: Element): void {
 		const owner =
 			el.localName === 'em' || el.localName === 'i'
 				? ['Badge']
-				: el.localName === 'var'
-					? ['Stat']
-					: [];
+				: el.localName === 'aside'
+					? ['Panel']
+					: el.localName === 'var'
+						? ['Stat', 'Panel']
+						: [];
 		expect(
 			source!.components.map((c) => c.name),
 			el.localName,

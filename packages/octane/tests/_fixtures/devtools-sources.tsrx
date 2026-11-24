@@ -12,6 +12,12 @@ function Stat() @{
 	<var>{String(n)}</var>
 }
 
+function Panel() @{
+	<aside>
+		<Stat />
+	</aside>
+}
+
 export function SourcesApp(props: { show: boolean }) @{
 	const [count, setCount] = useState(0);
 	<main class="app" onClick={() => setCount(count + 1)}>
@@ -25,7 +31,7 @@ export function SourcesApp(props: { show: boolean }) @{
 		@if (props.show) {
 			<section>
 				<b>shown</b>
-				<Stat />
+				<Panel />
 			</section>
 		}
 		<footer>end</footer>

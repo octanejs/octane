@@ -2046,7 +2046,10 @@ export function componentName(block: Block): string {
 	return body.displayName || body.name || 'Unknown';
 }
 
-/** DEV-only: the body that each hookless child's scope renders (componentSlotLite). */
+/**
+ * DEV-only: the body that each hookless child's scope, and its LiteBlockImpl
+ * stand-in, renders (componentSlotLite).
+ */
 export const LITE_BODIES: WeakMap<Scope, ComponentBody> | null =
 	process.env.NODE_ENV === 'production' ? null : /* @__PURE__ */ new WeakMap();
 
