@@ -25,6 +25,26 @@ export function skipWrappers(node: ts.Expression): ts.Expression {
 	return node;
 }
 
+export function isPrimitiveLiteral(node: ts.Expression) {
+	node = skipWrappers(node);
+	if (ts.isPrefixUnaryExpression(node)) {
+		const operand = skipWrappers(node.operand);
+		if (node.operator === ts.SyntaxKind.PlusToken) return ts.isNumericLiteral(operand);
+		return (
+			node.operator === ts.SyntaxKind.MinusToken &&
+			(ts.isNumericLiteral(operand) || ts.isBigIntLiteral(operand))
+		);
+	}
+	return (
+		ts.isStringLiteralLike(node) ||
+		ts.isNumericLiteral(node) ||
+		ts.isBigIntLiteral(node) ||
+		node.kind === ts.SyntaxKind.TrueKeyword ||
+		node.kind === ts.SyntaxKind.FalseKeyword ||
+		node.kind === ts.SyntaxKind.NullKeyword
+	);
+}
+
 /** Short-circuit behavior if this expression finishes evaluating. */
 export function literalCondition(expr: ts.Expression) {
 	const value = skipWrappers(expr);
