@@ -18,7 +18,7 @@ export async function invokeHook(page, hook) {
 	}, call);
 }
 
-function countNamedFunctions(coverage, metrics) {
+export function countNamedFunctions(coverage, metrics) {
 	const counts = Object.fromEntries(metrics.map((name) => [name, 0]));
 	let productionCalls = 0;
 	for (const script of coverage.result) {

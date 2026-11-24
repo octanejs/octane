@@ -60,6 +60,7 @@ export const BENCHMARK_SUITES = [
 	'weather-app',
 	'weather-app-lighthouse',
 	'chat-stream',
+	'chat-switching',
 	'streamdown-hosted',
 	'svg-dashboard',
 	'uibench',

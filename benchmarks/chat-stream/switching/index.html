@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Survey conversations</title>
+		<style>
+			body {
+				margin: 0;
+				background: #f1f3ee;
+				color: #24332b;
+				font:
+					15px/1.5 Inter,
+					system-ui,
+					sans-serif;
+			}
+			main {
+				height: 100vh;
+				max-width: 48rem;
+				margin: auto;
+			}
+			main,
+			section {
+				display: flex;
+				flex-direction: column;
+			}
+			nav {
+				display: flex;
+				gap: 0.5rem;
+				padding: 1rem;
+				border-bottom: 1px solid #c4d0c7;
+			}
+			button {
+				border: 1px solid #becbbf;
+				border-radius: 0.5rem;
+				background: white;
+				padding: 0.45rem 0.8rem;
+				font: inherit;
+				cursor: pointer;
+			}
+			button[aria-current] {
+				background: #204938;
+				border-color: #204938;
+				color: white;
+			}
+			section {
+				min-height: 0;
+				padding: 0 1rem;
+			}
+			h1 {
+				margin: 1rem 0 0;
+				font-size: 1.4rem;
+			}
+			small,
+			output,
+			footer {
+				color: #506659;
+			}
+			output {
+				margin-bottom: 1rem;
+			}
+			/* Keep the live tail in view without a synchronous scroll or layout read. */
+			.history {
+				overflow-y: auto;
+				display: flex;
+				flex-direction: column-reverse;
+			}
+			article {
+				border: 1px solid #d4ded5;
+				background: white;
+				padding: 0.7rem 1rem;
+				border-radius: 0.6rem;
+				margin: 0 0 0.65rem;
+			}
+			article[data-kind='reply'] {
+				background: #e4f2e6;
+			}
+			header,
+			footer {
+				display: flex;
+				gap: 0.75rem;
+				align-items: baseline;
+			}
+			footer {
+				font-size: 0.8rem;
+			}
+			p,
+			ul,
+			pre,
+			figure,
+			blockquote {
+				margin: 0.4rem 0;
+			}
+			pre,
+			figure {
+				padding: 0.5rem;
+				background: #eff3f2;
+				white-space: pre-wrap;
+			}
+			blockquote {
+				border-left: 2px solid #9fb7a9;
+				padding-left: 0.65rem;
+			}
+		</style>
+	</head>
+	<body>
+		<main id="root"></main>
+		<script type="module" src="/assets/app.js"></script>
+	</body>
+</html>
