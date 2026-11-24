@@ -2194,17 +2194,22 @@ plugin where to find it, and a connection from each tab.
 listener you used in the tab. If you keep an encrypted cache, move its setup
 into the worker too. The `persist` function takes the signed-in account. The
 worker handles all writes to that account's cache and journal, so the tabs
-share a single cache and size limit.
+share a single cache and size limit. Pass the build's `contracts` too: the
+worker then runs each read's output schema on the reply itself, and a tab of
+the same build takes the validated value without running the schema on the
+page.
 
 ```ts
 // worker.ts
 import { indexedDBStorage, serveDataOwner, serverListener, serverTransport } from 'octane/data';
+import { contracts } from 'octane/data/manifest';
 import { data, events } from './data.tsrx';
 import { cacheKeyFor } from './cache-key.ts';
 
 serveDataOwner({
 	transport: serverTransport(data),
 	listen: serverListener(events),
+	contracts,
 	persist: (account) => ({
 		storage: indexedDBStorage(),
 		partition: account,

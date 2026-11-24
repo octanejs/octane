@@ -59,6 +59,7 @@ import {
 	entryKey,
 	internals,
 	requestTimes,
+	validatedReplies,
 	type DataStore,
 	type DataStoreOptions,
 	type Entry,
@@ -161,6 +162,8 @@ type ToReplica =
 			readonly at?: number;
 			/** The owner kept the value: a tab that validates it unchanged saves it without sending it back. */
 			readonly kept?: boolean;
+			/** The owner validated the value with the tab's own output schema. */
+			readonly validated?: boolean;
 	  }
 	| { readonly t: 'failed'; readonly id: number; readonly error: unknown }
 	/** A provisional value of the read asked for as `id`, ahead of its reply. */
@@ -175,8 +178,9 @@ type ToReplica =
 			readonly value: unknown;
 			/** When the request that read it started; an owner from an older build leaves it out. */
 			readonly at?: number;
-			/** The owner kept the value, as for a reply. */
+			/** The owner kept the value, and validated it, as for a reply. */
 			readonly kept?: boolean;
+			readonly validated?: boolean;
 	  }
 	/** A value another replica holds, which the owner passes on as it came. */
 	| Offer
@@ -237,8 +241,38 @@ export function createDataOwner(options: {
 	 * their only writer, so every tab shares one budget and one journal.
 	 */
 	readonly persist?: ((account: string) => PersistOptions) | undefined;
+	/**
+	 * Every read, write and feed the app uses, as `createReplica` takes them.
+	 * With them, the owner validates each read's reply with its output schema
+	 * for tabs of the same build, which then adopt the value without validating
+	 * it on the page.
+	 */
+	readonly contracts?: ReadonlyArray<Contract> | undefined;
 }): DataOwner {
 	const { transport, listen, fence } = options;
+	const outputs = new Map<string, Read<any, any>>();
+	for (const contract of options.contracts ?? [])
+		if (contract.kind === 'read') outputs.set(contract.name, contract);
+	/** Whether the tabs served, all of one build, share this owner's contracts. */
+	let validating = false;
+	/** The replies whose value this owner validated. */
+	const validated = new WeakSet<DataReply>();
+	/** A read's reply as the tabs should take it: validated here, where the value survives the trip. */
+	const check = async (name: string, reply: DataReply): Promise<DataReply> => {
+		const read = outputs.get(name);
+		if (!validating || !read || !reply.ok) return reply;
+		let value: unknown;
+		try {
+			value = await parse(read.output, reply.value);
+		} catch {
+			// The tab validates it, and reports what was wrong.
+			return reply;
+		}
+		if (!cloneable(value, new Set())) return reply;
+		const checked: DataReply = { ...reply, value };
+		validated.add(checked);
+		return checked;
+	};
 	const accountDatabase = fence === 'explicit' ? EXPLICIT_ACCOUNT_DATABASE : ACCOUNT_DATABASE;
 	const accountChannel = fence === 'explicit' ? EXPLICIT_ACCOUNT_CHANNEL : ACCOUNT_CHANNEL;
 	const persistOptions = (account: string, grant: number): PersistOptions => {
@@ -610,13 +644,15 @@ export function createDataOwner(options: {
 				abort: new AbortController(),
 				preview: null,
 			};
-			const started = (shared = Promise.resolve().then(() =>
-				transport(payload, asking.abort.signal, (value) => {
-					asking.preview = { value };
-					for (const [port, member] of asking.waiting)
-						post(port, { t: 'preview', id: member, value });
-				}),
-			));
+			const started = (shared = Promise.resolve()
+				.then(() =>
+					transport(payload, asking.abort.signal, (value) => {
+						asking.preview = { value };
+						for (const [port, member] of asking.waiting)
+							post(port, { t: 'preview', id: member, value });
+					}),
+				)
+				.then((reply) => check(payload.name, reply)));
 			asked.set(started, asking);
 			flying.add(asking);
 			reading.set(key, started);
@@ -657,6 +693,7 @@ export function createDataOwner(options: {
 							value: reply.value,
 							at,
 							kept: kept.get(cacheKey)?.at === at,
+							validated: validated.has(reply),
 						};
 						for (const port of replicas)
 							if (!asking.waiting.some(([asker]) => asker === port)) post(port, value);
@@ -672,7 +709,15 @@ export function createDataOwner(options: {
 		asking.keep ||= !!keep;
 		if (asking.preview) post(from, { t: 'preview', id, value: asking.preview.value });
 		shared.then(
-			(reply) => post(from, { t: 'reply', id, reply, at, kept: kept.get(cacheKey)?.at === at }),
+			(reply) =>
+				post(from, {
+					t: 'reply',
+					id,
+					reply,
+					at,
+					kept: kept.get(cacheKey)?.at === at,
+					validated: validated.has(reply),
+				}),
 			fail,
 		);
 	}
@@ -814,7 +859,10 @@ export function createDataOwner(options: {
 				const message = data as ToOwner;
 				if (message.t === 'hello') {
 					// The first build served decides which builds share this owner.
-					identity ??= message.identity;
+					if (identity === undefined) {
+						identity = message.identity;
+						validating = outputs.size > 0 && contractIdentity(options.contracts!) === identity;
+					}
 					if (message.identity !== identity) joined = Promise.resolve(refuse(port));
 					else if (fence === 'explicit') joined = admit(port, message.account!);
 					else if (fence) joined = join(port, message.account!);
@@ -1281,16 +1329,24 @@ export function createReplica(
 	 * Take a value another replica loaded, for a read held here and not loading,
 	 * unless what is held was read by a request that started later.
 	 */
-	async function value(name: string, input: unknown, raw: unknown, requestedAt?: number) {
+	async function value(
+		name: string,
+		input: unknown,
+		raw: unknown,
+		requestedAt?: number,
+		validated?: boolean,
+	) {
 		const at = requestedAt ?? hostDateNow();
 		const entry: Entry | undefined = inner.wireEntry(entryKey(name, input));
 		const older = () => entry!.hasBase && at < entry!.fetchedAt;
 		if (!entry || entry.inflight || store.retired || older()) return;
-		let parsed: unknown;
-		try {
-			parsed = await parse(entry.read.output, raw);
-		} catch {
-			return;
+		let parsed: unknown = raw;
+		if (!validated) {
+			try {
+				parsed = await parse(entry.read.output, raw);
+			} catch {
+				return;
+			}
 		}
 		// Another value or offer may have landed while this one was validated.
 		if (store.retired || entry.inflight || inner.entries.get(entry.key) !== entry || older())
@@ -1336,6 +1392,7 @@ export function createReplica(
 					replies.delete(message.id);
 					if (message.t === 'reply') {
 						if (message.at !== undefined) requestTimes.set(message.reply, message.at);
+						if (message.validated) validatedReplies.add(message.reply);
 						if (message.kept && message.reply.ok) ownerKept(message.reply.value, message.at!);
 						pending?.resolve(message.reply);
 					} else pending?.reject(message.error);
@@ -1352,7 +1409,7 @@ export function createReplica(
 					break;
 				case 'value':
 					if (message.kept) ownerKept(message.value, message.at!);
-					void value(message.name, message.input, message.value, message.at);
+					void value(message.name, message.input, message.value, message.at, message.validated);
 					break;
 				case 'offer':
 					void offered(message);
@@ -1488,6 +1545,32 @@ export function sharedOwner(name: string, url: string | URL = DATA_WORKER_PATH):
 		failed: (then) => (unloadable ? then() : (tell = then)),
 	});
 	return port;
+}
+
+/**
+ * Whether a structured clone of `value` equals it: plain data, with nothing a
+ * clone would drop or turn into a plain object, such as a class instance.
+ */
+function cloneable(value: unknown, seen: Set<object>): boolean {
+	if (typeof value !== 'object' || value === null)
+		return typeof value !== 'function' && typeof value !== 'symbol';
+	if (seen.has(value)) return true;
+	seen.add(value);
+	const proto = Object.getPrototypeOf(value);
+	if (proto === Object.prototype || proto === Array.prototype) {
+		for (const key in value) if (!cloneable((value as any)[key], seen)) return false;
+		return true;
+	}
+	if (proto === Map.prototype) {
+		for (const [key, item] of value as Map<unknown, unknown>)
+			if (!cloneable(key, seen) || !cloneable(item, seen)) return false;
+		return true;
+	}
+	if (proto === Set.prototype) {
+		for (const item of value as Set<unknown>) if (!cloneable(item, seen)) return false;
+		return true;
+	}
+	return proto === Date.prototype || proto === RegExp.prototype || ArrayBuffer.isView(value);
 }
 
 /** Each partition's dedicated data worker, where the page has no SharedWorker. */
