@@ -48,6 +48,7 @@ import {
 	type Listener,
 	type Read,
 	type Transport,
+	type StandardSchema,
 	type Write,
 	type DataReply,
 	type DataRequest,
@@ -59,6 +60,7 @@ import {
 	entryKey,
 	internals,
 	requestTimes,
+	ownerValidated,
 	validatedReplies,
 	type DataStore,
 	type DataStoreOptions,
@@ -167,8 +169,18 @@ type ToReplica =
 	  }
 	| { readonly t: 'failed'; readonly id: number; readonly error: unknown }
 	/** A provisional value of the read asked for as `id`, ahead of its reply. */
-	| { readonly t: 'preview'; readonly id: number; readonly value: unknown }
-	| { readonly t: 'frame'; readonly id: number; readonly frame: FeedFrame }
+	| {
+			readonly t: 'preview';
+			readonly id: number;
+			readonly value: unknown;
+			readonly validated?: boolean;
+	  }
+	| {
+			readonly t: 'frame';
+			readonly id: number;
+			readonly frame: FeedFrame;
+			readonly validated?: boolean;
+	  }
 	| { readonly t: 'end'; readonly id: number; readonly error?: unknown }
 	/** Another replica loaded a read. */
 	| {
@@ -187,7 +199,12 @@ type ToReplica =
 	/** Another replica sent a write. */
 	| { readonly t: 'write'; readonly op: string; readonly name: string; readonly raw: unknown }
 	/** How a write another replica sent ended: its reply, or uncertain. */
-	| { readonly t: 'outcome'; readonly op: string; readonly reply: DataReply | null }
+	| {
+			readonly t: 'outcome';
+			readonly op: string;
+			readonly reply: DataReply | null;
+			readonly validated?: boolean;
+	  }
 	| {
 			readonly t: 'settle';
 			readonly op: string;
@@ -213,7 +230,9 @@ interface Asking {
 	/** Aborts the transport once no replica waits. */
 	readonly abort: AbortController;
 	/** The newest preview sent, for a replica that joins after it. */
-	preview: { readonly value: unknown } | null;
+	preview: { readonly value: unknown; readonly validated: boolean } | null;
+	/** The previews still being validated, which go out in the order they came. */
+	previewing: Promise<void>;
 }
 
 interface Upstream {
@@ -243,33 +262,73 @@ export function createDataOwner(options: {
 	readonly persist?: ((account: string) => PersistOptions) | undefined;
 	/**
 	 * Every read, write and feed the app uses, as `createReplica` takes them.
-	 * With them, the owner validates each read's reply with its output schema
-	 * for tabs of the same build, which then adopt the value without validating
-	 * it on the page.
+	 * With them, the owner validates what the server sends with the build's
+	 * schemas, for tabs of the same build, which then adopt it without
+	 * validating it on the page: each read's reply and previews, each write's
+	 * output and the reads its reply returns, and each feed event.
 	 */
 	readonly contracts?: ReadonlyArray<Contract> | undefined;
 }): DataOwner {
 	const { transport, listen, fence } = options;
 	const outputs = new Map<string, Read<any, any>>();
-	for (const contract of options.contracts ?? [])
+	const writeContracts = new Map<string, Write<any, any>>();
+	const feedContracts = new Map<string, Feed<any, any>>();
+	for (const contract of options.contracts ?? []) {
 		if (contract.kind === 'read') outputs.set(contract.name, contract);
+		else if (contract.kind === 'write') writeContracts.set(contract.name, contract);
+		else feedContracts.set(contract.name, contract);
+	}
 	/** Whether the tabs served, all of one build, share this owner's contracts. */
 	let validating = false;
-	/** The replies whose value this owner validated. */
-	const validated = new WeakSet<DataReply>();
+	/** The replies and frames whose values this owner validated. */
+	const validated = new WeakSet<object>();
+	/**
+	 * `value` through `schema`, where the result survives the trip to a tab
+	 * unchanged; `NOT` where it fails or would not, and the tab validates it,
+	 * reporting what was wrong.
+	 */
+	const validate = async (schema: StandardSchema<unknown, unknown>, value: unknown) => {
+		try {
+			const output = await parse(schema, value);
+			return cloneable(output, new Set()) ? output : NOT;
+		} catch {
+			return NOT;
+		}
+	};
 	/** A read's reply as the tabs should take it: validated here, where the value survives the trip. */
 	const check = async (name: string, reply: DataReply): Promise<DataReply> => {
 		const read = outputs.get(name);
 		if (!validating || !read || !reply.ok) return reply;
-		let value: unknown;
-		try {
-			value = await parse(read.output, reply.value);
-		} catch {
-			// The tab validates it, and reports what was wrong.
-			return reply;
-		}
-		if (!cloneable(value, new Set())) return reply;
+		const value = await validate(read.output, reply.value);
+		if (value === NOT) return reply;
 		const checked: DataReply = { ...reply, value };
+		validated.add(checked);
+		return checked;
+	};
+	/** A write's reply, with its output and every read it returns validated, or as it came. */
+	const checkWrite = async (name: string, reply: DataReply): Promise<DataReply> => {
+		const write = writeContracts.get(name);
+		if (!validating || !write || !reply.ok) return reply;
+		const value = write.output ? await validate(write.output, reply.value) : reply.value;
+		if (value === NOT) return reply;
+		const refreshed = [];
+		for (const item of reply.refreshed ?? []) {
+			const read = outputs.get(item.name);
+			const fresh = read ? await validate(read.output, item.value) : NOT;
+			if (fresh === NOT) return reply;
+			refreshed.push({ ...item, value: fresh });
+		}
+		const checked: DataReply = { ...reply, value, refreshed };
+		validated.add(checked);
+		return checked;
+	};
+	/** A feed's frame, with its event validated, or as it came. */
+	const checkFrame = async (name: string, frame: FeedFrame): Promise<FeedFrame> => {
+		const feed = feedContracts.get(name);
+		if (!validating || !feed || !('event' in frame)) return frame;
+		const event = await validate(feed.event, frame.event);
+		if (event === NOT) return frame;
+		const checked = { ...frame, event };
 		validated.add(checked);
 		return checked;
 	};
@@ -614,15 +673,16 @@ export function createDataOwner(options: {
 		from: OwnerPort,
 		{ id, request: payload, fresh, receipt, keep }: Extract<ToOwner, { t: 'request' }>,
 	): void {
-		const answer = (reply: DataReply) => post(from, { t: 'reply', id, reply });
 		const fail = (error: unknown) => post(from, { t: 'failed', id, error });
 		if (payload.kind === 'write') {
 			const op = payload.operationId!;
 			others(from, { t: 'write', op, name: payload.name, raw: payload.input });
 			transport(payload, new AbortController().signal).then(
-				(reply) => {
-					answer(reply);
-					others(from, { t: 'outcome', op, reply });
+				async (raw) => {
+					const reply = await checkWrite(payload.name, raw);
+					const checked = validated.has(reply);
+					post(from, { t: 'reply', id, reply, validated: checked });
+					others(from, { t: 'outcome', op, reply, validated: checked });
 				},
 				(error) => {
 					fail(error);
@@ -643,13 +703,21 @@ export function createDataOwner(options: {
 				keep: false,
 				abort: new AbortController(),
 				preview: null,
+				previewing: Promise.resolve(),
 			};
+			const show = (value: unknown, validated: boolean) => {
+				asking.preview = { value, validated };
+				for (const [port, member] of asking.waiting)
+					post(port, { t: 'preview', id: member, value, validated });
+			};
+			const read = outputs.get(payload.name);
 			const started = (shared = Promise.resolve()
 				.then(() =>
-					transport(payload, asking.abort.signal, (value) => {
-						asking.preview = { value };
-						for (const [port, member] of asking.waiting)
-							post(port, { t: 'preview', id: member, value });
+					transport(payload, asking.abort.signal, (raw) => {
+						if (!validating || !read || payload.kind !== 'read') return show(raw, false);
+						asking.previewing = asking.previewing
+							.then(() => validate(read.output, raw))
+							.then((value) => (value === NOT ? show(raw, false) : show(value, true)));
 					}),
 				)
 				.then((reply) => check(payload.name, reply)));
@@ -707,7 +775,7 @@ export function createDataOwner(options: {
 		const { at } = asking;
 		asking.waiting.push([from, id]);
 		asking.keep ||= !!keep;
-		if (asking.preview) post(from, { t: 'preview', id, value: asking.preview.value });
+		if (asking.preview) post(from, { t: 'preview', id, ...asking.preview });
 		shared.then(
 			(reply) =>
 				post(from, {
@@ -768,11 +836,15 @@ export function createDataOwner(options: {
 		void (async () => {
 			let error: unknown;
 			try {
-				for await (const frame of listen(payload, current.abort.signal)) {
+				for await (const raw of listen(payload, current.abort.signal)) {
+					if (current.abort.signal.aborted) return;
+					// Validated in order: the next frame waits for this one.
+					const frame = await checkFrame(payload.name, raw);
 					if (current.abort.signal.aborted) return;
 					if (frame.cursor !== undefined) current.cursor = frame.cursor;
+					const checked = validated.has(frame);
 					for (const [port, member] of current.members)
-						post(port, { t: 'frame', id: member, frame });
+						post(port, { t: 'frame', id: member, frame, validated: checked });
 				}
 			} catch (cause) {
 				error = cause;
@@ -1279,7 +1351,10 @@ export function createReplica(
 			const { write } = operation;
 			let output: unknown;
 			try {
-				output = write.output ? await parse(write.output, reply.value) : reply.value;
+				output =
+					write.output && !ownerValidated(reply)
+						? await parse(write.output, reply.value)
+						: reply.value;
 			} catch {
 				output = undefined;
 			}
@@ -1392,16 +1467,18 @@ export function createReplica(
 					replies.delete(message.id);
 					if (message.t === 'reply') {
 						if (message.at !== undefined) requestTimes.set(message.reply, message.at);
-						if (message.validated) validatedReplies.add(message.reply);
+						if (message.validated) trust(message.reply);
 						if (message.kept && message.reply.ok) ownerKept(message.reply.value, message.at!);
 						pending?.resolve(message.reply);
 					} else pending?.reject(message.error);
 					break;
 				}
 				case 'preview':
+					if (message.validated) trust(message.value);
 					replies.get(message.id)?.preview?.(message.value);
 					break;
 				case 'frame':
+					if (message.validated) trust(message.frame);
 					feeds.get(message.id)?.push(message.frame);
 					break;
 				case 'end':
@@ -1418,6 +1495,7 @@ export function createReplica(
 					inOrder(() => follow(message.op, message.name, message.raw));
 					break;
 				case 'outcome':
+					if (message.validated) trust(message.reply);
 					inOrder(() => outcome(message.op, message.reply));
 					break;
 				case 'settle':
@@ -1546,6 +1624,13 @@ export function sharedOwner(name: string, url: string | URL = DATA_WORKER_PATH):
 	});
 	return port;
 }
+
+/** What an owner's validation gives where the tab must validate instead. */
+const NOT: unique symbol = Symbol('not validated');
+/** Adopt `value`, which the owner validated with this build's schemas, as it came. */
+const trust = (value: unknown) => {
+	if (typeof value === 'object' && value !== null) validatedReplies.add(value);
+};
 
 /**
  * Whether a structured clone of `value` equals it: plain data, with nothing a

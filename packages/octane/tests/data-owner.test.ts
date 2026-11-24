@@ -19,6 +19,8 @@ import {
 	read,
 	serveDataOwner,
 	sharedOwner,
+	feed,
+	write,
 	type DataOwner,
 	type DataReply,
 	type DataStore,
@@ -737,6 +739,154 @@ describe('octane/data replies validated by the owner', () => {
 		const shown = await observed(stores[0]!.read(meeting));
 		expect(shown().start).toEqual(new Date('2026-11-24T10:00:00Z'));
 		expect(calls).toEqual(['page']);
+	});
+});
+
+describe('octane/data previews, writes and feed events validated by the owner', () => {
+	/**
+	 * One build's contracts, each schema logging `side` when it runs: a meeting
+	 * read whose start becomes a Date, a write that moves it and returns it, and
+	 * a feed announcing moves. The owner and the tabs each build their own copy,
+	 * as a worker and its pages do.
+	 */
+	function build(side: string, calls: string[], delays: number[] = []) {
+		const schema = (what: string) => {
+			const output: StandardSchema<unknown, { start: Date }> = {
+				'~standard': {
+					version: 1,
+					vendor: 'test',
+					validate(value) {
+						calls.push(`${side} ${what}`);
+						const at = (value as { start?: unknown }).start;
+						const result =
+							typeof at === 'string' || at instanceof Date
+								? { value: { start: new Date(at) } }
+								: { issues: [{ message: 'Expected a start' }] };
+						const delay = side === 'worker' ? delays.shift() : undefined;
+						return delay === undefined
+							? result
+							: new Promise((resolve) => setTimeout(() => resolve(result), delay));
+					},
+				},
+			};
+			return output;
+		};
+		const meeting = read({ name: 'meeting', output: schema('read') });
+		const move = write({
+			name: 'meeting.move',
+			input: schema('input'),
+			output: schema('write'),
+		});
+		const moved = feed({
+			name: 'meeting.moved',
+			event: schema('event'),
+			changes: (event) => ({ read: meeting, value: event }),
+			covers: ['meeting'],
+		});
+		return { meeting, move, moved, contracts: [...contracts, meeting, move, moved] };
+	}
+
+	function served(options: {
+		transport: Transport;
+		listen?: Listener;
+		count?: number;
+		delays?: number[];
+	}) {
+		const calls: string[] = [];
+		const owner = createDataOwner({
+			transport: options.transport,
+			listen: options.listen,
+			contracts: build('worker', calls, options.delays).contracts,
+		});
+		const page = build('page', calls);
+		const stores = Array.from({ length: options.count ?? 1 }, () => {
+			const channel = new MessageChannel();
+			owner.connect(channel.port1);
+			const store = createReplica(channel.port2, { ...replicaOptions, contracts: page.contracts });
+			closers.push(() => (void store.dispose(), channel.port1.close(), channel.port2.close()));
+			return store;
+		});
+		return { stores, page, calls };
+	}
+	const at = (hour: number) => ({ start: `2026-11-24T${hour}:00:00Z` });
+	const date = (hour: number) => new Date(`2026-11-24T${hour}:00:00Z`);
+	const onPage = (calls: string[], what: string) => calls.filter((call) => call === `page ${what}`);
+
+	it('shows the previews the worker validated, in the order they came, without validating them on the page', async () => {
+		let reply!: () => void;
+		const { stores, page, calls } = served({
+			// The first preview validates more slowly than the second.
+			delays: [30, 0],
+			transport: (_request, _signal, preview) => {
+				preview?.(at(9));
+				preview?.(at(10));
+				return new Promise((resolve) => (reply = () => resolve({ ok: true, value: at(11) })));
+			},
+		});
+		const handle = stores[0]!.read(page.meeting);
+		closers.push(handle.subscribe(() => {}));
+		await vi.waitFor(() => expect(handle.getSnapshot().value?.start).toEqual(date(10)));
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		// The slower first preview did not come after the second.
+		expect(handle.getSnapshot()).toMatchObject({ preview: true, value: { start: date(10) } });
+		reply();
+		await vi.waitFor(() => expect(handle.getSnapshot().value?.start).toEqual(date(11)));
+		expect(onPage(calls, 'read')).toEqual([]);
+	});
+
+	it('confirms a write with the output and the reads it returns as the worker validated them, in every tab', async () => {
+		const { stores, page, calls } = served({
+			count: 2,
+			transport: async (request) =>
+				request.kind === 'write'
+					? {
+							ok: true,
+							value: at(14),
+							refreshed: [{ name: 'meeting', input: undefined, value: at(14) }],
+						}
+					: { ok: true, value: at(9) },
+		});
+		const [mine, theirs] = stores as [DataStore, DataStore];
+		const here = await observed(mine.read(page.meeting));
+		const there = await observed(theirs.read(page.meeting));
+		const output = await mine.write(page.move, { start: date(14) });
+		expect(output).toEqual({ start: date(14) });
+		await vi.waitFor(() => expect(there().start).toEqual(date(14)));
+		expect(here().start).toEqual(date(14));
+		// Each tab validated the write's input for its own edit, and nothing the server sent.
+		expect(onPage(calls, 'write')).toEqual([]);
+		expect(onPage(calls, 'read')).toEqual([]);
+	});
+
+	it('applies feed events the worker validated, without validating them on the page', async () => {
+		const { stores, page, calls } = served({
+			transport: async () => ({ ok: true, value: at(9) }),
+			listen: async function* () {
+				yield { cursor: '1', event: at(15) } as FeedFrame;
+				await new Promise(() => {});
+			},
+		});
+		const shown = await observed(stores[0]!.read(page.meeting));
+		closers.push(listen(stores[0]!, page.moved).subscribe(() => {}));
+		await vi.waitFor(() => expect(shown().start).toEqual(date(15)));
+		expect(onPage(calls, 'event')).toEqual([]);
+	});
+
+	it('leaves a write reply to the page when a read it returns does not validate in the worker', async () => {
+		const { stores, page, calls } = served({
+			transport: async (request) =>
+				request.kind === 'write'
+					? {
+							ok: true,
+							value: at(14),
+							refreshed: [{ name: 'meeting', input: undefined, value: { begins: 'soon' } }],
+						}
+					: { ok: true, value: at(9) },
+		});
+		await observed(stores[0]!.read(page.meeting));
+		await stores[0]!.write(page.move, { start: date(14) });
+		// The page validates the whole reply itself, output included.
+		expect(onPage(calls, 'write')).toEqual(['page write']);
 	});
 });
 

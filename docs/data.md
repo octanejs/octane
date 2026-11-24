@@ -438,14 +438,18 @@ dependency that shows every edit at once is not built in.
 - `createDataOwner({ transport, listen?, contracts? })` makes every request and
   holds every feed connection for its replicas; `connect(port)` serves one.
 - With `contracts`, every read, write and feed the app uses (the data worker
-  imports them from `octane/data/manifest`), the owner validates each read's
-  reply with its output schema when its contracts' identity is the one its
-  tabs share, and a tab adopts that value without validating it again. It
-  leaves the reply to the tab's own validator when validation fails (the tab
-  reports the issues) and when the validated value holds anything a
-  structured clone would change: a class instance, a function, a symbol or a
-  null-prototype object. Previews, seeds, cached values and the reads a write
-  returns are validated in the tab as before.
+  imports them from `octane/data/manifest`), the owner validates what the
+  server sends with the build's schemas when its contracts' identity is the
+  one its tabs share, and a tab adopts it without validating it again: each
+  read's reply (output schema), each preview (in the order the transport sent
+  them), each write's reply (its `output` and every read in `refreshed`, all
+  or none), and each feed event (`event` schema, in order). It leaves a value
+  to the tab's own validator when validation fails (the tab reports the
+  issues) and when the validated value holds anything a structured clone
+  would change: a class instance, a function, a symbol or a null-prototype
+  object. A write's input, seeds, cached values and values offered by other
+  tabs are validated in the tab, as is everything when the owner has no
+  `contracts`.
 - `createReplica(owner, { ...storeOptions, contracts })` takes an ordinary
   store's options plus `contracts`, every read, write and feed the app uses.
   It renders, evaluates views and shows its own edits in the same task. It

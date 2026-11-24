@@ -189,7 +189,8 @@ plugin where to find it, and the store in the page.
 **The worker module.** Give `serveDataOwner` the transport, here
 `serverTransport(data)`, which sends each request through the `data` function
 we just wrote. Give it your build's `contracts` too, so the worker can check
-each reply against the read's schema before it reaches the page.
+what the server sends against your schemas before it reaches the page: each
+read's reply and previews, each write's reply, and each feed event.
 
 ```ts
 // data.worker.ts
@@ -2335,8 +2336,8 @@ in any of these cases.
 
 Both sides use `contracts`. The replica needs the write declarations to show
 edits from other tabs as they happen. The owner checks the full list to make
-sure the tabs agree on the contracts they're sharing, and checks each read's
-reply against its schema for them, so the tabs take the value as it comes. In the meantime, the
+sure the tabs agree on the contracts they're sharing, and checks what the
+server sends against their schemas, so the tabs take each value as it comes. In the meantime, the
 replica can hydrate from its page's seed without waiting for the worker.
 
 If you just opened a tab, the server may have sent you a more recent copy of

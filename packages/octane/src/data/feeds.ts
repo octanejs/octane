@@ -20,6 +20,7 @@ import {
 	DataRetiredError,
 	entryKey,
 	internals,
+	ownerValidated,
 	rewrite,
 	seedCursorKey,
 	selections,
@@ -98,7 +99,9 @@ function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P, key: st
 		if (frame.gap) missed();
 		if ('event' in frame && !(frame.id !== undefined && seen.has(frame.id))) {
 			try {
-				const event = await parse(feed.event, frame.event);
+				const event = ownerValidated(frame)
+					? (frame.event as E)
+					: await parse(feed.event, frame.event);
 				if (signal.aborted) return;
 				const changes = feed.changes(event, params);
 				// The connection signal also aborts synchronously when the store retires.
