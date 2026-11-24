@@ -577,6 +577,30 @@ for (const { name, path } of [PAGES[0]!, PAGES[1]!])
 		await other.close();
 	});
 
+test('uses up a lost reply once for the account, when each tab runs its own dedicated data worker', async ({
+	page,
+}) => {
+	const url = `/?ns=${Date.now()}-${++namespace}`;
+	const other = await page.context().newPage();
+	for (const tab of [page, other]) {
+		await tab.addInitScript(() => {
+			delete (globalThis as { SharedWorker?: unknown }).SharedWorker;
+		});
+		await tab.goto(url);
+		await expect(tab.getByText('3 books · 0 read')).toBeVisible();
+	}
+	const lose = (tab: Page) => tab.getByRole('checkbox', { name: 'Lose the next reply' });
+	await lose(page).click();
+	for (const tab of [page, other]) await expect(lose(tab)).toBeChecked();
+	await book(page, 'Kindred').getByRole('checkbox').click();
+	await expect(status(page)).toContainText('The reply was lost');
+	for (const tab of [page, other]) await expect(lose(tab)).not.toBeChecked();
+	// The other tab's worker heard the fault was used, so its write keeps its reply.
+	await book(other, 'Piranesi').getByRole('checkbox').click();
+	await expect(status(other)).toHaveText('Saved');
+	await other.close();
+});
+
 test('signs every shared tab of an account out when another account signs in, even one that was frozen', async ({
 	page,
 }) => {

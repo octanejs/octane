@@ -27,6 +27,8 @@ const faults = {
 channel.onmessage = ({ data: message }: MessageEvent<FaultMessage>) => {
 	if (message.t === 'set') faults.set(message.faults);
 	else if (message.t === 'ask') faults.set(current);
+	// Another worker of the account, such as another tab's dedicated one, used up a fault.
+	else if (message.t === 'faults') current = message.faults;
 };
 
 serveDataOwner({
