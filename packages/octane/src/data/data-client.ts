@@ -6,12 +6,7 @@
  * persistence from one module, so neither is configured twice.
  */
 import type { Feed, Listener, Read, Transport, Write } from './contracts.js';
-import {
-	createReplica,
-	serveDataOwner,
-	sharedOwner,
-	type DataOwner,
-} from './owner.js';
+import { createReplica, serveDataOwner, sharedOwner, type DataOwner } from './owner.js';
 import type { PersistOptions } from './persist.js';
 import type { DataStore, DataStoreOptions } from './store.js';
 
