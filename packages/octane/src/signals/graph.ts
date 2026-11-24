@@ -207,6 +207,7 @@ type Work = ScopedNode | SignalObserver | (() => void);
 let activeNode: ScopedNode | EffectNode | PlainComputed | undefined;
 let activeOwners: Set<GraphOwner> | undefined;
 let trackingCycle = 0;
+let idleInputs: Set<ReactiveNode> | undefined;
 let executionDepth = 0;
 let pureDepth = 0;
 let runningWatchHook = false;
@@ -301,6 +302,20 @@ function linkDependency(dep: ReactiveNode, sub: ReactiveNode, version: number): 
 	if (prevDep !== undefined && prevDep.dep === dep) {
 		return;
 	}
+	if (sub.flags & REACTIVE_DETACHED) {
+		version = (dep as ScopedNode).revision;
+		if (idleInputs) {
+			if (idleInputs.has(dep)) return;
+			idleInputs.add(dep);
+		}
+		if (
+			!(dep.flags & REACTIVE_KEYLESS_CELL) &&
+			((dep.flags & (REACTIVE_DETACHED | REACTIVE_DIRTY | REACTIVE_PENDING)) !==
+				REACTIVE_DETACHED ||
+				(dep as PlainComputed).checkedAt !== inputVersion)
+		)
+			(sub as PlainComputed).checkedAt = -1;
+	}
 	const nextDep = prevDep !== undefined ? prevDep.nextDep : sub.deps;
 	if (nextDep !== undefined && nextDep.dep === dep) {
 		nextDep.version = version;
@@ -326,6 +341,14 @@ function addLink(
 	nextDep: Link | undefined,
 	prevSub: Link | undefined,
 ): void {
+	// With no subscriber tail to deduplicate repeated idle reads, index
+	// consumed inputs only when the next dependency cannot be reused.
+	if (prevDep && sub.flags & REACTIVE_DETACHED && !idleInputs) {
+		idleInputs = new Set();
+		for (let link: Link | undefined = prevDep; link; link = link.prevDep) idleInputs.add(link.dep);
+		if (idleInputs.has(dep)) return;
+		idleInputs.add(dep);
+	}
 	const newLink = (sub.depsTail = {
 		version,
 		dep,
@@ -342,6 +365,10 @@ function addLink(
 		prevDep.nextDep = newLink;
 	} else {
 		sub.deps = newLink;
+	}
+	if (sub.flags & REACTIVE_DETACHED) {
+		newLink.prevSub = undefined;
+		return;
 	}
 	if (dep.flags & REACTIVE_DETACHED) reconnect(dep as PlainComputed);
 	attachLink(newLink, prevSub);
@@ -403,6 +430,15 @@ function detachLink(link: Link, sub: ReactiveNode): void {
 
 /** Finish obsolete dependencies while the computation still rejects recursive reads. */
 function unlinkObsolete(node: ReactiveNode, first: Link): void {
+	// Idle inputs have no reverse links or watch hooks to release.
+	if (node.flags & REACTIVE_DETACHED) {
+		if (node.depsTail) node.depsTail.nextDep = undefined;
+		else {
+			node.deps = undefined;
+			node.flags &= ~REACTIVE_DETACHED;
+		}
+		return;
+	}
 	let obsolete: Link | undefined = first;
 	try {
 		do {
@@ -2664,6 +2700,53 @@ function reconnect(node: PlainComputed): void {
 	}
 }
 
+// Validate an idle chain from its inputs up. Reuse forward links during
+// computation. A live or keyed input needs the regular push-graph checks.
+function refreshIdle(node: PlainComputed): boolean {
+	let parent: Link | undefined;
+	let parents: Link[] | undefined;
+	let link = node.deps;
+	while (link) {
+		const dep = link.dep as PlainCell | PlainComputed;
+		if (dep.flags & (REACTIVE_DIRTY | REACTIVE_PENDING | REACTIVE_RECURSED_CHECK)) return false;
+		if (dep.flags & REACTIVE_DETACHED) {
+			if ((dep as PlainComputed).checkedAt !== inputVersion) {
+				if (parent) (parents ??= []).push(parent);
+				parent = link;
+				node = dep as PlainComputed;
+				link = node.deps;
+				continue;
+			}
+		} else if (!(dep.flags & REACTIVE_KEYLESS_CELL) || dep.owner?.retired) return false;
+
+		if (dep.revision !== link.version) {
+			node.checkedAt = inputVersion;
+			if (!parent) {
+				node.flags |= REACTIVE_DIRTY;
+				return true;
+			}
+			updateLean(node);
+			if (
+				node.checkedAt !== inputVersion ||
+				!(node.flags & REACTIVE_DETACHED) ||
+				node.flags & REACTIVE_DIRTY
+			)
+				return false;
+		} else if (link.nextDep) {
+			link = link.nextDep;
+			continue;
+		} else {
+			node.checkedAt = inputVersion;
+		}
+		link = parent;
+		if (link) {
+			node = link.sub as PlainComputed;
+			parent = parents?.pop();
+		}
+	}
+	return true;
+}
+
 // The common idle read has only live, unchanged inputs. It needs no graph edits.
 function inputsCurrent(node: PlainComputed): boolean {
 	if (node.checkedAt === inputVersion) return true;
@@ -2987,11 +3070,8 @@ export class PlainComputed<T = any> implements ReactiveNode {
 	get(): T {
 		if (
 			this.flags &
-			(REACTIVE_DETACHED |
-				REACTIVE_DIRTY |
-				REACTIVE_PENDING |
-				REACTIVE_RECURSED_CHECK |
-				REACTIVE_FAILED)
+				(REACTIVE_DIRTY | REACTIVE_PENDING | REACTIVE_RECURSED_CHECK | REACTIVE_FAILED) ||
+			(this.flags & REACTIVE_DETACHED && this.checkedAt !== inputVersion)
 		)
 			refreshLean(this, true);
 		const reader = activeNode;
@@ -3071,6 +3151,7 @@ function leanChannel(node: PlainComputed): NativeReadSource {
 			__matchesNativeDomHandle: matchesKeylessNativeDomHandle,
 			// Not told of a change, so while one may have reached it no earlier read is reusable.
 			getVersion: () => {
+				if (node.flags & REACTIVE_RECURSED_CHECK) return NaN;
 				if (node.flags & REACTIVE_DETACHED && !inputsCurrent(node)) {
 					reconnect(node);
 					disconnect(node);
@@ -3092,13 +3173,16 @@ function reportLeanRead(node: PlainComputed): void {
 
 /** Bring a keyless derived value up to date, or rethrow what its computation threw. */
 function refreshLean(node: PlainComputed, trackFailure = false): void {
-	if (
-		node.flags & REACTIVE_DETACHED &&
-		(node.flags & (REACTIVE_DIRTY | REACTIVE_PENDING) || !inputsCurrent(node))
-	)
-		reconnect(node);
+	if (node.flags & REACTIVE_RECURSED_CHECK) throw new SignalCycleError('');
+	if (node.flags & REACTIVE_DETACHED) {
+		if (
+			!(node.flags & (REACTIVE_DIRTY | REACTIVE_PENDING)) &&
+			(node.checkedAt === inputVersion || refreshIdle(node) || inputsCurrent(node))
+		) {
+			if (!(node.flags & (REACTIVE_DIRTY | REACTIVE_FAILED))) return;
+		} else reconnect(node);
+	}
 	const flags = node.flags;
-	if (flags & REACTIVE_RECURSED_CHECK) throw new SignalCycleError('');
 	if (flags & (REACTIVE_DIRTY | REACTIVE_PENDING)) {
 		let dirty = (flags & REACTIVE_DIRTY) !== 0;
 		if (!dirty) {
@@ -3112,7 +3196,12 @@ function refreshLean(node: PlainComputed, trackFailure = false): void {
 		}
 		if (dirty && updateLean(node) && node.subs !== undefined) shallowPropagate(node.subs);
 	}
-	if (!node.subs && !(trackFailure && activeNode)) disconnect(node);
+	if (
+		!(node.flags & REACTIVE_DETACHED) &&
+		!node.subs &&
+		(!trackFailure || !activeNode || activeNode.flags & REACTIVE_DETACHED)
+	)
+		disconnect(node);
 	if (node.flags & REACTIVE_FAILED) {
 		if (trackFailure) {
 			if (activeNode !== undefined) linkDependency(node, activeNode, trackingCycle);
@@ -3145,7 +3234,9 @@ function updateLean(node: PlainComputed): boolean {
 /** Recompute; a throw is held as the value, flagged REACTIVE_FAILED. */
 function recomputeLean(node: PlainComputed, inStabilization?: boolean): boolean {
 	node.depsTail = undefined;
-	node.flags = REACTIVE_MUTABLE | REACTIVE_RECURSED_CHECK;
+	node.flags = REACTIVE_MUTABLE | REACTIVE_RECURSED_CHECK | (node.flags & REACTIVE_DETACHED);
+	const previousInputs = idleInputs;
+	idleInputs = undefined;
 	const previousNode = activeNode;
 	// Being the active node rejects writes (assertWritable) and keeps no provenance (addOwner).
 	activeNode = node;
@@ -3158,6 +3249,7 @@ function recomputeLean(node: PlainComputed, inStabilization?: boolean): boolean 
 		// A thrown thenable is computed again once its readers retry.
 		node.flags |= isThenable(error) ? REACTIVE_FAILED | REACTIVE_DIRTY : REACTIVE_FAILED;
 	} finally {
+		idleInputs = previousInputs;
 		activeNode = previousNode;
 		const tail = node.depsTail as Link | undefined;
 		const obsolete = tail ? tail.nextDep : node.deps;
