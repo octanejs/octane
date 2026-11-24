@@ -506,6 +506,29 @@ for (const { name, path } of [PAGES[2]!, PAGES[1]!])
 		await keeper.close();
 	});
 
+for (const { name, path } of [PAGES[2]!, PAGES[0]!])
+	test(`${name}: runs the data worker as the tab’s own dedicated Worker where SharedWorker is missing`, async ({
+		page,
+	}) => {
+		await page.addInitScript(() => {
+			delete (globalThis as { SharedWorker?: unknown }).SharedWorker;
+		});
+		const ns = `${Date.now()}-${++namespace}`;
+		await page.goto(`${path}?ns=${ns}&owner=shared`);
+		await expect(page.getByText('3 books · 0 read')).toBeVisible();
+		await expect
+			.poll(() => page.workers().map((worker) => new URL(worker.url()).pathname))
+			.toContain('/_octane/data-worker.js');
+
+		// The worker makes the tab's requests, so the tab's own transport logs none.
+		await book(page, 'Kindred').getByRole('checkbox').click();
+		await expect(page.getByText('3 books · 1 read')).toBeVisible();
+		await expect(status(page)).toHaveText('Saved');
+		await expect(network(page).getByRole('listitem')).toHaveCount(0);
+		await page.reload();
+		await expect(book(page, 'Kindred').getByRole('checkbox')).toBeChecked();
+	});
+
 test('signs every shared tab of an account out when another account signs in, even one that was frozen', async ({
 	page,
 }) => {

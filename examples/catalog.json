@@ -1136,6 +1136,13 @@
           "critical": true
         },
         {
+          "id": "dedicated-owner-fallback",
+          "title": "Run the data worker as the tab's own dedicated Worker where SharedWorker is missing, on the mixed page and on the Octane page: the worker makes the tab's requests, and an edit is saved",
+          "kind": "resilience",
+          "spec": "e2e/shelf.spec.ts",
+          "critical": true
+        },
+        {
           "id": "shared-owner-cache",
           "title": "Start a reloaded shared tab from the data worker's encrypted cache, without loading its lists",
           "kind": "golden",

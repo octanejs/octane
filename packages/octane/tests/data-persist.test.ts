@@ -2820,9 +2820,10 @@ describe('octane/data persistence through a shared owner', () => {
 		let worker: { owner: DataOwner; ports: MessagePort[] } | null = null;
 		vi.stubGlobal(
 			'SharedWorker',
-			class {
+			class extends EventTarget {
 				port: MessagePort;
 				constructor() {
+					super();
 					worker ??= {
 						owner: createDataOwner({ transport, persist: () => cache(storage, 'ada') }),
 						ports: [],
