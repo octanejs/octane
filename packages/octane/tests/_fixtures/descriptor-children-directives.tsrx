@@ -35,6 +35,15 @@ export function ForChildren(props: { ids: string[]; inspect: Inspect }) @{
 	</Inspector>
 }
 
+// Rows whose own `key` carries no value, so the header key identifies them.
+export function ValuelessKeyRows(props: { ids: string[]; inspect: Inspect }) @{
+	<Inspector inspect={props.inspect}>
+		@for (const id of props.ids; key id) {
+			<Item key value={id} />
+		}
+	</Inspector>
+}
+
 // Items nested in a host, as a menu's options sit inside its content part.
 export function NestedForChildren(props: { ids: string[]; inspect: Inspect }) @{
 	<Inspector inspect={props.inspect}>

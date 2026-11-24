@@ -14,6 +14,7 @@ import {
 	KeylessIfRows,
 	NestedForChildren,
 	SetupArmChildren,
+	ValuelessKeyRows,
 } from './_fixtures/descriptor-children-directives.tsrx';
 
 const server = loadServerFixture(
@@ -91,6 +92,19 @@ describe('descriptorChildren template directives', () => {
 		expect(seen.at(-1)).toEqual(['Item.$c', 'Item.$b', 'Item.$a']);
 		expect(mounted.container.textContent).toBe('cba');
 		// Keyed rows keep their identity across the reorder.
+		expect(mounted.container.querySelectorAll('.item')[2]).toBe(first);
+		mounted.unmount();
+	});
+
+	it('keys @for rows whose own key is valueless by the header key', () => {
+		const { seen, inspect } = inspector();
+		const mounted = mount(ValuelessKeyRows, { ids: ['a', 'b'], inspect });
+		expect(seen.at(-1)).toEqual(['Item.$a', 'Item.$b']);
+		const first = mounted.container.querySelector('.item');
+
+		flushSync(() => mounted.root.render(ValuelessKeyRows, { ids: ['c', 'b', 'a'], inspect }));
+		expect(seen.at(-1)).toEqual(['Item.$c', 'Item.$b', 'Item.$a']);
+		expect(mounted.container.textContent).toBe('cba');
 		expect(mounted.container.querySelectorAll('.item')[2]).toBe(first);
 		mounted.unmount();
 	});

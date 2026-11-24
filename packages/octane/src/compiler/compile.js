@@ -26801,7 +26801,8 @@ function inspectableDirectiveValue(directive, ctx) {
 		return null;
 	const row = renderOnlyArmOutput(directive.body);
 	if (row === null || row === undefined) return null;
-	const keyed = row.type === 'JSXElement' && row.openingElement.attributes.some(isKeyAttribute);
+	const keyed =
+		row.type === 'JSXElement' && keyAttributeExpression(row.openingElement.attributes) !== null;
 	const value =
 		directive.key == null ? inspectableArmValue(row, ctx) : keyedRowValue(row, directive.key, ctx);
 	if (value === null) return null;
@@ -26835,10 +26836,12 @@ function keyedRowValue(arm, key, ctx) {
 		inheritOriginLoc(b.jsx_attribute(b.jsx_id('key'), b.jsx_expression_container(key)), key);
 	if (output.type === 'JSXElement') {
 		const { attributes } = output.openingElement;
-		if (attributes.some(isKeyAttribute)) return inspectableTemplateDirectives(output, ctx);
+		if (keyAttributeExpression(attributes) !== null)
+			return inspectableTemplateDirectives(output, ctx);
+		// A valueless key gives way to the header key, as the template list's does.
 		const openingElement = {
 			...output.openingElement,
-			attributes: [...attributes, keyAttribute()],
+			attributes: [...attributes.filter((attribute) => !isKeyAttribute(attribute)), keyAttribute()],
 		};
 		return inspectableTemplateDirectives({ ...output, openingElement }, ctx);
 	}
@@ -38990,6 +38993,16 @@ function keyedSelectionDepIndex(itemName, keyBody, subStmts, runtimeDepNames, ct
 
 const isKeyAttribute = (attribute) => (attribute.name?.name || attribute.name) === 'key';
 
+// The expression of an element's `key` attribute. A valueless `<li key>` or a
+// comment-only `key={}` carries none, so the row falls through to the header
+// key, the index, or the `x.id ?? x` default.
+function keyAttributeExpression(attributes) {
+	const value = attributes.find(isKeyAttribute)?.value;
+	if (value == null) return null;
+	const expression = value.type === 'JSXExpressionContainer' ? value.expression : value;
+	return expression.type === 'JSXEmptyExpression' ? null : expression;
+}
+
 // The legacy row-key spelling: a valued `key` attribute on the first element of
 // an @for body. It takes precedence over a header key, as in @tsrx/core's React
 // target. The reconciler reads row keys before the body runs, so the key can
@@ -38999,17 +39012,10 @@ const isKeyAttribute = (attribute) => (attribute.name?.name || attribute.name) =
 function forRowKeyAttribute(node, ctx) {
 	const statements = node.body.body;
 	const element = statements.find((n) => n.type === 'Element' || n.type === 'JSXElement');
-	const attribute = (element?.attributes || element?.openingElement?.attributes || []).find(
-		isKeyAttribute,
+	const expression = keyAttributeExpression(
+		element?.attributes || element?.openingElement?.attributes || [],
 	);
-	// A valueless `<li key>` or a comment-only `key={}` carries no expression and
-	// falls through to the header key, the index, or the `x.id ?? x` default.
-	if (attribute?.value == null) return null;
-	const expression =
-		attribute.value.type === 'JSXExpressionContainer'
-			? attribute.value.expression
-			: attribute.value;
-	if (expression.type === 'JSXEmptyExpression') return null;
+	if (expression === null) return null;
 	// The keyed element is the row's only output node, so every other statement
 	// is setup that runs in the row function.
 	const setup = statements.filter((statement) => statement !== element);
