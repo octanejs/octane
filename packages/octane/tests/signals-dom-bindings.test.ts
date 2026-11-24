@@ -8,6 +8,7 @@ import * as Signals from 'octane/signals';
 import * as ClientSignals from 'octane/signals/client';
 import * as ServerSignals from 'octane/signals/server';
 import * as SignalRead from '../src/signals/read-protocol.js';
+import { SIGNAL_BINDING_SUBSCRIBE } from '../src/signals/types.js';
 import { mount } from './_helpers.js';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
 import * as client from './_fixtures/signals-dom-bindings.tsrx';
@@ -927,4 +928,61 @@ describe('direct bindings across dropped renders', () => {
 			scope.dispose();
 		}
 	});
+});
+
+describe('direct bindings over watched sources', () => {
+	it('restores the render write guard once a watched setup returns', () => {
+		const scope = createScope({ scopeKey: 'watched-guard-restored' });
+		const source$ = scope.signal$<string>(null, 'cached', {
+			watched() {
+				source$.set('live');
+			},
+		});
+		const other$ = scope.signal$<string>(null, 'idle');
+		const guard = SignalRead.beginNativeWriteGuard();
+		let stop = () => {};
+		try {
+			stop = source$[SIGNAL_BINDING_SUBSCRIBE](() => {});
+			expect(source$.get()).toBe('live');
+			expect(() => other$.set('render')).toThrow(Signals.SignalWriteError);
+		} finally {
+			SignalRead.endNativeWriteGuard(guard);
+			stop();
+			scope.dispose();
+		}
+	});
+
+	for (const shape of ['keyless', 'keyed', 'derived'] as const) {
+		it(`presents a synchronous watched write through a ${shape} handle`, () => {
+			const scope = createScope({ scopeKey: `watched-direct-${shape}` });
+			const reportError = vi.fn();
+			const previousReportError = globalThis.reportError;
+			globalThis.reportError = reportError;
+			let starts = 0;
+			let stops = 0;
+			const source$ = scope.signal$<string>(shape === 'keyed' ? 'source' : null, 'cached', {
+				watched() {
+					starts++;
+					source$.set('live');
+					return () => stops++;
+				},
+			});
+			const label$ = shape === 'derived' ? scope.derived$(null, () => source$.get()) : source$;
+			const rendered = mount(client.HeldSignalLabel, { label$, wait: null });
+			try {
+				const label = rendered.find('[data-signal-label]') as HTMLElement;
+				expect([label.title, label.textContent]).toEqual(['live', 'live']);
+				expect(reportError).not.toHaveBeenCalled();
+				expect(starts).toBe(1);
+				flushSync(() => source$.set('next'));
+				expect([label.title, label.textContent]).toEqual(['next', 'next']);
+				rendered.unmount();
+				expect(stops).toBe(1);
+			} finally {
+				globalThis.reportError = previousReportError;
+				rendered.unmount();
+				scope.dispose();
+			}
+		});
+	}
 });

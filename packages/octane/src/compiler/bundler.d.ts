@@ -304,6 +304,13 @@ export function formatDataDiagnostic(diagnostic: DataContractDiagnostic, root: s
 /** The specifier the build plugins generate from the project's `*.data.ts` modules. */
 export const DATA_MANIFEST_MODULE: 'octane/data/manifest';
 
+/** The specifier the build plugins generate from the `dataClient` option's module. */
+export const DATA_CLIENT_MODULE: 'octane/data/client';
+/** The data worker's source, for the data client module at `file`. */
+export function dataClientWorker(file: string): string;
+/** `octane/data/client`'s source, for the data client module at `file`. */
+export function dataClientModule(file: string): string;
+
 /**
  * The project's octane/data facts, read from disk under `root`, or from
  * `files` when given: per-module checks, the whole-program report, and the

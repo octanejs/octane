@@ -47,6 +47,7 @@ import {
 	WRITE_JOURNALED,
 	getNativeAdoptionResolver,
 	isNativeAdoptionMiss,
+	endNativeWriteGuard,
 	isNativeWriteGuarded,
 	nativeReadSerializer,
 	reportNativeRead,
@@ -3004,13 +3005,17 @@ function stopWatch(hook: WatchHook): void {
  */
 function runHook(hook: () => void | (() => void)): void | (() => void) {
 	// A committed observer can gain or lose a dependency while a derived value
-	// is being checked. Its lifecycle is imperative even inside that pure read.
+	// is being checked, and a direct DOM binding subscribes while it renders.
+	// Its lifecycle is imperative even inside that pure read or guarded render,
+	// so a source may publish its current value as it starts.
 	const previousNode = activeNode;
 	const previousDepth = pureDepth;
 	const previousHook = runningWatchHook;
+	const previousGuard = isNativeWriteGuarded();
 	activeNode = undefined;
 	pureDepth = 0;
 	runningWatchHook = true;
+	if (previousGuard) endNativeWriteGuard(false);
 	try {
 		return untrack(hook);
 	} catch (error) {
@@ -3021,6 +3026,7 @@ function runHook(hook: () => void | (() => void)): void | (() => void) {
 		activeNode = previousNode;
 		pureDepth = previousDepth;
 		runningWatchHook = previousHook;
+		if (previousGuard) endNativeWriteGuard(true);
 	}
 }
 

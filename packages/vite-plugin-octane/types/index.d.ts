@@ -62,6 +62,8 @@ export interface OctanePluginOptions {
 	 * `sharedOwner`. Resolved from the Vite project root.
 	 */
 	dataWorker?: OctaneVitePluginOptions['dataWorker'];
+	/** The app's data client module; see `OctaneVitePluginOptions['dataClient']`. */
+	dataClient?: OctaneVitePluginOptions['dataClient'];
 	/** The `octane/data` contract check and generated `octane/data/manifest`. */
 	data?: OctaneVitePluginOptions['data'];
 }
