@@ -777,15 +777,11 @@ function recordFunctionUse(node, state, called) {
 		if (fn) called.add(fn);
 	}
 	let descriptor;
-	if (node.openingElement && intrinsicTag(node) === null) {
+	let children = node.children;
+	if ((node.openingElement || node.type === 'Element') && intrinsicTag(node) === null) {
 		const tag = elementName(node);
 		descriptor = tag?.type === 'JSXExpressionContainer' ? tag.expression : tag;
-	} else if (node.children) {
-		for (const child of node.children) {
-			if (child.type !== 'JSXExpressionContainer') continue;
-			const fn = templateFunction(child.expression, state);
-			if (fn) called.add(fn);
-		}
+		children = componentChildren(node, state);
 	} else if (node.type === 'ExportDefaultDeclaration') {
 		descriptor = node.declaration;
 	} else if (node.type === 'ExportNamedDeclaration' && !node.source && node.exportKind !== 'type') {
@@ -801,6 +797,13 @@ function recordFunctionUse(node, state, called) {
 	if (descriptor) {
 		const fn = templateFunction(descriptor, state);
 		if (fn) state.descriptors.add(fn);
+	}
+	if (Array.isArray(children)) {
+		for (const child of children) {
+			if (child?.type !== 'JSXExpressionContainer') continue;
+			const fn = templateFunction(child.expression, state);
+			if (fn) called.add(fn);
+		}
 	}
 }
 
@@ -1101,46 +1104,43 @@ function isEmptyChild(node, state) {
 	);
 }
 
+// A lone expression is a children prop. Other nonempty bodies render as a sequence.
+function componentChildren(node, state) {
+	let expression = null;
+	for (const child of node.children ?? []) {
+		if (isEmptyChild(child, state)) continue;
+		if (expression || child.type !== 'JSXExpressionContainer') return node.children;
+		expression = child;
+	}
+	return expression;
+}
+
 function emitElement(node, state, keys) {
 	const name = elementName(node);
 	const tag = intrinsicTag(node);
 	const intrinsic = tag !== null;
 	const entries = attributeEntries(node, state);
 	if (!intrinsic) {
-		const children = (node.children ?? []).filter((child) => !isEmptyChild(child, state));
-		if (children.length) {
-			if (state.componentRuntime) {
-				const only =
-					children.length === 1 && children[0].type === 'JSXExpressionContainer'
-						? children[0].expression
-						: null;
-				entries.push({
-					name: 'children',
-					value:
-						only !== null
-							? componentProp(only, state, node, 'children')
-							: deferredChildren(emitNodes(children, state, [], false), state, node),
-					origin: node,
-				});
-			} else {
-				const child = children[0];
-				const fn = child.type === 'JSXExpressionContainer' && unwrap(child.expression);
-				if (
-					children.length !== 1 ||
-					!(
-						FUNCTION_TYPES.has(fn?.type) ||
-						fn?.type === 'Identifier' ||
-						fn?.type === 'MemberExpression'
-					)
-				) {
+		const children = componentChildren(node, state);
+		if (children) {
+			const expression = Array.isArray(children) ? null : children.expression;
+			if (!state.componentRuntime) {
+				const fn = unwrap(expression);
+				if (!(
+					FUNCTION_TYPES.has(fn?.type) ||
+					fn?.type === 'Identifier' ||
+					fn?.type === 'MemberExpression'
+				)) {
 					throw valdiError(state, node, 'component children must be a single render callback.');
 				}
-				entries.push({
-					name: 'children',
-					value: componentProp(child.expression, state, node, 'children'),
-					origin: child,
-				});
 			}
+			entries.push({
+				name: 'children',
+				value: expression
+					? componentProp(expression, state, node, 'children')
+					: deferredChildren(emitNodes(children, state, [], false), state, node),
+				origin: state.componentRuntime ? node : children,
+			});
 		}
 	}
 	const attrs = prepareAttributes(entries, state, node);

@@ -156,6 +156,27 @@ describe.each([false, true])('Valdi component runtime in dev=%s', (dev) => {
 		}
 	});
 
+	it('renders a module helper among component children and forwards a lone expression as a prop', () => {
+		const { module, render } = fixture(
+			`function prefix() @{ <prefix /> }
+			 function Group(props) @{ <group>{props.children}</group> }
+			 function Slot(props) @{ <frame>{props.children()}</frame> }
+			 export function Scene() @{
+				<view>
+					<Group>{prefix}<suffix /></Group>
+					<Slot>
+						{/* callback */}
+						{prefix}
+					</Slot>
+				</view>
+			 }`,
+			dev,
+		);
+		const [group, slot] = render(module['Scene'], {})[0].children;
+		expect(group.children.map((child) => child.tag)).toEqual(['prefix', 'suffix']);
+		expect(slot.children.map((child) => child.tag)).toEqual(['prefix']);
+	});
+
 	it('preserves a lowercase descriptor and its alias when a local helper shadows it', () => {
 		const { module, render } = fixture(
 			`function row(props) @{ <label value={props.label} /> }

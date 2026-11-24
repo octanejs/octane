@@ -372,15 +372,15 @@ export function Greeting(props: { name: string }) @{
 }
 ```
 
-A bare child such as `{fallback}` in a host or fragment invokes the local
-helper when its binding resolves to a parameterless JSX function. In a
-component prop, the function stays callable. Pass `fallback()` when the
-receiver expects a child value. Call parameterized helpers with their
-arguments. Helpers must be synchronous and hook-free. A component can read
-hooks during setup and pass the resulting values to a helper.
+A bare child such as `{fallback}` invokes a parameterless JSX helper in a
+host, a fragment, or a component body with siblings. A lone expression in
+`<Slot>{fallback}</Slot>` passes `fallback` directly as the `children` prop.
+Pass `fallback()` when the receiver expects a child value. Call parameterized
+helpers with their arguments. Helpers must be synchronous and hook-free. A
+component can read hooks during setup and pass the resulting values to a helper.
 
 The compiler recognizes a module helper from a direct call, `.call()`,
-`.apply()`, `.map(helper)`, or a bare host or fragment child. It follows
+`.apply()`, `.map(helper)`, or a bare child in a rendered sequence. It follows
 local bindings and their `const` aliases. A module function passed only as
 a prop can represent a component descriptor. Use
 `row={item => label(item, prefix)}` to pass a callback invoking a module
