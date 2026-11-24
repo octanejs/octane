@@ -26802,7 +26802,8 @@ function inspectableDirectiveValue(directive, ctx) {
 	const row = renderOnlyArmOutput(directive.body);
 	if (row === null || row === undefined) return null;
 	const keyed =
-		row.type === 'JSXElement' && keyAttributeExpression(row.openingElement.attributes) !== null;
+		row.type === 'JSXElement' &&
+		keyAttributeExpression(row.openingElement.attributes.find(isKeyAttribute)) !== null;
 	const value =
 		directive.key == null ? inspectableArmValue(row, ctx) : keyedRowValue(row, directive.key, ctx);
 	if (value === null) return null;
@@ -26836,7 +26837,7 @@ function keyedRowValue(arm, key, ctx) {
 		inheritOriginLoc(b.jsx_attribute(b.jsx_id('key'), b.jsx_expression_container(key)), key);
 	if (output.type === 'JSXElement') {
 		const { attributes } = output.openingElement;
-		if (keyAttributeExpression(attributes) !== null)
+		if (keyAttributeExpression(attributes.find(isKeyAttribute)) !== null)
 			return inspectableTemplateDirectives(output, ctx);
 		// A valueless key gives way to the header key, as the template list's does.
 		const openingElement = {
@@ -38993,11 +38994,11 @@ function keyedSelectionDepIndex(itemName, keyBody, subStmts, runtimeDepNames, ct
 
 const isKeyAttribute = (attribute) => (attribute.name?.name || attribute.name) === 'key';
 
-// The expression of an element's `key` attribute. A valueless `<li key>` or a
+// The expression of a `key` attribute. A valueless `<li key>` or a
 // comment-only `key={}` carries none, so the row falls through to the header
 // key, the index, or the `x.id ?? x` default.
-function keyAttributeExpression(attributes) {
-	const value = attributes.find(isKeyAttribute)?.value;
+function keyAttributeExpression(attribute) {
+	const value = attribute?.value;
 	if (value == null) return null;
 	const expression = value.type === 'JSXExpressionContainer' ? value.expression : value;
 	return expression.type === 'JSXEmptyExpression' ? null : expression;
@@ -39012,9 +39013,10 @@ function keyAttributeExpression(attributes) {
 function forRowKeyAttribute(node, ctx) {
 	const statements = node.body.body;
 	const element = statements.find((n) => n.type === 'Element' || n.type === 'JSXElement');
-	const expression = keyAttributeExpression(
-		element?.attributes || element?.openingElement?.attributes || [],
+	const attribute = (element?.attributes || element?.openingElement?.attributes || []).find(
+		isKeyAttribute,
 	);
+	const expression = keyAttributeExpression(attribute);
 	if (expression === null) return null;
 	// The keyed element is the row's only output node, so every other statement
 	// is setup that runs in the row function.
