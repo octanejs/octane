@@ -62,7 +62,7 @@ export const dataFiles = scaffoldTemplate('data', {
 	'src/books.data.ts': 'contracts',
 	'src/data.client.ts': 'the data worker is built from it',
 	'src/data.tsrx': 'module server function',
-	'src/store.ts': 'openDataStore',
+	'src/store.ts': 'the data module every route renders inside',
 	'src/server/data.ts': 'the contracts’ handler',
 	'src/server/health.ts': 'GET /api/health',
 });

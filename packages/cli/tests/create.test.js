@@ -199,12 +199,15 @@ describe('octane create', () => {
 		// The build makes the data worker and `octane/data/client` from the one data client.
 		expect(read(app, 'vite.config.ts')).toContain('octane({ dataClient: "src/data.client.ts" })');
 		expect(read(app, 'src/data.client.ts')).toContain('export default defineDataClient(');
-		expect(read(app, 'src/store.ts')).toContain('openDataStore("guest")');
+		// Every route renders inside the store src/store.ts opens: one per request on the
+		// server, and in the browser the account's store over the data worker, from its seed.
+		expect(config).toContain('data: "/src/store.ts"');
+		expect(read(app, 'src/store.ts')).toContain('export default function open(');
+		expect(read(app, 'src/store.ts')).toContain('openDataStore("guest", { seed })');
 
 		// Every import the page makes resolves to a file this run wrote, exporting what it names.
 		const page = read(app, 'src/Books.tsrx');
 		expect(page).toContain('export function Books()');
-		expect(page).toContain('from "./store.ts"');
 		expect(page).toContain('from "./books.data.ts"');
 		expect(read(app, 'src/books.data.ts')).toMatch(/export const books = view\(/);
 		expect(read(app, 'src/books.data.ts')).toMatch(/export const addBook = write\(/);

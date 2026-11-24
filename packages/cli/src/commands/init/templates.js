@@ -109,7 +109,7 @@ export const octaneConfig = (
 ) => `import { defineConfig, RenderRoute, ServerRoute } from "@octanejs/vite-plugin";
 import { health } from "./src/server/health.ts";
 
-export default defineConfig({
+export default defineConfig({${mode === 'data' ? '\n  data: "/src/store.ts",' : ''}
   router: {
     routes: [
       new RenderRoute({ path: "/", entry: ["App", "/src/App.tsrx"] }),
@@ -598,32 +598,48 @@ import { data } from "./data.tsrx";
 export default defineDataClient({ transport: serverTransport(data) });
 `;
 
-/** The store a page renders from, opened over the data worker. */
-export const dataStore = `import { openDataStore } from "octane/data/client";
+/**
+ * The config's \`data\` module: every route renders inside the store it opens.
+ * The server opens a plain store per request and seeds the page with what it
+ * loaded; the browser opens the account's store over the data worker, starting
+ * from that seed.
+ */
+export const dataStore = `import type { Context } from "@octanejs/vite-plugin";
+import { createDataStore, serverTransport } from "octane/data";
+import { openDataStore } from "octane/data/client";
+import { data } from "./data.tsrx";
 
 /**
- * The store of the signed-in account, named by its ID. This app has no
- * sign-in, so every visitor is "guest"; with one, open a store per account and
- * reuse it while that account stays signed in.
+ * Opens the store every route renders inside: \`data\` in octane.config.ts.
+ *
+ * On the server, \`context\` is the request's, and this store lasts for that
+ * one render: its \`data\` calls run in process, and what it loads is written
+ * into the page. In the browser, \`context\` is null and \`seed\` is what the
+ * server wrote, so the page hydrates without loading anything again. That
+ * store is the account's, over the data worker, which every tab shares.
  */
-export const store = openDataStore("guest");
+export default function open(seed: string | null, context: Context | null) {
+  if (context) return createDataStore({ transport: serverTransport(data) });
+  // This app has no sign-in, so every visitor is "guest". With one, name the
+  // signed-in account, and open a new store when another signs in.
+  return openDataStore("guest", { seed });
+}
 `;
 
 /**
- * The data page. It reads the list without suspending, so the server renders
- * its frame and a loading line, hydration starts from the same markup, and the
- * data worker loads the list in the browser.
+ * The data page. The router renders it inside the store \`src/store.ts\` opens,
+ * so it reads with no store code of its own: the server renders the list, and
+ * the browser's store starts from what the server loaded.
  */
 export const booksComponent = `import { useState } from "octane";
 import { DataError } from "octane/data";
-import { DataProvider, useDataStore, useRead } from "octane/data/octane";
+import { useDataStore, useRead } from "octane/data/octane";
 import { addBook, books } from "./books.data.ts";
 import { Layout } from "./Layout.tsrx";
-import { store } from "./store.ts";
 
 function Shelf() @{
   const data = useDataStore();
-  const list = useRead(data.read(books), { suspend: false });
+  const list = useRead(data.read(books));
   const [title, setTitle] = useState("");
   const [problem, setProblem] = useState("");
 
@@ -654,8 +670,7 @@ function Shelf() @{
         line-height: 1.1;
         letter-spacing: -0.02em;
       }
-      .lede,
-      .status {
+      .lede {
         margin: 0;
         color: var(--text-secondary);
       }
@@ -703,22 +718,16 @@ function Shelf() @{
     </style>
     <h1 class="title">Reading list</h1>
     <p class="lede">
-      Loaded and saved through the data worker. Open this page in a second tab:
-      both share one worker, one request, and each other's edits.
+      Rendered on the server, then saved through the data worker. Open this page
+      in a second tab: both share one worker and each other's edits.
     </p>
-    @if (list.status === "ready") {
-      <ul class="list" aria-label="Books">
-        @for (const book of list.value!; key book.id) {
-          <li class="book">{book.title as string}</li>
-        } @empty {
-          <li class="book">The shelf is empty.</li>
-        }
-      </ul>
-    } @else if (list.status === "error") {
-      <p class="status" role="alert">Could not load the shelf.</p>
-    } @else {
-      <p class="status">Loading the shelf…</p>
-    }
+    <ul class="list" aria-label="Books">
+      @for (const book of list; key book.id) {
+        <li class="book">{book.title as string}</li>
+      } @empty {
+        <li class="book">The shelf is empty.</li>
+      }
+    </ul>
     <form class="add" onSubmit={add}>
       <input
         class="field"
@@ -736,9 +745,13 @@ function Shelf() @{
 
 export function Books() @{
   <Layout>
-    <DataProvider store={store}>
+    @try {
       <Shelf />
-    </DataProvider>
+    } @pending {
+      <p>Loading the shelf…</p>
+    } @catch {
+      <p role="alert">Could not load the shelf.</p>
+    }
   </Layout>
 }
 `;
