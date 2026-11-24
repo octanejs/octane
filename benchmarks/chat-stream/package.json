@@ -8,6 +8,7 @@
     "bench": "node run.mjs",
     "bench:long": "node run.mjs 16",
     "bench:work": "node work.mjs",
+    "bench:switching": "node switching/run.mjs",
     "bench:descriptors": "node descriptor-stream.mjs"
   },
   "dependencies": {

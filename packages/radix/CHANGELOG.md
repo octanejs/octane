@@ -1,5 +1,12 @@
 # @octanejs/radix
 
+## 0.1.77
+
+### Patch Changes
+
+- b5f81c6: Escape now dismisses the newest dialog first when native and React Radix dialogs nest in place across `OctaneCompat` or `ReactCompat`, without `createEscapeLayerBridge()`. A native layer inside an `OctaneCompat` island listens on the window capture phase, and a native layer that contains `ReactCompat` content answers after the document's capture listeners.
+- @octanejs/floating-ui@0.1.76
+
 ## 0.1.76
 
 ### Patch Changes

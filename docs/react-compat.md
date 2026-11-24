@@ -58,8 +58,11 @@ the host its own layout box.
 When React's `Activity` hides an `OctaneCompat` island, prop and React context
 changes still reach it, as they reach a hidden React child: the island re-renders and
 its insertion effects run, so a stylesheet they install for visible siblings
-stays current. Layout effects, passive effects, and refs stay disconnected
-until reveal.
+stays current. A new child identity replaces the island while hidden, as a
+React key change does. Layout effects, passive effects, and refs stay
+disconnected until reveal. Behind a React Suspense fallback, React discards an
+update that suspends again, so the island, like a React child, takes the new
+value when the boundary reveals.
 
 When React removes an `OctaneCompat` host, it takes the host out of the DOM
 during the commit. Octane disposes the hosted root afterward, so its ref and

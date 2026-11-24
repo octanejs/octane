@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
 	acceptStreamedSignalResult,
 	bindStreamedSignalSelection,
@@ -13,9 +13,17 @@ import {
 	capturePending$,
 	controlledStream,
 	deferred,
-	drainProducers,
 	nextSnapshot$,
 } from './_fixtures/signals-async-controls';
+import { installTestClock, type TestClock } from 'octane/testing';
+
+let clock: TestClock;
+beforeEach(() => {
+	clock = installTestClock();
+});
+afterEach(() => {
+	clock.uninstall();
+});
 
 const owners: Scope[] = [];
 function owner(key = `streams-${owners.length}`): Scope {
@@ -239,7 +247,7 @@ describe('scoped stream resources', () => {
 			if (completion === 'yield') streams.a.emit('obsolete a');
 			else if (completion === 'reject') streams.a.fail(new Error('obsolete a failure'));
 			else streams.a.end();
-			await drainProducers();
+			await clock.advance(0);
 			expect(resource$.snapshot().status).toBe('pending');
 			expect(resource$.latest('fallback')).toBe('a value');
 			const second = nextSnapshot$(resource$, (snapshot) => snapshot.status === 'ready');
@@ -287,7 +295,7 @@ describe('scoped stream resources', () => {
 			expect(signals[0].aborted).toBe(true);
 			expect(attempts[0].cancellations).toBe(1);
 			attempts[0].emit('obsolete');
-			await drainProducers();
+			await clock.advance(0);
 			expect(resource$.latest('fallback')).toBe('retained');
 			const refreshed = nextSnapshot$(
 				resource$,
@@ -398,7 +406,7 @@ describe('scoped stream resources', () => {
 		expect(stream.cancellations).toBe(0);
 		expect(signal?.aborted).toBe(false);
 		stream.emit('still owned');
-		await drainProducers();
+		await clock.advance(0);
 		expect(resource$.get()).toBe('still owned');
 		expect(observed).toEqual([]);
 		scope.dispose();
@@ -433,7 +441,7 @@ describe('scoped stream resources', () => {
 			if (completion === 'yield') stream.emit('obsolete');
 			else if (completion === 'reject') stream.fail(new Error('obsolete failure'));
 			else stream.end();
-			await drainProducers();
+			await clock.advance(0);
 			expect(observed).toEqual([]);
 			expect(() => resource$.get()).toThrow(ScopeDisposedError);
 			expect(() => resource$.latest('fallback')).toThrow(ScopeDisposedError);
@@ -450,7 +458,7 @@ describe('scoped stream resources', () => {
 		expect(resource$.snapshot().status).toBe('pending');
 		scope.dispose();
 		factory.resolve(stream.iterable);
-		await drainProducers();
+		await clock.advance(0);
 		expect(stream.nextCalls).toBe(0);
 		expect(() => resource$.snapshot()).toThrow(ScopeDisposedError);
 	});
@@ -480,7 +488,7 @@ describe('scoped stream resources', () => {
 			const ready = nextSnapshot$(resource$, (snapshot) => snapshot.status === 'ready');
 			second.emit('current');
 			await ready;
-			await drainProducers();
+			await clock.advance(0);
 			expect(resource$.get()).toBe('current');
 		},
 	);
@@ -589,7 +597,7 @@ describe('scoped stream resources', () => {
 			};
 			const load = query('throwing-result', () => iterable, { kind: 'stream' });
 			const resource$ = createResource(scope, 'resource', () => load(undefined));
-			await drainProducers();
+			await clock.advance(0);
 			expect(resource$.snapshot()).toMatchObject({
 				status: 'error',
 				error: failure,
@@ -615,7 +623,7 @@ describe('scoped stream resources', () => {
 		expect(selected$.get()).toBe('b');
 		expect(first.cancellations).toBe(1);
 		first.emit('obsolete');
-		await drainProducers();
+		await clock.advance(0);
 		expect(resource$.snapshot().status).toBe('pending');
 		const ready = nextSnapshot$(resource$, (snapshot) => snapshot.status === 'ready');
 		second.emit('current b');
@@ -642,7 +650,7 @@ describe('scoped stream resources', () => {
 		expect(first.cancellations).toBe(1);
 		first.emit('obsolete a');
 		second.emit('obsolete b');
-		await drainProducers();
+		await clock.advance(0);
 		expect(resource$.snapshot().status).toBe('pending');
 		const ready = nextSnapshot$(resource$, (snapshot) => snapshot.status === 'ready');
 		third.emit('current c');
@@ -719,7 +727,7 @@ describe('optional scope capabilities', () => {
 		expect(() => count$.get()).toThrow(ScopeDisposedError);
 		stop();
 		lease.release();
-		await drainProducers();
+		await clock.advance(0);
 		expect(starts).toBe(0);
 	});
 });

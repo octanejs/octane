@@ -1,8 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'octane/compiler';
 import * as Signals from 'octane/signals';
 import { loadCompiledFixtureSource } from '../_server-fixture';
-import { deferred, drainProducers } from '../_fixtures/signals-async-controls';
+import { deferred } from '../_fixtures/signals-async-controls';
+import { installTestClock, type TestClock } from 'octane/testing';
+
+let clock: TestClock;
+beforeEach(() => {
+	clock = installTestClock();
+});
+afterEach(() => {
+	clock.uninstall();
+});
 
 function client(source: string) {
 	return compile(source, '/src/signal-attempts.tsrx', { hmr: false }).code;
@@ -26,13 +35,13 @@ describe('attempt-bound signal reads', () => {
 		try {
 			Signals.runWithSignalOwner(scope, () => count$.set(9));
 			Signals.runWithSignalOwner(scope, () => result$.snapshot());
-			await drainProducers();
+			await clock.advance(0);
 			expect(Signals.runWithSignalOwner(scope, () => result$.snapshot())).toMatchObject({
 				status: 'ready',
 				value: 9,
 			});
 			Signals.runWithSignalOwner(scope, () => count$.set(10));
-			await drainProducers();
+			await clock.advance(0);
 			expect(Signals.runWithSignalOwner(scope, () => result$.snapshot())).toMatchObject({
 				status: 'ready',
 				value: 10,
@@ -71,10 +80,10 @@ describe('attempt-bound signal reads', () => {
 				const scope = Signals.createScope({ scopeKey: 'compiled-attempt' });
 				try {
 					Signals.runWithSignalOwner(scope, () => fixture.result$.snapshot());
-					await drainProducers();
+					await clock.advance(0);
 					Signals.runWithSignalOwner(scope, () => fixture.count$.set(2));
 					gate.resolve();
-					await drainProducers();
+					await clock.advance(0);
 					expect(Signals.runWithSignalOwner(scope, () => fixture.result$.snapshot())).toMatchObject(
 						{ status: 'ready', value: 2 },
 					);

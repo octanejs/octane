@@ -31,7 +31,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
+import { pairedRatio, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '10', 10);
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -77,29 +77,47 @@ function jsGzipKb(dir) {
 	return bytes ? bytes / 1024 : null;
 }
 
+async function loadPage(t, browser, { delay, cpu }, measureHome = false) {
+	const page = await browser.newPage();
+	await page.addInitScript(
+		({ delay, measureHome }) => {
+			window.__ROUTER_DATA_DELAY = delay;
+			if (!measureHome) return;
+			const observer = new MutationObserver(() => {
+				if (typeof window.__measure === 'function' && document.querySelector('.home')) {
+					window.__routerDataHomeReady = performance.now();
+					observer.disconnect();
+				}
+			});
+			observer.observe(document, { subtree: true, childList: true, attributes: true });
+		},
+		{ delay, measureHome },
+	);
+	if (cpu > 1) {
+		const cdp = await page.context().newCDPSession(page);
+		await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpu });
+	}
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(String(error)));
+	await page.goto(`http://localhost:${t.port}/`, { waitUntil: 'load' });
+	await page.waitForFunction(
+		(measureHome) =>
+			typeof window.__measure === 'function' &&
+			document.querySelector('#l-cold') &&
+			(!measureHome || Number.isFinite(window.__routerDataHomeReady)),
+		measureHome,
+		{ timeout: 15000 },
+	);
+	return { page, errors };
+}
+
 async function runTarget(t, browser, pass) {
-	const url = `http://localhost:${t.port}/`;
 	const samples = Object.fromEntries(
 		OPS.map((o) => [o.op, { ms: [], reads: [], writes: [], waves: [] }]),
 	);
 	const failures = [];
 	for (let i = 0; i < ITER; i++) {
-		const page = await browser.newPage();
-		await page.addInitScript((delay) => {
-			window.__ROUTER_DATA_DELAY = delay;
-		}, pass.delay);
-		if (pass.cpu > 1) {
-			const cdp = await page.context().newCDPSession(page);
-			await cdp.send('Emulation.setCPUThrottlingRate', { rate: pass.cpu });
-		}
-		const errors = [];
-		page.on('pageerror', (e) => errors.push(String(e)));
-		await page.goto(url, { waitUntil: 'load' });
-		await page.waitForFunction(
-			() => typeof window.__measure === 'function' && document.querySelector('#l-cold'),
-			null,
-			{ timeout: 15000 },
-		);
+		const { page, errors } = await loadPage(t, browser, pass);
 		for (const o of OPS) {
 			const title = `Renamed ${i}`;
 			if (o.keep) await page.evaluate(() => window.__tag('.org') && window.__tag('.project'));
@@ -138,7 +156,135 @@ async function runTarget(t, browser, pass) {
 
 const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
 
+async function browserScope(browser, quota, cpu) {
+	const page = await browser.newPage();
+	try {
+		const session = await browser.newBrowserCDPSession();
+		const { processInfo } = await session.send('SystemInfo.getProcessInfo');
+		const groups = new Set(
+			processInfo.map(
+				({ id }) => fs.readFileSync(`/proc/${id}/cgroup`, 'utf8').trim().split('::')[1],
+			),
+		);
+		const [group] = groups;
+		if (!group || groups.size !== 1 || !processInfo.some(({ type }) => type === 'renderer')) {
+			throw new Error('Chromium processes must share one cgroup with a renderer');
+		}
+		const read = (file) => fs.readFileSync(`/sys/fs/cgroup${group}/${file}`, 'utf8').trim();
+		const [quotaUs, periodUs] = read('cpu.max').split(' ').map(Number);
+		if (quotaUs * 100 !== periodUs * quota || read('cpuset.cpus.effective') !== cpu) {
+			throw new Error(`Chromium scope must have CPU ${cpu} and quota ${quota}%`);
+		}
+		const usedMs = () => Number(read('cpu.stat').match(/^usage_usec (\d+)$/m)[1]) / 1000;
+		return {
+			usedMs,
+			quotaUs,
+			periodUs,
+			processTypes: [...new Set(processInfo.map(({ type }) => type))],
+		};
+	} finally {
+		await page.close();
+	}
+}
+
+async function runBrowserBudget(cpu) {
+	if (process.platform !== 'linux' || !/^(0|[1-9]\d*)$/.test(cpu)) {
+		throw new Error('ROUTER_DATA_BUDGET_CPU needs a Linux logical CPU number');
+	}
+	if (!Number.isSafeInteger(ITER) || ITER < 1) throw new Error('expected at least one iteration');
+	const modes = [
+		{ name: 'browser100', quota: 100, cpu: 1 },
+		{ name: 'browser100_cdp4x', quota: 100, cpu: 4 },
+		{ name: 'browser25', quota: 25, cpu: 1 },
+	];
+	const targets = TARGETS.map(({ name }) => ({
+		name,
+		ops: {},
+		meta: { delayMs: 0, browserCpu: cpu, modes: {} },
+	}));
+	for (const mode of modes) {
+		const browser = await chromium.launch({
+			headless: true,
+			args: ['--disable-extensions'],
+			executablePath: path.join(here, 'browser-budget.sh'),
+			env: {
+				...process.env,
+				ROUTER_DATA_BUDGET_CPU: cpu,
+				ROUTER_DATA_CHROMIUM: process.env.ROUTER_DATA_CHROMIUM ?? chromium.executablePath(),
+				ROUTER_DATA_BROWSER_QUOTA: String(mode.quota),
+			},
+		});
+		try {
+			const { usedMs, ...scope } = await browserScope(browser, mode.quota, cpu);
+			for (const [index, target] of TARGETS.entries()) {
+				const samples = {
+					home_ready: [],
+					cold_nested: [],
+					warm_nested: [],
+					home_plus_cold: [],
+					home_plus_cold_cpu: [],
+				};
+				for (let i = 0; i < ITER; i++) {
+					const startCpu = usedMs();
+					const { page, errors } = await loadPage(target, browser, { ...mode, delay: 0 }, true);
+					try {
+						const measure = (click, waitFor) =>
+							page.evaluate((args) => window.__measure(args), { click, waitFor });
+						const homeReady = await page.evaluate(() => window.__routerDataHomeReady);
+						const cold = await measure('#l-cold', TASK(3));
+						const cpuThroughCold = usedMs() - startCpu;
+						await measure('#l-home', '.home');
+						// No hover. All three loader keys are new, although the code is warm.
+						const warm = await measure('#l-pre', TASK(7));
+						if (errors.length || [cold, warm].some((r) => r.reads !== 3 || r.writes || r.aborted)) {
+							throw new Error(
+								`${target.name} ${mode.name}: invalid cold/warm pair ${JSON.stringify({ cold, warm, errors })}`,
+							);
+						}
+						samples.home_ready.push(homeReady);
+						samples.cold_nested.push(cold.ms);
+						samples.warm_nested.push(warm.ms);
+						samples.home_plus_cold.push(homeReady + cold.ms);
+						samples.home_plus_cold_cpu.push(cpuThroughCold);
+					} finally {
+						await page.close();
+					}
+				}
+				for (const [name, values] of Object.entries(samples)) {
+					targets[index].ops[`${name}_${mode.name}`] = timingStatForJson(
+						summarizeSamples(values, { scoreMode: 'mean' }),
+					);
+				}
+				targets[index].meta.modes[mode.name] = {
+					...scope,
+					chromium: browser.version(),
+					cdpRate: mode.cpu,
+					coldOverWarm: ITER > 1 ? pairedRatio(samples.warm_nested, samples.cold_nested) : null,
+				};
+				console.log(
+					`${target.name} ${mode.name} (ms)`,
+					Object.fromEntries(
+						Object.entries(samples).map(([name, values]) => [name, median(values).toFixed(2)]),
+					),
+				);
+			}
+		} finally {
+			await browser.close();
+		}
+	}
+	if (process.env.BENCH_JSON) {
+		fs.writeFileSync(
+			process.env.BENCH_JSON,
+			JSON.stringify({ suite: 'router-data', iterations: ITER, targets }, null, '\t') + '\n',
+		);
+	}
+}
+
 (async () => {
+	if (process.env.ROUTER_DATA_BUDGET_CPU !== undefined) {
+		await runBrowserBudget(process.env.ROUTER_DATA_BUDGET_CPU);
+		return;
+	}
 	const browser = await chromium.launch({ headless: true, args: ['--disable-extensions'] });
 	const all = {};
 	for (const t of TARGETS) {

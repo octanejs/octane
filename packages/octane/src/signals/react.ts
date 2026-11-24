@@ -11,6 +11,7 @@ import {
 	createElement,
 	use,
 	useCallback,
+	useEffect,
 	useInsertionEffect,
 	useLayoutEffect,
 	useMemo,
@@ -24,11 +25,55 @@ import type { Scope, SignalHandle } from './types.js';
 
 const ScopeContext = createContext<Scope | null>(null);
 
+type Handoff = {
+	parent: Handoff | undefined;
+	phase: 'idle' | 'incoming' | 'mounted';
+	incoming: number;
+	releases: (() => void)[] | undefined;
+};
+
+// React removes passive subscriptions before mounting their replacements. When
+// sibling providers trade places, overlap their physical observations until the
+// incoming providers finish their passive mounts. Never hold up a final unmount.
+function finishHandoff(handoff: Handoff, phase: 'idle' | 'mounted') {
+	const incoming = handoff.phase === 'incoming';
+	handoff.phase = phase;
+	const parent = handoff.parent;
+	if (!incoming || !parent || --parent.incoming || !parent.releases) return;
+	const releases = parent.releases;
+	parent.releases = undefined;
+	let errors: unknown[] | undefined;
+	for (const release of releases) {
+		try {
+			release();
+		} catch (error) {
+			(errors ??= []).push(error);
+		}
+	}
+	if (errors)
+		throw errors.length === 1 ? errors[0] : new AggregateError(errors, formatClientError(373));
+}
+
+function releaseAfterHandoff(handoff: Handoff | undefined, release: () => void) {
+	// Deleted providers run passive cleanup before their descendants. Walk only
+	// through departing providers, up to the first surviving common parent.
+	while (handoff?.phase === 'idle') {
+		handoff = handoff.parent;
+		if (handoff?.incoming) {
+			(handoff.releases ??= []).push(release);
+			return;
+		}
+	}
+	release();
+}
+
 type RetainedSignalDefaults = {
+	handoff: Handoff | undefined;
 	getServerSnapshot: (<T>(handle: SignalHandle<T>) => T) | undefined;
 	retainOnHide: boolean;
 };
 const RetainedSignalContext = createContext<RetainedSignalDefaults>({
+	handoff: undefined,
 	getServerSnapshot: undefined,
 	retainOnHide: true,
 });
@@ -40,12 +85,39 @@ export function RetainedSignalProvider(props: {
 	children?: ReactNode;
 }) {
 	const outer = use(RetainedSignalContext);
+	const handoff = useMemo<Handoff>(
+		() => ({
+			parent: outer.handoff,
+			phase: 'idle',
+			incoming: 0,
+			releases: undefined,
+		}),
+		[outer.handoff],
+	);
+
+	useLayoutEffect(() => {
+		// Suspense can reconnect layout alone. Only arm a handoff for a passive mount.
+		if (!handoff.parent || handoff.phase === 'mounted') return;
+		handoff.phase = 'incoming';
+		handoff.parent.incoming++;
+		return () => {
+			if (handoff.phase === 'incoming') finishHandoff(handoff, 'idle');
+		};
+	}, [handoff]);
+	useEffect(() => {
+		// Descendant store subscriptions have attached by this point.
+		finishHandoff(handoff, 'mounted');
+		return () => {
+			handoff.phase = 'idle';
+		};
+	}, [handoff]);
 	const value = useMemo(
 		() => ({
+			handoff,
 			getServerSnapshot: props.getServerSnapshot ?? outer.getServerSnapshot,
 			retainOnHide: props.retainOnHide ?? outer.retainOnHide,
 		}),
-		[outer, props.getServerSnapshot, props.retainOnHide],
+		[outer, handoff, props.getServerSnapshot, props.retainOnHide],
 	);
 	return createElement(RetainedSignalContext, { value }, props.children);
 }
@@ -93,7 +165,7 @@ export function useRetainedSignalValue<T>(
 	retainOnHide?: boolean,
 ): T {
 	const defaults = use(RetainedSignalContext);
-	const subscribe = useActivitySubscription(handle$, retainOnHide ?? defaults.retainOnHide);
+	const subscribe = useActivitySubscription(handle$, defaults, retainOnHide);
 	const read = useCallback(() => handle$[SIGNAL_BINDING_READ](), [handle$]);
 	const resolve = defaults.getServerSnapshot;
 	return useSyncExternalStore(
@@ -112,7 +184,7 @@ export function useOptionalRetainedSignalValue<
 >(source: Source): OptionalSignalValue<Source> {
 	const defaults = use(RetainedSignalContext);
 	const handle = isSignalHandle(source) ? source : null;
-	const subscribe = useActivitySubscription(handle, defaults.retainOnHide);
+	const subscribe = useActivitySubscription(handle, defaults);
 	const read = useCallback(
 		() => (handle ? handle[SIGNAL_BINDING_READ]() : source) as OptionalSignalValue<Source>,
 		[handle, source],
@@ -140,12 +212,13 @@ export function useSignalSubscription<T>(
 	retainOnHide?: boolean,
 ): Subscribe {
 	const defaults = use(RetainedSignalContext);
-	return useActivitySubscription(source, retainOnHide ?? defaults.retainOnHide);
+	return useActivitySubscription(source, defaults, retainOnHide);
 }
 
 function useActivitySubscription<T>(
 	source: SignalHandle<T> | Subscribe | null,
-	retainOnHide: boolean,
+	defaults: RetainedSignalDefaults,
+	retainOnHide?: boolean,
 ): Subscribe {
 	const binding = useMemo(() => {
 		if (source === null) return null;
@@ -153,14 +226,14 @@ function useActivitySubscription<T>(
 			typeof source === 'function' ? source : (notify) => source[SIGNAL_BINDING_SUBSCRIBE](notify),
 		);
 	}, [source]);
-	useInsertionEffect(() => {
-		if (retainOnHide) return binding?.retain();
-	}, [binding, retainOnHide]);
+	const retention = (retainOnHide ?? defaults.retainOnHide) && (defaults.handoff ?? true);
+	useInsertionEffect(() => binding?.retain(retention), [binding, retention]);
 	useLayoutEffect(binding?.prepare ?? noop, [binding]);
 	return binding?.subscribe ?? subscribeToNothing;
 }
 
 function activityBinding(subscribe: Subscribe) {
+	let handoff: Handoff | undefined;
 	let release: (() => void) | undefined;
 	let notify: (() => void) | undefined;
 	let retained = false;
@@ -179,7 +252,9 @@ function activityBinding(subscribe: Subscribe) {
 	};
 	return {
 		// Insertion effects survive an Activity hide.
-		retain() {
+		retain(retention: boolean | Handoff) {
+			handoff = typeof retention === 'object' ? retention : undefined;
+			if (!retention) return;
 			retained = true;
 			return () => {
 				retained = false;
@@ -204,7 +279,7 @@ function activityBinding(subscribe: Subscribe) {
 			}
 			return () => {
 				notify = undefined;
-				releaseIfIdle();
+				if (!retained) releaseAfterHandoff(handoff, releaseIfIdle);
 			};
 		},
 	};

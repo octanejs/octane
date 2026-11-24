@@ -1,10 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { TestClock } from '../../src/testing.js';
 // Cold scenarios load a fresh runtime graph after resetModules(). Load every
 // helper once during collection so the first in-test import stays cheap.
 import '../_server-fixture.js';
 import '../_server-stream.js';
-import '../_fixtures/signals-async-controls.js';
+import '../../src/testing.js';
 import '../../src/hydration/streamed-signals.js';
+
+// Each cold scenario installs a clock on its own fresh runtime graph.
+const clocks: TestClock[] = [];
+afterEach(() => {
+	for (const clock of clocks.splice(0)) clock.uninstall();
+});
 
 // A hydrating Suspense boundary whose first client attempt is waiting for the
 // browser's own load keeps that load when its parent renders again. The parent's
@@ -65,7 +72,8 @@ describe('a hydrating JSX Suspense across parent renders', () => {
 			const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
 			const { activateStreamedMarkup, resetStreamRuntimeGlobals } =
 				await import('../_server-stream.js');
-			const { drainProducers } = await import('../_fixtures/signals-async-controls.js');
+			const clock = (await import('../../src/testing.js')).installTestClock();
+			clocks.push(clock);
 			const signalModules = {
 				'octane/signals': signals,
 				'octane/signals/query': signals,
@@ -101,7 +109,7 @@ describe('a hydrating JSX Suspense across parent renders', () => {
 			let root: ReturnType<typeof client.hydrateRoot> | undefined;
 			let hydration: ReturnType<typeof bootstrapStreamedSignalHydration> | undefined;
 			const drain = async () => {
-				await drainProducers();
+				await clock.advance(0);
 				client.flushSync(() => {});
 			};
 			try {

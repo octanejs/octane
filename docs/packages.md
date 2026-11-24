@@ -27,8 +27,8 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/blocknote` | [`packages/blocknote`](../packages/blocknote) | framework binding | `0.1.19` | 2 |
 | `@octanejs/calendar` | [`packages/calendar`](../packages/calendar) | framework binding | `0.0.31` | 4 |
 | `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.3.6` | 4 |
-| `@octanejs/cmdk` | [`packages/cmdk`](../packages/cmdk) | framework binding | `0.1.60` | 1 |
-| `@octanejs/codemod` | [`packages/codemod`](../packages/codemod) | developer tooling | `0.2.9` | 2 |
+| `@octanejs/cmdk` | [`packages/cmdk`](../packages/cmdk) | framework binding | `0.1.61` | 1 |
+| `@octanejs/codemod` | [`packages/codemod`](../packages/codemod) | developer tooling | `0.2.11` | 2 |
 | `@octanejs/colorful` | [`packages/colorful`](../packages/colorful) | framework binding | `0.0.40` | 1 |
 | `@octanejs/content-loader` | [`packages/content-loader`](../packages/content-loader) | framework binding | `0.0.30` | 2 |
 | `@octanejs/day-picker` | [`packages/day-picker`](../packages/day-picker) | framework binding | `0.0.41` | 12 |
@@ -84,7 +84,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/pierre-trees` | [`packages/pierre-trees`](../packages/pierre-trees) | framework binding | `0.0.8` | 2 |
 | `@octanejs/popper` | [`packages/popper`](../packages/popper) | framework binding | `0.0.40` | 2 |
 | `@octanejs/portabletext` | [`packages/portabletext`](../packages/portabletext) | framework binding | `0.1.24` | 2 |
-| `@octanejs/radix` | [`packages/radix`](../packages/radix) | framework binding | `0.1.76` | 1 |
+| `@octanejs/radix` | [`packages/radix`](../packages/radix) | framework binding | `0.1.77` | 1 |
 | `@octanejs/rainbowkit` | [`packages/rainbowkit`](../packages/rainbowkit) | framework binding | `0.0.58` | 2 |
 | `@octanejs/react-error-boundary` | [`packages/react-error-boundary`](../packages/react-error-boundary) | framework binding | `0.1.55` | 2 |
 | `@octanejs/react-map-gl` | [`packages/react-map-gl`](../packages/react-map-gl) | framework binding | `0.0.46` | 2 |
@@ -101,7 +101,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/sanity-logos` | [`packages/sanity-logos`](../packages/sanity-logos) | framework binding | `0.1.24` | 2 |
 | `@octanejs/select` | [`packages/select`](../packages/select) | framework binding | `0.1.26` | 6 |
 | `@octanejs/seo` | [`packages/seo`](../packages/seo) | document metadata | `0.0.61` | 1 |
-| `@octanejs/shadcn` | [`packages/shadcn`](../packages/shadcn) | framework binding | `0.0.66` | 124 |
+| `@octanejs/shadcn` | [`packages/shadcn`](../packages/shadcn) | framework binding | `0.0.67` | 124 |
 | `@octanejs/solana-kit` | [`packages/solana-kit`](../packages/solana-kit) | framework binding | `0.0.46` | 2 |
 | `@octanejs/sonner` | [`packages/sonner`](../packages/sonner) | framework binding | `0.1.70` | 2 |
 | `@octanejs/spring` | [`packages/spring`](../packages/spring) | framework binding | `0.0.41` | 2 |
@@ -131,7 +131,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/use-sync-external-store` | [`packages/use-sync-external-store`](../packages/use-sync-external-store) | framework binding | `0.0.8` | 10 |
 | `@octanejs/usehooks-ts` | [`packages/usehooks-ts`](../packages/usehooks-ts) | framework binding | `0.0.56` | 1 |
 | `@octanejs/valtio` | [`packages/valtio`](../packages/valtio) | framework binding | `0.1.57` | 5 |
-| `@octanejs/vaul` | [`packages/vaul`](../packages/vaul) | framework binding | `0.0.43` | 3 |
+| `@octanejs/vaul` | [`packages/vaul`](../packages/vaul) | framework binding | `0.0.44` | 3 |
 | `@octanejs/visx` | [`packages/visx`](../packages/visx) | framework binding | `0.1.72` | 49 |
 | `@octanejs/vite-plugin` | [`packages/vite-plugin-octane`](../packages/vite-plugin-octane) | metaframework | `0.6.6` | 4 |
 | `@octanejs/wagmi` | [`packages/wagmi`](../packages/wagmi) | framework binding | `0.0.58` | 3 |
@@ -144,7 +144,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/zag` | [`packages/zag`](../packages/zag) | framework binding | `0.0.41` | 1 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.76` | 8 |
 | `create-octane` | [`packages/create-octane`](../packages/create-octane) | project scaffolder | `0.0.25` | 1 |
-| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.23.0` | 58 |
+| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.23.2` | 58 |
 
 ## Private packages
 

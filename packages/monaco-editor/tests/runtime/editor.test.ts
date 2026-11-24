@@ -1,6 +1,7 @@
 import loader from '@monaco-editor/loader';
 import type { editor } from 'monaco-editor';
 import { flushSync, startTransition } from 'octane';
+import { installTestClock } from 'octane/testing';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import Editor, {
@@ -9,7 +10,7 @@ import Editor, {
 	type MonacoDiffEditor,
 	type MonacoEditor,
 } from '../../src/index';
-import { flushEffects, mount, nextTask } from '../../../octane/tests/_helpers';
+import { flushEffects, mount } from '../../../octane/tests/_helpers';
 import { createFakeMonaco, FakeCodeEditor } from './_fake-monaco';
 import {
 	DiffEditorCreationErrorBoundary,
@@ -76,6 +77,7 @@ describe('@octanejs/monaco-editor Editor', () => {
 		const onChangeB = vi.fn();
 		const onValidateA = vi.fn();
 		const onValidateB = vi.fn();
+		const clock = installTestClock();
 		const result = mount(PendingTab, {
 			tab: 'A',
 			gate: null,
@@ -104,7 +106,7 @@ describe('@octanejs/monaco-editor Editor', () => {
 					onValidate: onValidateB,
 				}),
 			);
-			await nextTask();
+			await clock.advance(0);
 			await settle();
 
 			expect(result.find('[data-tab]').textContent).toBe('A');
@@ -120,7 +122,7 @@ describe('@octanejs/monaco-editor Editor', () => {
 
 			resolveGate();
 			await settle();
-			await nextTask();
+			await clock.advance(0);
 			await settle();
 			expect(result.find('[data-tab]').textContent).toBe('B');
 			const modelB = editorInstance!.getModel()!;
@@ -153,6 +155,7 @@ describe('@octanejs/monaco-editor Editor', () => {
 		} finally {
 			result.unmount();
 			await settle();
+			clock.uninstall();
 		}
 	});
 

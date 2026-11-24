@@ -300,7 +300,7 @@
     },
     {
       "name": "@octanejs/cmdk",
-      "version": "0.1.60",
+      "version": "0.1.61",
       "category": "UI Libraries",
       "upstream": { "package": "cmdk", "version": "1.1.1" },
       "surface": "Complete against the published `cmdk@1.1.1` public surface: `Command` (the root itself) and the `CommandRoot` named export, `Command.Input`, `Command.List`, `Command.Item`, `Command.Group`, `Command.Separator`, `Command.Dialog`, `Command.Empty`, `Command.Loading`, the flat `CommandX` aliases, `useCommandState`, and `defaultFilter` — with the DOM-authoritative store and item/group registration, `useValue` text-content inference, `onInput`-driven search, score filtering plus item and group DOM sorting, keyboard navigation (arrows/Home/End/vim/Enter), controlled `value`/`onValueChange`/`loop`/`shouldFilter`/custom `filter`/`forceMount`, the `--cmdk-list-height` ResizeObserver, and a Radix-backed `Command.Dialog`. `asChild` is the one unsupported prop (see divergences).",
@@ -1225,7 +1225,7 @@
     },
     {
       "name": "@octanejs/radix",
-      "version": "0.1.76",
+      "version": "0.1.77",
       "category": "UI Libraries",
       "upstream": { "package": "radix-ui", "version": "1.6.4" },
       "surface": "Surface-present against the unified `radix-ui@1.6.4` component exports. Sixteen repo-authored differential cases compare representative primitives and interactions against the real package; the complete 38-file canonical upstream suite is preserved but not adapted, so the binding remains recorded-unverified.",
@@ -1688,7 +1688,7 @@
     },
     {
       "name": "@octanejs/shadcn",
-      "version": "0.0.66",
+      "version": "0.0.67",
       "category": "UI Libraries",
       "upstream": {
         "package": "shadcn-ui/ui (component registry)",
@@ -4953,7 +4953,7 @@
     },
     {
       "name": "@octanejs/vaul",
-      "version": "0.0.43",
+      "version": "0.0.44",
       "category": "UI Libraries",
       "upstream": {
         "package": "vaul",
@@ -7794,6 +7794,11 @@
     },
     "372": {
       "message": "Keyless scopes require a null signal key.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "373": {
+      "message": "Multiple retained signal subscriptions failed to release.",
       "runtime": ["client", "server"],
       "status": "active"
     }

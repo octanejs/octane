@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { TestClock } from '../../src/testing.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { componentSlot, createRoot, enableSignalBindings, type Scope } from '../../src/runtime.js';
 import {
@@ -27,8 +28,14 @@ import {
 import '../_server-fixture.js';
 import type { CompiledFixtureModule } from '../_server-fixture.js';
 import '../_server-stream.js';
-import '../_fixtures/signals-async-controls.js';
+import '../../src/testing.js';
 import '../../src/hydration/streamed-signals.js';
+
+// Each cold scenario installs a clock on its own fresh runtime graph.
+const clocks: TestClock[] = [];
+afterEach(() => {
+	for (const clock of clocks.splice(0)) clock.uninstall();
+});
 
 function currentInstanceKey(): string {
 	return (currentSignalOwner() as { instanceKey?: string } | null)?.instanceKey ?? 'missing';
@@ -346,7 +353,8 @@ export function App(props) @{
 			const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
 			const { activateStreamedMarkup, resetStreamRuntimeGlobals } =
 				await import('../_server-stream.js');
-			const { drainProducers } = await import('../_fixtures/signals-async-controls.js');
+			const clock = (await import('../../src/testing.js')).installTestClock();
+			clocks.push(clock);
 			// The module never imports signals, so a returned fragment keeps its
 			// compiled-renderer boundary on both sides. Its invocation site is the
 			// parent of every component site rendered inside it.
@@ -393,7 +401,7 @@ export function App(props) @{ <main>@try { <Row show={true} query={props.query}/
 						onUncaughtError: (error) => errors.push(error),
 					},
 				);
-				await drainProducers();
+				await clock.advance(0);
 				client.flushSync(() => {});
 				expect(browserLoad).not.toHaveBeenCalled();
 				expect(container.querySelector('output')).toBe(result);
@@ -1019,7 +1027,8 @@ export function App(props) @{ <main>@for (const item of props.items; key item) {
 			const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
 			const { activateStreamedMarkup, resetStreamRuntimeGlobals } =
 				await import('../_server-stream.js');
-			const { drainProducers } = await import('../_fixtures/signals-async-controls.js');
+			const clock = (await import('../../src/testing.js')).installTestClock();
+			clocks.push(clock);
 			// Dynamic JSX values defer their whole element until they render. The
 			// two fields share every declaration, so only each element's call site
 			// keeps their signals apart and joins the client to the server's.
@@ -1069,7 +1078,7 @@ export function App(props) @{
 					onRecoverableError: (error) => errors.push(error),
 					onUncaughtError: (error) => errors.push(error),
 				});
-				await drainProducers();
+				await clock.advance(0);
 				client.flushSync(() => {});
 				expect(browserLoad).not.toHaveBeenCalled();
 				expect([...container.querySelectorAll('output')]).toEqual(results);
@@ -1155,7 +1164,8 @@ export function App(props) @{
 			const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
 			const { activateStreamedMarkup, resetStreamRuntimeGlobals } =
 				await import('../_server-stream.js');
-			const { drainProducers } = await import('../_fixtures/signals-async-controls.js');
+			const clock = (await import('../../src/testing.js')).installTestClock();
+			clocks.push(clock);
 			// Importing signals compiles a returning Row as a plain function whose
 			// JSX is a scoped value. Field's query must resolve to the same
 			// instance on both sides so the browser resumes the server result.
@@ -1208,7 +1218,7 @@ export function App(props) @{ <main>@try { <Row show={props.show} load={props.lo
 						onUncaughtError: (error) => errors.push(error),
 					},
 				);
-				await drainProducers();
+				await clock.advance(0);
 				client.flushSync(() => {});
 				expect(browserLoad).not.toHaveBeenCalled();
 				expect(container.querySelector('output')).toBe(result);
@@ -1252,7 +1262,8 @@ export function App(props) @{ <main>@try { <Row show={props.show} load={props.lo
 			const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
 			const { activateStreamedMarkup, resetStreamRuntimeGlobals } =
 				await import('../_server-stream.js');
-			const { drainProducers } = await import('../_fixtures/signals-async-controls.js');
+			const clock = (await import('../../src/testing.js')).installTestClock();
+			clocks.push(clock);
 			// Every row reads the same query site and key. Only its keyed list item
 			// separates one row's instance from another on both sides.
 			const source = `import { query$ } from 'octane/signals';
@@ -1305,7 +1316,7 @@ export function App(props) @{ <main>@try { <List ids={props.ids} load={props.loa
 						onUncaughtError: (error) => errors.push(error),
 					},
 				);
-				await drainProducers();
+				await clock.advance(0);
 				client.flushSync(() => {});
 				expect(browserLoad).not.toHaveBeenCalled();
 				expect([...container.querySelectorAll('output')]).toEqual(outputs);
@@ -1313,7 +1324,7 @@ export function App(props) @{ <main>@try { <List ids={props.ids} load={props.loa
 				client.flushSync(() =>
 					root!.render(clientModule.App, { ids: ids.toReversed(), load: browserLoad }),
 				);
-				await drainProducers();
+				await clock.advance(0);
 				client.flushSync(() => {});
 				expect(browserLoad).not.toHaveBeenCalled();
 				expect([...container.querySelectorAll('output')]).toEqual(outputs.toReversed());
@@ -1521,7 +1532,8 @@ export function App(props) { return <main><Suspense fallback={<i>waiting</i>}>{[
 			const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
 			const { activateStreamedMarkup, resetStreamRuntimeGlobals } =
 				await import('../_server-stream.js');
-			const { drainProducers } = await import('../_fixtures/signals-async-controls.js');
+			const clock = (await import('../../src/testing.js')).installTestClock();
+			clocks.push(clock);
 			const app = `import { Fragment, Suspense, use, useState } from 'octane';${signalsApp ? " import 'octane/signals';" : ''}
 import { Field } from './field';
 ${source}`;
@@ -1593,7 +1605,7 @@ ${source}`;
 				// without its server seed refetches from here on.
 				expect(clientOwners.size).toBe(rows);
 				expect(serverOwners).toEqual(clientOwners);
-				await drainProducers();
+				await clock.advance(0);
 				client.flushSync(() => {});
 				expect(browserLoad).not.toHaveBeenCalled();
 				expect([...container.querySelectorAll('output')]).toEqual(outputs);
