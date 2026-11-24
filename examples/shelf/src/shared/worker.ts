@@ -5,8 +5,8 @@
  * connection, one cache, and each other's pending edits and rollbacks.
  */
 import { indexedDBStorage, serveDataOwner, serverListener, serverTransport } from 'octane/data';
-// The build's contracts: with them, the worker validates each read's reply, so a tab of this
-// build adopts it without running the schema on the page.
+// The build's contracts: with them, the worker validates what the server sends (replies,
+// previews, feed events), so a tab of this build adopts it without running a schema on the page.
 import { contracts } from 'octane/data/manifest';
 import { data, events } from './data.tsrx';
 
