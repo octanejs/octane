@@ -58,6 +58,7 @@ const PLUGIN_OPTION_KEYS = new Set([
 	'cssModuleConstants',
 	'clientBuildMode',
 	'dataWorker',
+	'dataClient',
 	'data',
 ]);
 const LAYER_SPECIALIZATION_KEYS = new Set(['runtime', 'renderers', 'universalRuntime']);
@@ -204,6 +205,15 @@ function normalizeOptions(value, plugin) {
 	}
 	if (plugin) normalizeRuntimeRequest(options.runtime);
 	if (plugin) normalizeRuntimeRequest(options.dataWorker, 'dataWorker');
+	if (plugin) normalizeRuntimeRequest(options.dataClient, 'dataClient');
+	if (plugin && options.dataClient !== undefined && options.dataWorker !== undefined) {
+		throw new TypeError('@octanejs/rspack-plugin: pass `dataClient` or `dataWorker`, not both.');
+	}
+	if (plugin && options.dataClient !== undefined && options.data === false) {
+		throw new TypeError(
+			'@octanejs/rspack-plugin: `dataClient` needs the generated `octane/data/manifest`; drop `data: false`.',
+		);
+	}
 	if (plugin && options.data !== undefined && typeof options.data !== 'boolean') {
 		throw new TypeError('@octanejs/rspack-plugin: `data` must be a boolean when provided.');
 	}
@@ -297,6 +307,7 @@ function normalizeOptions(value, plugin) {
 		...(plugin && options.transpile !== undefined ? { transpile: options.transpile } : null),
 		...(plugin && options.runtime !== undefined ? { runtime: options.runtime } : null),
 		...(plugin && options.dataWorker !== undefined ? { dataWorker: options.dataWorker } : null),
+		...(plugin && options.dataClient !== undefined ? { dataClient: options.dataClient } : null),
 		...(plugin && options.data !== undefined ? { data: options.data } : null),
 		...(plugin && options.cssModuleConstants !== undefined
 			? { cssModuleConstants: options.cssModuleConstants }

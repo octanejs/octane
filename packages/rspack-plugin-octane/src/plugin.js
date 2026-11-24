@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
 	DATA_WORKER_PATH,
+	DATA_CLIENT_MODULE,
 	DATA_MANIFEST_MODULE,
 	INDEPENDENT_HYDRATION_MANIFEST_FILENAME,
 	createClientReferenceManifest,
@@ -34,6 +35,8 @@ const loaderPath = fileURLToPath(new URL('./loader.js', import.meta.url));
 const finalizeLoaderPath = fileURLToPath(new URL('./finalize-loader.js', import.meta.url));
 const parallelLoaderPath = fileURLToPath(new URL('./parallel-loader.js', import.meta.url));
 const dataManifestPath = fileURLToPath(new URL('./data-manifest.js', import.meta.url));
+const dataClientPath = fileURLToPath(new URL('./data-client.js', import.meta.url));
+const dataClientWorkerPath = fileURLToPath(new URL('./data-client-worker.js', import.meta.url));
 const DEFAULT_MAX_WORKERS = 4;
 const OCTANE_RULE = /\.(?:tsrx|tsx|ts|js)$/i;
 const TYPESCRIPT_RULE = /\.(?:tsrx|tsx|ts)$/i;
@@ -583,9 +586,30 @@ export class OctaneRspackPlugin {
 			? realRoot(resolve(root, this.options.textTypes.tsconfig))
 			: undefined;
 		assertProfilingDefineAvailable(compiler, profile);
-		if (this.options.dataWorker && environment === 'client') {
+		const dataClient =
+			this.options.dataClient === undefined
+				? undefined
+				: resolve(compilerRoot, this.options.dataClient).replaceAll('\\', '/');
+		if (dataClient !== undefined) {
+			// The worker and `octane/data/client` are generated from the app's one data client module.
+			compiler.options.module.rules.push(
+				{ resolve: { alias: { [`${DATA_CLIENT_MODULE}$`]: dataClientPath } } },
+				{
+					resource: dataClientPath,
+					enforce: 'post',
+					use: [{ loader: dataClientPath, options: { file: dataClient } }],
+				},
+				{
+					resource: dataClientWorkerPath,
+					enforce: 'post',
+					use: [{ loader: dataClientWorkerPath, options: { file: dataClient } }],
+				},
+			);
+		}
+		const dataWorker = this.options.dataWorker ?? (dataClient && dataClientWorkerPath);
+		if (dataWorker && environment === 'client') {
 			// The data worker keeps one path across deploys, so every tab shares one SharedWorker.
-			new compiler.webpack.EntryPlugin(compilerRoot, this.options.dataWorker, {
+			new compiler.webpack.EntryPlugin(compilerRoot, dataWorker, {
 				name: 'octane-data-worker',
 				filename: DATA_WORKER_PATH.slice(1),
 				// A worker has no document to load chunks into, so its dynamic imports stay in the file.
