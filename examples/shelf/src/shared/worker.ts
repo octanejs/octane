@@ -5,11 +5,15 @@
  * and each other's pending edits and rollbacks.
  */
 import { indexedDBStorage, serveDataOwner, serverListener, serverTransport } from 'octane/data';
+// The build's contracts: with them, the worker validates each read's reply, so a tab of this
+// build adopts it without running the schema on the page.
+import { contracts } from 'octane/data/manifest';
 import { data, events } from './data.tsrx';
 
 serveDataOwner({
 	transport: serverTransport(data),
 	listen: serverListener(events),
+	contracts,
 	// The account's one encrypted cache and write journal, which only this worker writes. The
 	// options match a page's own (`session.ts`), so a tab that cannot share reads the same cache.
 	persist: (account) => ({

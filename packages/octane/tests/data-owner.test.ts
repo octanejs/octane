@@ -613,6 +613,133 @@ const recordedExplicitAccount = () =>
 	accountStore('readonly', (store) => store.get(0), 'octane-data-account-explicit');
 const recordAccount = (value: object) => accountStore('readwrite', (store) => store.put(value, 0));
 
+describe('octane/data replies validated by the owner', () => {
+	/** A meeting's start, sent as text and validated into whatever `into` makes of it. */
+	class Start {
+		constructor(readonly at: string) {}
+	}
+	function startSchema(into: (at: string) => unknown, calls: string[], label: string) {
+		const output: StandardSchema<unknown, { start: unknown }> = {
+			'~standard': {
+				version: 1,
+				vendor: 'test',
+				validate(value) {
+					calls.push(label);
+					const at = (value as { start?: unknown }).start;
+					return typeof at === 'string'
+						? { value: { start: into(at) } }
+						: { issues: [{ message: 'Expected a start', path: ['start'] }] };
+				},
+			},
+		};
+		return read({ name: 'meeting', output, version: '1' });
+	}
+
+	/**
+	 * An owner serving `count` tabs of one build. The owner and the tabs each
+	 * hold their own copy of the build's contracts, as a worker and its pages do.
+	 */
+	function served(
+		reply: unknown,
+		into: (at: string) => unknown,
+		options: { count?: number; ownerVersion?: string } = {},
+	) {
+		const calls: string[] = [];
+		const onPage = startSchema(into, calls, 'page');
+		const inWorker = startSchema(into, calls, 'worker');
+		const ownerRead =
+			options.ownerVersion === undefined
+				? inWorker
+				: { ...inWorker, version: options.ownerVersion };
+		const owner = createDataOwner({
+			transport: async () => ({
+				ok: true,
+				value: typeof reply === 'function' ? reply() : reply,
+			}),
+			contracts: [...contracts, ownerRead],
+		});
+		const stores = Array.from({ length: options.count ?? 1 }, () => {
+			const channel = new MessageChannel();
+			owner.connect(channel.port1);
+			const store = createReplica(channel.port2, {
+				...replicaOptions,
+				contracts: [...contracts, onPage],
+			});
+			closers.push(() => (void store.dispose(), channel.port1.close(), channel.port2.close()));
+			return store;
+		});
+		return { stores, read: onPage, calls };
+	}
+
+	it('adopts a reply the owner validated with the same build’s schema, without validating it on the page', async () => {
+		const {
+			stores,
+			read: meeting,
+			calls,
+		} = served({ start: '2026-11-24T10:00:00Z' }, (at) => new Date(at));
+		const shown = await observed(stores[0]!.read(meeting));
+		// The schema's output, a Date, crosses to the page intact.
+		expect(shown().start).toEqual(new Date('2026-11-24T10:00:00Z'));
+		expect(calls).toEqual(['worker']);
+	});
+
+	it('gives the value it validated to every other tab holding the read, which adopts it as it came', async () => {
+		let hour = 10;
+		const {
+			stores,
+			read: meeting,
+			calls,
+		} = served(
+			() => ({ start: `2026-11-24T${hour++}:00:00Z` }),
+			(at) => new Date(at),
+			{ count: 2 },
+		);
+		const [first, second] = stores as [DataStore, DataStore];
+		const there = await observed(second.read(meeting));
+		const here = first.read(meeting);
+		await observed(here);
+		// A reload in one tab reaches the other, validated once, in the worker.
+		await here.refresh();
+		await vi.waitFor(() => expect(there().start).toEqual(new Date('2026-11-24T12:00:00Z')));
+		expect(calls).toEqual(['worker', 'worker', 'worker']);
+	});
+
+	it('leaves a value the trip would change to the page’s own validator, such as a class instance', async () => {
+		const {
+			stores,
+			read: meeting,
+			calls,
+		} = served({ start: '2026-11-24T10:00:00Z' }, (at) => new Start(at));
+		const shown = await observed(stores[0]!.read(meeting));
+		expect(shown().start).toBeInstanceOf(Start);
+		expect(calls).toEqual(['worker', 'page']);
+	});
+
+	it('leaves an invalid reply to the page, which reports what was wrong', async () => {
+		const { stores, read: meeting } = served({ begins: 'soon' }, (at) => at);
+		const handle = stores[0]!.read(meeting);
+		closers.push(handle.subscribe(() => {}));
+		await vi.waitFor(() => expect(handle.getSnapshot().status).toBe('error'));
+		expect(handle.getSnapshot().error).toMatchObject({
+			code: 'invalid',
+			issues: [{ message: 'Expected a start' }],
+		});
+	});
+
+	it('validates nothing for tabs whose build has other contracts than its own', async () => {
+		const {
+			stores,
+			read: meeting,
+			calls,
+		} = served({ start: '2026-11-24T10:00:00Z' }, (at) => new Date(at), {
+			ownerVersion: '2',
+		});
+		const shown = await observed(stores[0]!.read(meeting));
+		expect(shown().start).toEqual(new Date('2026-11-24T10:00:00Z'));
+		expect(calls).toEqual(['page']);
+	});
+});
+
 describe('octane/data owners across builds and crashes', () => {
 	afterEach(() => {
 		vi.useRealTimers();
