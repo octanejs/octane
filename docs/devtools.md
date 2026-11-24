@@ -146,6 +146,27 @@ probe. Where the Profiler tab is a per-commit table, this tab ranks:
 Until the app has rendered anything with profiling enabled, the tab shows
 "No performance data yet — interact with the app." instead of empty lists.
 
+## Element source locations
+
+Inspectors, "click to open in editor" overlays and visual editors can ask the
+hook where an element was written:
+
+```ts
+globalThis.__OCTANE_DEVTOOLS__?.sourceFor(element);
+// { file: '/src/components/App.tsrx', line: 7, column: 4 }
+```
+
+`file` is the module id the compiler received: under the Vite plugin, a path
+relative to the project root, which is also the module's dev-server URL. `line`
+is 1-based and `column` 0-based. Every host element a dev-compiled template
+creates is covered, static elements included, on both client mounts and
+hydration. `sourceFor` returns `null` for an element no template created, such
+as one a ref or an effect inserted, and in any build compiled without `dev`.
+
+The location is stamped when the template is cloned, so it costs a short walk of
+each template's elements on every dev mount and nothing in production, where the
+compiler emits no stamp at all.
+
 ## Guarantees
 
 - **Read-only.** Selecting a node only requests a description from the app; the

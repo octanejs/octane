@@ -13136,6 +13136,8 @@ function compileInternal(
 		mayHaveHoistedVars: source.includes('var'),
 		currentHoistedVars: null,
 		mapSourceName: (filename || 'module.tsrx').split(/[\\/]/).pop(),
+		// DEV: the full module path stamped on host elements for devtools sourceFor().
+		devSourceFile: (filename || 'module.tsrx').replace(/\\/g, '/'),
 		output: options?.output,
 		typescriptWeb,
 		// Coarse origin for module scaffolding with no authored source position
@@ -19335,6 +19337,7 @@ function preparePresentationHydration(body, node, ctx, hostEnd) {
 	}
 	const preparation = new Set([
 		'clone',
+		'stampSources',
 		'devHtmlNesting',
 		'devEventListener',
 		'queueRefAttach',
@@ -30301,6 +30304,36 @@ function planJsx(
 					? b.call('_$clone', b.id(tpl), cloneLocArg)
 					: b.call('_$clone', b.id(tpl));
 		mountLines.push(inheritOriginLoc(b.const('_root', cloneCall), planOrigin));
+		// DEV: stamp every host element of the still-intact clone with its authored
+		// `file:line:col` (`__oct_src`), for devtools `sourceFor()`. Unlike `__oct_loc`,
+		// this covers static elements and names the full module path.
+		if (ctx._elemLocs !== null && ctx._elemLocs.size > 0) {
+			ctx.runtimeNeeded.add('stampSources');
+			const entries = [];
+			for (const [key, lc] of ctx._elemLocs) {
+				if (lc === undefined) continue;
+				entries.push(
+					b.array([
+						b.array(JSON.parse(key).map((index) => b.literal(index))),
+						b.literal(lc[0]),
+						b.literal(lc[1]),
+					]),
+				);
+			}
+			mountLines.push(
+				inheritOriginLoc(
+					b.stmt(
+						b.call(
+							'_$stampSources',
+							b.id('_root'),
+							b.literal(ctx.devSourceFile, JSON.stringify(ctx.devSourceFile)),
+							b.array(entries),
+						),
+					),
+					planOrigin,
+				),
+			);
+		}
 		elementVars = new Map();
 		let varCounter = 0;
 		// Does this template contain a control-flow / component / portal hole? If so

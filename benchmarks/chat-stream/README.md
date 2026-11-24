@@ -6,6 +6,9 @@ CONTROLLED composer — streaming **predefined token sequences** into the UI.
 Seven frameworks implement the same DOM contract and state model; the harness
 drains the stream deterministically and verifies the DOM after every sample.
 
+For press latency and subscription work across retained panes, cold mounts and
+revisits during streaming, run the [Signals switching benchmark](switching/README.md).
+
 ## Determinism
 
 - The corpus (`src/data.js`, identical file in every app) derives from one
