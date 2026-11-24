@@ -29,6 +29,8 @@ import { BlockImpl } from './block.js';
 import { CURRENT_SCOPE, ROOT_RENDER_TRANSACTION } from './render.js';
 import { sourceComponents } from './engine.js';
 import { __devtoolsSetSourceComponents } from '../devtools-hook.js';
+
+declare const __OCTANE_PROFILE_ENABLED__: boolean;
 import { PRESENTATION_HYDRATION, preparePresentationOperation } from './hydration-presentation.js';
 import { readSignalBinding } from './signal-bindings.js';
 import { isSignalHandle } from '../signals/handle-protocol.js';
@@ -550,7 +552,9 @@ export function stampSources(
 	file: string,
 	entries: ReadonlyArray<readonly [readonly number[], number, number]>,
 ): void {
-	__devtoolsSetSourceComponents(sourceComponents);
+	// The hook exists only in profile builds; elsewhere this folds away with it.
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__devtoolsSetSourceComponents(sourceComponents);
 	for (const [path, line, col] of entries) {
 		let node: Node | null = root;
 		for (let i = 0; i < path.length && node !== null; i++) {

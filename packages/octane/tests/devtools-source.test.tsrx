@@ -4,7 +4,12 @@ import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { hydrateRoot } from 'octane';
 import { renderToString } from 'octane/server';
-import { installDevtoolsGlobal, type OctaneDevtoolsHook } from '../src/devtools-hook';
+import {
+	__devtoolsSetSourceComponents,
+	installDevtoolsGlobal,
+	type OctaneDevtoolsHook,
+} from '../src/devtools-hook';
+import { sourceComponents } from '../src/runtime/engine';
 import { SourcesApp } from './_fixtures/devtools-sources.tsrx';
 import { act, mount } from './_helpers';
 
@@ -13,7 +18,9 @@ const FIXTURE = 'packages/octane/tests/_fixtures/devtools-sources.tsrx';
 const dev = process.env['OCTANE_TEST_COMPILE_MODE'] !== 'prod';
 
 function hook(): OctaneDevtoolsHook {
+	// What a profile build's runtime does; this project compiles dev without profile.
 	installDevtoolsGlobal();
+	__devtoolsSetSourceComponents(sourceComponents);
 	return globalThis.__OCTANE_DEVTOOLS__!;
 }
 
