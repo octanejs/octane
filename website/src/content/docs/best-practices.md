@@ -915,7 +915,7 @@ export function Shelf() @{
 
 ### Provide one store per account and read with useRead
 
-Create a store for each signed-in account and pass it to a `DataProvider` near the root. In the browser, make it a replica of the app's data worker, `createReplica(sharedOwner(account), { transport, contracts })`, so requests, validation, feeds and the cache stay off the main thread and the account's tabs share them; keep `createDataStore` for the server, tests and scripts. [Create a store](https://octanejs.dev/docs/data#first-store) has the setup. Key the subtree by account so that someone switching accounts will only see the new account's cache. In the book list, `useRead(handle)` returns the list once it's available. On the first load it suspends, so the surrounding `@try` can show a loading message. On later reloads, the current list stays on screen.
+Create a store for each signed-in account and pass it to a `DataProvider` near the root. In the browser, open it with `openDataStore(account)` from `octane/data/client`, which the build generates from your data client, so requests, validation, feeds and the cache stay in the data worker, off the main thread, and the account's tabs share them; keep `createDataStore` for the server, tests and scripts. [Create a store](https://octanejs.dev/docs/data#first-store) has the setup. Key the subtree by account so that someone switching accounts will only see the new account's cache. In the book list, `useRead(handle)` returns the list once it's available. On the first load it suspends, so the surrounding `@try` can show a loading message. On later reloads, the current list stays on screen.
 
 ```tsrx
 import type { DataStore } from 'octane/data';
