@@ -75,10 +75,21 @@ export interface DevtoolsTransitionState {
 	boundaries: DevtoolsBoundary[];
 }
 
+export interface DevtoolsSource {
+	/** The module id the compiler received, with `/` separators: root-relative under the Vite plugin. */
+	file: string;
+	/** 1-based. */
+	line: number;
+	/** 0-based, as `__oct_loc` uses. */
+	column: number;
+}
+
 export interface OctaneDevtoolsHook {
 	version: number;
 	getTree(): DevtoolsTreeNode[];
 	inspect(id: number): DevtoolsNodeDetail | null;
+	/** Where a dev-compiled template wrote `el`, or null for other elements. */
+	sourceFor(el: Element): DevtoolsSource | null;
 	subscribe(listener: () => void): () => void;
 	getTransitionState(): DevtoolsTransitionState;
 }
@@ -265,6 +276,17 @@ const hook: OctaneDevtoolsHook = {
 			};
 		}
 		return detail;
+	},
+	sourceFor(el) {
+		const loc = (el as Element & { __oct_src?: unknown }).__oct_src;
+		if (typeof loc !== 'string') return null;
+		const colAt = loc.lastIndexOf(':');
+		const lineAt = loc.lastIndexOf(':', colAt - 1);
+		return {
+			file: loc.slice(0, lineAt),
+			line: Number(loc.slice(lineAt + 1, colAt)),
+			column: Number(loc.slice(colAt + 1)),
+		};
 	},
 	subscribe(listener) {
 		subscribers.add(listener);

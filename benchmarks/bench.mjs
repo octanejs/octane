@@ -163,6 +163,13 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		name: 'chat-switching',
+		cwd: 'chat-stream/switching',
+		servers: [],
+		iter: { normal: 12, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// React-hosted migration boundary: the same React 19 host renders either
 		// upstream Streamdown directly or @octanejs/streamdown through
 		// OctaneCompat. The browser harness checks semantic DOM parity before
