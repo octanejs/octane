@@ -17,7 +17,13 @@ import type { DataStore, Read } from '../../src/data/index.js';
 import { createTempProject, type TempProject } from '../_temp-project.js';
 
 const DATA = resolve(fileURLToPath(new URL('../../src/data', import.meta.url)));
-const alias = [{ find: /^octane\/data$/, replacement: join(DATA, 'index.ts') }];
+const alias = [
+	{ find: /^octane\/data$/, replacement: join(DATA, 'index.ts') },
+	{
+		find: /^octane\/internal\/data-client$/,
+		replacement: join(DATA, '../internal/data-client.ts'),
+	},
+];
 
 const projects: TempProject[] = [];
 const closers: Array<() => unknown> = [];

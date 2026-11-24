@@ -205,6 +205,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 	'./internal/hydration-signal': ['__hydrationSignalRevision'],
 	'./internal/hydration-query': ['__beginHydrationQueryRead', '__readHydrationQueryInput'],
 	'./internal/server-rpc': ['__serverRpc', '__serverRpcPreload', '__serverRpcStream'],
+	'./internal/data-client': ['openDataClient', 'serveDataClient'],
 	'./internal/context': ['isContext', 'registerContext'],
 	'./internal/universal-children': ['__methodDep', 'createUniversalChildren', 'descriptorChildren'],
 	'./internal/client': [
