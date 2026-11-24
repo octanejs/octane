@@ -54,6 +54,34 @@ The journey runs in two passes:
 
 `js_gzip_kb` is every built JavaScript file, gzipped.
 
+## Cold first-navigation probe on Linux
+
+Set `ROUTER_DATA_BUDGET_CPU` to an available logical CPU to run the paired
+cold/warm probe in place of the standard browser journey. It uses Linux cgroup
+v2 and a systemd user session. Install the pinned Chromium first with
+`pnpm exec playwright install chromium`. Use `ROUTER_DATA_CHROMIUM` to select a
+different executable, such as an installed headless shell.
+
+```bash
+ROUTER_DATA_BUDGET_CPU=3 node benchmarks/bench.mjs router-data
+```
+
+The probe runs Chromium on the selected CPU at 100%, at 100% with the
+DevTools rate set to 4, and at a 25% browser-wide quota. The last quota also
+limits threads outside the page's main thread, including V8 background
+compilation. It is a shared CPU budget with a 4 ms scheduling period and
+doesn't model a processor that is uniformly four times slower. Keep the
+selected CPU free of other load when comparing runs.
+
+Each pair uses a fresh browser context and clicks home → task 3 → home → task 7
+without hover. Both nested navigations must make three reads for distinct
+loader keys. The probe reports time to home, both navigation times, and
+the sum of home readiness and cold navigation for each sample. The summed
+time helps identify work moved between startup and navigation. It also
+records CPU time for the Chromium scope from page creation through the
+cold navigation probe. The simulated delay is zero, but timers and scheduling remain
+part of the measured wall time. Leave the variable unset for the existing suite.
+
 ## Route matching
 
 [`trie/run.mjs`](trie/run.mjs) is a Node-only run in the same suite. It times the RFC's route
