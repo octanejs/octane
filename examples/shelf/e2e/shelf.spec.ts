@@ -43,7 +43,7 @@ function storeRequest(request: Request): string | null {
 	return body.includes('books.changes') ? null : body;
 }
 
-/** Open a page on server data no other test shares, with its own store, whose faults and requests a test can see. */
+/** Open a page on server data no other test shares, with its own store, whose requests a test can see. */
 async function open(page: Page, path: string): Promise<void> {
 	await page.goto(`${path}?ns=${Date.now()}-${++namespace}&owner=local`);
 	await expect(page.getByRole('list', { name: 'Books' })).toBeVisible();
@@ -514,6 +514,12 @@ for (const { name, path } of [PAGES[2]!, PAGES[0]!])
 		await page.addInitScript(() => {
 			delete (globalThis as { SharedWorker?: unknown }).SharedWorker;
 		});
+		// Where each data call came from: a fetch's referrer is the page, or the worker's script.
+		const senders: Promise<string>[] = [];
+		page.on('request', (request) => {
+			if (!isData(new URL(request.url()))) return;
+			senders.push(request.allHeaders().then(({ referer }) => new URL(referer!).pathname));
+		});
 		const ns = `${Date.now()}-${++namespace}`;
 		await page.goto(`${path}?ns=${ns}`);
 		await expect(page.getByText('3 books · 0 read')).toBeVisible();
@@ -521,14 +527,79 @@ for (const { name, path } of [PAGES[2]!, PAGES[0]!])
 			.poll(() => page.workers().map((worker) => new URL(worker.url()).pathname))
 			.toContain('/_octane/data-worker.js');
 
-		// The worker makes the tab's requests, so the tab's own transport logs none.
 		await book(page, 'Kindred').getByRole('checkbox').click();
 		await expect(page.getByText('3 books · 1 read')).toBeVisible();
 		await expect(status(page)).toHaveText('Saved');
-		await expect(network(page).getByRole('listitem')).toHaveCount(0);
+		// The worker made every data call the tab needed, the write included.
+		await expect(network(page).getByText(/^write books\.setRead/)).toHaveCount(1);
+		expect(new Set(await Promise.all(senders))).toEqual(new Set(['/_octane/data-worker.js']));
 		await page.reload();
 		await expect(book(page, 'Kindred').getByRole('checkbox')).toBeChecked();
 	});
+
+for (const { name, path } of [PAGES[0]!, PAGES[1]!])
+	test(`${name}: the data worker applies the fault switches, and every tab of the account lists its requests`, async ({
+		page,
+	}) => {
+		const url = `${path}?ns=${Date.now()}-${++namespace}`;
+		const other = await page.context().newPage();
+		for (const tab of [page, other]) {
+			await tab.goto(url);
+			await expect(tab.getByText('3 books · 0 read')).toBeVisible();
+		}
+
+		// The worker delivers the next write, then loses its reply. A switch shows what the worker
+		// confirmed, in every tab of the account.
+		const lose = (tab: Page) => tab.getByRole('checkbox', { name: 'Lose the next reply' });
+		await lose(page).click();
+		for (const tab of [page, other]) await expect(lose(tab)).toBeChecked();
+		await book(page, 'Kindred').getByRole('checkbox').click();
+		await expect(status(page)).toContainText('The reply was lost');
+		// Used once.
+		for (const tab of [page, other]) await expect(lose(tab)).not.toBeChecked();
+		for (const tab of [page, other])
+			await expect(network(tab).getByText(/^write books\.setRead/)).toHaveCount(1);
+		await status(page).getByRole('button', { name: 'Check saved result' }).click();
+		await expect(status(page)).toHaveText('Saved');
+		await expect(book(other, 'Kindred').getByRole('checkbox')).toBeChecked();
+
+		// Offline, the worker sends nothing, so a lookup shows the edit never arrived.
+		const offline = page.getByRole('checkbox', { name: 'Offline' });
+		await offline.click();
+		await expect(offline).toBeChecked();
+		await book(page, 'Piranesi').getByRole('checkbox').click();
+		await expect(status(page)).toContainText('The reply was lost');
+		await offline.click();
+		await expect(offline).not.toBeChecked();
+		await status(page).getByRole('button', { name: 'Check saved result' }).click();
+		await expect(status(page)).toHaveText('The server never received that change');
+		await expect(book(page, 'Piranesi').getByRole('checkbox')).not.toBeChecked();
+		await other.close();
+	});
+
+test('uses up a lost reply once for the account, when each tab runs its own dedicated data worker', async ({
+	page,
+}) => {
+	const url = `/?ns=${Date.now()}-${++namespace}`;
+	const other = await page.context().newPage();
+	for (const tab of [page, other]) {
+		await tab.addInitScript(() => {
+			delete (globalThis as { SharedWorker?: unknown }).SharedWorker;
+		});
+		await tab.goto(url);
+		await expect(tab.getByText('3 books · 0 read')).toBeVisible();
+	}
+	const lose = (tab: Page) => tab.getByRole('checkbox', { name: 'Lose the next reply' });
+	await lose(page).click();
+	for (const tab of [page, other]) await expect(lose(tab)).toBeChecked();
+	await book(page, 'Kindred').getByRole('checkbox').click();
+	await expect(status(page)).toContainText('The reply was lost');
+	for (const tab of [page, other]) await expect(lose(tab)).not.toBeChecked();
+	// The other tab's worker heard the fault was used, so its write keeps its reply.
+	await book(other, 'Piranesi').getByRole('checkbox').click();
+	await expect(status(other)).toHaveText('Saved');
+	await other.close();
+});
 
 test('signs every shared tab of an account out when another account signs in, even one that was frozen', async ({
 	page,

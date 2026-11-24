@@ -126,6 +126,13 @@
       "critical": true
     },
     {
+      "id": "shared-owner-faults",
+      "title": "Apply the fault switches in the data worker, on the Octane and React pages: a lost reply and an offline edit settle by lookup, the switches show what the worker confirmed in every tab, every tab lists the worker's requests, and a lost reply is used once for the account even when each tab runs its own dedicated worker",
+      "kind": "resilience",
+      "spec": "e2e/shelf.spec.ts",
+      "critical": true
+    },
+    {
       "id": "shared-owner-cache",
       "title": "Start a reloaded shared tab from the data worker's encrypted cache, without loading its lists",
       "kind": "golden",
