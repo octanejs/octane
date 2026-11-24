@@ -493,8 +493,8 @@ dependency that shows every edit at once is not built in.
 - A replica's reads show pending while its page is frozen. On `resume` it asks
   the owner, and shows them again only once the account is confirmed.
 - A tab's `hello` carries its contract identity: each contract's kind and
-  name, each read's `version` and output schema shape, each write's output
-  schema shape and each feed's event schema shape. The first build served sets the owner's;
+  name, each read's `version` and output schema shape, whether each write
+  has an output schema and its shape, and each feed's event schema shape. The first build served sets the owner's;
   a tab of another build is refused and carries on as a local store.
 - Tabs and owners check on each other every 5 seconds; three silent intervals
   mean gone. A tab whose owner is gone fences its reads, reopens the worker,

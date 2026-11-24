@@ -953,6 +953,18 @@ describe('octane/data contract identity', () => {
 		expect(contractIdentity(build(number, text))).not.toBe(contractIdentity(build(text, text)));
 		expect(contractIdentity(build(text, number))).not.toBe(contractIdentity(build(text, text)));
 	});
+
+	it('tells a write with an output schema from one without, whatever the schema describes', () => {
+		// A schema that describes no shape, as many with transforms do.
+		const opaque: StandardSchema<unknown, unknown> = {
+			'~standard': { version: 1, vendor: 'test', validate: (value: unknown) => ({ value }) },
+		};
+		const move = (output?: StandardSchema<unknown, unknown>) => [
+			write({ name: 'meeting.move', input: opaque, ...(output && { output }) }),
+		];
+		expect(contractIdentity(move(opaque))).not.toBe(contractIdentity(move()));
+		expect(contractIdentity(move(opaque))).toBe(contractIdentity(move(opaque)));
+	});
 });
 
 describe('octane/data owners across builds and crashes', () => {
