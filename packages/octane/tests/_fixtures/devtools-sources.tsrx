@@ -7,6 +7,11 @@ function Badge(props: { label: string }) @{
 	</>
 }
 
+function Stat() @{
+	const [n] = useState(1);
+	<var>{String(n)}</var>
+}
+
 export function SourcesApp(props: { show: boolean }) @{
 	const [count, setCount] = useState(0);
 	<main class="app" onClick={() => setCount(count + 1)}>
@@ -20,6 +25,7 @@ export function SourcesApp(props: { show: boolean }) @{
 		@if (props.show) {
 			<section>
 				<b>shown</b>
+				<Stat />
 			</section>
 		}
 		<footer>end</footer>
