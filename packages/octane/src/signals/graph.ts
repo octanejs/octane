@@ -2706,45 +2706,56 @@ function refreshIdle(node: PlainComputed): boolean {
 	let parent: Link | undefined;
 	let parents: Link[] | undefined;
 	let link = node.deps;
-	while (link) {
-		const dep = link.dep as PlainCell | PlainComputed;
-		if (dep.flags & (REACTIVE_DIRTY | REACTIVE_PENDING | REACTIVE_RECURSED_CHECK)) return false;
-		if (dep.flags & REACTIVE_DETACHED) {
-			if ((dep as PlainComputed).checkedAt !== inputVersion) {
-				if (parent) (parents ??= []).push(parent);
-				parent = link;
-				node = dep as PlainComputed;
-				link = node.deps;
-				continue;
-			}
-		} else if (!(dep.flags & REACTIVE_KEYLESS_CELL) || dep.owner?.retired) return false;
+	try {
+		while (link) {
+			const dep = link.dep as PlainCell | PlainComputed;
+			if (dep.flags & REACTIVE_RECURSED_CHECK) throw new SignalCycleError('');
+			if (dep.flags & (REACTIVE_DIRTY | REACTIVE_PENDING)) return false;
+			if (dep.flags & REACTIVE_DETACHED) {
+				if ((dep as PlainComputed).checkedAt !== inputVersion) {
+					if (parent) (parents ??= []).push(parent);
+					// A new branch of the input can try to read this unfinished parent.
+					node.flags |= REACTIVE_RECURSED_CHECK;
+					parent = link;
+					node = dep as PlainComputed;
+					link = node.deps;
+					continue;
+				}
+			} else if (!(dep.flags & REACTIVE_KEYLESS_CELL) || dep.owner?.retired) return false;
 
-		if (dep.revision !== link.version) {
-			node.checkedAt = inputVersion;
-			if (!parent) {
-				node.flags |= REACTIVE_DIRTY;
-				return true;
+			if (dep.revision !== link.version) {
+				node.checkedAt = inputVersion;
+				if (!parent) {
+					node.flags |= REACTIVE_DIRTY;
+					return true;
+				}
+				updateLean(node);
+				if (
+					node.checkedAt !== inputVersion ||
+					!(node.flags & REACTIVE_DETACHED) ||
+					node.flags & REACTIVE_DIRTY
+				)
+					return false;
+			} else if (link.nextDep) {
+				link = link.nextDep;
+				continue;
+			} else {
+				node.checkedAt = inputVersion;
 			}
-			updateLean(node);
-			if (
-				node.checkedAt !== inputVersion ||
-				!(node.flags & REACTIVE_DETACHED) ||
-				node.flags & REACTIVE_DIRTY
-			)
-				return false;
-		} else if (link.nextDep) {
-			link = link.nextDep;
-			continue;
-		} else {
-			node.checkedAt = inputVersion;
+			link = parent;
+			if (link) {
+				node = link.sub as PlainComputed;
+				node.flags &= ~REACTIVE_RECURSED_CHECK;
+				parent = parents?.pop();
+			}
 		}
-		link = parent;
-		if (link) {
-			node = link.sub as PlainComputed;
+		return true;
+	} finally {
+		while (parent) {
+			parent.sub.flags &= ~REACTIVE_RECURSED_CHECK;
 			parent = parents?.pop();
 		}
 	}
-	return true;
 }
 
 // The common idle read has only live, unchanged inputs. It needs no graph edits.

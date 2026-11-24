@@ -18,6 +18,7 @@ import {
 	query,
 	retireSignalOwnerIdentity,
 	runWithSignalOwner,
+	SignalCycleError,
 	SignalStreamError,
 	skip,
 	type Scope,
@@ -513,6 +514,21 @@ describe('unified readonly derived declarations', () => {
 		expect(seen).toEqual([3]);
 		second$.set(4);
 		expect(selected$.get()).toBe(4);
+	});
+
+	it('rejects a circular branch reached through a cached idle parent and recovers', () => {
+		const scope = owner('idle-cycle');
+		const enabled$ = scope.signal$(null, false);
+		const other$ = scope.signal$(null, 0);
+		const input$ = scope.derived$(null, (): number => (enabled$.get() ? result$.get() : 1));
+		const result$ = scope.derived$(null, (): number => input$.get() + 1);
+		expect(result$.get()).toBe(2);
+		enabled$.set(true);
+		expect(() => result$.get()).toThrow(SignalCycleError);
+		other$.set(1);
+		expect(() => result$.get()).toThrow(SignalCycleError);
+		enabled$.set(false);
+		expect(result$.get()).toBe(2);
 	});
 
 	it('refreshes an idle branch when its new input retries a thrown promise', async () => {
