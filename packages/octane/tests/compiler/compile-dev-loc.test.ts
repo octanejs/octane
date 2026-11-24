@@ -99,6 +99,9 @@ describe('dev hydration source-LOC plumbing (P1)', () => {
 		expect(production).not.toContain('devHtmlNesting');
 		expect(development).toContain('_$stampSources(_root, "App.tsrx", [[[], 2, 2]]);');
 		expect(production).not.toContain('stampSources');
+		// Components carry the full-path location devtools sourceFor() reports.
+		expect(development).toMatch(/\.__oct_src = "App\.tsrx:\d+:\d+";/);
+		expect(production).not.toContain('__oct_src');
 		expect(strip(production)).toBe(strip(development));
 	});
 

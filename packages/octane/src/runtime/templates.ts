@@ -27,6 +27,8 @@ import type { TrackedThenable } from './use.js';
 import { HYDRATION_PASS, CURSOR, type HydrationCapability } from './hydration.js';
 import { BlockImpl } from './block.js';
 import { CURRENT_SCOPE, ROOT_RENDER_TRANSACTION } from './render.js';
+import { sourceComponents } from './engine.js';
+import { __devtoolsSetSourceComponents } from '../devtools-hook.js';
 import { PRESENTATION_HYDRATION, preparePresentationOperation } from './hydration-presentation.js';
 import { readSignalBinding } from './signal-bindings.js';
 import { isSignalHandle } from '../signals/handle-protocol.js';
@@ -548,6 +550,7 @@ export function stampSources(
 	file: string,
 	entries: ReadonlyArray<readonly [readonly number[], number, number]>,
 ): void {
+	__devtoolsSetSourceComponents(sourceComponents);
 	for (const [path, line, col] of entries) {
 		let node: Node | null = root;
 		for (let i = 0; i < path.length && node !== null; i++) {
@@ -561,7 +564,10 @@ export function stampSources(
 			);
 			if (node !== null && path[i] > 0) node = sibling(node, path[i]);
 		}
-		if (node !== null && node.nodeType === 1) (node as any).__oct_src = `${file}:${line}:${col}`;
+		if (node !== null && node.nodeType === 1) {
+			(node as any).__oct_src = `${file}:${line}:${col}`;
+			(node as any).__oct_scope = CURRENT_SCOPE;
+		}
 	}
 }
 
