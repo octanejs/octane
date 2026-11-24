@@ -19,6 +19,7 @@ up front:
 ```bash
 npm create octane my-app -- --template spa
 npm create octane my-app -- --template fullstack
+npm create octane my-app -- --template data
 ```
 
 npm needs that `--` to forward the flag; pnpm and yarn forward it already, so
@@ -66,7 +67,39 @@ src/
 
 <!-- /scaffold:fullstack -->
 
-Both open on a page that links back into the documentation, and both are a
+`data` is `fullstack` with [`octane/data`](https://octanejs.dev/docs/data): a
+reading list at `/books` that loads and adds books through a data worker. The
+build makes that worker from `src/data.client.ts`, the one module that says how
+the app reaches its server, so requests, schema checks and the cache stay off
+the page's main thread, and every tab shares them. The page server-renders its
+frame and a loading line, then the data worker loads the list in the browser.
+
+<!-- scaffold:data -->
+
+```
+index.html            carries the <!--ssr-head--> / <!--ssr-body--> markers
+octane.config.ts      3 render routes + 1 server route
+vite.config.ts        octane({ dataClient: "src/data.client.ts" })
+tsconfig.json
+package.json
+.prettierrc
+src/
+  App.tsrx            /
+  Counter.tsrx        /counter
+  Books.tsrx          /books — reads and adds books through the store
+  Layout.tsrx         the frame the pages share
+  books.data.ts       the contracts: a Book entity, its view, and addBook
+  data.client.ts      the data client the data worker is built from
+  data.tsrx           the module server function the store calls
+  store.ts            openDataStore("guest")
+  styles.css          the reset and the theme tokens
+  server/data.ts      the handler that serves the contracts
+  server/health.ts    GET /api/health
+```
+
+<!-- /scaffold:data -->
+
+All three open on a page that links back into the documentation, and both are a
 working starting point rather than a directory of things to delete. The palette,
 typography and card styling are [octanejs.dev](https://octanejs.dev)'s own, so a
 new app and the documentation look like one thing; `src/styles.css` holds the

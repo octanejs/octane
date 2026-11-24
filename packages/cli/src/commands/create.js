@@ -72,7 +72,8 @@ export default defineCommand({
 			short: 't',
 			choices: Object.keys(MODES),
 			placeholder: '<name>',
-			description: 'spa for a client-only app, fullstack for routing and SSR.',
+			description:
+				'spa for a client-only app, fullstack for routing and SSR, data for fullstack with octane/data.',
 		},
 		install: {
 			type: 'boolean',

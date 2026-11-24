@@ -1,9 +1,11 @@
 /**
- * The two supported ways to compile Octane.
+ * The templates, over the two supported ways to compile Octane.
  *
  * `spa` wires the compiler plugin only, which is all a client-rendered app
  * needs. `fullstack` wires the metaframework plugin, which adds routing,
- * streaming SSR, hydration, and the production build.
+ * streaming SSR, hydration, and the production build. `data` is `fullstack`
+ * with `octane/data`: a data client the build makes a data worker from, a
+ * contract, its handler, and a page that reads and writes through them.
  */
 export const MODES = {
 	spa: {
@@ -16,7 +18,18 @@ export const MODES = {
 		hint: 'adds octane.config.ts, streaming SSR, hydration, production build',
 		dependencies: [],
 	},
+	data: {
+		label: 'Routing, SSR and data',
+		hint: 'fullstack, plus octane/data: a data worker, a contract and a page that edits it',
+		dependencies: ['zod'],
+	},
 };
+
+/**
+ * Whether `mode` routes and server-renders through the metaframework plugin.
+ * @param {keyof typeof MODES} mode
+ */
+export const isFullstack = (mode) => mode !== 'spa';
 
 /**
  * Which package supplies the Octane plugin, per bundler and mode.
@@ -51,10 +64,12 @@ const INTEGRATIONS = {
  * @returns {{ specifier: string, dependencies: string[], devDependencies: string[] }}
  */
 export function integrationFor(bundler, mode) {
-	const target = INTEGRATIONS[bundler ?? 'vite'] ?? INTEGRATIONS.vite;
+	const target = (INTEGRATIONS[bundler ?? 'vite'] ?? INTEGRATIONS.vite)[
+		isFullstack(mode) ? 'fullstack' : 'spa'
+	];
 	return {
-		specifier: target[mode].specifier,
-		dependencies: ['octane', ...target[mode].packages],
+		specifier: target.specifier,
+		dependencies: ['octane', ...target.packages, ...MODES[mode].dependencies],
 		// TypeScript is installed separately so init can choose a supported line
 		// instead of resolving the plugin's full peer range to its nightly. The
 		// bundler is only ours to install when we are the ones creating its config.
@@ -75,7 +90,7 @@ export const viteConfig = (mode) => `import { defineConfig } from "vite";
 import { octane } from "${integrationFor('vite', mode).specifier}";
 
 export default defineConfig({
-  plugins: [octane()],
+  plugins: [${mode === 'data' ? 'octane({ dataClient: "src/data.client.ts" })' : 'octane()'}],
   build: { target: "esnext" },
 });
 `;
@@ -85,15 +100,24 @@ export default defineConfig({
  * rendering the wrong component. The health endpoint is a `ServerRoute`: it
  * returns a `Response` rather than a component, which is the other half of the
  * app layer and the piece that has no equivalent in the `spa` template.
+ * `data` adds `/books`, the page that reads and writes through its store.
+ *
+ * @param {keyof typeof MODES} mode
  */
-export const octaneConfig = `import { defineConfig, RenderRoute, ServerRoute } from "@octanejs/vite-plugin";
+export const octaneConfig = (
+	mode,
+) => `import { defineConfig, RenderRoute, ServerRoute } from "@octanejs/vite-plugin";
 import { health } from "./src/server/health.ts";
 
 export default defineConfig({
   router: {
     routes: [
       new RenderRoute({ path: "/", entry: ["App", "/src/App.tsrx"] }),
-      new RenderRoute({ path: "/counter", entry: ["Counter", "/src/Counter.tsrx"] }),
+      new RenderRoute({ path: "/counter", entry: ["Counter", "/src/Counter.tsrx"] }),${
+				mode === 'data'
+					? '\n      new RenderRoute({ path: "/books", entry: ["Books", "/src/Books.tsrx"] }),'
+					: ''
+			}
       new ServerRoute({ path: "/api/health", handler: health }),
     ],
   },
@@ -216,7 +240,7 @@ const DOC_LINKS = `const LINKS = [
  * @returns {string}
  */
 export const appComponent = (mode) =>
-	mode === 'fullstack'
+	isFullstack(mode)
 		? `import { Layout } from "./Layout.tsrx";
 
 ${DOC_LINKS}
@@ -330,9 +354,12 @@ export function App() @{
 
 /**
  * The frame the fullstack pages share. `children` is an ordinary prop, typed as
- * `OctaneNode` — the renderable type, never React's `ReactNode`.
+ * `OctaneNode` — the renderable type, never React's `ReactNode`. `data` links
+ * its `/books` page too.
+ *
+ * @param {keyof typeof MODES} mode
  */
-export const layoutComponent = `import type { OctaneNode } from "octane";
+export const layoutComponent = (mode) => `import type { OctaneNode } from "octane";
 
 interface LayoutProps {
   children: OctaneNode;
@@ -385,7 +412,9 @@ export function Layout(props: LayoutProps) @{
     <div class="shell">
       <nav class="nav">
         <a class="nav-link" href="/">Home</a>
-        <a class="nav-link" href="/counter">Counter</a>
+        <a class="nav-link" href="/counter">Counter</a>${
+					mode === 'data' ? '\n        <a class="nav-link" href="/books">Books</a>' : ''
+				}
         <a class={["nav-link", "nav-endpoint"]} href="/api/health">/api/health</a>
       </nav>
       <main class="main">{props.children}</main>
@@ -471,6 +500,246 @@ export const healthRoute = `/**
  */
 export function health(): Response {
   return Response.json({ status: "ok" });
+}
+`;
+
+/**
+ * The `data` template's contracts: one entity, a view of it, and a write that
+ * creates one. Both the server and the browser import this module; declaring
+ * a contract does no I/O. Its `.data.ts` name opts it into the build's
+ * contract check, which also generates `octane/data/manifest`.
+ */
+export const booksContracts = `import { entity, view, write } from "octane/data";
+import { z } from "zod";
+
+const bookShape = z.object({
+  id: z.string(),
+  title: z.string().trim().min(1, "Enter a title").max(80, "Keep titles under 80 characters"),
+});
+export type Book = z.infer<typeof bookShape>;
+
+/** Every read that holds a book shares its fields, so one edit updates each copy. */
+export const Book = entity("book", bookShape);
+
+/** The reading list, kept sorted by the store, so an added book lands in place at once. */
+export const books = view({ name: "books.list", of: Book, order: [["title", "asc"]] });
+
+/** Add a book. The store shows it before the server replies, and removes it if the server refuses. */
+export const addBook = write({
+  name: "books.add",
+  input: bookShape.pick({ title: true }),
+  output: Book.one,
+  creates: Book,
+});
+`;
+
+/**
+ * The handler that serves the contracts. Server code only: it holds the data,
+ * here an in-memory list, and checks each input and output against the
+ * contract's schema.
+ */
+export const booksHandler = `import { createDataHandler } from "octane/data/server";
+import { addBook, books, type Book } from "../books.data.ts";
+
+/** A real app keeps these in a database; this list lasts as long as the server process. */
+const shelf: Book[] = [
+  { id: "1", title: "Kindred" },
+  { id: "2", title: "Piranesi" },
+];
+
+export const handler = createDataHandler({}, (handle) => [
+  // A view's handler serves the window it is asked for, in the view's order.
+  handle(books, ({ offset, limit }) =>
+    [...shelf].sort(books.view.compare).slice(offset, offset + limit),
+  ),
+  // The new book takes the write's operation ID, the ID the page showed it under.
+  handle(addBook, ({ title }, { operationId }) => {
+    const book = { id: operationId, title };
+    shelf.push(book);
+    return book;
+  }),
+]);
+`;
+
+/**
+ * The one door between the browser and the handler: a `module server`
+ * function. The page and the data worker call it like a local function; the
+ * compiler's stub sends each call to the server.
+ */
+export const dataModule = `module server {
+  import type { ServerCallContext } from "octane/server";
+  import { handler } from "./server/data.ts";
+
+  export async function data(request: string, call: ServerCallContext) {
+    return handler.serve(request, call);
+  }
+}
+
+import { data } from "server";
+
+export { data };
+`;
+
+/**
+ * The data client: how the app reaches its server, declared once. The
+ * `dataClient` option in vite.config.ts builds the data worker from it, and
+ * generates `octane/data/client`, whose `openDataStore` opens a page's store
+ * over that worker.
+ */
+export const dataClientModule = `import { defineDataClient, serverTransport } from "octane/data";
+import { data } from "./data.tsrx";
+
+/**
+ * The data worker makes every request, checks each reply against the
+ * contracts' schemas, and keeps the cache, off the page's main thread. Every
+ * tab of an account shares it. Add \`listen\` for realtime feeds and \`persist\`
+ * for an encrypted cache here, too.
+ */
+export default defineDataClient({ transport: serverTransport(data) });
+`;
+
+/** The store a page renders from, opened over the data worker. */
+export const dataStore = `import { openDataStore } from "octane/data/client";
+
+/**
+ * The store of the signed-in account, named by its ID. This app has no
+ * sign-in, so every visitor is "guest"; with one, open a store per account and
+ * reuse it while that account stays signed in.
+ */
+export const store = openDataStore("guest");
+`;
+
+/**
+ * The data page. It reads the list without suspending, so the server renders
+ * its frame and a loading line, hydration starts from the same markup, and the
+ * data worker loads the list in the browser.
+ */
+export const booksComponent = `import { useState } from "octane";
+import { DataError } from "octane/data";
+import { DataProvider, useDataStore, useRead } from "octane/data/octane";
+import { addBook, books } from "./books.data.ts";
+import { Layout } from "./Layout.tsrx";
+import { store } from "./store.ts";
+
+function Shelf() @{
+  const data = useDataStore();
+  const list = useRead(data.read(books), { suspend: false });
+  const [title, setTitle] = useState("");
+  const [problem, setProblem] = useState("");
+
+  const add = async (event: SubmitEvent) => {
+    event.preventDefault();
+    setProblem("");
+    try {
+      // The book shows at once, in order; the store rolls it back if the server refuses.
+      const pending = data.write(addBook, { title });
+      setTitle("");
+      await pending;
+    } catch (error) {
+      setProblem(error instanceof DataError ? (error.issues?.[0]?.message ?? error.code) : "Could not save that book");
+    }
+  };
+
+  <section class="shelf">
+    <style>
+      .shelf {
+        display: flex;
+        width: min(32rem, 100%);
+        flex-direction: column;
+        gap: 1.25rem;
+      }
+      .title {
+        margin: 0;
+        font-size: 2rem;
+        line-height: 1.1;
+        letter-spacing: -0.02em;
+      }
+      .lede,
+      .status {
+        margin: 0;
+        color: var(--text-secondary);
+      }
+      .list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .book {
+        padding: 0.75rem 1rem;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--surface);
+      }
+      .add {
+        display: flex;
+        gap: 0.5rem;
+      }
+      .field {
+        flex: 1;
+        padding: 0.6rem 0.9rem;
+        border: 1px solid var(--border);
+        border-radius: 9999px;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+      }
+      .button {
+        padding: 0.6rem 1.2rem;
+        border: none;
+        border-radius: 9999px;
+        background: var(--accent);
+        color: var(--on-accent);
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .problem {
+        margin: 0;
+        color: var(--accent-text);
+      }
+    </style>
+    <h1 class="title">Reading list</h1>
+    <p class="lede">
+      Loaded and saved through the data worker. Open this page in a second tab:
+      both share one worker, one request, and each other's edits.
+    </p>
+    @if (list.status === "ready") {
+      <ul class="list" aria-label="Books">
+        @for (const book of list.value!; key book.id) {
+          <li class="book">{book.title as string}</li>
+        } @empty {
+          <li class="book">The shelf is empty.</li>
+        }
+      </ul>
+    } @else if (list.status === "error") {
+      <p class="status" role="alert">Could not load the shelf.</p>
+    } @else {
+      <p class="status">Loading the shelf…</p>
+    }
+    <form class="add" onSubmit={add}>
+      <input
+        class="field"
+        aria-label="Book title"
+        value={title}
+        onInput={(event: Event) => setTitle((event.currentTarget as HTMLInputElement).value)}
+      />
+      <button class="button" type="submit">Add</button>
+    </form>
+    @if (problem) {
+      <p class="problem" role="alert">{problem}</p>
+    }
+  </section>
+}
+
+export function Books() @{
+  <Layout>
+    <DataProvider store={store}>
+      <Shelf />
+    </DataProvider>
+  </Layout>
 }
 `;
 
@@ -606,7 +875,7 @@ export const SSR_MARKERS = ['<!--ssr-head-->', '<!--ssr-body-->'];
  * @param {keyof typeof MODES} mode
  * @returns {string}
  */
-export const indexHtml = (mode) => (mode === 'fullstack' ? SSR_INDEX_HTML : SPA_INDEX_HTML);
+export const indexHtml = (mode) => (isFullstack(mode) ? SSR_INDEX_HTML : SPA_INDEX_HTML);
 
 /**
  * The client bootstrap, `spa` only. `render(App)` is the body-and-props
