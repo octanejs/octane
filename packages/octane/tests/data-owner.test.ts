@@ -872,6 +872,48 @@ describe('octane/data previews, writes and feed events validated by the owner', 
 		expect(onPage(calls, 'event')).toEqual([]);
 	});
 
+	it('shows a preview whose validated value is not an object, validated again on the page from what the server sent', async () => {
+		const calls: string[] = [];
+		// Text in, a number out: validating the number again fails.
+		const count = (side: string) =>
+			read({
+				name: 'count',
+				output: {
+					'~standard': {
+						version: 1,
+						vendor: 'test',
+						validate(value) {
+							calls.push(side);
+							return typeof value === 'string'
+								? { value: Number(value) }
+								: { issues: [{ message: 'Expected text' }] };
+						},
+					},
+				} as StandardSchema<unknown, number>,
+			});
+		const owner = createDataOwner({
+			transport: (_request, _signal, preview) => {
+				preview?.('41');
+				return new Promise(() => {});
+			},
+			contracts: [...contracts, count('worker')],
+		});
+		const channel = new MessageChannel();
+		owner.connect(channel.port1);
+		const page = count('page');
+		const store = createReplica(channel.port2, {
+			...replicaOptions,
+			contracts: [...contracts, page],
+		});
+		closers.push(() => (void store.dispose(), channel.port1.close(), channel.port2.close()));
+		const handle = store.read(page);
+		closers.push(handle.subscribe(() => {}));
+		await vi.waitFor(() =>
+			expect(handle.getSnapshot()).toMatchObject({ preview: true, value: 41 }),
+		);
+		expect(calls).toEqual(['worker', 'page']);
+	});
+
 	it('leaves a write reply to the page when a read it returns does not validate in the worker', async () => {
 		const { stores, page, calls } = served({
 			transport: async (request) =>
@@ -887,6 +929,29 @@ describe('octane/data previews, writes and feed events validated by the owner', 
 		await stores[0]!.write(page.move, { start: date(14) });
 		// The page validates the whole reply itself, output included.
 		expect(onPage(calls, 'write')).toEqual(['page write']);
+	});
+});
+
+describe('octane/data contract identity', () => {
+	const shaped = (shape: object): StandardSchema<unknown, { start: string }> => ({
+		'~standard': {
+			version: 1,
+			vendor: 'test',
+			validate: (value: unknown) => ({ value: value as { start: string } }),
+			jsonSchema: { input: () => shape, output: () => shape },
+		} as never,
+	});
+	const build = (writeShape: object, eventShape: object) => [
+		write({ name: 'meeting.move', input: shaped({}), output: shaped(writeShape) }),
+		feed({ name: 'meeting.moved', event: shaped(eventShape), changes: () => [], covers: [] }),
+	];
+	const text = { type: 'object', properties: { start: { type: 'string' } } };
+	const number = { type: 'object', properties: { start: { type: 'number' } } };
+
+	it('tells builds apart by the shape of each write’s output and each feed’s event', () => {
+		expect(contractIdentity(build(text, text))).toBe(contractIdentity(build(text, text)));
+		expect(contractIdentity(build(number, text))).not.toBe(contractIdentity(build(text, text)));
+		expect(contractIdentity(build(text, number))).not.toBe(contractIdentity(build(text, text)));
 	});
 });
 

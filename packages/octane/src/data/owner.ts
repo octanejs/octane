@@ -72,6 +72,7 @@ import {
 	createPersistence,
 	done,
 	request as settled,
+	schemaShape,
 	shape,
 	type Persistence,
 	type PersistOptions,
@@ -715,9 +716,12 @@ export function createDataOwner(options: {
 				.then(() =>
 					transport(payload, asking.abort.signal, (raw) => {
 						if (!validating || !read || payload.kind !== 'read') return show(raw, false);
+						// Only an object can be marked as validated: the tab validates any other value itself.
 						asking.previewing = asking.previewing
 							.then(() => validate(read.output, raw))
-							.then((value) => (value === NOT ? show(raw, false) : show(value, true)));
+							.then((value) =>
+								typeof value === 'object' && value !== null ? show(value, true) : show(raw, false),
+							);
 					}),
 				)
 				.then((reply) => check(payload.name, reply)));
@@ -964,7 +968,9 @@ export function contractIdentity(contracts: ReadonlyArray<Contract>): string {
 		.map((contract) =>
 			contract.kind === 'read'
 				? `read ${contract.name} ${contract.version} ${shape(contract)}`
-				: `${contract.kind} ${contract.name}`,
+				: contract.kind === 'write'
+					? `write ${contract.name} ${schemaShape(contract.output)}`
+					: `feed ${contract.name} ${schemaShape(contract.event)}`,
 		)
 		.sort()
 		.join('\n');

@@ -492,8 +492,9 @@ dependency that shows every edit at once is not built in.
 - For trusted host account lifecycle, opt into `createDataOwner({ fence: 'explicit' })` or `serveDataOwner({ fence: 'explicit' })`. Explicit mode uses a separate account database/channel and a separate persistence partition for each durable account generation, so migration starts with a cold cache and late prior-generation commits cannot appear in a new grant. Only trusted code holding the owner object calls `activate(account)` or `activate(null)`; activation rotates the durable generation, clears the prior generation, and publishes the grant only after that cleanup succeeds. A separate old owner can still finish a previously started commit into its isolated old partition before receiving revocation; the new grant cannot restore it. For physical deletion to be complete when activation resolves, the trusted host must stop and await all old owners before activating the replacement. Replica hello/reopen only joins the active grant. Replica `retire()` and raw persistence-clear messages cannot revoke or erase peers in this mode. Never expose `activate` over an untrusted replica port; explicit mode does not itself authenticate the host, and the host must serialize its account transitions and revoke old windows. The trusted host must authenticate port/account admission and keep one live owner per grant; a fresh owner may adopt the durable grant only when replacing a stopped worker.
 - A replica's reads show pending while its page is frozen. On `resume` it asks
   the owner, and shows them again only once the account is confirmed.
-- A tab's `hello` carries its contract identity: each contract's kind, name,
-  `version` and output schema shape. The first build served sets the owner's;
+- A tab's `hello` carries its contract identity: each contract's kind and
+  name, each read's `version` and output schema shape, each write's output
+  schema shape and each feed's event schema shape. The first build served sets the owner's;
   a tab of another build is refused and carries on as a local store.
 - Tabs and owners check on each other every 5 seconds; three silent intervals
   mean gone. A tab whose owner is gone fences its reads, reopens the worker,
