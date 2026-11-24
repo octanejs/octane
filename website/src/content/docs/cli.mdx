@@ -4,7 +4,7 @@ title: CLI
 
 import { PackageInstall } from '../../components/PackageInstall.tsrx';
 import { FileTree } from '../../components/FileTree.tsrx';
-import { spaFiles, fullstackFiles } from '../scaffold-files.ts';
+import { dataFiles, spaFiles, fullstackFiles } from '../scaffold-files.ts';
 
 <div className="doc-hero">
 	<h1>CLI</h1>
@@ -147,13 +147,14 @@ command reached two ways.
 ```bash
 octane create my-app --template spa        # client-only app
 octane create my-app --template fullstack  # routing, SSR, and a server route
+octane create my-app --template data       # fullstack, plus octane/data
 ```
 
 Leave an argument off and you are asked for it. Dependencies are installed with
 the package manager that ran the command, since a directory this new has no
 lockfile to go by; `--no-install` skips that and prints the list instead.
 
-Both templates open on a landing page that links back into these docs, and both
+Every template opens on a landing page that links back into these docs, and each
 are a working starting point rather than a directory of things to delete.
 `spa` mounts one component into an `index.html`:
 
@@ -164,6 +165,15 @@ arrives server-rendered and becomes interactive on hydration, and an endpoint
 that returns a `Response` instead of a component:
 
 <FileTree label="Files created by the fullstack template" entries={fullstackFiles} />
+
+`data` is `fullstack` with [`octane/data`](/docs/data): a reading list at
+`/books` that loads and adds books through a data worker. The build makes the
+worker from `src/data.client.ts`, the one module that says how the app reaches
+its server, so requests, schema checks and the cache stay off the page's main
+thread, and every tab of the account shares them. The page server-renders its
+frame and a loading line, then the data worker loads the list in the browser:
+
+<FileTree label="Files created by the data template" entries={dataFiles} />
 
 The palette, typography and card styling are this site's own, so a new app and
 these docs look like one thing. `src/styles.css` holds the tokens and both
@@ -185,6 +195,7 @@ settings `.tsrx` needs, the scripts, and the dependencies. This is the same work
 ```bash
 octane init --mode spa        # client-only app
 octane init --mode fullstack  # routing, SSR, and a production build
+octane init --mode data       # fullstack, plus octane/data
 ```
 
 `spa` wires `octane/compiler/vite`. `fullstack` wires `@octanejs/vite-plugin`

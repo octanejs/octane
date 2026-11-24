@@ -22,6 +22,25 @@
       "src/Layout.tsrx",
       "src/styles.css",
       "src/server/health.ts"
+    ],
+    "data": [
+      ".prettierrc",
+      "index.html",
+      "octane.config.ts",
+      "package.json",
+      "tsconfig.json",
+      "vite.config.ts",
+      "src/App.tsrx",
+      "src/Books.tsrx",
+      "src/Counter.tsrx",
+      "src/Layout.tsrx",
+      "src/books.data.ts",
+      "src/data.client.ts",
+      "src/data.tsrx",
+      "src/store.ts",
+      "src/styles.css",
+      "src/server/data.ts",
+      "src/server/health.ts"
     ]
   }
 }

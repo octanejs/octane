@@ -53,3 +53,16 @@ export const fullstackFiles = scaffoldTemplate('fullstack', {
 	'octane.config.ts': 'routes',
 	'src/server/health.ts': 'GET /api/health',
 });
+
+export const dataFiles = scaffoldTemplate('data', {
+	'index.html': 'SSR markers',
+	'octane.config.ts': 'routes',
+	'vite.config.ts': 'dataClient',
+	'src/Books.tsrx': '/books, reads and adds books',
+	'src/books.data.ts': 'contracts',
+	'src/data.client.ts': 'the data worker is built from it',
+	'src/data.tsrx': 'module server function',
+	'src/store.ts': 'openDataStore',
+	'src/server/data.ts': 'the contracts’ handler',
+	'src/server/health.ts': 'GET /api/health',
+});

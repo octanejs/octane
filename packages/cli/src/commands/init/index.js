@@ -13,12 +13,19 @@ import {
 	SSR_MARKERS,
 	VITE_SCRIPTS,
 	appComponent,
+	booksComponent,
+	booksContracts,
+	booksHandler,
 	clientEntry,
 	counterComponent,
+	dataClientModule,
+	dataModule,
+	dataStore,
 	globalStyles,
 	healthRoute,
 	indexHtml,
 	integrationFor,
+	isFullstack,
 	layoutComponent,
 	octaneConfig,
 	prettierConfig,
@@ -333,6 +340,12 @@ function plan(project, mode, integration, nativeTypeScript) {
 				: 'then include octane() in the plugins array.',
 		);
 	}
+	// The data worker is built from the data client only once the plugin is told where it is.
+	if (mode === 'data' && project.bundlerConfigPath && !bundlerConfig.includes('dataClient')) {
+		manual.push(
+			`In ${configFile}, pass dataClient: "src/data.client.ts" to octane(): the build makes the data worker from it.`,
+		);
+	}
 	// TanStack's generator lists only .ts/.tsx/.js/.jsx route files, so the
 	// route tree it writes would drop every .tsrx route. Start's own generator
 	// reads .tsrx; a plain app keeps the tree it has.
@@ -354,18 +367,21 @@ function plan(project, mode, integration, nativeTypeScript) {
 	// it is the low-level integration where the app owns its own shell.
 	const scaffoldsVite = project.bundler === null || project.bundler === 'vite';
 
-	if (mode === 'fullstack' && !scaffoldsVite) {
+	if (isFullstack(mode) && !scaffoldsVite) {
 		manual.push(
 			`Add an octane.config.ts for ${project.bundler}: see https://octanejs.dev/docs/build-tools`,
 		);
 	}
 
 	if (scaffoldsVite) {
-		if (mode === 'fullstack' && !project.octaneConfigPath) {
+		if (isFullstack(mode) && !project.octaneConfigPath) {
 			changes.push({
 				file: 'octane.config.ts',
-				summary: 'create, with routes for /, /counter, and GET /api/health',
-				apply: writeFile(at('octane.config.ts'), octaneConfig),
+				summary:
+					mode === 'data'
+						? 'create, with routes for /, /counter, /books, and GET /api/health'
+						: 'create, with routes for /, /counter, and GET /api/health',
+				apply: writeFile(at('octane.config.ts'), octaneConfig(mode)),
 			});
 		}
 
@@ -384,8 +400,9 @@ function plan(project, mode, integration, nativeTypeScript) {
 		if (writesShell) {
 			changes.push({
 				file: 'index.html',
-				summary:
-					mode === 'fullstack' ? 'create, carrying the SSR markers' : 'create, loading src/main.ts',
+				summary: isFullstack(mode)
+					? 'create, carrying the SSR markers'
+					: 'create, loading src/main.ts',
 				apply: writeFile(at('index.html'), indexHtml(mode)),
 			});
 			if (writesClientEntry) {
@@ -395,7 +412,7 @@ function plan(project, mode, integration, nativeTypeScript) {
 					apply: writeFile(at('src/main.ts'), clientEntry),
 				});
 			}
-		} else if (mode === 'fullstack') {
+		} else if (isFullstack(mode)) {
 			// Their index.html is theirs to edit, and splicing markers into
 			// arbitrary HTML is the same guesswork as rewriting a bundler config.
 			const html = readFileSync(at('index.html'), 'utf8');
@@ -413,18 +430,21 @@ function plan(project, mode, integration, nativeTypeScript) {
 		// behind them were never declared. A missing entry in someone's own config
 		// is a real problem, but it is `octane doctor`'s to report, not this
 		// command's to paper over with a page they did not ask for.
-		const scaffoldsRoutes = mode === 'fullstack' && !project.octaneConfigPath;
+		const scaffoldsRoutes = isFullstack(mode) && !project.octaneConfigPath;
 		// spa needs the component only alongside the entry that imports it, so a
 		// project with its own page does not collect an orphan component. That is
 		// the entry this run writes, not the shell: keeping someone's src/main.ts
 		// means keeping whatever it imports, which is not this file.
 		const writesApp = (scaffoldsRoutes || writesClientEntry) && !existsSync(at('src/App.tsrx'));
 		const writesCounter = scaffoldsRoutes && !existsSync(at('src/Counter.tsrx'));
+		const writesBooks = scaffoldsRoutes && mode === 'data' && !existsSync(at('src/Books.tsrx'));
 		// Both fullstack pages import the layout, so it follows whichever of them
 		// this run writes: writing one of those pages without it would scaffold an
 		// app whose own import does not resolve.
 		const writesLayout =
-			mode === 'fullstack' && (writesApp || writesCounter) && !existsSync(at('src/Layout.tsrx'));
+			isFullstack(mode) &&
+			(writesApp || writesCounter || writesBooks) &&
+			!existsSync(at('src/Layout.tsrx'));
 
 		// The components this run scaffolds, in the order the app reads: the entry,
 		// the frame it renders through, then the second page. Collected as a list
@@ -436,18 +456,17 @@ function plan(project, mode, integration, nativeTypeScript) {
 		if (writesApp) {
 			pages.push({
 				file: 'src/App.tsrx',
-				summary:
-					mode === 'fullstack'
-						? 'create the route entry referenced by octane.config.ts'
-						: 'create the entry component',
+				summary: isFullstack(mode)
+					? 'create the route entry referenced by octane.config.ts'
+					: 'create the entry component',
 				body: appComponent(mode),
 			});
 		}
 		if (writesLayout) {
 			pages.push({
 				file: 'src/Layout.tsrx',
-				summary: 'create the frame both pages share',
-				body: layoutComponent,
+				summary: 'create the frame the pages share',
+				body: layoutComponent(mode),
 			});
 		}
 		if (writesCounter) {
@@ -455,6 +474,13 @@ function plan(project, mode, integration, nativeTypeScript) {
 				file: 'src/Counter.tsrx',
 				summary: 'create the route entry for /counter',
 				body: counterComponent,
+			});
+		}
+		if (writesBooks) {
+			pages.push({
+				file: 'src/Books.tsrx',
+				summary: 'create the route entry for /books, reading and adding books',
+				body: booksComponent,
 			});
 		}
 		for (const page of pages) {
@@ -467,6 +493,24 @@ function plan(project, mode, integration, nativeTypeScript) {
 
 		// Not a page: it renders nothing and reads no tokens, so it is deliberately
 		// outside the list above.
+		// The data page's contracts, their handler, and the data client the build makes
+		// the data worker from. They follow the page that uses them, like the layout.
+		if (writesBooks) {
+			for (const [file, body, summary] of [
+				['src/books.data.ts', booksContracts, 'create the reading list’s contracts'],
+				['src/server/data.ts', booksHandler, 'create the handler that serves them'],
+				['src/data.tsrx', dataModule, 'create the module server function the store calls'],
+				[
+					'src/data.client.ts',
+					dataClientModule,
+					'create the data client the data worker is built from',
+				],
+				['src/store.ts', dataStore, 'create the store the page reads from'],
+			]) {
+				if (!existsSync(at(file)))
+					changes.push({ file, summary, apply: writeFile(at(file), body) });
+			}
+		}
 		if (scaffoldsRoutes && !existsSync(at('src/server/health.ts'))) {
 			changes.push({
 				file: 'src/server/health.ts',
@@ -763,7 +807,8 @@ export default defineCommand({
 			type: 'string',
 			choices: Object.keys(MODES),
 			placeholder: '<mode>',
-			description: 'spa for a client-only app, fullstack for routing and SSR.',
+			description:
+				'spa for a client-only app, fullstack for routing and SSR, data for fullstack with octane/data.',
 		},
 		install: {
 			type: 'boolean',

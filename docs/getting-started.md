@@ -30,13 +30,16 @@ building, or you can answer up front:
 ```bash
 npm create octane my-app -- --template spa        # client-only app
 npm create octane my-app -- --template fullstack  # routing, SSR, and a server route
+npm create octane my-app -- --template data       # fullstack, plus octane/data
 ```
 
 npm needs that `--` to forward the flag; pnpm and yarn forward it already, so
 drop it there. `spa` is a client-only app: the compiler plugin, an `index.html`,
 and an entry that mounts one component. `fullstack` adds `octane.config.ts`, a
 second page, streaming SSR, hydration, a `GET /api/health` server route, and a
-production build. Both open on a page that links back into the documentation.
+production build. `data` is `fullstack` with `octane/data`: a reading list
+loaded and saved through a data worker the build makes from one data client
+module. All three open on a page that links back into the documentation.
 
 `--no-install` skips the install and prints the dependency list instead. The
 scaffolder is `octane create`; see the

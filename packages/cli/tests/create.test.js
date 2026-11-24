@@ -171,6 +171,49 @@ describe('octane create', () => {
 		expect(html).toContain('<link rel="stylesheet" href="/src/styles.css" />');
 	});
 
+	it('creates a routed app whose /books page reads and writes through a data worker built from its data client', async () => {
+		const cwd = workspace();
+
+		const result = await create([
+			'my-app',
+			'--cwd',
+			cwd,
+			'--template',
+			'data',
+			'--yes',
+			'--no-install',
+			'--json',
+		]);
+		const app = path.join(cwd, 'my-app');
+
+		expect(result.exitCode).toBe(0);
+		// The fullstack app, with a third route and a frame that links to it.
+		const config = read(app, 'octane.config.ts');
+		expect(config).toContain('new RenderRoute({ path: "/", entry: ["App", "/src/App.tsrx"] })');
+		expect(config).toContain(
+			'new RenderRoute({ path: "/books", entry: ["Books", "/src/Books.tsrx"] })',
+		);
+		expect(read(app, 'src/Layout.tsrx')).toContain('href="/books"');
+		expect(read(app, 'index.html')).toContain('<!--ssr-body-->');
+
+		// The build makes the data worker and `octane/data/client` from the one data client.
+		expect(read(app, 'vite.config.ts')).toContain('octane({ dataClient: "src/data.client.ts" })');
+		expect(read(app, 'src/data.client.ts')).toContain('export default defineDataClient(');
+		expect(read(app, 'src/store.ts')).toContain('openDataStore("guest")');
+
+		// Every import the page makes resolves to a file this run wrote, exporting what it names.
+		const page = read(app, 'src/Books.tsrx');
+		expect(page).toContain('export function Books()');
+		expect(page).toContain('from "./store.ts"');
+		expect(page).toContain('from "./books.data.ts"');
+		expect(read(app, 'src/books.data.ts')).toMatch(/export const books = view\(/);
+		expect(read(app, 'src/books.data.ts')).toMatch(/export const addBook = write\(/);
+		expect(read(app, 'src/data.tsrx')).toContain('export async function data(');
+		expect(read(app, 'src/server/data.ts')).toContain('handle(addBook,');
+		// The contracts' schemas are zod's, which this template installs.
+		expect(result.json().manual.join(' ')).toContain('zod');
+	});
+
 	it('scaffolds inside a working tree that has unrelated changes', async () => {
 		// `init` refuses a dirty tree so `git diff` stays a usable review of what
 		// it wrote. That reasoning is about a project someone already has, and a
