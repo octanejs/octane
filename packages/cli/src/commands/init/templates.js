@@ -104,20 +104,56 @@ export default defineConfig({
  *
  * @param {keyof typeof MODES} mode
  */
-export const octaneConfig = (
-	mode,
-) => `import { defineConfig, RenderRoute, ServerRoute } from "@octanejs/vite-plugin";
+export const octaneConfig = (mode) =>
+	mode === 'data'
+		? DATA_OCTANE_CONFIG
+		: `import { defineConfig, RenderRoute, ServerRoute } from "@octanejs/vite-plugin";
 import { health } from "./src/server/health.ts";
 
-export default defineConfig({${mode === 'data' ? '\n  data: "/src/store.ts",' : ''}
+export default defineConfig({
   router: {
     routes: [
       new RenderRoute({ path: "/", entry: ["App", "/src/App.tsrx"] }),
-      new RenderRoute({ path: "/counter", entry: ["Counter", "/src/Counter.tsrx"] }),${
-				mode === 'data'
-					? '\n      new RenderRoute({ path: "/books", entry: ["Books", "/src/Books.tsrx"] }),'
-					: ''
-			}
+      new RenderRoute({ path: "/counter", entry: ["Counter", "/src/Counter.tsrx"] }),
+      new ServerRoute({ path: "/api/health", handler: health }),
+    ],
+  },
+});
+`;
+
+/**
+ * The \`data\` template's routes, inside the store \`src/store.ts\` opens. \`/books\`
+ * runs its native form submissions first, so adding a book works before the
+ * page hydrates and without JavaScript.
+ */
+const DATA_OCTANE_CONFIG = `import { defineConfig, RenderRoute, ServerRoute, type Middleware } from "@octanejs/vite-plugin";
+import { FORMS } from "./src/books.data.ts";
+import { handler } from "./src/server/data.ts";
+import { health } from "./src/server/health.ts";
+
+/**
+ * A native form post to the page: an accepted one answers with a redirect back
+ * to it; a refused one renders the page again, with what was typed and why.
+ * The session goes to src/store.ts through \`context.state\`, and from there
+ * into the page with the store's seed.
+ */
+const forms: Middleware = async (context, next) => {
+  const session = await handler.forms(context.request, context);
+  if (session.response) return session.response;
+  context.state.set(FORMS, session);
+  const page = await next();
+  return session.status === 200
+    ? page
+    : new Response(page.body, { status: session.status, headers: page.headers });
+};
+
+export default defineConfig({
+  data: "/src/store.ts",
+  router: {
+    routes: [
+      new RenderRoute({ path: "/", entry: ["App", "/src/App.tsrx"] }),
+      new RenderRoute({ path: "/counter", entry: ["Counter", "/src/Counter.tsrx"] }),
+      new RenderRoute({ path: "/books", entry: ["Books", "/src/Books.tsrx"], before: [forms] }),
       new ServerRoute({ path: "/api/health", handler: health }),
     ],
   },
@@ -524,13 +560,21 @@ export const Book = entity("book", bookShape);
 /** The reading list, kept sorted by the store, so an added book lands in place at once. */
 export const books = view({ name: "books.list", of: Book, order: [["title", "asc"]] });
 
-/** Add a book. The store shows it before the server replies, and removes it if the server refuses. */
+/**
+ * Add a book. The store shows it before the server replies, and removes it if
+ * the server refuses. Its \`form\` fields let a native form post it too, before
+ * the page hydrates or without JavaScript.
+ */
 export const addBook = write({
   name: "books.add",
   input: bookShape.pick({ title: true }),
   output: Book.one,
   creates: Book,
+  form: { title: "text" },
 });
+
+/** Where octane.config.ts keeps a page's form session for src/store.ts. */
+export const FORMS = "books.forms";
 `;
 
 /**
@@ -547,7 +591,14 @@ const shelf: Book[] = [
   { id: "2", title: "Piranesi" },
 ];
 
-export const handler = createDataHandler({}, (handle) => [
+/**
+ * Signs the tokens that tie a native form post to the page that served it. Set
+ * FORMS_SECRET once more than one server process serves the app; without it,
+ * each process signs with a secret of its own, which a restart replaces.
+ */
+const secret = process.env.FORMS_SECRET ?? crypto.randomUUID();
+
+export const handler = createDataHandler({ secret }, (handle) => [
   // A view's handler serves the window it is asked for, in the view's order.
   handle(books, ({ offset, limit }) =>
     [...shelf].sort(books.view.compare).slice(offset, offset + limit),
@@ -605,8 +656,9 @@ export default defineDataClient({ transport: serverTransport(data) });
  * from that seed.
  */
 export const dataStore = `import type { Context } from "@octanejs/vite-plugin";
-import { createDataStore, serverTransport } from "octane/data";
+import { createDataStore, serverTransport, type FormSeed } from "octane/data";
 import { openDataStore } from "octane/data/client";
+import { FORMS } from "./books.data.ts";
 import { data } from "./data.tsrx";
 
 /**
@@ -619,7 +671,11 @@ import { data } from "./data.tsrx";
  * store is the account's, over the data worker, which every tab shares.
  */
 export default function open(seed: string | null, context: Context | null) {
-  if (context) return createDataStore({ transport: serverTransport(data) });
+  if (context) {
+    // A native form post's outcome, which the page shows and its seed carries.
+    const form = (context.state.get(FORMS) as { form: FormSeed } | undefined)?.form;
+    return createDataStore({ transport: serverTransport(data), form });
+  }
   // This app has no sign-in, so every visitor is "guest". With one, name the
   // signed-in account, and open a new store when another signs in.
   return openDataStore("guest", { seed });
@@ -629,32 +685,20 @@ export default function open(seed: string | null, context: Context | null) {
 /**
  * The data page. The router renders it inside the store \`src/store.ts\` opens,
  * so it reads with no store code of its own: the server renders the list, and
- * the browser's store starts from what the server loaded.
+ * the browser's store starts from what the server loaded. It has no \`@pending\`
+ * arm on purpose: the server waits for the list before it sends the page, so
+ * the page is whole without JavaScript, and hydration has nothing to wait for.
  */
-export const booksComponent = `import { useState } from "octane";
-import { DataError } from "octane/data";
-import { useDataStore, useRead } from "octane/data/octane";
+export const booksComponent = `import { useDataStore, useForm, useRead } from "octane/data/octane";
 import { addBook, books } from "./books.data.ts";
 import { Layout } from "./Layout.tsrx";
 
 function Shelf() @{
-  const data = useDataStore();
-  const list = useRead(data.read(books));
-  const [title, setTitle] = useState("");
-  const [problem, setProblem] = useState("");
-
-  const add = async (event: SubmitEvent) => {
-    event.preventDefault();
-    setProblem("");
-    try {
-      // The book shows at once, in order; the store rolls it back if the server refuses.
-      const pending = data.write(addBook, { title });
-      setTitle("");
-      await pending;
-    } catch (error) {
-      setProblem(error instanceof DataError ? (error.issues?.[0]?.message ?? error.code) : "Could not save that book");
-    }
-  };
+  const list = useRead(useDataStore().read(books));
+  // Posts natively until the page hydrates, and through the store once it has:
+  // the book then shows at once, in order, and goes away if the server refuses.
+  const add = useForm(addBook);
+  const problem = add.issues.title ?? (add.error ? "Could not save that book" : "");
 
   <section class="shelf">
     <style>
@@ -718,8 +762,9 @@ function Shelf() @{
     </style>
     <h1 class="title">Reading list</h1>
     <p class="lede">
-      Rendered on the server, then saved through the data worker. Open this page
-      in a second tab: both share one worker and each other's edits.
+      Rendered on the server, then saved through the data worker. Adding works
+      before the page hydrates, and without JavaScript. Open this page in a
+      second tab: both share one worker and each other's edits.
     </p>
     <ul class="list" aria-label="Books">
       @for (const book of list; key book.id) {
@@ -728,12 +773,14 @@ function Shelf() @{
         <li class="book">The shelf is empty.</li>
       }
     </ul>
-    <form class="add" onSubmit={add}>
+    <form class="add" {...add.attrs}>
+      {add.hidden()}
       <input
         class="field"
+        name="title"
         aria-label="Book title"
-        value={title}
-        onInput={(event: Event) => setTitle((event.currentTarget as HTMLInputElement).value)}
+        aria-invalid={problem ? "true" : undefined}
+        defaultValue={add.values.title ?? ""}
       />
       <button class="button" type="submit">Add</button>
     </form>
@@ -747,8 +794,6 @@ export function Books() @{
   <Layout>
     @try {
       <Shelf />
-    } @pending {
-      <p>Loading the shelf…</p>
     } @catch {
       <p role="alert">Could not load the shelf.</p>
     }

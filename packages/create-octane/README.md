@@ -74,7 +74,8 @@ the app reaches its server, so requests, schema checks and the cache stay off
 the page's main thread, and every tab shares them. `src/store.ts` is the
 config's `data` module: the server renders the list in a store of its own and
 writes what it loaded into the page, and the browser's store starts from that,
-so hydration loads nothing.
+so hydration loads nothing. Adding a book is a native form: it works before
+the page hydrates and without JavaScript, and through the store once it has.
 
 <!-- scaffold:data -->
 
