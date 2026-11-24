@@ -8,6 +8,8 @@ type Setter<T> = (next: T | ((previous: T) => T)) => void;
 type State<T> = [T, Setter<T>, ...unknown[]];
 type StateWithGetter<T> = [T, Setter<T>, () => T];
 type Dependencies = readonly unknown[] | null;
+// Match the authored hook's NoInfer return type in adapters built with TypeScript 5.3.
+type InitialValue<T> = [T][T extends unknown ? 0 : never];
 
 /**
  * Stable facade consumed by the Valdi writer compiler. Prototype, constructor,
@@ -110,6 +112,8 @@ export type ValdiChild<Element = object> =
 /** A registered component descriptor. Its return representation belongs to the adapter. */
 export type ValdiComponent<Props = object, Element = object> = (props: Props) => Element;
 
+type MemoComponent<C> = C & { readonly type: C; displayName?: string };
+
 export interface ValdiContext<Value, Element = object> extends ValdiComponent<
 	{ value: Value; children?: ValdiChild<Element> },
 	Element
@@ -153,6 +157,17 @@ export interface ValdiComponentRuntimeAdapter<
 		options: { hasHooks: boolean },
 	): ValdiComponent<Props, Element>;
 	getValdiComponentConstructor(component: ValdiComponent<any, Element>): Constructor;
+	memo?<C extends ValdiComponent<any, Element>>(
+		component: C,
+		arePropsEqual?: (
+			previous: Readonly<Parameters<C>[0]>,
+			next: Readonly<Parameters<C>[0]>,
+		) => boolean,
+	): MemoComponent<C>;
+	memo?<Props>(
+		component: ValdiComponent<Props, Element>,
+		arePropsEqual?: (previous: Readonly<Props>, next: Readonly<Props>) => boolean,
+	): MemoComponent<ValdiComponent<Props, Element>>;
 	createValdiChildren(render: () => void): Element;
 	createContext<Value>(defaultValue: Value): ValdiContext<Value, Element>;
 	useContext<Value>(context: ValdiContext<Value, Element>): Value;
@@ -187,6 +202,10 @@ export interface ValdiComponentRuntimeAdapter<
 		slot?: ValdiHookSlot,
 	): StateWithGetter<unknown extends Previous ? Value : Previous>;
 	useId(slot?: ValdiHookSlot): string;
+	useInitialValue?<Value>(
+		initial: Value | (() => Value),
+		slot?: ValdiHookSlot,
+	): InitialValue<Value>;
 	useLazyRef<Value>(create: () => Value, slot?: ValdiHookSlot): { current: Value };
 	useLayoutSnapshot<Value>(
 		measure: () => Value,

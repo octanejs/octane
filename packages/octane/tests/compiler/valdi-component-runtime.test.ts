@@ -27,6 +27,21 @@ describe('Valdi component runtime capability', () => {
 		).toThrow(/runtime import "useEffect"/);
 	});
 
+	it.each([
+		[
+			'import { memo } from "octane"; export const Row = memo(() => <view />);',
+			/runtime import "memo"/,
+		],
+		['export function Row(p) @{ <{p.rows[p.id]} /> }', /dynamic component tags/],
+	] as const)('keeps component-runtime syntax opt-in: %s', (source, diagnostic) => {
+		expect(() =>
+			compile(source, '/src/Row.tsrx', {
+				renderer: { ...renderer, capabilities: ['host-text-site'] },
+				hmr: false,
+			}),
+		).toThrow(diagnostic);
+	});
+
 	it('requires host-text-site because ABI 4 children use renderText', () => {
 		expect(() =>
 			compile('export function Scene() @{ <view /> }', '/src/Scene.tsrx', {
@@ -58,10 +73,10 @@ describe('Valdi component runtime capability', () => {
 	});
 
 	it('projects component values and native child types into both authoring views', () => {
-		const input = `import { createContext, useContext, useEffect } from 'octane';
+		const input = `import { createContext, useContext, useEffect, memo as cache, useInitialValue } from 'octane';
 import type { Context, OctaneNode } from 'octane';
 const Theme: Context<string> = createContext('light');
-export function Scene(props: { children?: OctaneNode }) @{ const theme = useContext(Theme); useEffect(() => {}); <view>{props.children}{theme}</view> }`;
+export const Scene = cache(function Scene(props: { children?: OctaneNode }) @{ const theme = useContext(Theme); const first = useInitialValue(theme); useEffect(() => {}); <view>{props.children}{first}</view> });`;
 		const { id, ...entry } = renderer;
 		const options = {
 			renderers: {
@@ -92,8 +107,10 @@ export function Scene(props: { children?: OctaneNode }) @{ const theme = useCont
 			const result = project(input, '/src/Scene.native.tsrx', options);
 			expect(imports(result.code)).toEqual([
 				['octane', 'useEffect', 'useEffect'],
+				['octane', 'useInitialValue', 'useInitialValue'],
 				[renderer.module, 'createContext', 'createContext'],
 				[renderer.module, 'useContext', 'useContext'],
+				[renderer.module, 'memo', 'cache'],
 				[renderer.module, 'Context', 'Context'],
 				[renderer.module, 'ValdiChild', 'OctaneNode'],
 			]);

@@ -16,6 +16,8 @@ export const VALDI_COMPONENT_RUNTIME = new Set([
 	'useEffectEvent',
 	'useLinkedState',
 	'useId',
+	'useInitialValue',
+	'memo',
 	'useLayoutSnapshot',
 	'useLazyRef',
 	'flushSync',
@@ -41,6 +43,7 @@ const RUNTIME_TYPES = new Map([
 // Hooks retain Octane's authored signatures, including compiler-selected getter
 // tuples. Component values need the host's children and descriptor contracts.
 const COMPONENT_VALUES = new Set([
+	'memo',
 	'createContext',
 	'useContext',
 	'ErrorBoundary',

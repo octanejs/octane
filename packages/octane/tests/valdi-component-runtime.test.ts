@@ -32,6 +32,15 @@ function fixture(source: string, dev: boolean, abi = 4) {
 	};
 	const adapter = {
 		...recorder.adapter,
+		useInitialValue(value: unknown, slot: unknown) {
+			return recorder.adapter.useState(value, slot)[0];
+		},
+		memo(component: (props: any) => void, compare?: (a: any, b: any) => boolean) {
+			const body = recorder.adapter.getValdiComponentConstructor(component);
+			return Object.assign(recorder.adapter.defineValdiComponent(body, { hasHooks: false }), {
+				compare,
+			});
+		},
 		createValdiChildren(render: () => void): Deferred {
 			return { render };
 		},
@@ -59,36 +68,93 @@ describe.each([false, true])('Valdi component runtime in dev=%s', (dev) => {
 		]);
 	});
 
-	it('uses the dynamic descriptor in component identity and evaluates it before prop spreads', () => {
-		const { module, render, keys } = fixture(
-			`export function First(props) @{ <label value={props.value} /> }
-			 export function Second(props) @{ <badge value={props.value} /> }
-			 export function Scene(props) @{ <props.Component {...props.spread()} /> }`,
+	it('retains each initial value from its first render, even at a conditional site', () => {
+		const { module, render } = fixture(
+			`import { useInitialValue as initial } from 'octane';
+			 export function Scene(props) @{
+				 let first;
+				 if (props.show) first = initial(() => props.value);
+				 const second = initial(props.value);
+				 <label first={first} second={second} />
+			 }`,
 			dev,
 		);
-		const order: string[] = [];
-		let selected = module['First'];
-		const props = {
-			get Component() {
-				order.push('component');
-				return selected;
-			},
-			spread() {
-				order.push('spread');
-				return { value: 'visible' };
-			},
-		};
-		expect(render(module['Scene'], props)[0]).toMatchObject({
-			tag: 'label',
-			props: { value: 'visible' },
-		});
-		expect(render(module['Scene'], props)[0].tag).toBe('label');
-		selected = module['Second'];
-		expect(render(module['Scene'], props)[0].tag).toBe('badge');
-		expect(keys[0]).toBe(keys[1]);
-		expect(keys[2]).not.toBe(keys[1]);
-		expect(order).toEqual(['component', 'spread', 'component', 'spread', 'component', 'spread']);
+		const show = (value: number, show: boolean) =>
+			render(module['Scene'], { value, show })[0].props;
+		expect(show(2, false)['second']).toBe(2);
+		expect(show(3, true)).toMatchObject({ first: 3, second: 2 });
+		expect(show(4, true)).toMatchObject({ first: 3, second: 2 });
 	});
+
+	it('registers hoisted memo bodies and keeps recursive names local to the default export', () => {
+		const { module, render } = fixture(
+			`import { memo as cache } from 'octane';
+			 export const equal = (a, b) => a.n === b.n;
+			 const Empty = cache(() => null);
+			 export const registry = { Empty, Row: cache(Row) };
+			 function Row() @{ <badge /> }
+			 export default cache(function Row(props) @{
+				 <frame n={props.n}>@if (props.n > 1) { <Row n={props.n - 1} /> }</frame>
+			 }, equal);`,
+			dev,
+		);
+		expect(module['default'].compare).toBe(module['equal']);
+		const root = render(module['default'], { n: 2 })[0];
+		expect(root).toMatchObject({ tag: 'frame', props: { n: 2 }, children: [{ props: { n: 1 } }] });
+		expect(render(module['registry'].Row, {})[0].tag).toBe('badge');
+		expect(render(module['registry'].Empty, {})).toEqual([]);
+	});
+
+	it('resolves a computed identifier in its lexical scope', () => {
+		const { module, render } = fixture(
+			`function row() { return 'kept'; }
+			 export const value = row();
+			 export function Label() @{ <label /> }
+			 export function Scene({ row }) @{ <{row} /> }`,
+			dev,
+		);
+		expect(module['value']).toBe('kept');
+		expect(render(module['Scene'], { row: module['Label'] })[0].tag).toBe('label');
+	});
+
+	it('rejects a literal host name in a computed component tag', () => {
+		expect(() => fixture('export function Scene() @{ <{"view"} /> }', dev)).toThrow(/descriptor/);
+	});
+
+	it.each(['props.Component', '{props[props.name]}'])(
+		'keys <%s /> by its descriptor and reads it before prop spreads',
+		(tag) => {
+			const { module, render, keys } = fixture(
+				`export function First(props) @{ <label value={props.value} /> }
+			 export function Second(props) @{ <badge value={props.value} /> }
+			 export function Scene(props) @{ <${tag} {...props.spread()} /> }`,
+				dev,
+			);
+			const order: string[] = [];
+			let selected = module['First'];
+			const props = {
+				name: 'Component',
+				get Component() {
+					order.push('component');
+					return selected;
+				},
+				spread() {
+					order.push('spread');
+					return { value: 'visible' };
+				},
+			};
+			expect(render(module['Scene'], props)[0]).toMatchObject({
+				tag: 'label',
+				props: { value: 'visible' },
+			});
+			expect(render(module['Scene'], props)[0].tag).toBe('label');
+			selected = module['Second'];
+			expect(render(module['Scene'], props)[0].tag).toBe('badge');
+			expect(keys[0]).toBe(keys[1]);
+			expect(keys[2]).not.toBe(keys[1]);
+			expect(order).toEqual(['component', 'spread', 'component', 'spread', 'component', 'spread']);
+		},
+	);
 
 	it('rejects an adapter without ABI 4 before component registration', () => {
 		expect(() => fixture('export function Scene() @{ <view /> }', dev, 3)).toThrow(

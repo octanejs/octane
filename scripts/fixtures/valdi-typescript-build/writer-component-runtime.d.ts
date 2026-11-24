@@ -26,6 +26,7 @@ export type ValdiComponent<Props = object> = Component<Props, Element>;
 
 export declare const assertValdiCompilerAbi: Adapter['assertValdiCompilerAbi'];
 export declare const defineValdiComponent: Adapter['defineValdiComponent'];
+export declare const memo: NonNullable<Adapter['memo']>;
 export declare const getValdiComponentConstructor: Adapter['getValdiComponentConstructor'];
 export declare const createValdiChildren: Adapter['createValdiChildren'];
 export declare const valdiKey: Adapter['valdiKey'];
@@ -47,6 +48,7 @@ export declare const useEffectEvent: Adapter['useEffectEvent'];
 export declare const useLinkedState: Adapter['useLinkedState'];
 export declare const __useLinkedStateWithGetter: Adapter['__useLinkedStateWithGetter'];
 export declare const useId: Adapter['useId'];
+export declare const useInitialValue: NonNullable<Adapter['useInitialValue']>;
 export declare const useLazyRef: Adapter['useLazyRef'];
 export declare const useLayoutSnapshot: Adapter['useLayoutSnapshot'];
 export declare const flushSync: Adapter['flushSync'];
