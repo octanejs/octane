@@ -32,6 +32,12 @@ const renderer = {
 	text: 'reject',
 } as const;
 
+const componentOptions = {
+	renderer: { ...renderer, text: 'host', capabilities: ['host-text-site', 'component-runtime'] },
+	hmr: false,
+	output: 'ts',
+} as const;
+
 // Both the compiler consumer and real Valdi Workspace fixture resolve this
 // adapter through the published contract rather than copied hook signatures.
 const ADAPTER = readFileSync(
@@ -138,22 +144,82 @@ export function Scene(props: { Component: FunctionComponent<{ children?: OctaneN
 		<Theme value={theme}><Suspense fallback={<label value="Loading" />}><props.Component render={number => <label value={number.toFixed()} />}><Deferred><label value={id + value + size + snapshot} onPress={event} /></Deferred></props.Component></Suspense></Theme>
 	</ErrorBoundary>
 }`;
-			const result = compile(source, '/src/Scene.tsrx', {
-				renderer: {
-					...renderer,
-					text: 'host',
-					capabilities: ['host-text-site', 'component-runtime'],
-				},
-				hmr: false,
-				output: 'ts',
-			});
+			const result = compile(source, '/src/Scene.tsrx', componentOptions);
 			expect(typecheck(result.code, '', {}, COMPONENT_ADAPTER)).toEqual([]);
 		});
+
+		it('checks explicit memo props, comparator arguments and a plain TypeScript hook', () => {
+			parser.javascript = parserName === 'javascript';
+			const hooks = compile(
+				`import { useInitialValue } from 'octane';
+export function useFirst(value: string) {
+	const fallback = useInitialValue('first');
+	return useInitialValue<typeof fallback>(() => value || fallback);
+}`,
+				'/src/hooks.ts',
+				componentOptions,
+			);
+			const scene = compile(
+				`import { memo as cache, type FC } from 'octane';
+import { useFirst } from './hooks';
+type Props = { label: string };
+export const Badge: FC<Props> = cache(function label(props) @{ <label value={props.label} /> });
+export default cache<Props>(
+	function Row(props) @{
+		const first = useFirst(props.label);
+		<view>
+			<label value={first.toUpperCase()} />
+			@if (props.label) { <Row label="" /> }
+		</view>
+	},
+	(prev, next) => prev.label === next.label,
+);`,
+				'/src/Scene.tsrx',
+				componentOptions,
+			);
+			const consumer = `import Row from './scene';
+import { useFirst } from './hooks';
+Row.type({ label: useFirst('first') });
+// @ts-expect-error The memoized component requires a string.
+Row({ label: 1 });`;
+			expect(
+				typecheck(scene.code, consumer, { 'hooks.ts': hooks.code }, COMPONENT_ADAPTER),
+			).toEqual([]);
+		});
+
+		it('infers prop and child callback types from a computed generic memo component', () => {
+			parser.javascript = parserName === 'javascript';
+			const scene = compile(
+				`import { memo, type OctaneNode } from 'octane';
+type Props<T> = { value: T; row: (item: T) => OctaneNode; children: (item: T) => OctaneNode };
+function Leaf<T>(props: Props<T>) @{ <view>{props.row(props.value)}{props.children(props.value)}</view> }
+const Row = memo(Leaf);
+const rows = { wide: Row<number>, compact: Row<number> };
+export function Scene({ mode }: { mode: keyof typeof rows }) @{
+	<{rows[mode]} value={1} row={item => <label value={item.toFixed()} />}>
+		{item => <label value={item.missing()} />}
+	</{rows[mode]}>
+}`,
+				'/src/Scene.tsrx',
+				componentOptions,
+			);
+			expect(typecheck(scene.code, '', {}, COMPONENT_ADAPTER)).toEqual([
+				{
+					file: 'scene.ts',
+					code: 2339,
+					message: "Property 'missing' does not exist on type 'number'.",
+				},
+			]);
+		});
+
 		it('accepts the component-runtime adapter registration signature', () => {
 			const consumer = `import type { ValdiComponent, ValdiComponentRuntimeAdapter } from 'octane/compiler/valdi';
 type Element = { readonly native: true };
+type Adapter = ValdiComponentRuntimeAdapter<unknown, unknown, unknown, Element>;
+declare const existing: Omit<Adapter, 'memo' | 'useInitialValue'>;
+const adapter: Adapter = existing;
 declare function actualRegistration<Props>(render: (props: Props) => void, options: { hasHooks: boolean }): ValdiComponent<Props, Element>;
-const registration: ValdiComponentRuntimeAdapter<unknown, unknown, unknown, Element>['defineValdiComponent'] = actualRegistration;
+const registration: Adapter['defineValdiComponent'] = actualRegistration;
 const Scene = registration((props: { label: string }) => {}, { hasHooks: false });
 Scene({ label: 'visible' });`;
 			expect(typecheck('', consumer, {}, COMPONENT_ADAPTER)).toEqual([]);

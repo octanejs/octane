@@ -307,16 +307,23 @@ contract.
 ABI 4 accepts `createContext`, `useContext`, `useSyncExternalStore`, `useEffect`,
 `useEffectEvent`, `useLinkedState`, `useId`, `useLayoutSnapshot`, `useLazyRef`,
 `flushSync`, `ErrorBoundary`, `Suspense`, and `lazy` from `octane`, in addition
-to the baseline hooks. These imports and compiler-selected helpers are supplied
-by the adapter. `createValdiChildren(render)` creates a child value that retains
+to the baseline hooks. Adapters may also export `useInitialValue` and `memo`.
+Each initial value has a compiler-assigned hook slot. At module scope,
+`memo(Row)`, `const Row = memo(props => …)` and `export default memo(…)`
+wrap a registered descriptor. The adapter handles prop comparison.
+These exports are optional in `ValdiComponentRuntimeAdapter` and required
+when the authored module imports them.
+
+The adapter supplies the runtime values and compiler-selected helpers. `createValdiChildren(render)` creates a child value that retains
 the authored closure and can be rendered by the adapter under its own component
 scope. Component children, JSX-valued props, and render callbacks use this
 contract; callbacks return a child value instead of writing into their caller's
 active scope. Hooks within render callbacks or deferred JSX remain unsupported;
 evaluate parent hooks in component setup and pass their results into the child.
 
-Component tags may refer to a descriptor passed through props or a member
-expression, including context providers and lazy components. The compiler
+Component tags may select a registered descriptor through props, a member
+expression or a computed TSRX tag such as `<{rows[variant]} />`. The selected
+descriptor supplies the contextual type of callback props and children. The compiler
 evaluates a dynamic descriptor once and includes its identity in the writer key,
 so replacing the descriptor cannot reuse a different component's instance.
 Locally declared functions containing JSX remain unsupported: components must be

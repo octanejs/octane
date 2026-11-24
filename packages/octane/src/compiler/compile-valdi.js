@@ -9,7 +9,12 @@
  */
 import { builders as b, DIAGNOSTIC_CODES } from '@tsrx/core';
 import { parseModule } from '#octane/compiler-parser';
-import { createLexicalAnalysis, validateRendererAst } from './compile-universal.js';
+import {
+	createLexicalAnalysis,
+	isIdentifierReference,
+	isJsxBindingReference,
+	validateRendererAst,
+} from './compile-universal.js';
 import { HOOK_NAMES } from './hook-names.js';
 import {
 	VALDI_HOOKS,
@@ -78,20 +83,20 @@ function valdiError(state, node, message, code = 'OCTANE_VALDI_UNSUPPORTED') {
 
 function forEachChild(node, visit) {
 	for (const [key, child] of Object.entries(node)) {
-		if (!AST_SKIP_KEYS.has(key)) visit(child);
+		if (!AST_SKIP_KEYS.has(key)) visit(child, node, key);
 	}
 }
 
 function walk(root, visit) {
 	const seen = new WeakSet();
-	const descend = (node) => {
+	const descend = (node, parent, key) => {
 		if (node === null || typeof node !== 'object' || seen.has(node)) return;
 		seen.add(node);
 		if (Array.isArray(node)) {
-			for (const child of node) descend(child);
+			for (const child of node) descend(child, parent, key);
 			return;
 		}
-		if (visit(node) !== false) forEachChild(node, descend);
+		if (visit(node, parent, key) !== false) forEachChild(node, descend);
 	};
 	descend(root);
 }
@@ -302,7 +307,7 @@ function hasOwnTemplate(body) {
 	return found;
 }
 
-function componentShape(node) {
+function componentShape(node, state) {
 	const exportKind =
 		node.type === 'ExportNamedDeclaration'
 			? 'named'
@@ -319,17 +324,24 @@ function componentShape(node) {
 	) {
 		return { node, fn: declaration, name: declaration.id?.name, exportKind };
 	}
-	if (declaration?.type === 'VariableDeclaration' && declaration.declarations?.length === 1) {
-		const item = declaration.declarations[0];
-		const fn = unwrap(item.init);
-		if (
-			item.id?.type === 'Identifier' &&
-			(fn?.type === 'FunctionExpression' || fn?.type === 'ArrowFunctionExpression')
-		) {
-			return { node, fn, name: item.id.name, exportKind, binding: item.id, initializer: item.init };
-		}
-	}
-	return null;
+	const item =
+		declaration?.type === 'VariableDeclaration' && declaration.declarations.length === 1
+			? declaration.declarations[0]
+			: undefined;
+	if (exportKind !== 'default' && item?.id.type !== 'Identifier') return null;
+	const initializer = item ? item.init : declaration;
+	const value = unwrap(initializer);
+	const memo =
+		state.componentRuntime &&
+		value?.type === 'CallExpression' &&
+		importedHookName(value, state) === 'memo'
+			? value
+			: undefined;
+	if (!item && !memo) return null;
+	const fn = memo ? unwrap(memo.arguments[0]) : value;
+	if (fn?.type !== 'FunctionExpression' && fn?.type !== 'ArrowFunctionExpression') return null;
+	// A default memo's inner name belongs to the function, never the module.
+	return { node, fn, name: item?.id.name, exportKind, binding: item?.id, initializer, memo };
 }
 
 function collectComponents(ast, state) {
@@ -337,11 +349,25 @@ function collectComponents(ast, state) {
 	walk(ast, (node) => {
 		const name = node.openingElement?.name;
 		if (name?.type === 'JSXIdentifier' && !/^[a-z]/.test(name.name)) referenced.add(name.name);
+		if (!state.componentRuntime) return;
+		let target;
+		if (name?.type === 'JSXExpressionContainer') target = unwrap(name.expression);
+		else if (node.type === 'CallExpression' && importedHookName(node, state) === 'memo') {
+			target = unwrap(node.arguments[0]);
+		}
+		if (target?.type === 'Identifier') {
+			const { lexical } = state;
+			const scope = lexical.nodeScopes.get(target) ?? lexical.rootScope;
+			if (lexical.resolveBinding(scope, target.name)?.scope === lexical.rootScope) {
+				referenced.add(target.name);
+			}
+		}
 	});
 	for (const node of ast.body ?? []) {
-		const shape = componentShape(node);
+		const shape = componentShape(node, state);
 		if (shape === null) continue;
 		if (
+			!shape.memo &&
 			!hasOwnTemplate(shape.fn.body) &&
 			!referenced.has(shape.name) &&
 			shape.exportKind !== 'default' &&
@@ -515,7 +541,7 @@ function needsCallbackContext(node) {
 	);
 }
 
-function componentProp(value, state, element, prop) {
+function componentProp(value, state, receiver, prop) {
 	const fn = unwrap(value);
 	let lowered;
 	if (state.componentRuntime) {
@@ -534,13 +560,7 @@ function componentProp(value, state, element, prop) {
 	const parameters = b.ts_type_reference(
 		b.id('Parameters', fn),
 		b.ts_type_parameter_instantiation(
-			[
-				b.ts_type_query(
-					componentTypeName(elementName(element)),
-					element.openingElement?.typeArguments,
-					fn,
-				),
-			],
+			[b.ts_type_query(receiver.name, receiver.typeArguments, fn)],
 			fn,
 		),
 		fn,
@@ -564,7 +584,7 @@ function componentProp(value, state, element, prop) {
 	);
 }
 
-function attributeValue(attribute, state, tag) {
+function attributeValue(attribute, state, receiver) {
 	if (attribute.value == null) return withOrigin(b.literal(true), attribute);
 	const value =
 		attribute.value.type === 'JSXExpressionContainer'
@@ -573,12 +593,12 @@ function attributeValue(attribute, state, tag) {
 	if (!value || value.type === 'JSXEmptyExpression') {
 		throw valdiError(state, attribute, 'empty attribute expressions are unsupported.');
 	}
-	return tag
-		? componentProp(value, state, tag, attribute.name.name)
+	return receiver
+		? componentProp(value, state, receiver, attribute.name.name)
 		: assertNoTemplate(value, state, 'JSX-valued attributes');
 }
 
-function attributeEntries(node, state) {
+function attributeEntries(node, state, receiver) {
 	return (node.openingElement?.attributes ?? node.attributes ?? []).map((attribute) => {
 		if (attribute.type === 'JSXSpreadAttribute' || attribute.type === 'SpreadAttribute') {
 			return {
@@ -590,15 +610,14 @@ function attributeEntries(node, state) {
 		const name = attribute.name?.type === 'JSXIdentifier' ? attribute.name.name : null;
 		if (name === null) throw valdiError(state, attribute, 'namespaced attributes are unsupported.');
 		if (
-			(name === 'children' && intrinsicTag(node) !== null) ||
-			(name === 'ref' &&
-				(intrinsicTag(node) === null || !state.renderer.capabilities?.includes('host-ref')))
+			(name === 'children' && receiver === null) ||
+			(name === 'ref' && (receiver !== null || !state.renderer.capabilities?.includes('host-ref')))
 		) {
 			throw valdiError(state, attribute, `authored ${name} props are not supported yet.`);
 		}
 		return {
 			name,
-			value: attributeValue(attribute, state, intrinsicTag(node) === null ? node : null),
+			value: attributeValue(attribute, state, receiver),
 			origin: attribute,
 		};
 	});
@@ -888,18 +907,14 @@ function setterForAttribute(entry, state) {
 	return 'setAttribute';
 }
 
-function componentTypeName(name) {
-	if (name.type === 'JSXMemberExpression' || name.type === 'MemberExpression') {
-		return withOrigin(
-			b.ts_qualified_name(componentTypeName(name.object), b.id(name.property.name)),
-			name,
-		);
-	}
-	return withOrigin(b.id(name.name), name);
-}
-
 function componentExpression(name, state, origin) {
 	if (state.componentRuntime) {
+		if (name?.type === 'JSXExpressionContainer') {
+			if (name.expression.type === 'Literal') {
+				throw valdiError(state, name, 'computed component tags require a registered descriptor.');
+			}
+			return assertNoTemplate(name.expression, state, 'JSX in dynamic component tags');
+		}
 		if (name?.type === 'JSXMemberExpression' || name?.type === 'MemberExpression') {
 			return withOrigin(
 				b.member(componentExpression(name.object, state, origin), b.id(name.property.name)),
@@ -1002,7 +1017,16 @@ function emitElement(node, state, keys) {
 	const name = elementName(node);
 	const tag = intrinsicTag(node);
 	const intrinsic = tag !== null;
-	const entries = attributeEntries(node, state);
+	const dynamicName =
+		!intrinsic && state.componentRuntime && !isStableComponent(name, state)
+			? allocName(state, '__octaneValdiComponent')
+			: null;
+	const descriptor = intrinsic ? null : componentExpression(name, state, node);
+	const component = dynamicName ? withOrigin(b.id(dynamicName), name) : descriptor;
+	const receiver = intrinsic
+		? null
+		: { name: component, typeArguments: node.openingElement?.typeArguments };
+	const entries = attributeEntries(node, state, receiver);
 	if (!intrinsic) {
 		const children = (node.children ?? []).filter((child) => !isEmptyChild(child, state));
 		if (children.length) {
@@ -1015,7 +1039,7 @@ function emitElement(node, state, keys) {
 					name: 'children',
 					value:
 						only !== null
-							? componentProp(only, state, node, 'children')
+							? componentProp(only, state, receiver, 'children')
 							: deferredChildren(emitNodes(children, state, [], false), state, node),
 					origin: node,
 				});
@@ -1034,7 +1058,7 @@ function emitElement(node, state, keys) {
 				}
 				entries.push({
 					name: 'children',
-					value: componentProp(child.expression, state, node, 'children'),
+					value: componentProp(child.expression, state, receiver, 'children'),
 					origin: child,
 				});
 			}
@@ -1060,11 +1084,8 @@ function emitElement(node, state, keys) {
 		statements.push(writerStatement(state, 'endRender', [], node.closingElement ?? node));
 		return statements;
 	}
-	let component = componentExpression(name, state, node);
-	if (state.componentRuntime && !isStableComponent(name, state)) {
-		const componentName = allocName(state, '__octaneValdiComponent');
-		statements.unshift(withOrigin(b.const(componentName, component), node));
-		component = withOrigin(b.id(componentName), node);
+	if (dynamicName !== null) {
+		statements.unshift(withOrigin(b.const(dynamicName, descriptor), node));
 		key = keyExpression(state, prototype, [...keys, component], attrs.key, node);
 	}
 	statements.push(
@@ -1377,6 +1398,23 @@ function emitNodes(nodes, state, keys, allowReturn) {
 	return output;
 }
 
+function usesSelfName(fn, lexical) {
+	if (!fn.id) return false;
+	const self = lexical.nodeScopes.get(fn.id);
+	let used = false;
+	walk(fn, (node, parent, key) => {
+		if (used) return false;
+		if (node.name !== fn.id.name) return;
+		const reference =
+			node.type === 'Identifier'
+				? isIdentifierReference(node, parent, key, lexical)
+				: isJsxBindingReference(node, parent, key);
+		if (reference)
+			used = lexical.resolveBinding(lexical.nodeScopes.get(node), node.name)?.scope === self;
+	});
+	return used;
+}
+
 function emitComponent(shape, state) {
 	const { fn, name, exportKind } = shape;
 	if (fn.async || fn.generator) {
@@ -1402,10 +1440,27 @@ function emitComponent(shape, state) {
 	);
 	const options = b.object([b.prop('init', b.id('hasHooks'), b.literal(hasRenderTimeCalls(fn)))]);
 	let initializer = call(state, 'defineValdiComponent', [render, options], fn);
-	if (state.output === 'ts' && shape.initializer !== undefined) {
-		// Keep authored export constraints and the context they provide to props.
-		const wrap = (node) =>
-			node === fn ? initializer : { ...node, expression: wrap(node.expression) };
+	if (shape.memo && usesSelfName(fn, state.lexical)) {
+		// The inner binding interrupts contextual typing from memo<Props>.
+		if (state.output === 'ts' && shape.memo.typeArguments && !fn.params[0]?.typeAnnotation) {
+			initializer.typeArguments = shape.memo.typeArguments;
+		}
+		// A named function expression sees the original (unmemoized) component.
+		const self = b.id(fn.id.name);
+		initializer = b.call(
+			b.arrow([], b.block([b.const(self, initializer), b.return(b.id(fn.id.name))])),
+		);
+	}
+	if (shape.initializer !== undefined && (state.output === 'ts' || shape.memo !== undefined)) {
+		// Keep the memo call and any authored type constraints around its component.
+		const wrap = (node) => {
+			if (node === fn) return initializer;
+			if (node === shape.memo) {
+				const [component, ...rest] = node.arguments;
+				return { ...node, arguments: [wrap(component), ...rest] };
+			}
+			return { ...node, expression: wrap(node.expression) };
+		};
 		initializer = wrap(shape.initializer);
 	}
 	const declaration = withOrigin(
