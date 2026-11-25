@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { createRoot, hydrateRoot, type HydrationOptions, type Root } from 'react-dom/client';
 import { attachBehaviorRoot, type BehaviorRoot } from '../behavior-root.js';
+import type { BehaviorRootInit } from '../behavior-root-types.js';
 import {
 	createElement,
 	descriptorChildren,
@@ -308,10 +309,11 @@ export const ReactCompatInline = /* @__PURE__ */ createReactCompat('span');
 /** Hydrate a React-owned document. Disposing the Octane behavior root unmounts React. */
 export const ReactCompatDocument = {
 	hydrate(document: Document, children: ReactNode, options?: HydrationOptions): BehaviorRoot {
-		const shell = attachBehaviorRoot(document.documentElement);
+		let root: Root | undefined;
+		const behaviorOptions: BehaviorRootInit = { releaseContent: () => root?.unmount() };
+		const shell = attachBehaviorRoot(document.documentElement, behaviorOptions);
 		try {
-			const root = hydrateRoot(document, children, options);
-			shell.signal.addEventListener('abort', () => root.unmount(), { once: true });
+			root = hydrateRoot(document, children, options);
 			return shell;
 		} catch (error) {
 			shell.dispose();

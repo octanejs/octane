@@ -668,8 +668,9 @@ describe('ReactCompat full documents', () => {
 		expect(onError.mock.calls[0][0]).toBe(reason);
 	});
 
-	it('hydrates the existing document and releases React with the Octane behavior root', async () => {
+	it.each(['dispose', 'replace'])('releases behaviors before React on %s', async (action) => {
 		const cleanup = vi.fn();
+		const connectedAtCleanup = vi.fn();
 		const errors = vi.fn();
 		const hydrated = deferred<void>();
 		function Page() {
@@ -711,6 +712,19 @@ describe('ReactCompat full documents', () => {
 			expect(input.id).toContain('page-');
 			expect(errors).not.toHaveBeenCalled();
 			expect(() => ClientDocument.hydrate(doc, tree)).toThrow();
+			shell.registerBehavior({
+				target: input,
+				adopt: (element) => () => connectedAtCleanup(element.isConnected),
+			});
+			await shell.ready;
+			if (action === 'replace') {
+				Client.attachBehaviorRoot(doc.documentElement, { replace: true }).dispose();
+			} else {
+				shell.dispose({ preserveDOM: false });
+				expect(doc.body).toBeNull();
+			}
+			expect(connectedAtCleanup).toHaveBeenCalledWith(true);
+			expect(input.isConnected).toBe(false);
 		} finally {
 			shell.dispose();
 			frame.remove();

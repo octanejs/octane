@@ -1,4 +1,9 @@
-import type { BehaviorCleanup, BehaviorEntry, ExternalRange } from './behavior-root.js';
+import type {
+	BehaviorCleanup,
+	BehaviorEntry,
+	BehaviorRootOptions,
+	ExternalRange,
+} from './behavior-root.js';
 import type { NativeHydrationDOM } from './hydration/native-intent.js';
 
 export type Readiness = {
@@ -21,6 +26,10 @@ export type BehaviorDOM = Pick<
 	contains(container: Element, element: Element, document: Document): boolean;
 };
 
+export type BehaviorRootInit = BehaviorRootOptions & {
+	releaseContent?: () => void;
+};
+
 export type RootRecord = {
 	container: Element;
 	document: Document;
@@ -34,6 +43,7 @@ export type RootRecord = {
 	listeners: Map<string, EventListener>;
 	observer: MutationObserver | null;
 	disposed: boolean;
+	releaseContent: BehaviorRootInit['releaseContent'];
 	unlinkSignal: (() => void) | null;
 };
 
