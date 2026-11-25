@@ -2079,3 +2079,104 @@ describe('octane/data in a SharedWorker', () => {
 		}
 	});
 });
+
+describe('octane/data journal recovered through the owner', () => {
+	/** A schema that accepts what `ok` accepts, recording `label` each time it runs. */
+	const counted = <T>(calls: string[], label: string, ok: (value: any) => boolean) =>
+		({
+			'~standard': {
+				version: 1,
+				vendor: 'test',
+				validate(value: unknown) {
+					calls.push(label);
+					return ok(value)
+						? { value: value as T }
+						: { issues: [{ message: `Expected ${label}`, path: [] }] };
+				},
+			},
+		}) satisfies StandardSchema<unknown, T>;
+
+	it('recovers a journaled write and reads its receipt as the worker validated them, without validating either on the page', async () => {
+		const calls: string[] = [];
+		/** One build's journal contracts, as the worker or a tab holds its own copy of them. */
+		const build = (label: string) => {
+			const note = write({
+				name: 'note',
+				input: counted<{ text: string }>(
+					calls,
+					`${label} input`,
+					(v) => typeof v?.text === 'string',
+				),
+			});
+			const receipt = read({
+				name: 'receipt',
+				input: counted<{ operationId: string }>(calls, `${label} receipt input`, () => true),
+				output: counted<{ applied: boolean }>(
+					calls,
+					`${label} receipt`,
+					(v) => typeof v?.applied === 'boolean',
+				),
+			});
+			return { note, receipt, list: [...contracts, note, receipt] };
+		};
+		const storage = memoryStorage();
+		const cache = (journal: ReturnType<typeof build>): PersistOptions => ({
+			partition: 'ada',
+			key: 'a session secret of at least sixteen bytes',
+			storage,
+			journal: { writes: [journal.note], receipt: journal.receipt },
+		});
+		const applied = new Set<string>();
+		const log: string[] = [];
+		const transport: Transport = async (request) => {
+			log.push(request.name);
+			if (request.kind === 'write') {
+				applied.add(request.operationId!);
+				throw new Error('connection reset after the server applied the write');
+			}
+			const { operationId } = request.input as { operationId: string };
+			return { ok: true, value: { applied: applied.has(operationId) } };
+		};
+		/** A worker over the account's journal, and one tab. */
+		const session = () => {
+			const inWorker = build('worker');
+			const owner = createDataOwner({
+				transport,
+				persist: () => cache(inWorker),
+				contracts: inWorker.list,
+			});
+			const channel = new MessageChannel();
+			owner.connect(channel.port1);
+			const onPage = build('page');
+			const store = createReplica(channel.port2, {
+				...replicaOptions,
+				persist: cache(onPage),
+				contracts: onPage.list,
+			});
+			closers.push(() => (void store.dispose(), channel.port1.close(), channel.port2.close()));
+			return { store, note: onPage.note };
+		};
+
+		const first = session();
+		await expect(first.store.write(first.note, { text: 'Bring the maps' })).rejects.toBeInstanceOf(
+			DataUncertainError,
+		);
+		await first.store.dispose();
+
+		// The next session finds the write in the journal and settles it by its receipt.
+		calls.length = 0;
+		log.length = 0;
+		session();
+		await vi.waitFor(() => expect(log).toEqual(['receipt']));
+		await vi.waitFor(() => expect(calls).toContain('worker receipt'));
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		// The worker validated the write's input and the receipt; the page validated neither.
+		expect(calls.filter((call) => call.startsWith('page'))).toEqual([]);
+
+		// Settled, it left the journal: the session after asks for nothing.
+		log.length = 0;
+		session();
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(log).toEqual([]);
+	});
+});

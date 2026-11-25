@@ -199,8 +199,11 @@ export interface Persistence {
 	journal(write: Journaled): Promise<void>;
 	/** Remove a write from the journal once its outcome is known. */
 	unjournal(id: string): void;
-	/** The writes a previous session left in the journal. */
-	recover(): Promise<Array<Journaled & { order: [number, number] }>>;
+	/**
+	 * The writes a previous session left in the journal. A shared owner gives
+	 * each write whose input it validated that `input`.
+	 */
+	recover(): Promise<Array<Journaled & { order: [number, number]; input?: unknown }>>;
 	/** Values saved before now that hold one of these tags are restored stale. */
 	invalidated(tags: readonly (string | null)[]): void;
 	/** The cursor a feed last saved, by its key; null when there is none. */
