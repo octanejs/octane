@@ -379,7 +379,12 @@ describe('component-owned Lynx template rows', () => {
 			{ renderer: resolvedLynxMainThreadRenderer },
 		);
 
-		expect(args).toHaveLength(3);
+		// Every optional slot stays empty; only the pure row's memo inputs follow.
+		expect(args.slice(3, 11).every((arg) => arg.type === 'UnaryExpression')).toBe(true);
+		expect(args.slice(11)).toMatchObject([
+			{ type: 'ArrayExpression' },
+			{ type: 'Literal', value: false },
+		]);
 	});
 
 	it.each([

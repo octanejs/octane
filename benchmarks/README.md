@@ -89,7 +89,7 @@ suites reuse it. Collected results land in `benchmarks/results/<suite>.json`
 Some suites need no preview servers: **news**, **hydration-interactivity**, and
 the three runtime-stress suites vite-build and time each target themselves (the
 runner loops their per-target invocations and merges them),
-**ssr-throughput**, **streaming-ssr**, **conversation-streaming**, **lynx-list**, **universal-leaf-update**,
+**ssr-throughput**, **streaming-ssr**, **conversation-streaming**, **lynx-list**, **universal-leaf-update**, **universal-for-row-memo**,
 **universal-object-teardown**,
 **universal-template-events**, **universal-native-hover**, **universal-owner-drafts**,
 **universal-hook-slot**,
@@ -377,6 +377,7 @@ internally, get their own baseline and guard namespace.
 | `async-composition` | async-composition | octane-tsrx, react, inferno | dashboard composition: adjacent async panels, nested children, imported custom hook, and one true dependency |
 | `lynx-list` | lynx-list | none (Node-only) | deterministic 1,000-row native-list physical allocation, reuse, and teardown through a fake Element PAPI |
 | `universal-leaf-update` | universal-leaf-update | none (Node-only) | universal update locality beside 0–4,000 unrelated component siblings through the compiler and native object driver: plain leaf `setState`, keyed `@for` item state, a leaf under an idle `@try`, a structural (insert/remove) update, and compact-row list selection |
+| `universal-for-row-memo` | universal-for-row-memo | none (Node-only) | 1,000 compiled keyed `@for` rows beside a counter in the same component: counter tick, one changed row, rotate, and replace-all, with exact row-body render counts, a called-row control that re-renders every row, and an optional paired base checkout |
 | `universal-object-teardown` | universal-object-teardown | none (Node-only) | transactional object-driver unmount scaling at 2, 4,096, and 16,384 flat siblings, with exact remove/destroy and empty-driver controls |
 | `universal-template-events` | universal-template-events | none (Node-only) | shape-stable handler updates across 128 and 1,024 retained native event sites through ordinary hosts and the fallback collapsed-template host capability, with host identity, stable listener IDs, latest-handler dispatch, and redundant-command controls |
 | `universal-native-hover` | universal-native-hover | none (Node-only) | compiled production native universal selection in 20 and 80 keyed rows, each with four component/view layers; 2,000 real hover updates per sample, host and prop identity checks, teardown, a same-run scaling ratio, and optional local V8 cumulative allocation profile |

@@ -96,6 +96,38 @@
     "note": "Compact leaf rows driven by their list component's selection state replay only that component (its 100 rows), so unrelated siblings must not change the cost. Rejects the compact-range bail that forced list selection through a whole-root replay."
   },
   {
+    "suite": "universal-for-row-memo",
+    "op": "row_renders",
+    "target": "pure-tick",
+    "reference": "called-tick",
+    "maxRatio": 0,
+    "note": "A counter beside 1,000 keyed @for rows in the same component. Rows that render only from their item and captures keep their output, so the tick runs no row body; the called-row control runs all 1,000. Any row render here means the compiler stopped proving the row or the runtime stopped keeping it."
+  },
+  {
+    "suite": "universal-for-row-memo",
+    "op": "row_renders",
+    "target": "pure-toggle",
+    "reference": "called-toggle",
+    "maxRatio": 0.001,
+    "note": "Changing one row's item re-renders that row alone (1 of 1,000 row bodies; the called-row control re-renders all of them)."
+  },
+  {
+    "suite": "universal-for-row-memo",
+    "op": "step_ms",
+    "target": "pure-tick",
+    "reference": "called-tick",
+    "maxRatio": 0.5,
+    "note": "Same-run counter tick with kept rows versus the control that re-renders every row; observed near 0.1x. A ratio near 1x means survivor rows are re-rendering again."
+  },
+  {
+    "suite": "universal-for-row-memo",
+    "op": "step_ms",
+    "target": "pure-replace",
+    "reference": "called-replace",
+    "maxRatio": 1.5,
+    "note": "Every row's item changes, so no row can be kept and both variants re-render all 1,000 rows; observed near 1x. Bounds the per-row input comparison and bookkeeping on the path where memoization cannot help."
+  },
+  {
     "suite": "universal-object-teardown",
     "op": "unmount_ms",
     "target": "siblings-16384",

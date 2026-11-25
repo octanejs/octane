@@ -131,6 +131,7 @@ export const BENCHMARK_SUITES = [
 	'lynx-list',
 	'lynx-handle-retirement',
 	'universal-leaf-update',
+	'universal-for-row-memo',
 	'universal-object-teardown',
 	'universal-template-events',
 	'universal-native-hover',

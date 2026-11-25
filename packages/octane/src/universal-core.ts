@@ -359,6 +359,17 @@ export interface UniversalForValue {
 	readonly leafSignature?: string;
 	readonly template?: boolean;
 	readonly componentScope?: boolean;
+	/** Compiler-proven row inputs: the values every row closes over. */
+	readonly memoDeps?: readonly unknown[];
+	/** Whether a row's output also depends on its index. */
+	readonly memoIndex?: boolean;
+}
+
+/** The inputs a memoized `@for` row last rendered from (its owner's componentProps). */
+interface UniversalForRowInputs {
+	readonly item: unknown;
+	readonly index: number;
+	readonly deps: readonly unknown[];
 }
 
 export interface UniversalTryValue {
@@ -1917,8 +1928,23 @@ export function universalFor<T>(
 	leafSignature?: string,
 	componentScope = false,
 	prepare?: (item: T, index: number, prepared: unknown[]) => unknown,
+	memoDeps?: readonly unknown[],
+	memoIndex = false,
 ): UniversalForValue {
 	const universalItems = prepare === undefined ? items : prepareUniversalForItems(items, prepare);
+	if (memoDeps !== undefined) {
+		return {
+			$$kind: UNIVERSAL_FOR,
+			items: universalItems,
+			key,
+			render,
+			empty,
+			ownerless,
+			compact,
+			memoDeps,
+			memoIndex,
+		};
+	}
 	if (componentScope) {
 		return {
 			$$kind: UNIVERSAL_FOR,
@@ -2863,37 +2889,11 @@ function materializeComponentValue(
 		attempt.retainEligible &&
 		record !== undefined &&
 		record.mounted &&
-		!record.disposed &&
-		record.dirtyEpoch !== attempt.dirtyEpoch &&
-		record.visibility === 'visible' &&
-		parent.visibility === 'visible' &&
 		record.componentProps !== null &&
-		universalShallowEqual(record.componentProps, normalized.props) &&
-		record.range !== null &&
-		record.range.owner === record &&
-		ancestorContextsStable(parent) &&
-		ownerSubtreeRetainable(record)
+		universalShallowEqual(record.componentProps, normalized.props)
 	) {
-		const features = logicalTreeFeatures(record.range);
-		if ((features & (UNIVERSAL_TREE_PORTAL | UNIVERSAL_TREE_REGION)) === 0) {
-			// Adopt the committed subtree wholesale: the claim is recorded so the
-			// records survive reconciliation, but no draft is created and nothing
-			// below re-renders. The committed features join the attempt's so the
-			// commit keeps every staging branch those features rely on.
-			parent.claimedChildren.add(record);
-			(parent.retainedChildren ??= []).push({ record, position: parent.children.length });
-			attempt.treeFeatures |= features;
-			attempt.retainedCount++;
-			return [
-				{
-					kind: 'range',
-					key: record.range.key,
-					owner: record,
-					retained: record.range,
-					children: [],
-				},
-			];
-		}
+		const retained = retainCommittedOwner(parent, record);
+		if (retained !== null) return retained;
 	}
 	const owner = adoptChildOwner(
 		parent,
@@ -2909,6 +2909,93 @@ function materializeComponentValue(
 	return ownerRange(owner, nodes);
 }
 
+// Adopts an unchanged committed owner subtree wholesale when nothing it can
+// observe moved: the claim is recorded so the records survive reconciliation,
+// but no draft is created and nothing below re-renders. The committed features
+// join the attempt's so the commit keeps every staging branch they rely on.
+// The caller has already proven the owner's own inputs unchanged.
+function retainCommittedOwner(
+	parent: DraftOwner,
+	record: UniversalOwnerRecord,
+): BlueprintNode[] | null {
+	const attempt = currentAttempt();
+	if (
+		!attempt.retainEligible ||
+		!record.mounted ||
+		record.disposed ||
+		record.dirtyEpoch === attempt.dirtyEpoch ||
+		record.visibility !== 'visible' ||
+		parent.visibility !== 'visible' ||
+		record.range === null ||
+		record.range.owner !== record ||
+		!ancestorContextsStable(parent) ||
+		!ownerSubtreeRetainable(record)
+	) {
+		return null;
+	}
+	const features = logicalTreeFeatures(record.range);
+	if ((features & (UNIVERSAL_TREE_PORTAL | UNIVERSAL_TREE_REGION)) !== 0) return null;
+	parent.claimedChildren.add(record);
+	(parent.retainedChildren ??= []).push({ record, position: parent.children.length });
+	attempt.treeFeatures |= features;
+	attempt.retainedCount++;
+	return [
+		{
+			kind: 'range',
+			key: record.range.key,
+			owner: record,
+			retained: record.range,
+			children: [],
+		},
+	];
+}
+
+function sameForRowDeps(previous: readonly unknown[], next: readonly unknown[]): boolean {
+	if (previous === next) return true;
+	if (previous.length !== next.length) return false;
+	for (let index = 0; index < previous.length; index++) {
+		if (!Object.is(previous[index], next[index])) return false;
+	}
+	return true;
+}
+
+// A compiler-proven `@for` row renders only from its item, its index (when the
+// body reads one) and the list's closed-over values, so a survivor whose inputs
+// are unchanged keeps its committed output, as the DOM target's DEP-PURE rows do.
+function materializeMemoForRow(
+	parent: DraftOwner,
+	list: UniversalForValue,
+	record: UniversalOwnerRecord | null,
+	item: unknown,
+	index: number,
+	key: UniversalKey,
+	path: readonly unknown[],
+	outputPath: readonly unknown[],
+	expectedRenderer: string,
+): BlueprintNode[] {
+	const previous = record?.componentProps as UniversalForRowInputs | null | undefined;
+	if (
+		previous != null &&
+		Object.is(previous.item, item) &&
+		(list.memoIndex !== true || previous.index === index) &&
+		sameForRowDeps(previous.deps, list.memoDeps!)
+	) {
+		const retained = retainCommittedOwner(parent, record!);
+		if (retained !== null) return retained;
+	}
+	const inputs: UniversalForRowInputs = { item, index, deps: list.memoDeps! };
+	return materializeScoped(
+		parent,
+		path,
+		key,
+		() => materializeRawUniversalListValue(list, list.render(item, index), expectedRenderer),
+		null,
+		outputPath,
+		record,
+		inputs,
+	);
+}
+
 function materializeScoped(
 	parent: DraftOwner,
 	path: readonly unknown[],
@@ -2916,11 +3003,22 @@ function materializeScoped(
 	build: () => UniversalRenderable,
 	contextValues: Map<UniversalContext<any>, unknown> | null = null,
 	outputPath: readonly unknown[] = [...path, 'output'],
+	// A record the caller already claimed (null: none to claim), and the row
+	// inputs a memoized `@for` row renders from.
+	claimed?: UniversalOwnerRecord | null,
+	rowInputs?: UniversalForRowInputs,
 ): BlueprintNode[] {
 	const attempt = currentAttempt();
 	const universalIdCheckpoint = attempt.nextUniversalId;
-	const owner = claimChildOwner(parent, null, path, key);
+	const owner =
+		claimed === undefined
+			? claimChildOwner(parent, null, path, key)
+			: adoptChildOwner(
+					parent,
+					claimed ?? createOwnerRecord(attempt.root, null, parent.record, path, key),
+				);
 	owner.contextValues = contextValues;
+	if (rowInputs !== undefined) owner.componentProps = rowInputs;
 	try {
 		const nodes = executeOwner(owner, () =>
 			materializeValue(build(), parent.record.renderer, null, outputPath),
@@ -3696,6 +3794,26 @@ function materializeValue(
 			} else {
 				listOwnerPath ??= [...path, 'for'];
 				listOutputPath ??= [...listOwnerPath, 'output'];
+				if (list.memoDeps !== undefined) {
+					const record = findClaimableChildRecord(parent, null, listOwnerPath, itemKey) ?? null;
+					// Rows share one site path. Adopting the committed array lets the
+					// next row's claim compare it by reference.
+					if (record !== null) listOwnerPath = record.identityPath;
+					output.push(
+						...materializeMemoForRow(
+							parent,
+							list,
+							record,
+							item,
+							itemIndex,
+							itemKey,
+							listOwnerPath,
+							listOutputPath,
+							expectedRenderer,
+						),
+					);
+					continue;
+				}
 				output.push(
 					...materializeScoped(
 						parent,
