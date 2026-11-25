@@ -7,11 +7,6 @@ export function TrailingSpaceBeforeElement() @{
 	<p>Before <span>middle</span> after</p>
 }
 
-export function SpaceBetweenElements() @{
-	// prettier-ignore
-	<p><span>a</span> <span>b</span></p>
-}
-
 export function MultilineText() @{
 	// prettier-ignore
 	<p>

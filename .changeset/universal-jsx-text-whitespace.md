@@ -2,4 +2,4 @@
 'octane': patch
 ---
 
-Keep JSX text whitespace in universal plans the way the DOM compiler does. Text next to an inline element keeps its edge space (`Before <span>` no longer renders as "Before" glued to the span), a single space between two elements is kept, and tabs inside a line become spaces.
+Keep the edge whitespace of JSX text in universal plans the way the DOM template does. `Before <span>middle</span>` no longer lowers to the text `"Before"` glued to the span, multi-line text joins lines like the DOM template, and tabs inside a line become spaces. Whitespace-only text between elements is still dropped.

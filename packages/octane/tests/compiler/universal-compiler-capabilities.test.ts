@@ -99,6 +99,16 @@ describe('universal compiler renderer capabilities', () => {
 		);
 	});
 
+	it('accepts whitespace between elements on a renderer that rejects authored text', () => {
+		const output = compile(
+			'export function Scene() @{ <group><mesh /> <mesh /></group> }',
+			'/src/Scene.object.tsrx',
+			{ renderer: baseRenderer, hmr: false },
+		).code;
+
+		expect(output).not.toContain('"kind": "text"');
+	});
+
 	it('lowers or omits authored text according to the typed renderer policy', () => {
 		const source = 'export function Scene() @{ <label>authored text</label> }';
 		const host = compile(source, '/src/Scene.object.tsrx', {

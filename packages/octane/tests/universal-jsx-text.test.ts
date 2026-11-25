@@ -41,7 +41,6 @@ function renderDom(name: SceneName): string {
 describe('universal JSX text whitespace', () => {
 	it.each([
 		['TrailingSpaceBeforeElement', 'Before middle after'],
-		['SpaceBetweenElements', 'a b'],
 		['MultilineText', 'First line second line inlinelast line'],
 		['TabsInText', 'Tab separated x end'],
 	] as const)('%s renders the same text as the DOM compiler', (name, expected) => {
