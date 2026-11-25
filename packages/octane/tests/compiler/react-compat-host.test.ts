@@ -2,6 +2,7 @@ import { parseModule } from '@tsrx/core';
 import { compile } from 'octane/compiler';
 import { describe, expect, it } from 'vitest';
 import * as domBindings from '../../src/dom-bindings.js';
+import { createReactCompatHost } from '../../src/react/react-compat-host.js';
 import { evaluateCompiledFixtureCode } from '../_server-fixture.js';
 
 const children = '{unbound(props.children)}';
@@ -105,8 +106,12 @@ describe.each(['client', 'server'] as const)('createReactCompatHost in %s output
 		`<div data-oct-b={props["data-oct-b"]}>${children}</div>`,
 		`<div title={props.title}>${children}</div>`,
 		`<div class={props.active ? 'open' : 'closed'}>${children}</div>`,
+		`<div class={props.input.get()}>${children}</div>`,
+		`<div class={(props.input.touch()<unknown>)}>${children}</div>`,
+		`<div class={import('./other') ? 'one' : 'two'}>${children}</div>`,
+		`<div class={props.input === unbound ? 'one' : 'two'}>${children}</div>`,
 		`<div data-active={props.active}>${children}</div>`,
-		`<div style={{color: props.style}}>${children}</div>`,
+		`<div style={{color: props.color}}>${children}</div>`,
 		`<div class={props.className}>${children}<style>div { color:red; }</style></div>`,
 	])('rejects %s before emitting a projection', (invalid) => {
 		expect(() => compile(source.replace(template, invalid), 'frame.tsrx', { mode })).toThrow(
@@ -126,8 +131,44 @@ describe.each(['client', 'server'] as const)('createReactCompatHost in %s output
 			'an indirect factory',
 			source.replace(call, 'const alias = host; export const Frame = alias(Host)'),
 		],
-		['extra arguments', source.replace(call, 'export const Frame = host(Host, {})')],
+		['a mismatched tag', source.replace('host(Host)', "host(Host, 'button')")],
+		['a dynamic tag', source.replace('host(Host)', 'host(Host, name)')],
+		['extra arguments', source.replace('host(Host)', "host(Host, 'div', {})")],
 	])('rejects %s', (_, invalid) => {
 		expect(() => compile(invalid, 'frame.tsrx', { mode })).toThrow(/createReactCompatHost/);
 	});
+});
+it.each(['section', 'nav', 'button', 'select', 'textarea', 'input', 'linearGradient'])(
+	'projects private input for <%s> without a server adopter',
+	(tag) => {
+		const attrs = 'class={props.input.active ? "active" : props.className}';
+		const element =
+			tag === 'input' || tag === 'textarea'
+				? `<${tag} ${attrs} />`
+				: `<${tag} ${attrs}>${children}</${tag}>`;
+		const src = source.replace(template, element).replace('host(Host)', `host(Host, '${tag}')`);
+		const { code } = compile(src, 'frame.tsrx', { mode: 'server' });
+		expect(imports(code)).toEqual(['octane/react/server']);
+		const { Frame } = evaluateCompiledFixtureCode(code, 'frame.tsrx', 'server', {
+			'octane/react/server': { createReactCompatHost },
+		});
+		const rendered = Frame({ input: { active: true }, className: 'ignored', id: 'example' });
+		expect(rendered.type).toBe(tag);
+		expect(rendered.props).toMatchObject({ className: 'active', id: 'example' });
+		expect(rendered.props).not.toHaveProperty('input');
+	},
+);
+
+it('retains a pure helper and distinguishes shadowed parameter reads', () => {
+	const src =
+		source.replace(
+			template,
+			'<div style={{width: size(props.input.find(props => props.active))}} />',
+		) + "import { size } from './size';";
+	const { code } = compile(src, 'frame.tsrx', { mode: 'server' });
+	const { Frame } = evaluateCompiledFixtureCode(code, 'frame.tsrx', 'server', {
+		'octane/react/server': { createReactCompatHost },
+		'./size': { size: (item: { width: number }) => item.width },
+	});
+	expect(Frame({ input: [{ active: true, width: 42 }] }).props.style).toEqual({ width: 42 });
 });

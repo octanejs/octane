@@ -358,7 +358,7 @@ Passing `false` also removes the head and body.
 ## Binding a streamed React host
 
 Use `createReactCompatHost` when Octane should manage selected properties of
-a layout element while its children stay in the same React tree. Compile
+a native element while its children stay in the same React tree. Compile
 this module for both server and client with Octane.
 
 ```tsrx
@@ -385,15 +385,45 @@ Use the resulting component in ordinary React JSX.
 </Frame>
 ```
 
-The template declares ownership only. Use one `div`, direct reads of the
-corresponding `className`, `data-*`, `aria-*` or `style` props, and
-`{unbound(props.children)}`. Pass plain React DOM values. Binding `style`
-claims the whole object. Omit it when an animation library writes inline
-styles. Other props, events and refs pass through to the div. The compiler
-requires a named local template and the factory call in a module-level
-`const`. Compute any derived values in the caller.
+The default element is a `div`. For another native element, pass a tag literal
+matching the template. TypeScript uses it for the native props, events and ref.
+Declare a private `input` in the template props to derive presentation values.
 
-React streams the div and its children, including pending Suspense boundaries.
+```tsrx
+function TabView(props: { input: { selected: boolean }; children?: never }) @{
+	'use dom bindings';
+	<button
+		class={props.input.selected ? 'selected' : 'tab'}
+		aria-pressed={props.input.selected}
+	>
+		{unbound(props.children)}
+	</button>
+}
+
+export const Tab = createReactCompatHost(TabView, 'button');
+```
+
+```tsx
+<Tab type="button" input={{ selected }} onClick={select} ref={buttonRef}>
+	Details
+</Tab>
+```
+
+Use one native HTML or SVG element, empty or with
+`{unbound(props.children)}`. Use a self-closing template for void elements
+such as `input`. The DOM binding restrictions on custom,
+parser-sensitive and resource elements still apply. The compiler requires a
+local named template and a module-level `const` for the factory call.
+
+Bind `className`, `data-*`, `aria-*` or `style`. Each expression can read its
+corresponding prop and `props.input`, including through an imported pure
+helper. Return plain React DOM values. The same projection runs on the server
+and client. Derived values take precedence over caller props of the same
+name. The private input never becomes a DOM prop. Binding `style` claims the
+whole object. Leave it unbound when an animation library writes inline styles.
+React retains control of children, events, refs and form values.
+
+React streams the element and its children, including pending Suspense boundaries.
 On attachment, Octane checks the compiler's `data-octane-bindings` stamp and
 adopts the declared properties on that same element. If the stamp is missing
 or stale, React keeps ownership. Abandoned renders never update the bindings.
