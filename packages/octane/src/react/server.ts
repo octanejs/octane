@@ -26,6 +26,7 @@
  *   sentinel keeps React from ever touching the descendants (§9.3).
  */
 export { ReactCompat, ReactCompatDocument, ReactCompatInline } from './react-compat-server.js';
+export { createReactCompatHost } from './react-compat-host.js';
 export { bridgeReactContext } from './react-compat-shared.js';
 export type {
 	ReactCompatProps,

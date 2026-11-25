@@ -5,6 +5,7 @@ declare const process: { env: { NODE_ENV?: string } };
 import { RENDERER_REGION_OWNER_TAG as RENDERER_REGION_OWNER } from '../runtime-tags.js';
 
 export { ReactCompat, ReactCompatDocument, ReactCompatInline } from './react-compat.js';
+export { createReactCompatHost } from './react-compat-host.js';
 export { bridgeReactContext } from './react-compat-shared.js';
 export type {
 	ReactCompatProps,

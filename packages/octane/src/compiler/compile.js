@@ -148,7 +148,7 @@ import {
 	isDirectSignalHandleExpression,
 	lowerNativeAttributeReads,
 } from './native-attribute-reads.js';
-import { isScalarTextAssertion, prepareDomBindings } from './dom-bindings.js';
+import { hasReactHostImport, isScalarTextAssertion, prepareDomBindings } from './dom-bindings.js';
 import {
 	isHydrateIslandRendererRequest,
 	parseDomBindingIslandRequest,
@@ -12419,6 +12419,8 @@ function compileAuthored(source, filename, options, bundlerMetadata, analyzed = 
 		source.includes('use dom bindings') ||
 		source.includes('adoptBindings') ||
 		source.includes('mountBindings');
+	const reactHosts = source.includes('createReactCompatHost') && hasReactHostImport(analyzedAst);
+	const planBindings = hasDomBindings || reactHosts;
 	// Binding views receive their props from behavior roots, which publish
 	// signal handles, so the module admits handles in opaque holes.
 	if (hasDomBindings) options = { ...options, __signalModuleImport: true };
@@ -12426,13 +12428,17 @@ function compileAuthored(source, filename, options, bundlerMetadata, analyzed = 
 	// Binding plans classify authored child expressions before signal lowering or
 	// JSX extraction. Use the same source-bound proof pass here, exactly once;
 	// query modules no longer contain the original child ranges after planning.
-	const bindingAst = hasDomBindings
+	const bindingAst = planBindings
 		? prepareDomBindings(
 				applyStringChildProofs(analyzedAst, source, cleanFilename, options?.textTypeFacts),
 				source,
 				cleanFilename,
 				bindingExport,
 				{
+					reactHosts,
+					strong: strongModeEnabled,
+					server: mode === 'server',
+					typescript: output === 'ts',
 					normalizeChildren,
 					conditionalJsxStatement,
 					isText: isKnownTextChildExpression,
@@ -12484,7 +12490,7 @@ function compileAuthored(source, filename, options, bundlerMetadata, analyzed = 
 				strongHookAnalysis: strongAnalysis.strongHookAnalysis,
 			})
 		: signalAst;
-	const textTypedAst = hasDomBindings
+	const textTypedAst = planBindings
 		? memoizedAst
 		: applyStringChildProofs(memoizedAst, source, cleanFilename, options?.textTypeFacts);
 	let constantAst = textTypedAst;

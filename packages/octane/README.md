@@ -138,6 +138,9 @@ React retains its own state, events, refs, and component types, including class,
 prop to map native context into React. Within `OctaneCompat`, Octane's `use` or
 `useContext` can read a real React context directly.
 
+For streamed React layouts, [`createReactCompatHost`](https://github.com/octanejs/octane/blob/main/docs/react-compat.md#binding-a-streamed-react-host)
+lets a Strong template bind properties of a div while React hydrates its children in place.
+
 Both server implementations are exported from `octane/react/server`. Octane's
 server compiler selects that entry automatically; React-owned server entries
 that bypass it must select it explicitly. Each renderer commits its own work:
