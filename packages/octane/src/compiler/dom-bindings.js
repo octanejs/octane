@@ -1,6 +1,10 @@
 /** Explicit presentation views share authored SSR markup with a renderer-free program. */
 import { builders as b, strongHash } from '@tsrx/core';
-import { createLexicalAnalysis } from './compile-universal.js';
+import {
+	createLexicalAnalysis,
+	forEachRuntimeAstChild,
+	isJsxBindingReference,
+} from './compile-universal.js';
 import { inheritHookMemoOrigin } from './inline-hook-memo.js';
 import {
 	ATTRIBUTE_ALIASES,
@@ -1876,6 +1880,14 @@ function projectProgram(ast, plan, filename, lexical) {
 			],
 		};
 	}
+	const descriptor = scalarDescriptor(plan, lexical, importNodes, needed);
+	return {
+		...ast,
+		body: [...importNodes, inheritHookMemoOrigin(b.export_default(descriptor), plan.fn)],
+	};
+}
+
+function scalarDescriptor(plan, lexical, importNodes, needed) {
 	const project = inheritHookMemoOrigin(
 		b.arrow(
 			plan.fn.params,
@@ -1950,30 +1962,19 @@ function projectProgram(ast, plan, filename, lexical) {
 			plan.fn,
 		),
 	);
-	return {
-		...ast,
-		body: [
-			...importNodes,
-			inheritHookMemoOrigin(
-				b.export_default(
-					b.object([
-						b.prop('init', b.id('adopt'), b.id(adopt)),
-						...scalarProperties(
-							plan,
-							project,
-							classFactory ? b.id(classFactory) : null,
-							signalFactory ? b.id(signalFactory) : null,
-							styleFactory ? b.id(styleFactory) : null,
-							controlFactory ? b.id(controlFactory) : null,
-							projectionFactory ? b.id(projectionFactory) : null,
-							urlCapability ? b.id(urlCapability) : null,
-						),
-					]),
-				),
-				plan.fn,
-			),
-		],
-	};
+	return b.object([
+		b.prop('init', b.id('adopt'), b.id(adopt)),
+		...scalarProperties(
+			plan,
+			project,
+			classFactory ? b.id(classFactory) : null,
+			signalFactory ? b.id(signalFactory) : null,
+			styleFactory ? b.id(styleFactory) : null,
+			controlFactory ? b.id(controlFactory) : null,
+			projectionFactory ? b.id(projectionFactory) : null,
+			urlCapability ? b.id(urlCapability) : null,
+		),
+	]);
 }
 
 function checkImportedBindingReads(artifact, lexical, program) {
@@ -2069,11 +2070,7 @@ function checkImportedBindingReads(artifact, lexical, program) {
 }
 
 function isRuntimeReference(node, lexical, parent, key) {
-	if (node.type === 'JSXIdentifier')
-		return (
-			(parent?.type === 'JSXOpeningElement' || parent?.type === 'JSXClosingElement') &&
-			key === 'name'
-		);
+	if (node.type === 'JSXIdentifier') return isJsxBindingReference(node, parent, key);
 	if (
 		node.type !== 'Identifier' ||
 		lexical.bindingNodes.has(node) ||
@@ -2090,6 +2087,162 @@ function isRuntimeReference(node, lexical, parent, key) {
 		return false;
 	if (parent?.type === 'Property' && key === 'key' && !parent.computed) return false;
 	return true;
+}
+
+// Fizz owns the children and writes the initial React props. Every channel
+// adopted at commit must describe that same markup, including its prop name.
+function assertReactHost(plan, fn, filename) {
+	const reads = (value, name) => {
+		const member = unwrap(value);
+		return (
+			member?.type === 'MemberExpression' &&
+			!member.optional &&
+			member.object.type === 'Identifier' &&
+			member.object.name === fn.params[0]?.name &&
+			(member.computed ? member.property.value : member.property.name) === name
+		);
+	};
+	if (
+		plan?.handoff !== 'host' ||
+		plan.nodes[0][1] !== 'div' ||
+		plan.unbound.size !== 1 ||
+		!reads(plan.unbound.values().next().value, 'children')
+	)
+		error(
+			filename,
+			fn,
+			'createReactCompatHost requires a single div with {unbound(props.children)}',
+		);
+	const attributes = plan.render.openingElement?.attributes ?? plan.render.attributes;
+	if (plan.bindings.length !== attributes.length)
+		error(
+			filename,
+			fn,
+			'createReactCompatHost requires every attribute to bind its corresponding prop',
+		);
+	for (const attr of attributes) {
+		const name = attrName(attr);
+		const prop = name === 'class' ? 'className' : name;
+		if (
+			!(prop === 'className' || prop === 'style' || /^(data|aria)-[a-z0-9_.-]+$/.test(prop)) ||
+			/^data-oct(?:ane)?(?:-|$)/.test(prop) ||
+			!reads(attrValueForBinding(attr), prop)
+		)
+			error(
+				filename,
+				attr,
+				'createReactCompatHost requires unique, same-name className, style, data-* or aria-* prop reads',
+			);
+	}
+}
+
+function isReactHostFactory(binding) {
+	return (
+		binding?.imported === 'createReactCompatHost' &&
+		(binding.source === 'octane/react' || binding.source === 'octane/react/server')
+	);
+}
+
+export function hasReactHostImport(ast) {
+	return [...importedBindings(ast).values()].some(isReactHostFactory);
+}
+
+function lowerReactHosts(
+	ast,
+	source,
+	filename,
+	helpers,
+	lexical,
+	imports,
+	scalarFor,
+	localFunctions,
+	replacements,
+) {
+	const views = new Set();
+	const added = [];
+	for (const statement of ast.body) {
+		const declaration = statement.declaration ?? statement;
+		if (declaration.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
+		for (const { init } of declaration.declarations) {
+			const call = unwrap(init);
+			if (
+				call?.type !== 'CallExpression' ||
+				call.callee.type !== 'Identifier' ||
+				!isReactHostFactory(imports.get(call.callee.name))
+			)
+				continue;
+			const argument = unwrap(call.arguments[0]);
+			const fn = argument?.type === 'Identifier' && localFunctions.get(argument.name);
+			if (
+				call.optional ||
+				call.arguments.length !== 1 ||
+				!helpers.strong ||
+				!fn ||
+				fn.body.type !== 'JSXCodeBlock' ||
+				statements(fn).length !== 1 ||
+				!isDirective(statements(fn)[0])
+			)
+				error(
+					filename,
+					call,
+					"createReactCompatHost requires a local named Strong 'use dom bindings' template",
+				);
+			const plan = scalarFor(fn, bindingRender(fn, filename));
+			assertReactHost(plan, fn, filename);
+			const basename = filename.split(/[\\/]/).pop();
+			const id = `d:${strongHash(`octane:react-host:1\0${basename}\0${source.slice(fn.start, fn.end)}`)}`;
+			const server =
+				helpers.server || imports.get(call.callee.name).source === 'octane/react/server';
+			let descriptor = server
+				? b.literal(id)
+				: scalarDescriptor({ ...plan, id, handoff: null, signalIndices: [] }, lexical, added);
+			if (helpers.typescript)
+				descriptor = b.ts_as(
+					b.ts_as(descriptor, b.ts_keyword_type('unknown')),
+					b.ts_type_query(b.id(fn.id.name)),
+				);
+			replacements.set(call, {
+				...call,
+				arguments: [inheritHookMemoOrigin(descriptor, argument)],
+				__octanePure: true,
+			});
+			views.add(fn);
+		}
+	}
+	const remaining = remainingReferences(ast, lexical, new Set([...views, ...replacements.keys()]));
+	for (const name of remaining)
+		if (isReactHostFactory(imports.get(name)))
+			error(
+				filename,
+				imports.get(name).specifier,
+				'createReactCompatHost must initialize a module-scope const directly',
+			);
+	for (const fn of views) {
+		if (!ast.body.includes(fn) || remaining.has(fn.id.name)) continue;
+		// Preserve typeof Host and the factory's inferred props without shipping its render body.
+		replacements.set(
+			fn,
+			helpers.typescript
+				? {
+						...fn,
+						type: 'TSDeclareFunction',
+						declare: true,
+						body: null,
+						returnType: fn.returnType ?? b.ts_type_annotation(b.ts_keyword_type('unknown', fn), fn),
+					}
+				: null,
+		);
+	}
+	if (views.size > 0)
+		pruneImports(ast, replacements, (name) => {
+			const binding = imports.get(name);
+			return (
+				binding?.source === 'octane/behavior' &&
+				binding.imported === 'unbound' &&
+				!remaining.has(name)
+			);
+		});
+	return { views, added };
 }
 
 /** Lower only statically proven imported calls; authored types keep the real view import. */
@@ -2202,16 +2355,7 @@ function lowerAdoptions(ast, filename) {
 		);
 		replacements.set(view, inheritHookMemoOrigin(b.id(local), view));
 	});
-	const remaining = new Set();
-	walk(ast, (node, parent, key) => {
-		if (node.type.startsWith('TS') && !UNWRAP.has(node.type)) return false;
-		if (
-			isRuntimeReference(node, lexical, parent, key) &&
-			!consumed.has(node) &&
-			lexical.resolveBinding(lexical.nodeScopes.get(node), node.name)?.scope === lexical.rootScope
-		)
-			remaining.add(node.name);
-	});
+	const remaining = remainingReferences(ast, lexical, consumed);
 	for (const name of intrinsics) {
 		if (remaining.has(name))
 			error(
@@ -2221,16 +2365,34 @@ function lowerAdoptions(ast, filename) {
 			);
 	}
 	const candidates = new Set([...consumed].map((node) => node.name));
+	pruneImports(ast, replacements, (name) => candidates.has(name) && !remaining.has(name));
+	const lowered = mapCow(ast, replacements);
+	return { ...lowered, body: [...added, ...lowered.body] };
+}
+
+function remainingReferences(ast, lexical, consumed) {
+	const remaining = new Set();
+	function visit(node, parent, key) {
+		if (!node || consumed.has(node)) return;
+		if (
+			isRuntimeReference(node, lexical, parent, key) &&
+			lexical.resolveBinding(lexical.nodeScopes.get(node) ?? lexical.rootScope, node.name)
+				?.scope === lexical.rootScope
+		)
+			remaining.add(node.name);
+		forEachRuntimeAstChild(node, (child, childKey) => visit(child, node, childKey));
+	}
+	visit(ast);
+	return remaining;
+}
+
+function pruneImports(ast, replacements, remove) {
 	for (const node of ast.body) {
 		if (node.type !== 'ImportDeclaration') continue;
-		const specifiers = node.specifiers.filter(
-			(specifier) => !candidates.has(specifier.local.name) || remaining.has(specifier.local.name),
-		);
+		const specifiers = node.specifiers.filter((specifier) => !remove(specifier.local.name));
 		if (specifiers.length !== node.specifiers.length)
 			replacements.set(node, specifiers.length === 0 ? null : { ...node, specifiers });
 	}
-	const lowered = mapCow(ast, replacements);
-	return { ...lowered, body: [...added, ...lowered.body] };
 }
 
 /** A module specifier for `to`, resolved from the module at `from`. */
@@ -2859,6 +3021,19 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 		completeCycle(members);
 		return plan;
 	};
+	const reactHosts = helpers.reactHosts
+		? lowerReactHosts(
+				ast,
+				source,
+				filename,
+				helpers,
+				lexical,
+				imports,
+				scalarFor,
+				localFunctions,
+				replacements,
+			)
+		: null;
 	walk(ast, (node, parent) => {
 		if (
 			!['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node.type)
@@ -2866,11 +3041,13 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			return;
 		const setup = statements(node);
 		if (!setup.some(isDirective)) return;
+		if (reactHosts?.views.has(node) && replacements.has(node)) return false;
 		if (
-			node.type !== 'FunctionDeclaration' ||
-			parent?.type !== 'ExportNamedDeclaration' ||
-			!ast.body.includes(parent) ||
-			!node.id
+			!reactHosts?.views.has(node) &&
+			(node.type !== 'FunctionDeclaration' ||
+				parent?.type !== 'ExportNamedDeclaration' ||
+				!ast.body.includes(parent) ||
+				!node.id)
 		) {
 			error(filename, node, 'binding views must be named top-level exported functions');
 		}
@@ -3013,5 +3190,11 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 		}
 		helpers.collectConstants(shareableConstants(ast, [...names], lexical, imports));
 	}
-	return lowerAdoptions(mapCow(ast, replacements), filename);
+	const lowered = mapCow(ast, replacements);
+	return lowerAdoptions(
+		reactHosts?.added.length
+			? { ...lowered, body: [...lowered.body, ...reactHosts.added] }
+			: lowered,
+		filename,
+	);
 }

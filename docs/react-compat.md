@@ -354,3 +354,48 @@ promise tracks behavior adoption only. React may still be hydrating. Calling
 `shell.dispose()` aborts those listeners and unmounts React, including React's
 DOM cleanup. Leave `preserveDOM` at its default to keep the document structure.
 Passing `false` also removes the head and body.
+
+## Binding a streamed React host
+
+Use `createReactCompatHost` when Octane should manage selected properties of
+a layout element while its children stay in the same React tree. Compile
+this module for both server and client with Octane.
+
+```tsrx
+'use strong';
+
+import { unbound } from 'octane/behavior';
+import { createReactCompatHost } from 'octane/react';
+
+function View(props: { className?: string; 'data-open': boolean; children?: never }) @{
+	'use dom bindings';
+	<div class={props.className} data-open={props['data-open']}>
+		{unbound(props.children)}
+	</div>
+}
+
+export const Frame = createReactCompatHost(View);
+```
+
+Use the resulting component in ordinary React JSX.
+
+```tsx
+<Frame className="frame" data-open={open} ref={frameRef}>
+	<Outlet />
+</Frame>
+```
+
+The template declares ownership only. Use one `div`, direct reads of the
+corresponding `className`, `data-*`, `aria-*` or `style` props, and
+`{unbound(props.children)}`. Pass plain React DOM values. Binding `style`
+claims the whole object. Omit it when an animation library writes inline
+styles. Other props, events and refs pass through to the div. The compiler
+requires a named local template and the factory call in a module-level
+`const`. Compute any derived values in the caller.
+
+React streams the div and its children, including pending Suspense boundaries.
+On attachment, Octane checks the compiler's `data-octane-bindings` stamp and
+adopts the declared properties on that same element. If the stamp is missing
+or stale, React keeps ownership. Abandoned renders never update the bindings.
+The component also works in a client-only React root. It adds no wrapper,
+shadow root, portal or second renderer root.
