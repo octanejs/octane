@@ -379,7 +379,7 @@ function plan(project, mode, integration, nativeTypeScript) {
 				file: 'octane.config.ts',
 				summary:
 					mode === 'data'
-						? 'create, with routes for /, /counter, /books, and GET /api/health'
+						? 'create, with routes for /, /counter, /books, and GET /api/health, inside src/store.ts’s data store'
 						: 'create, with routes for /, /counter, and GET /api/health',
 				apply: writeFile(at('octane.config.ts'), octaneConfig(mode)),
 			});
@@ -493,9 +493,10 @@ function plan(project, mode, integration, nativeTypeScript) {
 
 		// Not a page: it renders nothing and reads no tokens, so it is deliberately
 		// outside the list above.
-		// The data page's contracts, their handler, and the data client the build makes
-		// the data worker from. They follow the page that uses them, like the layout.
-		if (writesBooks) {
+		// The config's data module and what it imports: the contracts, their handler, and
+		// the data client the build makes the data worker from. They follow the config
+		// that names `/src/store.ts`, not the page, since every route renders inside it.
+		if (scaffoldsRoutes && mode === 'data') {
 			for (const [file, body, summary] of [
 				['src/books.data.ts', booksContracts, 'create the reading list’s contracts'],
 				['src/server/data.ts', booksHandler, 'create the handler that serves them'],
@@ -505,7 +506,7 @@ function plan(project, mode, integration, nativeTypeScript) {
 					dataClientModule,
 					'create the data client the data worker is built from',
 				],
-				['src/store.ts', dataStore, 'create the store the page reads from'],
+				['src/store.ts', dataStore, 'create the data module every route renders inside'],
 			]) {
 				if (!existsSync(at(file)))
 					changes.push({ file, summary, apply: writeFile(at(file), body) });

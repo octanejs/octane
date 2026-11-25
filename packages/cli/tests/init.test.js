@@ -105,6 +105,29 @@ describe('octane init', () => {
 		expect(existsSync(path.join(root, 'src/main.ts'))).toBe(false);
 	});
 
+	it('writes the data module the config names even when the project already has the data page', async () => {
+		// Every route renders inside the store src/store.ts opens, so the config's
+		// `data` entry needs it whether or not this run writes src/Books.tsrx.
+		const own = 'export function Books() @{\n  <p>Mine</p>\n}\n';
+		const { root } = fixture({ 'src/Books.tsrx': own });
+
+		await runCli(['init', '--cwd', root, '--mode', 'data', '--yes', '--no-install'], {
+			exec: gitExec(),
+		});
+
+		expect(read(root, 'octane.config.ts')).toContain('data: "/src/store.ts"');
+		for (const file of [
+			'src/store.ts',
+			'src/data.tsrx',
+			'src/data.client.ts',
+			'src/books.data.ts',
+			'src/server/data.ts',
+		]) {
+			expect(existsSync(path.join(root, file)), file).toBe(true);
+		}
+		expect(read(root, 'src/Books.tsrx')).toBe(own);
+	});
+
 	it('scaffolds no pages into a project that brought its own route config', async () => {
 		// The pages exist to serve the routes this command declares. A project with
 		// its own octane.config.ts keeps it, and that config names its own entries,

@@ -71,8 +71,10 @@ src/
 reading list at `/books` that loads and adds books through a data worker. The
 build makes that worker from `src/data.client.ts`, the one module that says how
 the app reaches its server, so requests, schema checks and the cache stay off
-the page's main thread, and every tab shares them. The page server-renders its
-frame and a loading line, then the data worker loads the list in the browser.
+the page's main thread, and every tab shares them. `src/store.ts` is the
+config's `data` module: the server renders the list in a store of its own and
+writes what it loaded into the page, and the browser's store starts from that,
+so hydration loads nothing.
 
 <!-- scaffold:data -->
 
@@ -91,7 +93,7 @@ src/
   books.data.ts       the contracts: a Book entity, its view, and addBook
   data.client.ts      the data client the data worker is built from
   data.tsrx           the module server function the store calls
-  store.ts            openDataStore("guest")
+  store.ts            the data module: a store per request, then the data worker's
   styles.css          the reset and the theme tokens
   server/data.ts      the handler that serves the contracts
   server/health.ts    GET /api/health
