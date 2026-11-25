@@ -61,24 +61,26 @@ export function findRoot(cwd) {
 }
 
 /**
- * @param {string} root
  * @param {string} spec
  * @param {string} fromDir
  * @returns {string | null}
  */
-function resolveExtends(root, spec, fromDir) {
+function resolveExtends(spec, fromDir) {
 	if (spec.startsWith('.') || path.isAbsolute(spec)) {
 		const base = path.resolve(fromDir, spec);
 		if (existsSync(base) && !spec.endsWith('.json')) return path.join(base, 'tsconfig.json');
 		return existsSync(base) ? base : `${base}.json`;
 	}
-	const candidate = path.join(root, 'node_modules', spec);
-	if (existsSync(candidate)) {
-		return existsSync(path.join(candidate, 'tsconfig.json'))
-			? path.join(candidate, 'tsconfig.json')
-			: candidate;
+	for (let dir = fromDir; ; dir = path.dirname(dir)) {
+		const candidate = path.join(dir, 'node_modules', spec);
+		if (existsSync(candidate)) {
+			return existsSync(path.join(candidate, 'tsconfig.json'))
+				? path.join(candidate, 'tsconfig.json')
+				: candidate;
+		}
+		if (existsSync(`${candidate}.json`)) return `${candidate}.json`;
+		if (path.dirname(dir) === dir) return null;
 	}
-	return existsSync(`${candidate}.json`) ? `${candidate}.json` : null;
 }
 
 /**
@@ -113,7 +115,7 @@ export function loadTsconfig(root, file = path.join(root, 'tsconfig.json')) {
 
 		const parent = config.extends;
 		if (typeof parent !== 'string') break;
-		current = resolveExtends(root, parent, path.dirname(current));
+		current = resolveExtends(parent, path.dirname(current));
 	}
 
 	return chain.length > 0 ? { path: file, config: merged, chain } : null;

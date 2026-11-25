@@ -68,6 +68,30 @@ describe('octane doctor', () => {
 		expect(result.exitCode).toBe(0);
 	});
 
+	it('reads a tsconfig base package hoisted above the project', async () => {
+		const { root } = fixture({
+			'app/package.json': HEALTHY['package.json'],
+			'app/tsconfig.json': { extends: '@workspace/tsconfig/base.json' },
+			'node_modules/@workspace/tsconfig/package.json': {
+				name: '@workspace/tsconfig',
+				version: '1.0.0',
+			},
+			'node_modules/@workspace/tsconfig/base.json': HEALTHY['tsconfig.json'],
+		});
+
+		const result = await runCli([
+			'doctor',
+			'--cwd',
+			path.join(root, 'app'),
+			'--json',
+			'--only',
+			'ts.jsx-import-source',
+		]);
+
+		expect(check(result.json(), 'ts.jsx-import-source').status).toBe('pass');
+		expect(result.exitCode).toBe(0);
+	});
+
 	it('reports the mapper required by TypeScript 7.1', async () => {
 		const { root } = fixture({
 			...HEALTHY,
