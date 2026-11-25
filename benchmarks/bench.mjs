@@ -1007,6 +1007,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Universal keyed @for survivor rows (Node-only): 1,000 compiled rows beside
+		// a counter, with a called-row control that must re-render every row.
+		name: 'universal-for-row-memo',
+		cwd: 'universal-for-row-memo',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Universal object-driver teardown (Node-only): wide sibling unmounts through
 		// transactional simulation and apply, with exact remove/destroy controls.
 		name: 'universal-object-teardown',
