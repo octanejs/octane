@@ -2453,15 +2453,23 @@ function collectIdentifierNodes(root, names) {
 	return output;
 }
 
+// JSX text rules, matching the DOM compiler: tabs become spaces, whitespace
+// that touches a line break is dropped, and the remaining lines join with one
+// space. Whitespace inside a line, including the edges of a single-line text
+// next to an element, is kept.
 function normalizeJsxText(value) {
-	const lines = String(value).replace(/\r/g, '').split('\n');
+	const lines = String(value).split(/\r\n|\n|\r/);
+	let lastNonEmptyLine = 0;
+	for (let index = 0; index < lines.length; index++) {
+		if (/[^ \t]/.test(lines[index])) lastNonEmptyLine = index;
+	}
 	let output = '';
 	for (let index = 0; index < lines.length; index++) {
-		const line = lines[index].replace(/\t/g, ' ');
-		const text = index === 0 ? line.replace(/\s+$/g, '') : line.trim();
+		let text = lines[index].replace(/\t/g, ' ');
+		if (index !== 0) text = text.replace(/^ +/, '');
+		if (index !== lines.length - 1) text = text.replace(/ +$/, '');
 		if (text === '') continue;
-		if (output !== '' && !output.endsWith(' ')) output += ' ';
-		output += text;
+		output += index === lastNonEmptyLine ? text : `${text} `;
 	}
 	return output;
 }

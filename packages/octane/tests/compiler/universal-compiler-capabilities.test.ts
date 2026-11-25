@@ -121,7 +121,7 @@ describe('universal compiler renderer capabilities', () => {
 			{ renderer: resolvedLynxRenderer, hmr: false },
 		).code;
 
-		expect(legal).toContain('"kind": "text", "value": "Hello"');
+		expect(legal).toContain('"kind": "text", "value": "Hello "');
 		expect(legal).toContain('"type": "raw-text"');
 		expect(() =>
 			compile('export function Scene() @{ <view>illegal</view> }', '/src/Illegal.lynx.tsrx', {
