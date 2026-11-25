@@ -3975,6 +3975,185 @@ function forRowTemplateBody(node) {
 	return statements.map((statement) => (statement === root ? unkeyed : statement));
 }
 
+// Globals a row may read or call during render without a dependency slot,
+// matching the DOM compiler's immutable ambient reads and conversion calls.
+const FOR_MEMO_PURE_GLOBALS = new Set([
+	'undefined',
+	'NaN',
+	'Infinity',
+	'Math',
+	'JSON',
+	'Array',
+	'Object',
+	'String',
+	'Number',
+	'Boolean',
+	'BigInt',
+	'Symbol',
+	'parseInt',
+	'parseFloat',
+	'isNaN',
+	'isFinite',
+	'encodeURI',
+	'encodeURIComponent',
+	'decodeURI',
+	'decodeURIComponent',
+]);
+const FOR_MEMO_PURE_CALLS = new Set([
+	'String',
+	'Number',
+	'Boolean',
+	'BigInt',
+	'Symbol',
+	'parseInt',
+	'parseFloat',
+	'isNaN',
+	'isFinite',
+	'encodeURI',
+	'encodeURIComponent',
+	'decodeURI',
+	'decodeURIComponent',
+]);
+const FOR_MEMO_TEMPLATE_NODES = new Set([
+	'JSXElement',
+	'Element',
+	'JSXFragment',
+	'JSXOpeningElement',
+	'JSXClosingElement',
+	'JSXOpeningFragment',
+	'JSXClosingFragment',
+	'JSXAttribute',
+	'JSXIdentifier',
+	'JSXNamespacedName',
+	'JSXText',
+	'JSXExpressionContainer',
+	'JSXEmptyExpression',
+	'JSXIfExpression',
+	'JSXForExpression',
+	'JSXSwitchExpression',
+	'SwitchCase',
+	'BlockStatement',
+	'VariableDeclaration',
+	'VariableDeclarator',
+]);
+
+function moduleMutableBindings(state) {
+	if (state.moduleMutableBindings !== undefined) return state.moduleMutableBindings;
+	const names = new Set();
+	for (let statement of state.ast.body ?? []) {
+		if (statement.type === 'ExportNamedDeclaration') statement = statement.declaration;
+		if (statement?.type === 'VariableDeclaration' && statement.kind !== 'const') {
+			for (const declaration of statement.declarations ?? []) addPatternNames(declaration.id, names);
+		}
+	}
+	return (state.moduleMutableBindings = names);
+}
+
+// A row survivor may reuse its committed output when its item identity (and its
+// index, if the body reads one) and every value the body closes over are
+// unchanged — the universal counterpart of the DOM compiler's DEP-PURE @for.
+// Returns the closed-over names, or null when the body can observe anything
+// else during render: hooks, components, refs, code blocks, boundaries, calls
+// other than conversion globals, writes, or mutable module and global reads.
+// Event handlers and other nested functions run after render, so only their
+// captures count.
+function forItemMemo(node, state) {
+	// Renderer-region lowering compiles a synthetic module with no authored AST.
+	if (state.hmr || state.dev || state.profile || !state.ast || node.empty != null) return null;
+	const lexical = createLexicalAnalysis(state.ast);
+	const { nodeScopes, resolveBinding, rootScope } = lexical;
+	const itemScope = nodeScopes.get(node.body);
+	if (itemScope === undefined) return null;
+	const mutable = moduleMutableBindings(state);
+	const deps = new Set();
+	let readsIndex = false;
+	let safe = true;
+	const visit = (n, parent, key, deferred) => {
+		if (!safe || !n || typeof n !== 'object') return;
+		if (Array.isArray(n)) {
+			for (const child of n) visit(child, parent, key, deferred);
+			return;
+		}
+		const type = n.type;
+		if (type === 'ArrowFunctionExpression' || type === 'FunctionExpression') {
+			forEachRuntimeAstChild(n, (child, childKey) => visit(child, n, childKey, true));
+			return;
+		}
+		if (type === 'Identifier') {
+			if (!isIdentifierReference(n, parent, key, lexical)) return;
+			const binding = resolveBinding(nodeScopes.get(n) ?? rootScope, n.name);
+			if (binding === null) {
+				if (
+					!deferred &&
+					!FOR_MEMO_PURE_GLOBALS.has(n.name) &&
+					n.name !== state.helpers.normalizeClass
+				) {
+					safe = false;
+				}
+			} else if (scopeContains(binding.scope, itemScope)) {
+				if (node.index?.name === n.name && binding.scope === itemScope) readsIndex = true;
+			} else if (binding.scope !== rootScope || binding.importSource !== null) {
+				deps.add(n.name);
+			} else if (mutable.has(n.name)) {
+				safe = false;
+			}
+			return;
+		}
+		if (!deferred) {
+			if (type?.startsWith('JSX') || type === 'Element' || FOR_MEMO_TEMPLATE_NODES.has(type)) {
+				if (!FOR_MEMO_TEMPLATE_NODES.has(type)) return void (safe = false);
+				if ((type === 'JSXElement' || type === 'Element') && isComponentElement(n)) {
+					return void (safe = false);
+				}
+				if (type === 'JSXElement' || type === 'Element') {
+					const name = jsxName(n);
+					if (name === 'Activity' || name === 'style') return void (safe = false);
+				}
+				if (type === 'JSXAttribute' && attributeName(n) === 'ref') return void (safe = false);
+			} else if (
+				type === 'CallExpression' ||
+				type === 'OptionalCallExpression' ||
+				type === 'NewExpression'
+			) {
+				const callee = n.callee;
+				// Scoped styles wrap a dynamic class in the pure normalizeClass helper.
+				if (
+					type === 'NewExpression' ||
+					callee?.type !== 'Identifier' ||
+					(!FOR_MEMO_PURE_CALLS.has(callee.name) &&
+						callee.name !== state.helpers.normalizeClass) ||
+					resolveBinding(nodeScopes.get(callee) ?? rootScope, callee.name) !== null
+				) {
+					return void (safe = false);
+				}
+			} else if (
+				type === 'TaggedTemplateExpression' ||
+				type === 'AssignmentExpression' ||
+				type === 'UpdateExpression' ||
+				type === 'AwaitExpression' ||
+				type === 'YieldExpression' ||
+				type === 'ThisExpression' ||
+				type === 'Super' ||
+				type === 'MetaProperty' ||
+				type === 'ImportExpression' ||
+				type === 'ClassExpression' ||
+				type === 'SpreadElement' ||
+				type === 'JSXSpreadAttribute' ||
+				type === 'SpreadAttribute' ||
+				(type === 'UnaryExpression' && n.operator === 'delete') ||
+				(type?.endsWith('Statement') && type !== 'BlockStatement') ||
+				type?.endsWith('Declaration')
+			) {
+				if (type !== 'VariableDeclaration') return void (safe = false);
+			}
+		}
+		forEachRuntimeAstChild(n, (child, childKey) => visit(child, n, childKey, deferred));
+	};
+	visit(node.key, node, 'key', false);
+	visit(node.body, node, 'body', false);
+	return safe ? { deps: [...deps].sort(), index: readsIndex } : null;
+}
+
 function compileForAst(authored, context, state) {
 	if (authored.await) {
 		throw universalError(
@@ -4140,11 +4319,21 @@ function compileForAst(authored, context, state) {
 	} else if (node.empty) {
 		args.push(compileBlockValueAst(node.empty?.body ?? [], state, [], node.empty));
 	}
-	if (prepareItem !== null) {
+	const memo = args.length === 3 ? forItemMemo(authored, state) : null;
+	if (prepareItem !== null || memo !== null) {
 		while (args.length < 10) {
 			args.push(inheritGeneratedOrigin(b.unary('void', b.literal(0)), node));
 		}
-		args.push(prepareItem);
+		args.push(prepareItem ?? inheritGeneratedOrigin(b.unary('void', b.literal(0)), node));
+	}
+	if (memo !== null) {
+		args.push(
+			inheritGeneratedOrigin(
+				b.array(memo.deps.map((name) => generatedIdentifier(name, node))),
+				node,
+			),
+			b.literal(memo.index),
+		);
 	}
 	return addDynamicAst(context, generatedCall(referenceHelper(state, 'for'), args, node));
 }
@@ -5258,6 +5447,7 @@ export function compileUniversal(
 		hmrDialect,
 		hmrComponents: [],
 		profile: options.profile === true,
+		dev: options.dev === true,
 		profileFilename: options.profileFilename,
 		helpers: {},
 		usedHelpers: new Set(),
