@@ -29,7 +29,9 @@ const rowsSchema: StandardSchema<unknown, Row[]> = {
 	},
 };
 
-export const rows = read({ name: 'bench.rows', output: rowsSchema });
+// Never stale on its own, so a first load served from the owner's memory or
+// cache starts no refetch: each step's `refresh()` is the round's only request.
+export const rows = read({ name: 'bench.rows', output: rowsSchema, fresh: Infinity });
 
 export function makeRows(count: number, round: number): Row[] {
 	return Array.from({ length: count }, (_, id) => ({
