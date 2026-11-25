@@ -939,6 +939,35 @@ describe('scoped promise resources', () => {
 		expect(card$.get()).toEqual({ id: 'b', left: 'b left', right: 'b right' });
 	});
 
+	it('settles a ready promise on the clock it was installed with, whatever an earlier clock left', async () => {
+		// An earlier test's producer opens the shared budget window and ends with its task still
+		// held, as a test that awaits a snapshot rather than the clock does.
+		const earlier = owner();
+		const first = deferred<string>();
+		const first$ = createResource(earlier, 'first', () => query('earlier', () => first.promise)(0));
+		first$.snapshot();
+		first.resolve('earlier');
+		await Promise.resolve();
+		await Promise.resolve();
+		// Real time passes before the next test installs its clock, as it does on a loaded machine.
+		const until = performance.now() + 6;
+		while (performance.now() < until);
+		clock.uninstall();
+		clock = installTestClock();
+
+		const scope = owner();
+		const gate = deferred<string>();
+		const resource$ = createResource(scope, 'resource', () =>
+			query('later', () => gate.promise)(0),
+		);
+		resource$.snapshot();
+		gate.resolve('ready');
+		// The clock has not moved, so its budget is not spent: no host task is needed. Waiting on
+		// the earlier window's task, which now runs on a real timer, would race the test's end.
+		for (let i = 0; i < 10; i++) await Promise.resolve();
+		expect(resource$.get()).toBe('ready');
+	});
+
 	it.each(permutations)(
 		'retains complete results while independent promises resolve in order %j,%j,%j',
 		async (...order) => {
