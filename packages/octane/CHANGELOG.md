@@ -1,5 +1,22 @@
 # octane
 
+## 0.25.0
+
+### Minor Changes
+
+- 27d219c: Add ReactCompatDocument to stream and hydrate React-owned HTML documents with an Octane behavior root for shell events and cleanup.
+- 19d6c6f: Declare an app's data client once and let the build make its data worker. `export default defineDataClient({ transport, listen?, persist? })` from `octane/data`, with `persist` a function of the signed-in account, in one module, and set the new `dataClient` option of `octane()` from `octane/compiler/vite` or `@octanejs/vite-plugin`, or of `OctaneRspackPlugin`, to its path. The plugins generate the data worker from it, emitted and served at `/_octane/data-worker.js` as `dataWorker` is, and `octane/data/client`, whose `openDataStore(account, { seed?, seedAge?, form? })` opens a page's store over that worker with the client's options and the build's contracts. `dataWorker` stays for apps that write their own worker module; the two options are exclusive, and `dataClient` needs the generated manifest, so it refuses `data: false`.
+- 5d2cfb1: `write()` and `feed()` take a `version`, as `read()` does, and `contractIdentity` includes it. Change it when a deploy changes what a write's or a feed's schemas accept or return in a way their JSON Schema shape can't show, such as a transform: tabs of builds whose versions differ never share a data worker's owner, so an older worker never validates for a newer tab with its own schemas. A write's or feed's `version` affects nothing else.
+
+### Patch Changes
+
+- 79df583: `octane/data`: with a journal, the data worker validates the input of each write it recovers from a previous session and each receipt's reply, and the tab uses them without validating them again.
+- cabb8a7: `octane/data`: the data worker validates the values it restores from the account's cache, and a tab adopts them without validating them again. A value one tab offers the others, such as one a server render seeded, is taken as that tab's schema made it, so an output schema that transforms its input (text into a `Date`, say) no longer refuses the other tab's offer.
+- aa6d735: Refresh idle keyless computations without reconnecting their subscriber links after each input write.
+- 1973a9d: Keep the edge whitespace of JSX text in universal plans the way the DOM template does. `Before <span>middle</span>` no longer lowers to the text `"Before"` glued to the span, multi-line text joins lines like the DOM template, and tabs inside a line become spaces. Whitespace-only text between elements is still dropped.
+- 31d39db: Compile scoped template blocks in component props and template switches for the Valdi component runtime.
+- aae666f: A watched signal rendered directly in a text or attribute hole can now publish its current value synchronously from its `watched` callback. The write no longer throws `SignalWriteError`, the DOM shows the published value, and the subscription is released on unmount.
+
 ## 0.24.0
 
 ### Minor Changes
