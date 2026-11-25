@@ -6,12 +6,14 @@ import * as Client from 'octane';
 import { prerender } from 'octane/static';
 import {
 	ReactCompat,
+	ReactCompatDocument,
 	ReactCompatInline,
 	bridgeReactContext,
 	type OctaneCompatComponentProps,
 } from 'octane/react/server';
 import {
 	ReactCompat as ClientReactCompat,
+	ReactCompatDocument as ClientDocument,
 	ReactCompatInline as ClientReactCompatInline,
 	type ReactCompatComponentProps,
 } from 'octane/react';
@@ -166,7 +168,9 @@ describe('ReactCompat buffered server rendering', () => {
 		input.focus();
 		input.setSelectionRange(2, 7);
 		const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
-		const environment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
+		const environment = globalThis as typeof globalThis & {
+			IS_REACT_ACT_ENVIRONMENT?: boolean | undefined;
+		};
 		const previous = environment.IS_REACT_ACT_ENVIRONMENT;
 		environment.IS_REACT_ACT_ENVIRONMENT = typeof React.act === 'function';
 		const run = async (callback: () => void) => {
@@ -613,5 +617,105 @@ describe('server renderer resource lifetime', () => {
 		await done;
 		expect(textFrom(html)).toBe('resource');
 		expect(dispose).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe('ReactCompat full documents', () => {
+	function pendingDocument(data: Promise<string>) {
+		function Result() {
+			return React.createElement('main', null, React.use(data));
+		}
+		return React.createElement(
+			'html',
+			null,
+			React.createElement(
+				'body',
+				null,
+				React.createElement(React.Suspense, { fallback: 'waiting' }, React.createElement(Result)),
+			),
+		);
+	}
+
+	it('streams the shell before pending content and keeps the script nonce', async () => {
+		const data = deferred<string>();
+		const stream = await ReactCompatDocument.renderToReadableStream(pendingDocument(data.promise), {
+			nonce: 'example',
+		});
+		const [head, body] = stream.tee();
+		const reader = head.getReader();
+		const first = new TextDecoder().decode((await reader.read()).value);
+		reader.releaseLock();
+		expect(first).toMatch(/^<!DOCTYPE html><html/i);
+		expect(first).toContain('waiting');
+		data.resolve('received');
+		await stream.allReady;
+		const html = await new Response(body).text();
+		await head.cancel();
+		expect(html).toContain('<main>received</main>');
+		expect(html).toContain('nonce="example"');
+	});
+
+	it('forwards a pending document abort to the React error handler', async () => {
+		const controller = new AbortController();
+		const reason = new Error('client left');
+		const onError = vi.fn();
+		const stream = await ReactCompatDocument.renderToReadableStream(
+			pendingDocument(deferred<string>().promise),
+			{ signal: controller.signal, onError },
+		);
+		controller.abort(reason);
+		await stream.allReady;
+		expect(onError.mock.calls[0][0]).toBe(reason);
+	});
+
+	it('hydrates the existing document and releases React with the Octane behavior root', async () => {
+		const cleanup = vi.fn();
+		const errors = vi.fn();
+		const hydrated = deferred<void>();
+		function Page() {
+			const id = React.useId();
+			React.useEffect(() => {
+				hydrated.resolve();
+				return cleanup;
+			}, []);
+			return React.createElement(
+				'html',
+				null,
+				React.createElement(
+					'body',
+					null,
+					React.createElement('label', { htmlFor: id }, id),
+					React.createElement('input', { id }),
+				),
+			);
+		}
+		const tree = React.createElement(Page);
+		const stream = await ReactCompatDocument.renderToReadableStream(tree, {
+			identifierPrefix: 'page-',
+		});
+		const frame = document.body.appendChild(document.createElement('iframe'));
+		const doc = frame.contentDocument!;
+		doc.open();
+		doc.write(await new Response(stream).text());
+		doc.close();
+		const input = doc.querySelector('input')!;
+		input.value = 'draft';
+		const shell = ClientDocument.hydrate(doc, tree, {
+			onRecoverableError: errors,
+			identifierPrefix: 'page-',
+		});
+		await hydrated.promise;
+		try {
+			expect(doc.body.querySelector('input')).toBe(input);
+			expect(input.value).toBe('draft');
+			expect(input.id).toContain('page-');
+			expect(errors).not.toHaveBeenCalled();
+			expect(() => ClientDocument.hydrate(doc, tree)).toThrow();
+		} finally {
+			shell.dispose();
+			frame.remove();
+		}
+		expect(cleanup).toHaveBeenCalledOnce();
+		expect(shell.signal.aborted).toBe(true);
 	});
 });

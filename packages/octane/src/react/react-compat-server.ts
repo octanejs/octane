@@ -1,4 +1,4 @@
-/** Buffered React islands for the Octane server renderer. */
+/** Buffered React islands and streaming React documents. */
 import { renderToReadableStream } from 'react-dom/server';
 import {
 	createElement,
@@ -165,3 +165,6 @@ function createReactCompat(host: 'div' | 'span') {
 export const ReactCompat = /* @__PURE__ */ createReactCompat('div');
 /** Host phrasing React content inside a span with display: contents. */
 export const ReactCompatInline = /* @__PURE__ */ createReactCompat('span');
+
+/** A React-owned document streams directly, without an island host or buffer. */
+export const ReactCompatDocument = { renderToReadableStream };

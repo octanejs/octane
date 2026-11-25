@@ -1,6 +1,8 @@
 /** @jsxImportSource octane */
 /** A real React root owned by one committed Octane boundary. */
+import type { ReactNode } from 'react';
 import { createRoot, hydrateRoot, type HydrationOptions, type Root } from 'react-dom/client';
+import { attachBehaviorRoot, type BehaviorRoot } from '../behavior-root.js';
 import {
 	createElement,
 	descriptorChildren,
@@ -302,3 +304,18 @@ function createReactCompat(host: 'div' | 'span') {
 export const ReactCompat = /* @__PURE__ */ createReactCompat('div');
 /** Host phrasing React content inside a span with display: contents. */
 export const ReactCompatInline = /* @__PURE__ */ createReactCompat('span');
+
+/** Hydrate a React-owned document. Disposing the Octane behavior root unmounts React. */
+export const ReactCompatDocument = {
+	hydrate(document: Document, children: ReactNode, options?: HydrationOptions): BehaviorRoot {
+		const shell = attachBehaviorRoot(document.documentElement);
+		try {
+			const root = hydrateRoot(document, children, options);
+			shell.signal.addEventListener('abort', () => root.unmount(), { once: true });
+			return shell;
+		} catch (error) {
+			shell.dispose();
+			throw error;
+		}
+	},
+};

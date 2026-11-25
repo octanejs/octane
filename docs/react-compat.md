@@ -314,3 +314,43 @@ The [benchmark](../benchmarks/octane-hosted-react/README.md) records native bund
 controls and paired workloads against the same number of direct React roots.
 The shared server request lifetime adds a small fixed cost even without React;
 the benchmark's server measurements report that separately.
+
+## Streaming and hydrating a full document
+
+Use `ReactCompatDocument` when a React framework renders the entire HTML document.
+Call it once at the root with a real React element. Compile the document entry
+with React's JSX transform. Use the ordinary `<ReactCompat>` component for
+islands inside an Octane tree.
+
+```tsx
+/** @jsxImportSource react */
+import { ReactCompatDocument } from 'octane/react/server';
+
+const stream = await ReactCompatDocument.renderToReadableStream(<ServerDocument />, {
+	nonce,
+	signal: request.signal,
+});
+return new Response(stream, { headers: { 'Content-Type': 'text/html' } });
+```
+
+```tsx
+/** @jsxImportSource react */
+import { ReactCompatDocument } from 'octane/react';
+
+const shell = ReactCompatDocument.hydrate(document, <ClientDocument />, {
+	onRecoverableError: reportError,
+});
+document.addEventListener('keydown', handleShortcut, { signal: shell.signal });
+```
+
+React owns the document markup, head resources, IDs and Suspense boundaries.
+The server entry forwards the React DOM stream, including `allReady`, without
+buffering or adding an island host. Both entries accept the native React DOM
+options. Supply the same `identifierPrefix` on both sides if you set one.
+
+The client attaches an Octane behavior root to `document.documentElement`.
+Use it to register behaviors or bind listeners to its lifetime. Its `ready`
+promise tracks behavior adoption only. React may still be hydrating. Calling
+`shell.dispose()` aborts those listeners and unmounts React, including React's
+DOM cleanup. Leave `preserveDOM` at its default to keep the document structure.
+Passing `false` also removes the head and body.
