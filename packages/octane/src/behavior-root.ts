@@ -9,6 +9,7 @@ import type {
 	AdoptionRecord,
 	BehaviorCaptureFactory,
 	BehaviorDOM,
+	BehaviorRootInit,
 	DocumentRegistry,
 	EntryRecord,
 	RangeRecord,
@@ -875,6 +876,13 @@ function disposeRoot(root: RootRecord, options: BehaviorDisposeOptions = {}): vo
 		root.container.removeEventListener(event, listener, true);
 	}
 	root.listeners.clear();
+	const releaseContent = root.releaseContent;
+	root.releaseContent = undefined;
+	try {
+		releaseContent?.();
+	} catch (error) {
+		firstError ??= error;
+	}
 	if (root.registry.roots.get(root.container) === root) {
 		root.registry.roots.delete(root.container);
 	}
@@ -897,9 +905,10 @@ function disposeRoot(root: RootRecord, options: BehaviorDisposeOptions = {}): vo
  * Every owner, observer, listener, and constructor is scoped to the container's
  * own Document, including elements imported from another JavaScript realm.
  */
+export function attachBehaviorRoot(container: Element, options?: BehaviorRootOptions): BehaviorRoot;
 export function attachBehaviorRoot(
 	container: Element,
-	options: BehaviorRootOptions = {},
+	options: BehaviorRootInit = {},
 ): BehaviorRoot {
 	const capture = options.formSubmissions as unknown as BehaviorCaptureFactory | undefined;
 	const document =
@@ -936,6 +945,7 @@ export function attachBehaviorRoot(
 		listeners: new Map(),
 		observer: null,
 		disposed: false,
+		releaseContent: options.releaseContent,
 		unlinkSignal: null,
 	};
 	const root: BehaviorRoot = {
