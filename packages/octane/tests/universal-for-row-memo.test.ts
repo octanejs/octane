@@ -171,6 +171,20 @@ describe('universal @for row memo', () => {
 		]) {
 			expect(emit(body, 'let suffix = ""; const format = (v) => v;\n')).not.toMatch(memo);
 		}
+		for (const body of ['<row-host attach={() => {}} label={row.label} />', '<row-host hidden={row.off} label={row.label} />']) {
+			expect(emit(body)).not.toMatch(memo);
+		}
+		const header = (head: string) =>
+			compile(
+				`export function Rows(props) @{ const fallback = props.fallback; <row-list>@for (${head}) { <row-host label={label} onTap={() => props.pick(label)} /> }</row-list> }`,
+				'/src/Rows.object.tsrx',
+				{ renderer, hmr: false },
+			).code;
+		// A header default is a per-row read of its own captures.
+		expect(header('const { label = fallback } of props.rows').match(memo)![1]).toBe('fallback, props');
+		expect(header('const { label = format(fallback) } of props.rows')).not.toMatch(memo);
+		// A keyed destructured row is a fresh prepared array every render.
+		expect(header('const { label } of props.rows; key label')).not.toMatch(memo);
 		expect(
 			compile(
 				`export function Rows(props) @{ <row-list>@for (const row of props.rows; key row.id) { <row-host label={row.label} /> }</row-list> }`,

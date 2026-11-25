@@ -4109,7 +4109,20 @@ function forItemMemo(node, state) {
 					const name = jsxName(n);
 					if (name === 'Activity' || name === 'style') return void (safe = false);
 				}
-				if (type === 'JSXAttribute' && attributeName(n) === 'ref') return void (safe = false);
+				if (type === 'JSXAttribute') {
+					// Attachments, lifecycles, visibility and main-thread props run or
+					// re-arm per render; a skipped row would change when they fire.
+					const name = attributeName(n);
+					if (
+						name === 'ref' ||
+						name === 'attach' ||
+						name === 'onUpdate' ||
+						name === 'hidden' ||
+						name?.startsWith('main-thread:')
+					) {
+						return void (safe = false);
+					}
+				}
 			} else if (
 				type === 'CallExpression' ||
 				type === 'OptionalCallExpression' ||
@@ -4149,6 +4162,8 @@ function forItemMemo(node, state) {
 		}
 		forEachRuntimeAstChild(n, (child, childKey) => visit(child, n, childKey, deferred));
 	};
+	// A destructured header's defaults and computed keys run per row too.
+	visit(node.left, node, 'left', false);
 	visit(node.key, node, 'key', false);
 	visit(node.body, node, 'body', false);
 	return safe ? { deps: [...deps].sort(), index: readsIndex } : null;
@@ -4319,7 +4334,9 @@ function compileForAst(authored, context, state) {
 	} else if (node.empty) {
 		args.push(compileBlockValueAst(node.empty?.body ?? [], state, [], node.empty));
 	}
-	const memo = args.length === 3 ? forItemMemo(authored, state) : null;
+	// A prepared (destructured, keyed) row is a fresh array each render, so its
+	// identity can never match.
+	const memo = args.length === 3 && prepareItem === null ? forItemMemo(authored, state) : null;
 	if (prepareItem !== null || memo !== null) {
 		while (args.length < 10) {
 			args.push(inheritGeneratedOrigin(b.unary('void', b.literal(0)), node));

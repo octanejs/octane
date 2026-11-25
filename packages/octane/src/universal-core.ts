@@ -2886,7 +2886,9 @@ function materializeComponentValue(
 	const attempt = currentAttempt();
 	const record = findClaimableChildRecord(parent, value.component, path, key);
 	if (
+		attempt.retainEligible &&
 		record !== undefined &&
+		record.mounted &&
 		record.componentProps !== null &&
 		universalShallowEqual(record.componentProps, normalized.props)
 	) {
