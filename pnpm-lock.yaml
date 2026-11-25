@@ -7961,6 +7961,9 @@ importers:
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
+      '@types/react-dom':
+        specifier: catalog:default
+        version: 19.2.4(@types/react@19.2.18)
       '@volar/language-core':
         specifier: catalog:default
         version: 2.4.28
@@ -7986,9 +7989,6 @@ importers:
       '@tsrx/react':
         specifier: catalog:default
         version: 0.5.3(react@19.2.7)
-      '@types/react-dom':
-        specifier: catalog:default
-        version: 19.2.4(@types/react@19.2.18)
       '@wagmi/connectors':
         specifier: catalog:default
         version: 8.2.0(@coinbase/wallet-sdk@4.3.6(@types/react@19.2.18)(bufferutil@4.1.0)(immer@11.1.15)(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.6.0(react@19.2.7))(utf-8-validate@5.0.10)(zod@4.6.2))(@safe-global/safe-apps-provider@0.18.6(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.2))(@safe-global/safe-apps-sdk@9.1.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.2))(@wagmi/core@3.6.5(@tanstack/query-core@5.102.8)(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.6.0(react@19.2.7))(viem@2.55.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.2)))(@walletconnect/ethereum-provider@2.21.1(@types/react@19.2.18)(bufferutil@4.1.0)(db0@0.3.4)(encoding@0.1.13)(react@19.2.7)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.2))(typescript@5.9.3)(viem@2.55.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.2))
