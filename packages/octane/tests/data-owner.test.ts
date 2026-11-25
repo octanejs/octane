@@ -620,7 +620,12 @@ describe('octane/data replies validated by the owner', () => {
 	class Start {
 		constructor(readonly at: string) {}
 	}
-	function startSchema(into: (at: string) => unknown, calls: string[], label: string) {
+	function startSchema(
+		into: (at: string) => unknown,
+		calls: string[],
+		label: string,
+		persist = false,
+	) {
 		const output: StandardSchema<unknown, { start: unknown }> = {
 			'~standard': {
 				version: 1,
@@ -634,7 +639,7 @@ describe('octane/data replies validated by the owner', () => {
 				},
 			},
 		};
-		return read({ name: 'meeting', output, version: '1' });
+		return read({ name: 'meeting', output, version: '1', persist });
 	}
 
 	/**
@@ -726,6 +731,94 @@ describe('octane/data replies validated by the owner', () => {
 			code: 'invalid',
 			issues: [{ message: 'Expected a start' }],
 		});
+	});
+
+	it('restores a cached value the worker validated, without validating it on the page', async () => {
+		const storage = memoryStorage();
+		let saved = 0;
+		const cache: PersistOptions = {
+			partition: 'ada',
+			key: 'a session secret of at least sixteen bytes',
+			storage: {
+				...storage,
+				async commit(partition, put, remove) {
+					await storage.commit(partition, put, remove);
+					if (put.some((item) => item.value !== undefined)) saved++;
+				},
+			},
+		};
+		const calls: string[] = [];
+		// The cache keeps what the schema made of a value and validates that on restore, so the
+		// schema must accept its own output.
+		const asText = (at: string) => at;
+		/** A worker over the account's cache, and one tab whose requests go through `transport`. */
+		const session = (transport: Transport) => {
+			const owner = createDataOwner({
+				transport,
+				persist: () => cache,
+				contracts: [...contracts, startSchema(asText, calls, 'worker', true)],
+			});
+			const channel = new MessageChannel();
+			owner.connect(channel.port1);
+			const meeting = startSchema(asText, calls, 'page', true);
+			const store = createReplica(channel.port2, {
+				...replicaOptions,
+				persist: cache,
+				contracts: [...contracts, meeting],
+			});
+			closers.push(() => (void store.dispose(), channel.port1.close(), channel.port2.close()));
+			return { store, meeting };
+		};
+		const first = session(async () => ({ ok: true, value: { start: '2026-11-24T10:00:00Z' } }));
+		await observed(first.store.read(first.meeting));
+		await vi.waitFor(() => expect(saved).toBe(1));
+		await first.store.dispose();
+
+		// The next session starts offline, so what it shows comes from the cache.
+		calls.length = 0;
+		const next = session(() => new Promise(() => {}));
+		const handle = next.store.read(next.meeting);
+		closers.push(handle.subscribe(() => {}));
+		await vi.waitFor(() =>
+			expect(handle.getSnapshot().value).toEqual({ start: '2026-11-24T10:00:00Z' }),
+		);
+		expect(calls).toEqual(['worker']);
+	});
+
+	it('takes the value a seeded tab offers, as that tab’s schema made it, without validating it again', async () => {
+		const owner = createDataOwner({
+			transport: async () => ({ ok: true, value: { start: '2026-11-24T10:00:00Z' } }),
+		});
+		const calls: string[] = [];
+		const tab = (seed?: string) => {
+			const meeting = startSchema((at) => new Date(at), calls, 'page');
+			const channel = new MessageChannel();
+			owner.connect(channel.port1);
+			const store = createReplica(channel.port2, {
+				...replicaOptions,
+				contracts: [...contracts, meeting],
+				seed,
+			});
+			closers.push(() => (void store.dispose(), channel.port1.close(), channel.port2.close()));
+			return { store, meeting };
+		};
+		const loaded = tab();
+		const shown = await observed(loaded.store.read(loaded.meeting));
+		await new Promise((resolve) => setTimeout(resolve, 5));
+		// A tab the server rendered later, with a newer start, offers its value to the others.
+		const seed = devalue.stringify({
+			reads: [
+				{ name: 'meeting', input: undefined, age: 0, value: { start: '2026-11-24T11:00:00Z' } },
+			],
+		});
+		const seeded = tab(seed);
+		calls.length = 0;
+		expect((await observed(seeded.store.read(seeded.meeting)))().start).toEqual(
+			new Date('2026-11-24T11:00:00Z'),
+		);
+		// Its value, a Date, is what its schema made of the text: validating it again would refuse it.
+		await vi.waitFor(() => expect(shown().start).toEqual(new Date('2026-11-24T11:00:00Z')));
+		expect(calls).toEqual(['page']);
 	});
 
 	it('validates nothing for tabs whose build has other contracts than its own', async () => {

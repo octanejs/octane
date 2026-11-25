@@ -2454,14 +2454,20 @@ function collectIdentifierNodes(root, names) {
 }
 
 function normalizeJsxText(value) {
-	const lines = String(value).replace(/\r/g, '').split('\n');
+	const lines = String(value).split(/\r\n|\n|\r/);
+	let lastNonEmptyLine = -1;
+	for (let index = 0; index < lines.length; index++) {
+		if (/[^ \t]/.test(lines[index])) lastNonEmptyLine = index;
+	}
+	// Dropping whitespace-only text keeps spacing between elements legal on renderers that reject text.
+	if (lastNonEmptyLine === -1) return '';
 	let output = '';
 	for (let index = 0; index < lines.length; index++) {
-		const line = lines[index].replace(/\t/g, ' ');
-		const text = index === 0 ? line.replace(/\s+$/g, '') : line.trim();
+		let text = lines[index].replace(/\t/g, ' ');
+		if (index !== 0) text = text.replace(/^ +/, '');
+		if (index !== lines.length - 1) text = text.replace(/ +$/, '');
 		if (text === '') continue;
-		if (output !== '' && !output.endsWith(' ')) output += ' ';
-		output += text;
+		output += index === lastNonEmptyLine ? text : `${text} `;
 	}
 	return output;
 }

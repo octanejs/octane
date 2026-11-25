@@ -449,13 +449,16 @@ dependency that shows every edit at once is not built in.
   one its tabs share, and a tab adopts it without validating it again: each
   read's reply (output schema), each preview (in the order the transport sent
   them), each write's reply (its `output` and every read in `refreshed`, all
-  or none), and each feed event (`event` schema, in order). It leaves a value
+  or none), each feed event (`event` schema, in order), and each value it
+  restores from the account's cache. It leaves a value
   to the tab's own validator when validation fails (the tab reports the
   issues) and when the validated value holds anything a structured clone
   would change: a class instance, a function, a symbol or a null-prototype
-  object. A write's input, seeds, cached values and values offered by other
-  tabs are validated in the tab, as is everything when the owner has no
-  `contracts`.
+  object. A value one tab offers the others, such as one a server render
+  seeded, is what that tab's schema made of it, so the others take it as it
+  came when a structured clone keeps it unchanged. A write's input and seeds
+  are validated in the tab, since its optimistic edit and hydration use them
+  in the same task, as is everything when the owner has no `contracts`.
 - `createReplica(owner, { ...storeOptions, contracts })` takes an ordinary
   store's options plus `contracts`, every read, write and feed the app uses.
   It renders, evaluates views and shows its own edits in the same task. It

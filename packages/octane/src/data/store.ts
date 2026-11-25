@@ -1556,7 +1556,9 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			let value: unknown;
 			try {
 				if (age >= entry.read.expire) throw new Error('expired');
-				value = await parse(entry.read.output, stored.value);
+				value = ownerValidated(stored)
+					? stored.value
+					: await parse(entry.read.output, stored.value);
 			} catch {
 				if (current()) persisted!.discard(entry.key, stored.revision);
 				return;
