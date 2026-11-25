@@ -190,9 +190,12 @@ describe('octane create', () => {
 		// The fullstack app, with a third route and a frame that links to it.
 		const config = read(app, 'octane.config.ts');
 		expect(config).toContain('new RenderRoute({ path: "/", entry: ["App", "/src/App.tsrx"] })');
+		// /books runs its native form posts first, so adding works without JavaScript.
 		expect(config).toContain(
-			'new RenderRoute({ path: "/books", entry: ["Books", "/src/Books.tsrx"] })',
+			'new RenderRoute({ path: "/books", entry: ["Books", "/src/Books.tsrx"], before: [forms] })',
 		);
+		expect(config).toContain('handler.forms(context.request, context)');
+		expect(read(app, 'src/books.data.ts')).toContain('form: { title: "text" }');
 		expect(read(app, 'src/Layout.tsrx')).toContain('href="/books"');
 		expect(read(app, 'index.html')).toContain('<!--ssr-body-->');
 

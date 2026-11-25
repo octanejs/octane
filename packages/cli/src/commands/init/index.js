@@ -379,7 +379,7 @@ function plan(project, mode, integration, nativeTypeScript) {
 				file: 'octane.config.ts',
 				summary:
 					mode === 'data'
-						? 'create, with routes for /, /counter, /books, and GET /api/health, inside src/store.ts’s data store'
+						? 'create, with routes for /, /counter, /books (and its form posts), and GET /api/health, inside src/store.ts’s data store'
 						: 'create, with routes for /, /counter, and GET /api/health',
 				apply: writeFile(at('octane.config.ts'), octaneConfig(mode)),
 			});
