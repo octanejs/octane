@@ -449,8 +449,9 @@ dependency that shows every edit at once is not built in.
   one its tabs share, and a tab adopts it without validating it again: each
   read's reply (output schema), each preview (in the order the transport sent
   them), each write's reply (its `output` and every read in `refreshed`, all
-  or none), each feed event (`event` schema, in order), and each value it
-  restores from the account's cache. It leaves a value
+  or none), each feed event (`event` schema, in order), each value it
+  restores from the account's cache, and, for a journal, each recovered
+  write's `input` and each receipt's reply. It leaves a value
   to the tab's own validator when validation fails (the tab reports the
   issues) and when the validated value holds anything a structured clone
   would change: a class instance, a function, a symbol or a null-prototype

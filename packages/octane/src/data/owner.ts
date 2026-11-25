@@ -76,6 +76,7 @@ import {
 	shape,
 	type Persistence,
 	type PersistOptions,
+	type Journaled,
 	type Saving,
 	type Stored,
 } from './persist.js';
@@ -355,6 +356,24 @@ export function createDataOwner(options: {
 		const value = read ? await validate(read.output, stored!.value) : NOT;
 		return value === NOT ? [stored, false] : [{ ...stored!, value }, true];
 	};
+	/**
+	 * The writes a previous session journaled, each whose input validates here
+	 * carrying it as `input`; whether any does.
+	 */
+	const checkRecovered = async (
+		items: Array<Journaled & { order: [number, number] }>,
+	): Promise<[unknown, boolean]> => {
+		if (!validating) return [items, false];
+		let any = false;
+		const checked = [];
+		for (const item of items) {
+			const write = writeContracts.get(item.name);
+			const input = write ? await validate(write.input, item.raw) : NOT;
+			any ||= input !== NOT;
+			checked.push(input === NOT ? item : { ...item, input });
+		}
+		return [checked, any];
+	};
 	const accountDatabase = fence === 'explicit' ? EXPLICIT_ACCOUNT_DATABASE : ACCOUNT_DATABASE;
 	const accountChannel = fence === 'explicit' ? EXPLICIT_ACCOUNT_CHANNEL : ACCOUNT_CHANNEL;
 	const persistOptions = (account: string, grant: number): PersistOptions => {
@@ -528,11 +547,15 @@ export function createDataOwner(options: {
 					return answer(...(await checkRestored(key, value as Stored | undefined)));
 				// A write in flight through this owner is its tab's to settle; only an earlier
 				// owner's, such as a crashed worker's, are left for the recovering tab.
-				answer(
-					op === 'recover'
-						? (value as { id: string }[]).filter(({ id }) => !journaled.has(id))
-						: value,
-				);
+				if (op === 'recover')
+					return answer(
+						...(await checkRecovered(
+							(value as Array<Journaled & { order: [number, number] }>).filter(
+								({ id }) => !journaled.has(id),
+							),
+						)),
+					);
+				answer(value);
 			},
 			() => answer(nothing(op)),
 		);

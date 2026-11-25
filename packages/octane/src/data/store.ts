@@ -2098,7 +2098,9 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			retiring.signal,
 		);
 		if (!reply.ok) throw new DataError(reply.code);
-		return parse(receipt.output, reply.value);
+		return ownerValidated(reply)
+			? (reply.value as { applied: boolean; value?: unknown })
+			: parse(receipt.output, reply.value);
 	}
 
 	/** Settle an uncertain durable write by its receipt; one whose receipt cannot be read stays uncertain. */
@@ -2120,11 +2122,17 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	async function recover(journal: NonNullable<PersistOptions['journal']>): Promise<void> {
 		const recovered: Operation[] = [];
 		const obsolete: string[] = [];
-		for (const { id, name, raw, order } of await persisted!.recover()) {
-			const write = journal.writes.find((item) => item.name === name);
+		const journaled = await persisted!.recover();
+		for (const item of journaled) {
+			const { id, name, raw, order } = item;
+			const write = journal.writes.find((each) => each.name === name);
 			if (write) {
 				try {
-					const input = await parse(write.input, raw);
+					// A shared owner validated the input of each write it gave one.
+					const input =
+						ownerValidated(journaled) && 'input' in item
+							? item.input
+							: await parse(write.input, raw);
 					recovered.push(operationFor(id, write, input, raw, 'uncertain'));
 					continue;
 				} catch {
