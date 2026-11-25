@@ -7,8 +7,9 @@ rows.
 
 The universal compiler now proves when a row body renders only from its item, its
 index (when the body reads one) and the values it closes over: no hooks, no
-components, no refs, no render-time calls other than conversion globals such as
-`String`, no writes, and no mutable module or global reads. Event handlers and
+components, no refs or attachments, no render-time calls other than conversion
+globals such as `String` and the scoped-class `normalizeClass` wrapper, no writes,
+and no mutable module or global reads. Event handlers and
 other nested functions run after render, so only their captures count. For such
 a row it passes those captured values to `universalFor`, and a production render
 adopts every survivor whose item, index and captures are unchanged with the same
