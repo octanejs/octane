@@ -13,6 +13,7 @@ import { adoptTemplateShape } from './parser-template-shape.js';
 import { normalizeUniversalRuntime } from './universal-runtime.js';
 import { createContextSourceFacts } from './context-provider.js';
 import { inheritGeneratedOrigin } from './generated-origin.js';
+import { IMMUTABLE_AMBIENT_GLOBALS, SETUP_PURE_GLOBAL_CALLEES } from './ambient-globals.js';
 import { ARM_BREAK_MESSAGE, ARM_VALUE_RETURN_MESSAGE, armJump } from './arm-exits.js';
 
 // Keep CSS transformation in the DOM/SSR scope pass; only delivery is host-specific.
@@ -3975,45 +3976,6 @@ function forRowTemplateBody(node) {
 	return statements.map((statement) => (statement === root ? unkeyed : statement));
 }
 
-// Globals a row may read or call during render without a dependency slot,
-// matching the DOM compiler's immutable ambient reads and conversion calls.
-const FOR_MEMO_PURE_GLOBALS = new Set([
-	'undefined',
-	'NaN',
-	'Infinity',
-	'Math',
-	'JSON',
-	'Array',
-	'Object',
-	'String',
-	'Number',
-	'Boolean',
-	'BigInt',
-	'Symbol',
-	'parseInt',
-	'parseFloat',
-	'isNaN',
-	'isFinite',
-	'encodeURI',
-	'encodeURIComponent',
-	'decodeURI',
-	'decodeURIComponent',
-]);
-const FOR_MEMO_PURE_CALLS = new Set([
-	'String',
-	'Number',
-	'Boolean',
-	'BigInt',
-	'Symbol',
-	'parseInt',
-	'parseFloat',
-	'isNaN',
-	'isFinite',
-	'encodeURI',
-	'encodeURIComponent',
-	'decodeURI',
-	'decodeURIComponent',
-]);
 const FOR_MEMO_TEMPLATE_NODES = new Set([
 	'JSXElement',
 	'Element',
@@ -4086,7 +4048,7 @@ function forItemMemo(node, state) {
 			if (binding === null) {
 				if (
 					!deferred &&
-					!FOR_MEMO_PURE_GLOBALS.has(n.name) &&
+					!IMMUTABLE_AMBIENT_GLOBALS.has(n.name) &&
 					n.name !== state.helpers.normalizeClass
 				) {
 					safe = false;
@@ -4134,7 +4096,8 @@ function forItemMemo(node, state) {
 				if (
 					type === 'NewExpression' ||
 					callee?.type !== 'Identifier' ||
-					(!FOR_MEMO_PURE_CALLS.has(callee.name) && callee.name !== state.helpers.normalizeClass) ||
+					(!SETUP_PURE_GLOBAL_CALLEES.has(callee.name) &&
+						callee.name !== state.helpers.normalizeClass) ||
 					resolveBinding(nodeScopes.get(callee) ?? rootScope, callee.name) !== null
 				) {
 					return void (safe = false);
