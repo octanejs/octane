@@ -77,6 +77,7 @@ import {
 	type Persistence,
 	type PersistOptions,
 	type Saving,
+	type Stored,
 } from './persist.js';
 import { DATA_WORKER_PATH } from './worker-path.js';
 
@@ -145,6 +146,11 @@ interface Offer {
 	readonly input: unknown;
 	readonly value: unknown;
 	readonly at: number;
+	/**
+	 * The value is what the tab's own schema made of it, and a clone keeps it
+	 * as it is. Every tab an owner serves runs one build, so another takes it as it came.
+	 */
+	readonly validated?: boolean;
 }
 
 /** What an owner sends a replica. */
@@ -155,8 +161,13 @@ type ToReplica =
 	| { readonly t: 'retired' }
 	/** This tab cannot share the owner: its build's contracts differ, or the account cannot be recorded. */
 	| { readonly t: 'refused' }
-	/** The answer to a call to the account's persistence. */
-	| { readonly t: 'persisted'; readonly id: number; readonly value: unknown }
+	/** The answer to a call to the account's persistence; a restored value may be validated, as a reply's is. */
+	| {
+			readonly t: 'persisted';
+			readonly id: number;
+			readonly value: unknown;
+			readonly validated?: boolean;
+	  }
 	| {
 			readonly t: 'reply';
 			readonly id: number;
@@ -333,6 +344,17 @@ export function createDataOwner(options: {
 		validated.add(checked);
 		return checked;
 	};
+	/** A value restored from the cache for `key`, with its value validated here, or as it came. */
+	const checkRestored = async (
+		key: string,
+		stored: Stored | undefined,
+	): Promise<[Stored | undefined, boolean]> => {
+		// An entry key is the read's name, then its encoded input, which holds no newline.
+		const read =
+			validating && stored ? outputs.get(key.slice(0, key.lastIndexOf('\nwire:'))) : undefined;
+		const value = read ? await validate(read.output, stored!.value) : NOT;
+		return value === NOT ? [stored, false] : [{ ...stored!, value }, true];
+	};
 	const accountDatabase = fence === 'explicit' ? EXPLICIT_ACCOUNT_DATABASE : ACCOUNT_DATABASE;
 	const accountChannel = fence === 'explicit' ? EXPLICIT_ACCOUNT_CHANNEL : ACCOUNT_CHANNEL;
 	const persistOptions = (account: string, grant: number): PersistOptions => {
@@ -462,8 +484,12 @@ export function createDataOwner(options: {
 		return persistence;
 	}
 	function persist(port: OwnerPort, { id, op, args }: Extract<ToOwner, { t: 'persist' }>): void {
-		const answer = (value: unknown) => {
-			if (id) post(port, { t: 'persisted', id, value });
+		const answer = (value: unknown, validated = false) => {
+			if (id)
+				post(
+					port,
+					validated ? { t: 'persisted', id, value, validated } : { t: 'persisted', id, value },
+				);
 		};
 		if (fence === 'explicit' && op === 'clear') return answer(undefined);
 		const p = persistenceFor();
@@ -497,14 +523,17 @@ export function createDataOwner(options: {
 		// Each operation is the persistence method of the same name.
 		const result = (p as any)[op](...args) as Promise<unknown> | undefined;
 		result?.then(
-			(value) =>
+			async (value) => {
+				if (op === 'restore')
+					return answer(...(await checkRestored(key, value as Stored | undefined)));
 				// A write in flight through this owner is its tab's to settle; only an earlier
 				// owner's, such as a crashed worker's, are left for the recovering tab.
 				answer(
 					op === 'recover'
 						? (value as { id: string }[]).filter(({ id }) => !journaled.has(id))
 						: value,
-				),
+				);
+			},
 			() => answer(nothing(op)),
 		);
 	}
@@ -1371,7 +1400,7 @@ export function createReplica(
 	/** Offer the others what this tab holds for `entry`. */
 	const offer = (entry: Entry) => {
 		const held = inner.held(entry);
-		if (held) send({ t: 'offer', ...held });
+		if (held) send({ t: 'offer', ...held, validated: cloneable(held.value, new Set()) });
 	};
 	inner.onSeed((entry, wireKey) => {
 		// A reload of a seeded read must not join a request that may predate what it reloads for.
@@ -1383,7 +1412,7 @@ export function createReplica(
 	 * Take a value another replica holds, if it loaded later than the one held
 	 * here; offer this one back if it loaded later.
 	 */
-	async function offered({ name, input, value, at }: Offer) {
+	async function offered({ name, input, value, at, validated }: Offer) {
 		const key = entryKey(name, input);
 		let entry = inner.wireEntry(key);
 		// A load under way may finish older than the offer: judge the offer once it lands.
@@ -1393,11 +1422,13 @@ export function createReplica(
 		}
 		if (!entry?.hasBase || entry.inflight || store.retired || at === entry.fetchedAt) return;
 		if (at < entry.fetchedAt) return offer(entry);
-		let parsed: unknown;
-		try {
-			parsed = await parse(entry.read.output, value);
-		} catch {
-			return;
+		let parsed: unknown = value;
+		if (!validated) {
+			try {
+				parsed = await parse(entry.read.output, value);
+			} catch {
+				return;
+			}
 		}
 		if (store.retired || entry.inflight || inner.entries.get(entry.key) !== entry) return;
 		if (at <= entry.fetchedAt) return;
@@ -1458,6 +1489,7 @@ export function createReplica(
 					}
 					break;
 				case 'persisted':
+					if (message.validated) trust(message.value);
 					asked.get(message.id)?.resolve(message.value);
 					asked.delete(message.id);
 					break;
