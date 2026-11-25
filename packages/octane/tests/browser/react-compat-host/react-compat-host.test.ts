@@ -28,7 +28,7 @@ beforeAll(async () => {
 	server.middlewares.use('/document', async (_req, res, next) => {
 		try {
 			const stream = await ReactCompatDocument.renderToReadableStream(tree(data.promise));
-			res.setHeader('content-type', 'text/html');
+			res.setHeader('content-type', 'text/html; charset=utf-8');
 			for await (const chunk of stream) res.write(chunk);
 			res.end();
 		} catch (error) {
@@ -51,12 +51,13 @@ afterAll(async () => {
 	await server?.close();
 });
 
-async function expectState(label: 'open' | 'closed', className: string = label) {
-	const open = label === 'open';
+async function expectState(state: 'open' | 'closed', className: string = state) {
+	const open = state === 'open';
 	expect(await page.evaluate(() => window.host.snapshot())).toEqual({
-		label,
+		label: 'Navigation',
 		className,
 		open: String(open),
+		leakedInput: false,
 		width: open ? '320px' : '160px',
 		opacity: open ? '0.9' : '',
 		original: true,
@@ -75,7 +76,12 @@ async function start(stamp?: 'current' | 'stale') {
 	});
 	await page.goto(url, { waitUntil: 'commit' });
 	await page.getByText('Loading').waitFor();
-	expect(await page.locator('#frame').getAttribute('data-octane-bindings')).toBeTruthy();
+	const nav = page.getByRole('navigation', { name: 'Navigation' });
+	expect(await nav.getAttribute('data-octane-bindings')).toBeTruthy();
+	expect(await nav.getAttribute('input')).toBeNull();
+	expect(await nav.getAttribute('class')).toBe('open');
+	expect(await nav.getAttribute('data-open')).toBe('true');
+	expect(await nav.evaluate((el) => el.style.width)).toBe('320px');
 	await page.getByLabel('Draft').fill('unfinished');
 	await page.evaluate((stamp) => {
 		document.querySelector('input')!.setSelectionRange(2, 4);
@@ -84,7 +90,8 @@ async function start(stamp?: 'current' | 'stale') {
 		if (stamp) frame.className = 'altered';
 	}, stamp);
 	await page.evaluate("import('/page.tsx').then(({ hydrate }) => { window.host = hydrate(); })");
-	await page.waitForFunction(() => window.host.refs.length > 0);
+	// A small, still-open stream may hydrate before the browser starts painting.
+	await page.waitForFunction(() => window.host.refs.length > 0, undefined, { polling: 50 });
 	// Only successful adoption repairs an altered value before any prop update.
 	await expectState('open', stamp === 'stale' ? 'altered' : 'open');
 
@@ -107,6 +114,32 @@ it.each(['current', 'stale'] as const)(
 	},
 );
 
+it('shares React context and native controls across the navigation host', async () => {
+	await start();
+	const button = page.getByRole('button', { name: 'Toggle' });
+	const checkbox = page.getByRole('checkbox', { name: 'Expanded' });
+	const icon = page.locator('svg');
+	const stroke = icon.locator('path');
+	const links = page.locator('a');
+	const current = () =>
+		links.evaluateAll((nodes) => nodes.map((el) => el.getAttribute('aria-current')));
+	expect(await links.first().evaluate((el) => el instanceof HTMLAnchorElement)).toBe(true);
+	expect(await icon.locator('a').evaluate((el) => el instanceof SVGAElement)).toBe(true);
+	expect(await icon.getAttribute('viewBox')).toBe('0 0 10 10');
+	expect(await stroke.evaluate((el) => el instanceof SVGPathElement)).toBe(true);
+	expect(await checkbox.isChecked()).toBe(true);
+	await button.click();
+	expect(await checkbox.isChecked()).toBe(false);
+	expect(await current()).toEqual(['false', 'false']);
+	expect(await button.getAttribute('aria-pressed')).toBe('false');
+	expect(await stroke.getAttribute('class')).toBeNull();
+	await checkbox.check();
+	expect(await current()).toEqual(['true', 'true']);
+	expect(await button.evaluate((el) => el === document.activeElement)).toBe(true);
+	expect(await button.getAttribute('aria-pressed')).toBe('true');
+	expect(await stroke.getAttribute('class')).toBe('active');
+});
+
 it('does not publish props from a suspended transition', async () => {
 	await start();
 	await page.evaluate(() => window.host.suspend());
@@ -120,7 +153,7 @@ it('measures current styles on Activity reveal, including an initially hidden ho
 	await page.locator('#preloaded').waitFor({ state: 'attached' });
 	expect(await page.locator('#preloaded').isHidden()).toBe(true);
 	await page.evaluate(() => window.host.set('hidden'));
-	await page.locator('#frame[aria-label=hidden]').waitFor({ state: 'attached' });
+	await page.locator('#frame.hidden').waitFor({ state: 'attached' });
 	expect(await page.locator('#frame').isHidden()).toBe(true);
 	expect(await page.locator('#preloaded').isHidden()).toBe(true);
 	await page.evaluate(() => window.host.set('revealed'));

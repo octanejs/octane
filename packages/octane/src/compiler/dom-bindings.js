@@ -10,8 +10,10 @@ import {
 	ATTRIBUTE_ALIASES,
 	BOOLEAN_ATTR_PROPS,
 	MUST_USE_PROPERTY_PROPS,
+	MATHML_ONLY_TAGS,
 	POSITIVE_NUMERIC_ATTR_PROPS,
 	SVG_ONLY_TAGS,
+	VOID_ELEMENTS,
 	isUnitlessStyleProp,
 	isEnumeratedBooleanAttr,
 	hyphenateStyleName,
@@ -842,7 +844,7 @@ export function isScalarTextAssertion(expression) {
 	);
 }
 
-function planView(fn, filename, source, imports, lexical, native = null) {
+function planView(fn, filename, source, imports, lexical, native = null, reactHost = false) {
 	const render = native?.element ?? bindingRender(fn, filename);
 	const nodes = [];
 	const elements = [];
@@ -1035,6 +1037,7 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 				'component, custom, parser-sensitive and resource elements are not supported in binding views',
 			);
 		}
+		if (reactHost && parent === -1 && SVG_ONLY_TAGS.has(tag)) namespace = 1;
 		if (namespace === 0 && tag !== 'svg' && SVG_ONLY_TAGS.has(tag))
 			error(filename, element, 'SVG binding descendants need an explicit svg root');
 		const ns = tag === 'svg' ? 1 : namespace;
@@ -1275,6 +1278,7 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 				if (!addClassGroups(index, attr, value)) addClassTokens(index, value);
 			} else if (name === 'style') {
 				if (
+					reactHost ||
 					value?.type !== 'ObjectExpression' ||
 					value.properties.some(
 						(property) => property.type === 'SpreadElement' || property.computed,
@@ -2089,51 +2093,103 @@ function isRuntimeReference(node, lexical, parent, key) {
 	return true;
 }
 
-// Fizz owns the children and writes the initial React props. Every channel
-// adopted at commit must describe that same markup, including its prop name.
-function assertReactHost(plan, fn, filename) {
-	const reads = (value, name) => {
-		const member = unwrap(value);
-		return (
+// React streams the projected props. The adopter receives those same values,
+// so no authored helper runs again at attachment or during a commit.
+function projectReactHost(plan, fn, tag, filename, lexical, imports) {
+	const param = fn.params[0].name;
+	const read = (expression) => {
+		const member = unwrap(expression);
+		if (
 			member?.type === 'MemberExpression' &&
 			!member.optional &&
 			member.object.type === 'Identifier' &&
-			member.object.name === fn.params[0]?.name &&
-			(member.computed ? member.property.value : member.property.name) === name
-		);
+			member.object.name === param
+		)
+			return member.computed ? member.property.value : member.property.name;
 	};
+	const children = (plan.render.children ?? []).filter(
+		(child) => child.type !== 'JSXText' || !isLayoutText(child.raw ?? child.value),
+	);
 	if (
-		plan?.handoff !== 'host' ||
-		plan.nodes[0][1] !== 'div' ||
-		plan.unbound.size !== 1 ||
-		!reads(plan.unbound.values().next().value, 'children')
+		plan.nodes.length !== 1 ||
+		tag !== plan.nodes[0][1] ||
+		MATHML_ONLY_TAGS.has(tag) ||
+		(plan.nodes[0][2] === 0 && tag !== tag.toLowerCase()) ||
+		(children.length !== 0 &&
+			(children.length !== 1 ||
+				VOID_ELEMENTS.has(tag) ||
+				plan.nodes[0][3] !== null ||
+				plan.unbound.size !== 1 ||
+				read(plan.unbound.values().next().value) !== 'children'))
 	)
 		error(
 			filename,
 			fn,
-			'createReactCompatHost requires a single div with {unbound(props.children)}',
+			'createReactCompatHost requires one matching native element, empty or with {unbound(props.children)}',
 		);
+	// React can supply descendants even when the authored template is empty.
+	plan.nodes[0][3] = null;
 	const attributes = plan.render.openingElement?.attributes ?? plan.render.attributes;
-	if (plan.bindings.length !== attributes.length)
+	if (
+		!attributes.length ||
+		plan.bindings.length !== attributes.length ||
+		plan.unboundAttributes.size
+	)
 		error(
 			filename,
 			fn,
-			'createReactCompatHost requires every attribute to bind its corresponding prop',
+			'createReactCompatHost requires a binding for every presentation attribute',
 		);
-	for (const attr of attributes) {
+	const derived = [];
+	for (const [i, attr] of attributes.entries()) {
 		const name = attrName(attr);
 		const prop = name === 'class' ? 'className' : name;
 		if (
+			!['class', 'styleObject', 'aria'].includes(plan.bindings[i][1]) ||
 			!(prop === 'className' || prop === 'style' || /^(data|aria)-[a-z0-9_.-]+$/.test(prop)) ||
-			/^data-oct(?:ane)?(?:-|$)/.test(prop) ||
-			!reads(attrValueForBinding(attr), prop)
+			/^data-oct(?:ane)?(?:-|$)/.test(prop)
 		)
-			error(
-				filename,
-				attr,
-				'createReactCompatHost requires unique, same-name className, style, data-* or aria-* prop reads',
-			);
+			error(filename, attr, 'createReactCompatHost binds only className, style, data-* or aria-*');
+		const value = plan.values[i];
+		if (read(value) === prop) continue;
+		walk(value, (node, parent, key) => {
+			if (
+				[
+					'ImportExpression',
+					'MetaProperty',
+					'ThisExpression',
+					'Super',
+					'TSInstantiationExpression',
+				].includes(node.type) ||
+				signalReadName(node) !== null
+			)
+				error(filename, node, 'React host bindings require pure props projections');
+			if (!isRuntimeReference(node, lexical, parent, key)) return;
+			const scope = lexical.resolveBinding(lexical.nodeScopes.get(node), node.name)?.scope;
+			if (scope === lexical.rootScope && imports.get(node.name)?.source === 'octane/behavior')
+				error(filename, node, 'React host bindings cannot read behavior intrinsics');
+			if (
+				node.name !== param ||
+				scope !== lexical.resolveBinding(lexical.nodeScopes.get(fn.body), param)?.scope
+			)
+				return;
+			const field = read(parent);
+			if (field !== 'input' && field !== prop)
+				error(
+					filename,
+					node,
+					'derive a React host property from props.input or its corresponding prop',
+				);
+		});
+		derived.push(b.prop('init', b.literal(prop), value));
+		// The derived key can be absent from the authored input type.
+		plan.values[i] = b.member(
+			b.ts_as(b.id(param), b.ts_keyword_type('any')),
+			b.literal(prop),
+			true,
+		);
 	}
+	return derived.length ? b.arrow(fn.params, b.object(derived)) : null;
 }
 
 function isReactHostFactory(binding) {
@@ -2154,7 +2210,6 @@ function lowerReactHosts(
 	helpers,
 	lexical,
 	imports,
-	scalarFor,
 	localFunctions,
 	replacements,
 ) {
@@ -2175,9 +2230,11 @@ function lowerReactHosts(
 			const fn = argument?.type === 'Identifier' && localFunctions.get(argument.name);
 			if (
 				call.optional ||
-				call.arguments.length !== 1 ||
+				call.arguments.length > 2 ||
 				!helpers.strong ||
 				!fn ||
+				fn.params.length !== 1 ||
+				fn.params[0].type !== 'Identifier' ||
 				fn.body.type !== 'JSXCodeBlock' ||
 				statements(fn).length !== 1 ||
 				!isDirective(statements(fn)[0])
@@ -2187,8 +2244,9 @@ function lowerReactHosts(
 					call,
 					"createReactCompatHost requires a local named Strong 'use dom bindings' template",
 				);
-			const plan = scalarFor(fn, bindingRender(fn, filename));
-			assertReactHost(plan, fn, filename);
+			const tag = call.arguments.length === 1 ? 'div' : unwrap(call.arguments[1])?.value;
+			const plan = planView(fn, filename, source, imports, lexical, null, true);
+			const derive = projectReactHost(plan, fn, tag, filename, lexical, imports);
 			const basename = filename.split(/[\\/]/).pop();
 			const id = `d:${strongHash(`octane:react-host:1\0${basename}\0${source.slice(fn.start, fn.end)}`)}`;
 			const server =
@@ -2196,6 +2254,10 @@ function lowerReactHosts(
 			let descriptor = server
 				? b.literal(id)
 				: scalarDescriptor({ ...plan, id, handoff: null, signalIndices: [] }, lexical, added);
+			if (derive) {
+				if (server) descriptor = b.object([b.prop('init', b.id('id'), descriptor)]);
+				descriptor.properties.push(b.prop('init', b.id('derive'), derive));
+			}
 			if (helpers.typescript)
 				descriptor = b.ts_as(
 					b.ts_as(descriptor, b.ts_keyword_type('unknown')),
@@ -2203,7 +2265,7 @@ function lowerReactHosts(
 				);
 			replacements.set(call, {
 				...call,
-				arguments: [inheritHookMemoOrigin(descriptor, argument)],
+				arguments: [inheritHookMemoOrigin(descriptor, argument), ...call.arguments.slice(1)],
 				__octanePure: true,
 			});
 			views.add(fn);
@@ -3029,7 +3091,6 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 				helpers,
 				lexical,
 				imports,
-				scalarFor,
 				localFunctions,
 				replacements,
 			)
