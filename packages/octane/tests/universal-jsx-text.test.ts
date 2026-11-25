@@ -36,8 +36,6 @@ function renderDom(name: SceneName): string {
 	return text;
 }
 
-// The universal plan must keep the same JSX text as the DOM template, so a
-// host that renders the plan shows the words the author wrote.
 describe('universal JSX text whitespace', () => {
 	it.each([
 		['TrailingSpaceBeforeElement', 'Before middle after'],

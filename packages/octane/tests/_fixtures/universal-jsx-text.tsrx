@@ -1,7 +1,3 @@
-// Keep these scenes identical to universal-jsx-text.object.tsrx: the test
-// compares the text each compiler renders for the same authored JSX.
-// The authored whitespace is the input, so every scene is prettier-ignored.
-
 export function TrailingSpaceBeforeElement() @{
 	// prettier-ignore
 	<p>Before <span>middle</span> after</p>

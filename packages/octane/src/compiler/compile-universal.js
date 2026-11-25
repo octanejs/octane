@@ -2453,18 +2453,13 @@ function collectIdentifierNodes(root, names) {
 	return output;
 }
 
-// JSX text rules, matching the DOM template for text that has content: tabs
-// become spaces, whitespace that touches a line break is dropped, and the
-// remaining lines join with one space. Whitespace inside a line, including the
-// edges of a single-line text next to an element, is kept. Whitespace-only text
-// stays dropped, so renderers that reject or cannot parent text still accept
-// spacing between elements.
 function normalizeJsxText(value) {
 	const lines = String(value).split(/\r\n|\n|\r/);
 	let lastNonEmptyLine = -1;
 	for (let index = 0; index < lines.length; index++) {
 		if (/[^ \t]/.test(lines[index])) lastNonEmptyLine = index;
 	}
+	// Dropping whitespace-only text keeps spacing between elements legal on renderers that reject text.
 	if (lastNonEmptyLine === -1) return '';
 	let output = '';
 	for (let index = 0; index < lines.length; index++) {
