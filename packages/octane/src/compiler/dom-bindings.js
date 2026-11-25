@@ -2228,12 +2228,7 @@ function lowerReactHosts(
 						type: 'TSDeclareFunction',
 						declare: true,
 						body: null,
-						returnType:
-							fn.returnType ??
-							inheritHookMemoOrigin(
-								{ type: 'TSTypeAnnotation', typeAnnotation: b.ts_keyword_type('unknown') },
-								fn,
-							),
+						returnType: fn.returnType ?? b.ts_type_annotation(b.ts_keyword_type('unknown', fn), fn),
 					}
 				: null,
 		);

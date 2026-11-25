@@ -156,6 +156,8 @@ describe('compiler AST emit architecture', () => {
 			'MetaProperty',
 			'Program',
 			'ThrowStatement',
+			// @tsrx/core has no ambient function builder. FunctionDeclaration requires a body.
+			'TSDeclareFunction',
 			// @tsrx/core has a type-argument builder but no expression-instantiation builder.
 			'TSInstantiationExpression',
 			// @tsrx/core also lacks builders for indexed access and satisfies in Valdi callback types.
