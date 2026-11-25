@@ -1,5 +1,25 @@
 # @octanejs/vite-plugin
 
+## 0.7.0
+
+### Minor Changes
+
+- 19d6c6f: Declare an app's data client once and let the build make its data worker. `export default defineDataClient({ transport, listen?, persist? })` from `octane/data`, with `persist` a function of the signed-in account, in one module, and set the new `dataClient` option of `octane()` from `octane/compiler/vite` or `@octanejs/vite-plugin`, or of `OctaneRspackPlugin`, to its path. The plugins generate the data worker from it, emitted and served at `/_octane/data-worker.js` as `dataWorker` is, and `octane/data/client`, whose `openDataStore(account, { seed?, seedAge?, form? })` opens a page's store over that worker with the client's options and the build's contracts. `dataWorker` stays for apps that write their own worker module; the two options are exclusive, and `dataClient` needs the generated manifest, so it refuses `data: false`.
+
+### Patch Changes
+
+- Updated dependencies [27d219c]
+- Updated dependencies [19d6c6f]
+- Updated dependencies [79df583]
+- Updated dependencies [cabb8a7]
+- Updated dependencies [5d2cfb1]
+- Updated dependencies [aa6d735]
+- Updated dependencies [1973a9d]
+- Updated dependencies [31d39db]
+- Updated dependencies [aae666f]
+  - octane@0.25.0
+  - @octanejs/app-core@0.3.8
+
 ## 0.6.7
 
 ### Patch Changes

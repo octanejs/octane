@@ -1,5 +1,25 @@
 # @octanejs/codemod
 
+## 0.2.13
+
+### Patch Changes
+
+- 9569d86: Support generated adapters on every stable Octane release from 0.16.7, with no upper bound.
+- 50e9009: Support generated adapters on every Octane 0.x release from 0.16.7, so new Octane minors no longer need a codemod update.
+- Updated dependencies [930e83a]
+- Updated dependencies [27d219c]
+- Updated dependencies [9170304]
+- Updated dependencies [19d6c6f]
+- Updated dependencies [79df583]
+- Updated dependencies [cabb8a7]
+- Updated dependencies [5d2cfb1]
+- Updated dependencies [aa6d735]
+- Updated dependencies [1973a9d]
+- Updated dependencies [31d39db]
+- Updated dependencies [aae666f]
+  - @octanejs/cli@0.4.0
+  - octane@0.25.0
+
 ## 0.2.12
 
 ### Patch Changes
