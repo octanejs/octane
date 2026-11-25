@@ -4043,7 +4043,8 @@ function moduleMutableBindings(state) {
 	for (let statement of state.ast.body ?? []) {
 		if (statement.type === 'ExportNamedDeclaration') statement = statement.declaration;
 		if (statement?.type === 'VariableDeclaration' && statement.kind !== 'const') {
-			for (const declaration of statement.declarations ?? []) addPatternNames(declaration.id, names);
+			for (const declaration of statement.declarations ?? [])
+				addPatternNames(declaration.id, names);
 		}
 	}
 	return (state.moduleMutableBindings = names);
@@ -4133,8 +4134,7 @@ function forItemMemo(node, state) {
 				if (
 					type === 'NewExpression' ||
 					callee?.type !== 'Identifier' ||
-					(!FOR_MEMO_PURE_CALLS.has(callee.name) &&
-						callee.name !== state.helpers.normalizeClass) ||
+					(!FOR_MEMO_PURE_CALLS.has(callee.name) && callee.name !== state.helpers.normalizeClass) ||
 					resolveBinding(nodeScopes.get(callee) ?? rootScope, callee.name) !== null
 				) {
 					return void (safe = false);

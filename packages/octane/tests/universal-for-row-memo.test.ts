@@ -98,7 +98,12 @@ describe('universal @for row memo', () => {
 		root.render(MemoRows, { rows, prefix: '', select() {}, expose() {} });
 		const before = hosts(container);
 		let api!: { setRows(rows: unknown[]): void };
-		root.render(MemoRows, { rows, prefix: '', select() {}, expose: (value: typeof api) => (api = value) });
+		root.render(MemoRows, {
+			rows,
+			prefix: '',
+			select() {},
+			expose: (value: typeof api) => (api = value),
+		});
 		const mounted = hosts(container);
 		flushUniversalSync(() => api.setRows([rows[2], rows[0], rows[1]]));
 		// Retained rows move; none re-renders.
@@ -113,7 +118,10 @@ describe('universal @for row memo', () => {
 		const indexContainer = createObjectContainer();
 		const indexRoot = createUniversalRoot(indexContainer, createObjectDriver());
 		let setIndexed!: (rows: unknown[]) => void;
-		indexRoot.render(IndexRows, { rows: indexed, expose: (set: typeof setIndexed) => (setIndexed = set) });
+		indexRoot.render(IndexRows, {
+			rows: indexed,
+			expose: (set: typeof setIndexed) => (setIndexed = set),
+		});
 		flushUniversalSync(() => setIndexed([indexed[0], indexed[2], indexed[1]]));
 		if (MEMO) expect(Object.fromEntries(indexReads)).toEqual({ a: 1, b: 2, c: 2 });
 		expect(hosts(indexContainer).map((host) => [host.props.id, host.props.position])).toEqual([
@@ -156,9 +164,9 @@ describe('universal @for row memo', () => {
 			).code;
 		const memo = /,\s*\[([^\]]*)\],\s*(true|false)\s*\)/;
 		expect(emit('<row-host label={row.label} onTap={() => props.pick(row.id)} />')).toMatch(memo);
-		expect(emit('<row-host label={row.label} onTap={() => props.pick(row.id)} />').match(memo)![1]).toBe(
-			'props',
-		);
+		expect(
+			emit('<row-host label={row.label} onTap={() => props.pick(row.id)} />').match(memo)![1],
+		).toBe('props');
 		expect(emit('<row-host label={String(row.n)} />')).toMatch(memo);
 		for (const body of [
 			'<row-host label={row.label.trim()} />',
@@ -171,7 +179,10 @@ describe('universal @for row memo', () => {
 		]) {
 			expect(emit(body, 'let suffix = ""; const format = (v) => v;\n')).not.toMatch(memo);
 		}
-		for (const body of ['<row-host attach={() => {}} label={row.label} />', '<row-host hidden={row.off} label={row.label} />']) {
+		for (const body of [
+			'<row-host attach={() => {}} label={row.label} />',
+			'<row-host hidden={row.off} label={row.label} />',
+		]) {
 			expect(emit(body)).not.toMatch(memo);
 		}
 		const header = (head: string) =>
@@ -181,7 +192,9 @@ describe('universal @for row memo', () => {
 				{ renderer, hmr: false },
 			).code;
 		// A header default is a per-row read of its own captures.
-		expect(header('const { label = fallback } of props.rows').match(memo)![1]).toBe('fallback, props');
+		expect(header('const { label = fallback } of props.rows').match(memo)![1]).toBe(
+			'fallback, props',
+		);
 		expect(header('const { label = format(fallback) } of props.rows')).not.toMatch(memo);
 		// A keyed destructured row is a fresh prepared array every render.
 		expect(header('const { label } of props.rows; key label')).not.toMatch(memo);

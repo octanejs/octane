@@ -13,7 +13,11 @@ export function MemoRows(props) @{
 	props.expose({ tick: () => setTicks(ticks + 1), setRows });
 	<row-list ticks={ticks}>
 		@for (const row of rows; key row.id) {
-			<row-host id={row.id} class={row.on ? 'row on' : 'row'} onTap={() => props.select(props.prefix + row.id)}>
+			<row-host
+				id={row.id}
+				class={row.on ? 'row on' : 'row'}
+				onTap={() => props.select(props.prefix + row.id)}
+			>
 				<row-label value={String(row.label)} />
 				@if (row.on) {
 					<row-flag />
