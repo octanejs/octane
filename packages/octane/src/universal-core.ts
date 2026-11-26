@@ -305,8 +305,17 @@ function styleHostBinding(value: object): UniversalHostBinding<unknown> | null {
 	return binding;
 }
 
+/** A prop value as a signal binding: a signal handle, or a `style` object holding them. */
+function signalPropBinding(value: object, name?: string): UniversalHostBinding<unknown> | null {
+	if (name === 'style' && typeof value === 'object') {
+		const style = styleHostBinding(value);
+		if (style !== null) return style;
+	}
+	return signalHostBinding(value, false);
+}
+
 // Installed with native reads, like SIGNAL_HOST_BINDING.
-let STYLE_HOST_BINDING: typeof styleHostBinding | null = null;
+let SIGNAL_PROP_BINDING: typeof signalPropBinding | null = null;
 
 /**
  * A prop value as a host binding: an explicit binding, a signal handle, or a
@@ -315,24 +324,27 @@ let STYLE_HOST_BINDING: typeof styleHostBinding | null = null;
 function hostBindingOf(value: unknown, name?: string): UniversalHostBinding<unknown> | null {
 	if (value === null || (typeof value !== 'object' && typeof value !== 'function')) return null;
 	if (isUniversalHostBinding(value)) return value;
-	if (SIGNAL_HOST_BINDING === null) return null;
-	if (name === 'style' && STYLE_HOST_BINDING !== null && typeof value === 'object') {
-		const style = STYLE_HOST_BINDING(value);
-		if (style !== null) return style;
-	}
-	return SIGNAL_HOST_BINDING(value, false);
+	return SIGNAL_PROP_BINDING === null ? null : SIGNAL_PROP_BINDING(value, name);
 }
 
 /**
- * A host binding on a prop it cannot patch. A write updates ordinary props, so
- * an event handler that is a signal handle has to be a function that reads it.
+ * A signal handle passed as a host event handler. A write updates ordinary
+ * props, so the handler has to be a function that reads the handle. Installed
+ * with native reads: without them a handle is never a binding.
  */
-function hostBindingPropError(name: string): Error {
+function signalHandlerPropError(name: string): Error {
 	return new Error(
-		name.startsWith('on')
-			? `A signal handle cannot be the host event handler ${name}: host bindings update ordinary props only. Pass a function that reads the handle instead, such as ${name}={(event) => handler$.get()(event)}.`
-			: 'Experimental host bindings require an ordinary prop on a local direct root.',
+		`A signal handle cannot be the host event handler ${name}: host bindings update ordinary props only. Pass a function that reads the handle instead, such as ${name}={(event) => handler$.get()(event)}.`,
 	);
+}
+
+let SIGNAL_HANDLER_PROP_ERROR: typeof signalHandlerPropError | null = null;
+
+/** A host binding on a prop it cannot patch. */
+function hostBindingPropError(name: string): Error {
+	return SIGNAL_HANDLER_PROP_ERROR !== null && name.startsWith('on')
+		? SIGNAL_HANDLER_PROP_ERROR(name)
+		: new Error('Experimental host bindings require an ordinary prop on a local direct root.');
 }
 
 /** A signal handle rendered as a text child: one bound '#text' host. */
@@ -3082,7 +3094,8 @@ export function enableUniversalNativeReads(abi = 1): void {
 	if (NATIVE_READS !== null) return;
 	HOST_BINDING_SUPPORT = UNIVERSAL_HOST_BINDING_SUPPORT;
 	SIGNAL_HOST_BINDING = signalHostBinding;
-	STYLE_HOST_BINDING = styleHostBinding;
+	SIGNAL_PROP_BINDING = signalPropBinding;
+	SIGNAL_HANDLER_PROP_ERROR = signalHandlerPropError;
 	TRACK_NATIVE_READS = trackNativeReads;
 	installUniversalLocalHook(universalLocalHook);
 	NATIVE_READS = createNativeReadCollector((owner, source, version) => {
