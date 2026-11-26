@@ -30,6 +30,7 @@
  */
 import * as devalue from 'devalue';
 import { clearHostTimeout, hostDateNow, postHostTask, setHostTimeout } from '../host-task.js';
+import { decode, jsonExact } from './codec.js';
 import type { Read, StandardSchema, Write } from './contracts.js';
 
 /** What the store keeps in memory about each saved value. */
@@ -221,9 +222,8 @@ export interface Persistence {
 const encoder = new TextEncoder();
 
 /**
- * A cached value's text: JSON where JSON keeps the record exactly, which writes
- * and reads several times faster than devalue on a large list, and devalue for
- * anything else. Devalue's text of an object starts with `[`, never `{`.
+ * A cached value's text, as `encode` writes it (see codec.ts), with a view's span
+ * bounds checked apart from its rows.
  */
 function encodeStored(record: Stored & { at: number }): string {
 	const bounds = record.span as { start: unknown; first: unknown; last: unknown } | null;
@@ -240,32 +240,7 @@ function encodeStored(record: Stored & { at: number }): string {
 }
 
 function decodeStored(text: string): Stored & { at: number } {
-	return text.startsWith('{') ? JSON.parse(text) : devalue.parse(text);
-}
-
-/**
- * Whether `JSON.parse(JSON.stringify(value))` equals `value`, as devalue's
- * would: plain objects and arrays, each reached once, of strings, booleans,
- * null and finite numbers other than -0. JSON would drop `undefined` (which a
- * hole reads as), write a Date as text, and copy a value reached twice.
- * Neither keeps a list's other properties.
- */
-function jsonExact(value: unknown, seen: Set<object>): boolean {
-	if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
-	if (typeof value === 'number') return Number.isFinite(value) && !Object.is(value, -0);
-	if (typeof value !== 'object' || seen.has(value)) return false;
-	seen.add(value);
-	const proto = Object.getPrototypeOf(value);
-	if (proto === Array.prototype) {
-		const array = value as unknown[];
-		for (let index = 0; index < array.length; index++)
-			if (!jsonExact(array[index], seen)) return false;
-		return true;
-	}
-	if (proto !== Object.prototype) return false;
-	for (const key in value)
-		if (!jsonExact((value as Record<string, unknown>)[key], seen)) return false;
-	return true;
+	return decode(text) as Stored & { at: number };
 }
 
 /** The engine's own codecs, where it has them (Node 24 does not): far faster on a large value. */

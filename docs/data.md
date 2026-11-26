@@ -194,7 +194,14 @@ handle per store for equal arguments, with `getSnapshot`, `subscribe`,
 ## Wire protocol
 
 Transports and handlers exchange devalue-encoded messages, so dates, maps and
-sets survive.
+sets survive. A request from `httpTransport` or `serverTransport` carries
+`json: true`, and the handler then sends its reply as JSON where JSON keeps it
+exactly (plain objects and arrays of strings, booleans, null and finite
+numbers, with no value reached twice), which encodes, parses and compresses
+better on a large list. Such a reply starts with `json` and a newline, so a
+proxy's JSON error page still rejects rather than reading as a reply. A request
+without the field, such as one from an earlier client, always gets devalue, and
+both transports read devalue from an earlier server. Feed frames are devalue.
 
 ```ts
 interface DataRequest {

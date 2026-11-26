@@ -5,6 +5,7 @@
  * never see unvalidated input.
  */
 import * as devalue from 'devalue';
+import { encodeReply } from './codec.js';
 import {
 	DataError,
 	parse,
@@ -225,8 +226,17 @@ const FEED_CONNECTION = 25_000;
 /** A write may ask for at most this many reads back; the rest reload on their own. */
 const MAX_REFRESH = 8;
 
-function respond(status: number, reply: DataReply): Response {
-	return new Response(devalue.stringify(reply), {
+/**
+ * A reply's text: JSON where JSON keeps it exactly, for a client that asked
+ * (see codec.ts), and devalue for one that did not, which reads nothing else.
+ */
+const replyText = (reply: DataReply, payload?: DataRequest) =>
+	(payload as { json?: unknown } | undefined)?.json === true
+		? encodeReply(reply)
+		: devalue.stringify(reply);
+
+function respond(status: number, reply: DataReply, payload?: DataRequest): Response {
+	return new Response(replyText(reply, payload), {
 		status,
 		headers: { 'content-type': 'application/json' },
 	});
@@ -369,7 +379,8 @@ export function createDataHandler<C extends object = {}>(
 		}
 		try {
 			// A refusal is an answer, not a transport failure: browsers log every 4xx fetch.
-			return respond(200, await answer(devalue.parse(await request.text()), request));
+			const payload = devalue.parse(await request.text()) as DataRequest;
+			return respond(200, await answer(payload, request), payload);
 		} catch {
 			// Not a reply: the client must not read an unexpected failure as a refusal.
 			return new Response(null, { status: 500 });
@@ -524,9 +535,11 @@ export function createDataHandler<C extends object = {}>(
 			(payload) =>
 				answer(payload, request),
 		forms,
-		// devalue on both sides, as over HTTP: a server call carries only plain data.
-		serve: async (request: string, call: ServerCallContext) =>
-			devalue.stringify(await answer(devalue.parse(request), call.request, call)),
+		// As over HTTP: a server call carries only plain data.
+		serve: async (request: string, call: ServerCallContext) => {
+			const payload = devalue.parse(request) as DataRequest;
+			return replyText(await answer(payload, call.request, call), payload);
+		},
 		async *listen(request: string, call: ServerCallContext) {
 			for await (const frame of frames(
 				devalue.parse(request),
