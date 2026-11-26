@@ -57,3 +57,47 @@ export function ScopedTone() @{
 	renders.counter++;
 	<view class={universalScopedClass(tone$, 'scope-a')} />
 }
+
+import { useState } from 'octane';
+
+// Template programs: rows whose slots carry signal handles, a click
+// handler on the row root, a static label and a scoped class bound to a handle.
+export const rowPicks = { set: null as null | ((order: number) => void) };
+
+export function ProgramRows() @{
+	const [order, setOrder] = useState(0);
+	rowPicks.set = setOrder;
+	const list = order === 0 ? cells : [cells[1], cells[0], cells[2], cells[3]];
+	<view>
+		@for (const cell of list; key list.indexOf(cell)) {
+			<item value={cell} onPress={() => cell.set((n: number) => n + 100)}>
+				<label>{'#'}</label>
+				<label>{cell}</label>
+			</item>
+		}
+	</view>
+}
+
+export function ProgramScoped() @{
+	<view>
+		@for (const cell of cells; key cells.indexOf(cell)) {
+			<item class={universalScopedClass(tone$, 'scope-b')}>{cell}</item>
+		}
+	</view>
+}
+
+// Rows whose `detail` turns into an object: without structured program values
+// the committed programs expand into ordinary hosts, which keep their bindings.
+export const detailPicks = { set: null as null | ((mode: number) => void) };
+
+export function ProgramExpanding() @{
+	const [mode, setMode] = useState(0);
+	detailPicks.set = setMode;
+	<view>
+		@for (const cell of cells; key cells.indexOf(cell)) {
+			<item value={cell} detail={mode === 0 ? 'flat' : { mode }}>
+				<label>{cell}</label>
+			</item>
+		}
+	</view>
+}

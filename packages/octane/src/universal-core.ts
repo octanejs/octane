@@ -129,13 +129,67 @@ function isUniversalHostBinding(value: unknown): value is UniversalHostBinding<u
 	);
 }
 
-// One binding per handle and use, so a re-render that passes the same handle
-// keeps its subscription: bindings compare by identity at commit.
-let SIGNAL_PROP_BINDINGS: WeakMap<object, UniversalHostBinding<unknown>> | null = null;
-let SIGNAL_TEXT_BINDINGS: WeakMap<object, UniversalHostBinding<unknown>> | null = null;
-
 function signalBindingText(value: unknown): string {
 	return value == null || typeof value === 'boolean' ? '' : String(value);
+}
+
+function signalBindingRaw(value: unknown): unknown {
+	return value;
+}
+
+/**
+ * One source per signal handle: its prop, text and scoped-class bindings share
+ * it, so a host bound to one handle twice holds one subscription. The source
+ * and its bindings are plain prototype objects, not per-handle closures: a list
+ * that binds one handle per row allocates two small objects per handle.
+ */
+class SignalBindingSource {
+	readonly handle: SignalHandle<unknown>;
+	prop: UniversalHostBinding<unknown> | undefined;
+	text: UniversalHostBinding<unknown> | undefined;
+	scoped: Map<string, UniversalHostBinding<unknown>> | undefined;
+	constructor(handle: SignalHandle<unknown>) {
+		this.handle = handle;
+		this.prop = undefined;
+		this.text = undefined;
+		this.scoped = undefined;
+	}
+	get(): unknown {
+		return this.handle[SIGNAL_BINDING_READ]();
+	}
+	subscribe(notify: () => void): () => void {
+		return this.handle[SIGNAL_BINDING_SUBSCRIBE](notify);
+	}
+}
+
+class SignalHostBinding {
+	readonly $$kind: typeof UNIVERSAL_HOST_BINDING;
+	readonly source: SignalBindingSource;
+	readonly select: (value: unknown) => unknown;
+	constructor(source: SignalBindingSource, select: (value: unknown) => unknown) {
+		this.$$kind = UNIVERSAL_HOST_BINDING;
+		this.source = source;
+		this.select = select;
+	}
+	getSnapshot(): unknown {
+		return this.select(this.source.get());
+	}
+}
+
+// One source per handle, so a re-render that passes the same handle keeps its
+// subscription: bindings compare by identity at commit.
+let SIGNAL_BINDING_SOURCES: WeakMap<object, SignalBindingSource> | null = null;
+
+function signalBindingSource(value: unknown): SignalBindingSource | null {
+	if (!isSignalHandle(value)) return null;
+	HOST_BINDING_SUPPORT = UNIVERSAL_HOST_BINDING_SUPPORT;
+	const sources = (SIGNAL_BINDING_SOURCES ??= new WeakMap());
+	let source = sources.get(value as object);
+	if (source === undefined) {
+		source = new SignalBindingSource(value as SignalHandle<unknown>);
+		sources.set(value as object, source);
+	}
+	return source;
 }
 
 /**
@@ -144,35 +198,27 @@ function signalBindingText(value: unknown): string {
  * `update` command for that host, without rendering the component again.
  */
 function signalHostBinding(value: unknown, text: boolean): UniversalHostBinding<unknown> | null {
-	if (!isSignalHandle(value)) return null;
-	HOST_BINDING_SUPPORT = UNIVERSAL_HOST_BINDING_SUPPORT;
-	const cache = text
-		? (SIGNAL_TEXT_BINDINGS ??= new WeakMap())
-		: (SIGNAL_PROP_BINDINGS ??= new WeakMap());
-	let binding = cache.get(value);
-	if (binding === undefined) {
-		const handle = value as SignalHandle<unknown>;
-		const source = {
-			get: () => handle[SIGNAL_BINDING_READ](),
-			subscribe(notify: () => void): () => void {
-				const subscription = handle[SIGNAL_BINDING_SUBSCRIBE](notify);
-				return () => subscription();
-			},
-		};
-		const select = text ? signalBindingText : (raw: unknown) => raw;
-		binding = {
-			$$kind: UNIVERSAL_HOST_BINDING,
+	const source = signalBindingSource(value);
+	if (source === null) return null;
+	if (text) {
+		return (source.text ??= new SignalHostBinding(
 			source,
-			select,
-			getSnapshot: () => select(source.get()),
-		};
-		cache.set(value, binding);
+			signalBindingText,
+		) as unknown as UniversalHostBinding<unknown>);
 	}
-	return binding;
+	return (source.prop ??= new SignalHostBinding(
+		source,
+		signalBindingRaw,
+	) as unknown as UniversalHostBinding<unknown>);
 }
 
-let SCOPED_CLASS_BINDINGS: WeakMap<object, Map<string, UniversalHostBinding<unknown>>> | null =
-	null;
+// Installed with native reads by signals modules (enableUniversalNativeReads),
+// so an application without signals ships neither signal bindings nor the
+// binding-only commit path.
+let SIGNAL_HOST_BINDING: typeof signalHostBinding | null = null;
+
+// One select per scope, shared by every handle bound under it.
+let SCOPED_CLASS_SELECTS: Map<string, (value: unknown) => string> | null = null;
 
 /**
  * A dynamic class with the element's scoped-style classes appended. A signal
@@ -180,22 +226,19 @@ let SCOPED_CLASS_BINDINGS: WeakMap<object, Map<string, UniversalHostBinding<unkn
  * updates the class without rendering the component again.
  */
 export function universalScopedClass(value: unknown, scope: string): unknown {
-	const handle = signalHostBinding(value, false);
-	if (handle === null) return `${normalizeClass(value)} ${scope}`;
-	const byScope = (SCOPED_CLASS_BINDINGS ??= new WeakMap()).get(value as object);
-	let binding = byScope?.get(scope);
+	const source = signalBindingSource(value);
+	if (source === null) return `${normalizeClass(value)} ${scope}`;
+	const scoped = (source.scoped ??= new Map());
+	let binding = scoped.get(scope);
 	if (binding === undefined) {
-		const select = (raw: unknown) => `${normalizeClass(raw)} ${scope}`;
-		const source = handle.source;
-		binding = {
-			$$kind: UNIVERSAL_HOST_BINDING,
-			source,
-			select,
-			getSnapshot: () => select(source.get()),
-		};
-		if (byScope === undefined)
-			SCOPED_CLASS_BINDINGS.set(value as object, new Map([[scope, binding]]));
-		else byScope.set(scope, binding);
+		const selects = (SCOPED_CLASS_SELECTS ??= new Map());
+		let select = selects.get(scope);
+		if (select === undefined) {
+			select = (raw: unknown) => `${normalizeClass(raw)} ${scope}`;
+			selects.set(scope, select);
+		}
+		binding = new SignalHostBinding(source, select) as unknown as UniversalHostBinding<unknown>;
+		scoped.set(scope, binding);
 	}
 	return binding;
 }
@@ -203,7 +246,47 @@ export function universalScopedClass(value: unknown, scope: string): unknown {
 /** A prop value as a host binding: an explicit binding or a signal handle. */
 function hostBindingOf(value: unknown): UniversalHostBinding<unknown> | null {
 	if (value === null || (typeof value !== 'object' && typeof value !== 'function')) return null;
-	return isUniversalHostBinding(value) ? value : signalHostBinding(value, false);
+	if (isUniversalHostBinding(value)) return value;
+	return SIGNAL_HOST_BINDING === null ? null : SIGNAL_HOST_BINDING(value, false);
+}
+
+/** A signal handle rendered as a text child: one bound '#text' host. */
+function materializeBoundText(value: unknown, key: UniversalKey | null): BlueprintNode[] | null {
+	const textBinding = textBindingOf(value);
+	if (textBinding === null || currentAttempt().root.textPolicy() !== 'host') return null;
+	const root = currentAttempt().root;
+	if (root.hasHostBindingUnsupportedConfiguration()) {
+		throw new Error('Signal text children require a local direct root.');
+	}
+	markUniversalTreeFeature(UNIVERSAL_TREE_HOST_BINDING);
+	return [
+		{
+			kind: 'host',
+			key,
+			type: '#text',
+			props: { value: root.encodeHostProp('#text', 'value', textBinding.getSnapshot()) },
+			hostBindings: new Map([['value', textBinding]]),
+			ref: null,
+			owner: CURRENT_OWNER!.record,
+			events: EMPTY_BLUEPRINT_EVENTS,
+			lifecycles: EMPTY_BLUEPRINT_HOST_CALLBACKS,
+			localCallbacks: EMPTY_BLUEPRINT_HOST_CALLBACKS,
+			visibility: CURRENT_OWNER!.visibility,
+			children: [],
+		},
+	];
+}
+
+/** A text child as a host binding: a signal handle, when signals are installed. */
+function textBindingOf(value: unknown): UniversalHostBinding<unknown> | null {
+	if (
+		SIGNAL_HOST_BINDING === null ||
+		value === null ||
+		(typeof value !== 'object' && typeof value !== 'function')
+	) {
+		return null;
+	}
+	return SIGNAL_HOST_BINDING(value, true);
 }
 const UNIVERSAL_TRY = Symbol.for('octane.universal.try');
 const UNIVERSAL_CONTEXT = Symbol.for('octane.universal.context');
@@ -2890,6 +2973,8 @@ function readOwnerContext<T>(
 // read to the collector's owner; a component that read signals subscribes to
 // them when its render commits and renders again when one of them changes.
 let NATIVE_READS: ReturnType<typeof createNativeReadCollector> | null = null;
+// Installed with NATIVE_READS, so applications without signals do not ship it.
+let TRACK_NATIVE_READS: ((owner: DraftOwner) => void) | null = null;
 const NATIVE_READ_STATE_SLOT = Symbol('octane.universal.native-reads');
 const NATIVE_READ_REVISION_SLOT = Symbol('octane.universal.native-reads.revision');
 const NATIVE_READ_SYNC_SLOT = Symbol('octane.universal.native-reads.sync');
@@ -2901,11 +2986,18 @@ interface NativeReadState {
 	notify: () => void;
 }
 
-/** @internal Compiler capability: collect native signal reads per component render. */
+/**
+ * @internal Compiler capability of a module with a runtime signals import:
+ * collect native signal reads per component render, and bind signal handles
+ * passed as host props, text children or template-program values to their
+ * hosts. Applications that never call it ship neither.
+ */
 export function enableUniversalNativeReads(abi = 1): void {
 	if (abi !== 1) throw new TypeError(`Unsupported universal native-read ABI ${String(abi)}.`);
 	if (NATIVE_READS !== null) return;
 	HOST_BINDING_SUPPORT = UNIVERSAL_HOST_BINDING_SUPPORT;
+	SIGNAL_HOST_BINDING = signalHostBinding;
+	TRACK_NATIVE_READS = trackNativeReads;
 	NATIVE_READS = createNativeReadCollector((owner, source, version) => {
 		const draft = owner as DraftOwner;
 		const reads = (draft.nativeReads ??= new Map());
@@ -3004,7 +3096,7 @@ function executeOwner<T>(owner: DraftOwner, build: () => T, initialRenderCount =
 			} finally {
 				if (nativeReads !== null) nativeReads.endRender(readToken);
 			}
-			if (nativeReads !== null && !owner.needsRender) trackNativeReads(owner);
+			if (nativeReads !== null && !owner.needsRender) TRACK_NATIVE_READS!(owner);
 		} catch (error) {
 			didThrow = true;
 			thrown = error;
@@ -3478,11 +3570,13 @@ function blueprintFromLogical(record: LogicalRecord): BlueprintNode {
 	for (const value of Object.values(record.props)) {
 		if (isRendererRegion(value)) markUniversalTreeFeature(UNIVERSAL_TREE_REGION);
 	}
+	const hostBindings = HOST_BINDING_SUPPORT?.retained(currentAttempt().root, record);
 	return {
 		kind: 'host',
 		key: record.key,
 		type: record.type!,
 		props: { ...record.props },
+		...(hostBindings === undefined ? null : { hostBindings }),
 		ref: record.ref,
 		owner: record.owner!,
 		events: new Map(record.events),
@@ -3682,32 +3776,9 @@ function materializeValue(
 	path: readonly unknown[],
 ): BlueprintNode[] {
 	if (value == null || value === false || value === true) return [];
-	const textBinding =
-		typeof value === 'object' || typeof value === 'function'
-			? signalHostBinding(value, true)
-			: null;
-	if (textBinding !== null && currentAttempt().root.textPolicy() === 'host') {
-		const root = currentAttempt().root;
-		if (root.hasHostBindingUnsupportedConfiguration()) {
-			throw new Error('Signal text children require a local direct root.');
-		}
-		markUniversalTreeFeature(UNIVERSAL_TREE_HOST_BINDING);
-		return [
-			{
-				kind: 'host',
-				key,
-				type: '#text',
-				props: { value: root.encodeHostProp('#text', 'value', textBinding.getSnapshot()) },
-				hostBindings: new Map([['value', textBinding]]),
-				ref: null,
-				owner: CURRENT_OWNER!.record,
-				events: EMPTY_BLUEPRINT_EVENTS,
-				lifecycles: EMPTY_BLUEPRINT_HOST_CALLBACKS,
-				localCallbacks: EMPTY_BLUEPRINT_HOST_CALLBACKS,
-				visibility: CURRENT_OWNER!.visibility,
-				children: [],
-			},
-		];
+	if (HOST_BINDING_SUPPORT !== null && (typeof value === 'object' || typeof value === 'function')) {
+		const text = HOST_BINDING_SUPPORT.text(value, key);
+		if (text !== null) return text;
 	}
 	if ((value as UniversalKeyedValue)?.$$kind === UNIVERSAL_KEYED) {
 		const keyed = value as UniversalKeyedValue;
@@ -4857,9 +4928,24 @@ function prepareCollapsedTemplateValues(
 		root.transport === null;
 	const bindings = prepared.values;
 	const values: UniversalHostTemplateProgramValue[] = new Array(bindings.length);
+	let bound: (UniversalHostBinding<unknown> | undefined)[] | null = null;
 	for (let index = 0; index < bindings.length; index++) {
 		const binding = bindings[index];
-		const source = sources[binding.slot];
+		let source = sources[binding.slot];
+		if (
+			HOST_BINDING_SUPPORT !== null &&
+			source !== null &&
+			(typeof source === 'object' || typeof source === 'function')
+		) {
+			// A host binding (a signal handle) in a slot: the program carries its
+			// current value and the commit binds the slot (see TEMPLATE_SLOT_BINDINGS).
+			const hostBinding = HOST_BINDING_SUPPORT.slot(source, binding.text);
+			if (hostBinding !== null) {
+				if (root.hasHostBindingUnsupportedConfiguration()) return null;
+				source = hostBinding.getSnapshot();
+				(bound ??= new Array(bindings.length))[index] = hostBinding;
+			}
+		}
 		if (binding.text) {
 			if (typeof source !== 'string' && typeof source !== 'number' && typeof source !== 'bigint') {
 				return null;
@@ -4882,7 +4968,37 @@ function prepareCollapsedTemplateValues(
 		if (!acceptsTemplateProgramValue(root, encoded)) return null;
 		values[index] = encoded as UniversalHostTemplateProgramValue;
 	}
-	return Object.freeze(values);
+	const frozen = Object.freeze(values);
+	if (bound !== null) HOST_BINDING_SUPPORT!.bindSlots(frozen, bound);
+	return frozen;
+}
+
+function bindTemplateSlots(
+	values: readonly UniversalHostTemplateProgramValue[],
+	bound: readonly (UniversalHostBinding<unknown> | undefined)[],
+): void {
+	markUniversalTreeFeature(UNIVERSAL_TREE_HOST_BINDING);
+	(TEMPLATE_SLOT_BINDINGS ??= new WeakMap()).set(values, bound);
+}
+
+/**
+ * Host bindings carried by prepared program values, keyed by the values array
+ * they were read into (sparse, by value index). The array travels unchanged
+ * through blueprints, compact lists, retained patches and the committed
+ * program state, so the commit finds a row's bindings from its values alone
+ * and binds (host record, value index) instead of one record per node.
+ */
+let TEMPLATE_SLOT_BINDINGS: WeakMap<
+	readonly UniversalHostTemplateProgramValue[],
+	readonly (UniversalHostBinding<unknown> | undefined)[]
+> | null = null;
+
+function templateSlotBindings(
+	values: readonly UniversalHostTemplateProgramValue[] | undefined,
+): readonly (UniversalHostBinding<unknown> | undefined)[] | undefined {
+	return values === undefined || TEMPLATE_SLOT_BINDINGS === null
+		? undefined
+		: TEMPLATE_SLOT_BINDINGS.get(values);
 }
 
 function preparedCollapsedTemplateBlueprint(
@@ -5398,6 +5514,7 @@ function expandCollapsedTemplateBlueprint(host: BlueprintHost): void {
 		blueprints.push(blueprint);
 		blueprints[collapsed.program.shape[index].parent].children.push(blueprint);
 	}
+	HOST_BINDING_SUPPORT?.expandBlueprint(collapsed, blueprints);
 	delete host.collapsedTemplate;
 }
 
@@ -5608,8 +5725,88 @@ function expandCollapsedTemplate(root: UniversalRootImpl<any, any>, record: Logi
 		records.push(child);
 		child.parent!.children.push(child);
 	}
+	if (root.hostBindings !== null) {
+		HOST_BINDING_SUPPORT!.expandRecord(root.hostBindings, record, records, state);
+	}
 	delete record.collapsedTemplate;
 	root.collapsedTemplates?.delete(record);
+}
+
+/** Bound program slots become ordinary bindings of the expanded blueprint hosts. */
+function expandTemplateSlotBlueprints(
+	collapsed: BlueprintCollapsedTemplate,
+	blueprints: readonly BlueprintHost[],
+): void {
+	const slots = templateSlotBindings(collapsed.values);
+	if (slots === undefined) return;
+	const sites = collapsed.prepared!.values;
+	for (let slot = 0; slot < slots.length; slot++) {
+		const binding = slots[slot];
+		if (binding === undefined) continue;
+		const target = blueprints[sites[slot].node];
+		(target.hostBindings ??= new Map()).set(sites[slot].name, binding);
+	}
+}
+
+/** A retained host's connected bindings, for a blueprint rebuilt from its record. */
+function retainedHostBindings(
+	root: UniversalRootImpl<any, any>,
+	record: LogicalRecord,
+): Map<string, UniversalHostBinding<unknown>> | undefined {
+	const bound = root.hostBindings?.hosts.get(record);
+	if (bound === undefined) return undefined;
+	const hostBindings = new Map<string, UniversalHostBinding<unknown>>();
+	for (const entry of bound) hostBindings.set(entry.name, entry.binding);
+	markUniversalTreeFeature(UNIVERSAL_TREE_HOST_BINDING);
+	return hostBindings;
+}
+
+/**
+ * A committed program expanded into logical records: its bound slots become
+ * ordinary bindings of the records for their nodes, with the same sources.
+ */
+function rebindExpandedTemplateSlots(
+	state: UniversalHostBindingState,
+	record: LogicalRecord,
+	records: readonly LogicalRecord[],
+	program: CommittedCollapsedTemplate,
+): void {
+	const connected = state.hosts.get(record);
+	if (connected === undefined || program.prepared === undefined) return;
+	const sites = program.prepared.values;
+	const own: UniversalBoundHostProp[] = [];
+	for (const entry of connected) {
+		if (entry.slot === -1) {
+			own.push(entry);
+			continue;
+		}
+		const node = sites[entry.slot].node;
+		if (node === 0) {
+			own.push({ name: entry.name, binding: entry.binding, slot: -1 });
+			continue;
+		}
+		const target = records[node];
+		let list = state.hosts.get(target);
+		if (list === undefined) state.hosts.set(target, (list = []));
+		list.push({ name: entry.name, binding: entry.binding, slot: -1 });
+		const group = state.sources.get(entry.binding.source);
+		if (group !== undefined && !group.records.includes(target)) group.records.push(target);
+		if (state.dirtyHostSet.has(record) && !state.dirtyHostSet.has(target)) {
+			state.dirtyHostSet.add(target);
+			state.dirtyHosts.push(target);
+		}
+	}
+	if (own.length === 0) {
+		state.hosts.delete(record);
+		for (const entry of connected) {
+			const group = state.sources.get(entry.binding.source);
+			const position = group?.records.indexOf(record) ?? -1;
+			if (position >= 0) group!.records.splice(position, 1);
+		}
+		state.dirtyHostSet.delete(record);
+		const dirty = state.dirtyHosts.indexOf(record);
+		if (dirty !== -1) state.dirtyHosts.splice(dirty, 1);
+	} else state.hosts.set(record, own);
 }
 
 function expandCollapsedTemplates(root: UniversalRootImpl<any, any>): void {
@@ -13272,6 +13469,11 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 								bindingPublicationError = error;
 						}
 					}
+					if (attempt.templatePatches !== null) {
+						const error = bindings.patches(this, attempt.templatePatches);
+						if (bindingPublicationError === NO_PENDING_PASSIVE_ERROR)
+							bindingPublicationError = error;
+					}
 					if (bindingPublicationError !== NO_PENDING_PASSIVE_ERROR) throw bindingPublicationError;
 				}
 				if (portalReleaseError !== NO_PENDING_PASSIVE_ERROR) throw portalReleaseError;
@@ -13799,6 +14001,12 @@ type UniversalHostBindingSource = UniversalHostBinding<unknown>['source'];
 interface UniversalBoundHostProp {
 	readonly name: string;
 	readonly binding: UniversalHostBinding<unknown>;
+	/**
+	 * -1 for a prop of the host record itself; otherwise the value index of a
+	 * template-program slot of the record's committed program: the
+	 * node is the slot's program node, the value lives in the program state.
+	 */
+	readonly slot: number;
 }
 
 interface UniversalHostBindingState {
@@ -13822,6 +14030,37 @@ interface UniversalHostBindingState {
 interface UniversalHostBindingSupport {
 	/** Connect an accepted host's bindings, replacing any previous connection. */
 	commit(root: UniversalRootImpl<any, any>, record: LogicalRecord, next: BlueprintHost): unknown;
+	/**
+	 * Connect the bound slots of retained template rows patched in place.
+	 * Returns the first error; a failed row does not stop the others.
+	 */
+	patches(root: UniversalRootImpl<any, any>, patches: readonly RetainedTemplatePatch[]): unknown;
+	/** Record the host bindings read into a prepared program's values. */
+	bindSlots(
+		values: readonly UniversalHostTemplateProgramValue[],
+		bound: readonly (UniversalHostBinding<unknown> | undefined)[],
+	): void;
+	/** A prepared program slot's value as a host binding (a signal handle), if it is one. */
+	slot(value: object, text: boolean): UniversalHostBinding<unknown> | null;
+	/** A value rendered as a child, as one bound text host, if it is a signal handle. */
+	text(value: object, key: UniversalKey | null): BlueprintNode[] | null;
+	/** Hand a blueprint program's bound slots to its expanded hosts. */
+	expandBlueprint(
+		collapsed: BlueprintCollapsedTemplate,
+		blueprints: readonly BlueprintHost[],
+	): void;
+	/** Hand a committed program's bound slots to the records it expanded into. */
+	expandRecord(
+		state: UniversalHostBindingState,
+		record: LogicalRecord,
+		records: readonly LogicalRecord[],
+		program: CommittedCollapsedTemplate,
+	): void;
+	/** A retained host's bindings, for a blueprint rebuilt from its record. */
+	retained(
+		root: UniversalRootImpl<any, any>,
+		record: LogicalRecord,
+	): Map<string, UniversalHostBinding<unknown>> | undefined;
 	/** Disconnect a removed host. Returns the first unsubscribe error. */
 	drop(root: UniversalRootImpl<any, any>, record: LogicalRecord): unknown;
 	/** Publish queued source notifications as one binding-only host batch. */
@@ -13866,22 +14105,67 @@ function commitHostBindings(
 	record: LogicalRecord,
 	next: BlueprintHost,
 ): unknown {
-	const bindings = next.hostBindings;
-	if (bindings === undefined || next.visibility !== 'visible') {
+	const collapsed = next.collapsedTemplate;
+	return connectBoundHost(
+		root,
+		record,
+		next.type,
+		next.visibility === 'visible',
+		next.hostBindings,
+		collapsed?.values,
+		collapsed?.prepared,
+	);
+}
+
+/** Retained template rows patched in place bind their new values' slots. */
+function commitTemplatePatchBindings(
+	root: UniversalRootImpl<any, any>,
+	patches: readonly RetainedTemplatePatch[],
+): unknown {
+	let failure: unknown = NO_PENDING_PASSIVE_ERROR;
+	for (const patch of patches) {
+		const host = patch.host;
+		if (
+			patch.expanded ||
+			(templateSlotBindings(patch.values) === undefined &&
+				root.hostBindings?.hosts.get(host) === undefined)
+		) {
+			continue;
+		}
+		try {
+			const error = connectBoundHost(
+				root,
+				host,
+				host.type!,
+				true,
+				undefined,
+				patch.values,
+				patch.prepared,
+			);
+			if (failure === NO_PENDING_PASSIVE_ERROR) failure = error;
+		} catch (error) {
+			if (failure === NO_PENDING_PASSIVE_ERROR) failure = error;
+		}
+	}
+	return failure;
+}
+
+function connectBoundHost(
+	root: UniversalRootImpl<any, any>,
+	record: LogicalRecord,
+	type: string,
+	visible: boolean,
+	bindings: Map<string, UniversalHostBinding<unknown>> | undefined,
+	values: readonly UniversalHostTemplateProgramValue[] | undefined,
+	prepared: PreparedCollapsedTemplateProgram | undefined,
+): unknown {
+	const slots = prepared === undefined ? undefined : templateSlotBindings(values);
+	if ((bindings === undefined && slots === undefined) || !visible) {
 		return dropHostBindings(root, record);
 	}
 	const previous = root.hostBindings?.hosts.get(record);
-	if (previous !== undefined && previous.length === bindings.size) {
-		let unchanged = true;
-		let index = 0;
-		for (const [name, binding] of bindings) {
-			const current = previous[index++];
-			if (current.name !== name || current.binding !== binding) {
-				unchanged = false;
-				break;
-			}
-		}
-		if (unchanged) return NO_PENDING_PASSIVE_ERROR;
+	if (previous !== undefined && sameBoundHostProps(previous, bindings, slots)) {
+		return NO_PENDING_PASSIVE_ERROR;
 	}
 	const unsubscribeError = dropHostBindings(root, record);
 	const state = (root.hostBindings ??= {
@@ -13895,34 +14179,114 @@ function commitHostBindings(
 	});
 	const connected: UniversalBoundHostProp[] = [];
 	state.hosts.set(record, connected);
+	let stale = false;
 	try {
-		for (const [name, binding] of bindings) {
-			connected.push({ name, binding });
-			let group = state.sources.get(binding.source);
-			if (group === undefined) {
-				group = { records: [], unsubscribe: () => {} };
-				state.sources.set(binding.source, group);
-				group.records.push(record);
-				try {
-					// The listener survives individual bound hosts. Do not close over the
-					// first host's binding, which can retain its removed selector and payload.
-					const source = binding.source;
-					group.unsubscribe = source.subscribe(() => queueHostBindingSource(root, source));
-				} catch (error) {
-					state.sources.delete(binding.source);
-					throw error;
+		if (bindings !== undefined) {
+			for (const [name, binding] of bindings) {
+				connected.push({ name, binding, slot: -1 });
+				connectHostBindingSource(root, state, record, binding.source);
+				const value = root.encodeHostProp(type, name, binding.getSnapshot());
+				if (!sameUniversalHostPropValue(record.props[name], value)) stale = true;
+			}
+		}
+		if (slots !== undefined) {
+			// The committed program state holds the values the render read; a
+			// write between that read and this commit sends one update.
+			const committed = values!;
+			const sites = prepared!.values;
+			for (let slot = 0; slot < slots.length; slot++) {
+				const binding = slots[slot];
+				if (binding === undefined) continue;
+				const site = sites[slot];
+				connected.push({ name: site.name, binding, slot });
+				connectHostBindingSource(root, state, record, binding.source);
+				if (
+					!stale &&
+					!sameUniversalHostPropValue(
+						committed[slot],
+						slotBindingValue(root, prepared!, slot, binding.getSnapshot()),
+					)
+				) {
+					stale = true;
 				}
-			} else if (!group.records.includes(record)) group.records.push(record);
-			const value = root.encodeHostProp(next.type, name, binding.getSnapshot());
-			if (!sameUniversalHostPropValue(record.props[name], value)) {
-				queueHostBindingUpdate(root, record);
 			}
 		}
 	} catch (error) {
 		dropHostBindings(root, record);
 		throw error;
 	}
+	if (stale) queueHostBindingUpdate(root, record);
 	return unsubscribeError;
+}
+
+function sameBoundHostProps(
+	previous: readonly UniversalBoundHostProp[],
+	bindings: Map<string, UniversalHostBinding<unknown>> | undefined,
+	slots: readonly (UniversalHostBinding<unknown> | undefined)[] | undefined,
+): boolean {
+	let index = 0;
+	if (bindings !== undefined) {
+		for (const [name, binding] of bindings) {
+			const current = previous[index++];
+			if (
+				current === undefined ||
+				current.slot !== -1 ||
+				current.name !== name ||
+				current.binding !== binding
+			) {
+				return false;
+			}
+		}
+	}
+	if (slots !== undefined) {
+		for (let slot = 0; slot < slots.length; slot++) {
+			const binding = slots[slot];
+			if (binding === undefined) continue;
+			const current = previous[index++];
+			if (current === undefined || current.slot !== slot || current.binding !== binding)
+				return false;
+		}
+	}
+	return index === previous.length;
+}
+
+function connectHostBindingSource(
+	root: UniversalRootImpl<any, any>,
+	state: UniversalHostBindingState,
+	record: LogicalRecord,
+	source: UniversalHostBindingSource,
+): void {
+	let group = state.sources.get(source);
+	if (group === undefined) {
+		group = { records: [record], unsubscribe: NOOP_UNSUBSCRIBE };
+		state.sources.set(source, group);
+		try {
+			// The listener survives individual bound hosts. Do not close over the
+			// first host's binding, which can retain its removed selector and payload.
+			group.unsubscribe = source.subscribe(() => queueHostBindingSource(root, source));
+		} catch (error) {
+			state.sources.delete(source);
+			throw error;
+		}
+		return;
+	}
+	const records = group.records;
+	// A host binds one source in consecutive props: it is then the last record.
+	if (records[records.length - 1] !== record && !records.includes(record)) records.push(record);
+}
+
+const NOOP_UNSUBSCRIBE = (): void => {};
+
+/** A bound program slot's encoded value, as prepareCollapsedTemplateValues encodes it. */
+function slotBindingValue(
+	root: UniversalRootImpl<any, any>,
+	prepared: PreparedCollapsedTemplateProgram,
+	slot: number,
+	selected: unknown,
+): unknown {
+	const site = prepared.values[slot];
+	if (site.text) return typeof selected === 'string' ? selected : String(selected);
+	return root.encodeHostProp(prepared.wire.nodes[site.node].type, site.name, selected);
 }
 
 function queueHostBindingUpdate(root: UniversalRootImpl<any, any>, record: LogicalRecord): void {
@@ -14000,12 +14364,17 @@ function flushHostBindingUpdates(root: UniversalRootImpl<any, any>): void {
 	SCHEDULED_UNIVERSAL_ROOTS.delete(root);
 	let records = state.dirtyHosts;
 	const sources = state.dirtySources;
+	// Records queued by a commit-time staleness check read every binding; the
+	// records of notified sources read only those sources: no other source of
+	// theirs has notified since their values were committed.
+	let checkedRecords = records.length;
 	state.dirtyHosts = [];
 	state.dirtyHostSet.clear();
 	state.dirtySources = [];
 	state.dirtySourceSet.clear();
 	if (sources.length === 1 && records.length === 0) {
 		records = state.sources.get(sources[0])?.records.slice() ?? [];
+		checkedRecords = 0;
 	} else if (sources.length !== 0) {
 		const seen = new Set(records);
 		for (let index = 0; index < sources.length; index++) {
@@ -14021,53 +14390,112 @@ function flushHostBindingUpdates(root: UniversalRootImpl<any, any>): void {
 		}
 	}
 	const changedRecords: LogicalRecord[] = [];
+	// Per command: the program values a slot update commits (null for a record prop update).
+	const changedValues: (readonly UniversalHostTemplateProgramValue[] | null)[] = [];
 	const commands: UniversalHostCommand[] = [];
+	// Each notified source is read once per flush.
 	const soleSource = sources.length === 1 ? sources[0] : null;
 	let soleSourceRead = false;
 	let soleSourceSnapshot: unknown;
+	const notified = sources.length > 1 ? new Set(sources) : null;
 	const otherSourceSnapshots =
-		sources.length > 1 ? new Map<UniversalHostBindingSource, unknown>() : null;
+		notified === null ? null : new Map<UniversalHostBindingSource, unknown>();
 	const driver = root.driver;
+	const readSource = (source: UniversalHostBindingSource): unknown => {
+		if (source === soleSource) {
+			if (!soleSourceRead) {
+				soleSourceSnapshot = source.get();
+				soleSourceRead = true;
+			}
+			return soleSourceSnapshot;
+		}
+		if (notified !== null && notified.has(source)) {
+			if (!otherSourceSnapshots!.has(source)) otherSourceSnapshots!.set(source, source.get());
+			return otherSourceSnapshots!.get(source);
+		}
+		return source.get();
+	};
 	try {
 		for (let recordIndex = 0; recordIndex < records.length; recordIndex++) {
 			const record = records[recordIndex];
 			const connected = state.hosts.get(record);
 			if (connected === undefined || record.visibility !== 'visible') continue;
 			let next: Record<string, unknown> | null = null;
+			let program: CommittedCollapsedTemplate | undefined;
+			let nextValues: UniversalHostTemplateProgramValue[] | null = null;
+			// The changed program node, and the others when more than one changed.
+			let changedNode = -1;
+			let changedNodes: number[] | null = null;
+			const checked = recordIndex < checkedRecords;
 			for (let bindingIndex = 0; bindingIndex < connected.length; bindingIndex++) {
-				const { name, binding } = connected[bindingIndex];
-				let raw: unknown;
-				if (binding.source === soleSource) {
-					if (!soleSourceRead) {
-						soleSourceSnapshot = binding.source.get();
-						soleSourceRead = true;
-					}
-					raw = soleSourceSnapshot;
-				} else if (otherSourceSnapshots !== null && sources.includes(binding.source)) {
-					if (!otherSourceSnapshots.has(binding.source)) {
-						otherSourceSnapshots.set(binding.source, binding.source.get());
-					}
-					raw = otherSourceSnapshots.get(binding.source);
-				} else {
-					raw = binding.source.get();
+				const { name, binding, slot } = connected[bindingIndex];
+				const source = binding.source;
+				if (!checked && source !== soleSource && (notified === null || !notified.has(source))) {
+					continue;
 				}
-				const selected = binding.select(raw);
+				const selected = binding.select(readSource(source));
+				if (slot !== -1) {
+					program ??= record.collapsedTemplate;
+					const prepared = program?.prepared;
+					if (prepared === undefined || program!.values === undefined) continue;
+					const current = (nextValues ?? program!.values)[slot];
+					if (driver.props === undefined && sameUniversalHostPropValue(current, selected)) continue;
+					const value = slotBindingValue(root, prepared, slot, selected);
+					if (sameUniversalHostPropValue(current, value)) continue;
+					(nextValues ??= [...program!.values])[slot] = value as UniversalHostTemplateProgramValue;
+					const node = prepared.values[slot].node;
+					if (changedNode === -1) changedNode = node;
+					else if (node !== changedNode) {
+						changedNodes ??= [changedNode];
+						if (!changedNodes.includes(node)) changedNodes.push(node);
+					}
+					continue;
+				}
 				const current = (next ?? record.props)[name];
 				if (driver.props === undefined && sameUniversalHostPropValue(current, selected)) continue;
 				const value = root.encodeHostProp(record.type!, name, selected);
 				if (sameUniversalHostPropValue(current, value)) continue;
 				(next ??= { ...record.props })[name] = value;
 			}
-			if (next === null) continue;
-			const kind = driver.updates?.classify(record.type!, record.props, next) ?? 'update';
-			if (kind !== 'update' || record.lifecycles.size !== 0) {
-				throw new Error(
-					'Experimental host bindings require update-only hosts without lifecycle callbacks.',
-				);
+			if (next !== null) {
+				const kind = driver.updates?.classify(record.type!, record.props, next) ?? 'update';
+				if (kind !== 'update' || record.lifecycles.size !== 0) {
+					throw new Error(
+						'Experimental host bindings require update-only hosts without lifecycle callbacks.',
+					);
+				}
+				Object.freeze(next);
+				changedRecords.push(record);
+				changedValues.push(null);
+				commands.push({ op: 'update', id: record.id, props: next });
 			}
-			Object.freeze(next);
-			changedRecords.push(record);
-			commands.push({ op: 'update', id: record.id, props: next });
+			if (nextValues === null) continue;
+			// Changed program nodes in node order, each with its whole props.
+			const committed = program!;
+			const prepared = committed.prepared!;
+			Object.freeze(nextValues);
+			const wireNodes = prepared.wire.nodes;
+			if (changedNodes !== null) changedNodes.sort((left, right) => left - right);
+			const changedCount = changedNodes === null ? 1 : changedNodes.length;
+			for (let changedIndex = 0; changedIndex < changedCount; changedIndex++) {
+				const node = changedNodes === null ? changedNode : changedNodes[changedIndex];
+				const props = materializePreparedCollapsedHostProps(prepared, nextValues, node);
+				const type = wireNodes[node].type;
+				const kind =
+					driver.updates?.classify(
+						type,
+						materializePreparedCollapsedHostProps(prepared, committed.values!, node),
+						props,
+					) ?? 'update';
+				if (kind !== 'update' || (node === 0 && record.lifecycles.size !== 0)) {
+					throw new Error(
+						'Experimental host bindings require update-only hosts without lifecycle callbacks.',
+					);
+				}
+				changedRecords.push(record);
+				changedValues.push(nextValues);
+				commands.push({ op: 'update', id: committed.firstId! + node, props });
+			}
 		}
 	} catch (error) {
 		restoreDirtyHostBindings(root, records);
@@ -14093,6 +14521,7 @@ function flushHostBindingUpdates(root: UniversalRootImpl<any, any>): void {
 		batch,
 		prepared,
 		changedRecords,
+		changedValues,
 		records,
 	);
 	root.pending = transaction;
@@ -14101,6 +14530,13 @@ function flushHostBindingUpdates(root: UniversalRootImpl<any, any>): void {
 
 const UNIVERSAL_HOST_BINDING_SUPPORT: UniversalHostBindingSupport = {
 	commit: commitHostBindings,
+	patches: commitTemplatePatchBindings,
+	bindSlots: bindTemplateSlots,
+	slot: (value, text) => (text ? textBindingOf(value) : hostBindingOf(value)),
+	text: materializeBoundText,
+	expandBlueprint: expandTemplateSlotBlueprints,
+	expandRecord: rebindExpandedTemplateSlots,
+	retained: retainedHostBindings,
 	drop: dropHostBindings,
 	flush: flushHostBindingUpdates,
 	resume(root) {
@@ -14143,6 +14579,9 @@ class UniversalBoundHostTransaction<
 		readonly batch: UniversalHostBatch,
 		private readonly prepared: UniversalPreparedHostBatch,
 		private readonly changedRecords: readonly LogicalRecord[],
+		private readonly changedValues: readonly (
+			readonly UniversalHostTemplateProgramValue[] | null
+		)[],
 		private readonly records: readonly LogicalRecord[],
 	) {}
 
@@ -14175,10 +14614,24 @@ class UniversalBoundHostTransaction<
 			try {
 				// Binding-only batches contain update commands in changed-record order.
 				for (let index = 0; index < this.changedRecords.length; index++) {
-					invalidateLogicalTreeFeatures(this.changedRecords[index]);
-					this.changedRecords[index].props = (
-						this.batch.commands[index] as Extract<UniversalHostCommand, { op: 'update' }>
-					).props;
+					const record = this.changedRecords[index];
+					const command = this.batch.commands[index] as Extract<
+						UniversalHostCommand,
+						{ op: 'update' }
+					>;
+					invalidateLogicalTreeFeatures(record);
+					const values = this.changedValues[index];
+					if (values === null) {
+						record.props = command.props;
+						continue;
+					}
+					// A program slot: the committed program state takes the new values;
+					// its root node is the record itself. The connection keeps the
+					// bindings, so these values need no TEMPLATE_SLOT_BINDINGS entry.
+					(
+						record.collapsedTemplate as { values: readonly UniversalHostTemplateProgramValue[] }
+					).values = values;
+					if (command.id === record.id) record.props = command.props;
 				}
 			} catch (error) {
 				if (failure === NO_PENDING_PASSIVE_ERROR) failure = error;
