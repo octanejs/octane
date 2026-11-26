@@ -264,6 +264,62 @@ describe('universal template programs', () => {
 		root.unmount();
 	});
 
+	it('remounts a patched row from its new values when its parent host changes', () => {
+		const framePlan = universalPlan('object', {
+			kind: 'host',
+			type: 'frame',
+			children: [{ kind: 'slot', slot: 0 }],
+		});
+		const clicks: string[] = [];
+		const Scene = defineUniversalComponent(
+			'object',
+			({ items, framed }: { items: readonly Item[]; framed: boolean }) =>
+				universalValue(framed ? framePlan : shellPlan, [
+					universalFor(
+						items,
+						(item) => item.id,
+						(item) =>
+							universalValue(rowPlan, [
+								item.tone,
+								() => clicks.push(`${item.id}:${item.text}`),
+								item.text,
+							]),
+						null,
+						false,
+						false,
+						undefined,
+						undefined,
+						undefined,
+						false,
+						undefined,
+						[clicks],
+						false,
+					),
+				]),
+		);
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createProgramDriver());
+		const items = ['a', 'b'].map((id) => ({ id, text: `label:${id}`, tone: 'plain' }));
+		root.render(Scene, { items, framed: false });
+		// The rows miss their memo and move under a new parent host in one render.
+		const next = [{ ...items[0], text: 'label:A' }, items[1]];
+		root.render(Scene, { items: next, framed: true });
+		const frame = container.children[0];
+		expect(frame.type).toBe('frame');
+		expect(frame.children.map((row) => row.children[0].children[0].props.value)).toEqual([
+			'label:A',
+			'label:b',
+		]);
+		container.dispatchEvent(frame.children[0], 'click', undefined);
+		expect(clicks).toEqual(['a:label:A']);
+		// The remounted rows are committed with their new inputs.
+		const again = container.commits.length;
+		root.render(Scene, { items: next, framed: true });
+		expect(commandsOf(container, again)).toEqual([]);
+		root.unmount();
+		expect(container.instanceCount).toBe(0);
+	});
+
 	it('carries structured values in programs when the driver accepts them', () => {
 		const plan = universalPlan('object', {
 			kind: 'host',
