@@ -226,7 +226,17 @@ const encoder = new TextEncoder();
  * anything else. Devalue's text of an object starts with `[`, never `{`.
  */
 function encodeStored(record: Stored & { at: number }): string {
-	return jsonExact(record, new Set()) ? JSON.stringify(record) : devalue.stringify(record);
+	const bounds = record.span as { start: unknown; first: unknown; last: unknown } | null;
+	// A view's span bounds are rows of its value, which the store compares by order, never by
+	// identity, so JSON may repeat them: each is checked apart from the value.
+	const exact =
+		bounds !== null && typeof bounds === 'object'
+			? jsonExact({ ...record, span: null }, new Set()) &&
+				jsonExact(bounds.start, new Set()) &&
+				jsonExact(bounds.first, new Set()) &&
+				jsonExact(bounds.last, new Set())
+			: jsonExact(record, new Set());
+	return exact ? JSON.stringify(record) : devalue.stringify(record);
 }
 
 function decodeStored(text: string): Stored & { at: number } {
