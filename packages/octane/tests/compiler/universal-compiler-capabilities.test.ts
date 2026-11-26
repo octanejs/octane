@@ -143,6 +143,30 @@ describe('universal compiler renderer capabilities', () => {
 		}
 	});
 
+	it('keeps the warm plan of a signals module off the DOM runtime', () => {
+		const source = `import { use } from 'octane';
+			import { signal$ } from 'octane/signals';
+			const count$ = signal$(0);
+			function Label() @{ <label value={count$} /> }
+			export function Scene({ load }) @{
+				SCENE_BODY<view><Label /><button onTap={() => count$.set(1)} /></view>
+			}`;
+		const output = compile(source.replace('SCENE_BODY', ''), '/src/Scene.object.tsrx', {
+			renderer: { ...baseRenderer, text: 'host' as const, capabilities: ['signal-bindings'] },
+			hmr: false,
+		}).code;
+		expect(output).toMatch(/warmChild as ([\w$]+)[\s\S]*\1\(Label, \{\}\)/);
+		expect(output).not.toContain('octane/internal/client');
+		expect(output).not.toMatch(/NativeReadWitness|nativeWarmMemo/);
+		// The DOM client keeps witnessing native reads in its warm plan.
+		const dom = compile(source.replace('SCENE_BODY', 'use(load());'), '/src/Scene.tsrx', {
+			hmr: false,
+		}).code;
+		expect(dom).toMatch(
+			/_\$beginNativeReadWitness\(true\);[\s\S]*_\$nativeWarmMemo\(\(\) => load\(\)/,
+		);
+	});
+
 	it('keeps a scoped class handle bindable and its pure rows memoized in a signals module', () => {
 		const source = `import { signal$ } from 'octane/signals';
 			const tone$ = signal$('row');
