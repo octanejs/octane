@@ -409,6 +409,12 @@ export function createPersistence(
 	/** The pending save of changed values, and when the first of them changed. */
 	let quietTimer: unknown;
 	let firstChange = 0;
+	/**
+	 * Changed values collected on the host task after they changed, as they were before the
+	 * quiet window, while they wait for it: a read evicted in the meantime is saved, not removed.
+	 */
+	const collected = new Map<string, Saving | null | undefined>();
+	let collecting = false;
 	const delay = Math.max(0, options.delay ?? 50);
 	let writing: Promise<void> = Promise.resolve();
 
@@ -488,8 +494,18 @@ export function createPersistence(
 
 	/** Save changed values once `delay` passes without another, or ten of it after the first. */
 	function scheduleValues(): void {
-		if (delay === 0) return schedule();
+		// A hidden page's timers are clamped or frozen, and it may be discarded: save now.
+		if (delay === 0 || document?.visibilityState === 'hidden') return schedule();
 		if (scheduled || cleared || closing) return;
+		if (!collecting) {
+			collecting = true;
+			postHostTask(() => {
+				collecting = false;
+				if (cleared || closing) return;
+				for (const key of dirty) collected.set(key, collect(key));
+				dirty.clear();
+			});
+		}
 		const now = hostDateNow();
 		if (quietTimer === undefined) firstChange = now;
 		else clearHostTimeout(quietTimer);
@@ -535,10 +551,14 @@ export function createPersistence(
 		if (cleared) return;
 		const now = hostDateNow();
 		const at = Math.max(now, markTime);
-		const keys = [...dirty];
+		const keys = [...new Set([...collected.keys(), ...dirty])];
+		const early = new Map(collected);
+		collected.clear();
 		dirty.clear();
 		// Disposal can end the source store while a prior key is encrypting.
-		const saves = keys.map((key) => (closing?.has(key) ? closing.get(key) : collect(key)));
+		const saves = keys.map((key) =>
+			closing?.has(key) ? closing.get(key) : early.has(key) ? early.get(key) : collect(key),
+		);
 		// Later frames can arrive while encryption or storage is pending. Their
 		// checkpoints belong to the next batch, with the values they changed.
 		const checkpoint = marksChanged ? { marks: [...marks], cursors: [...cursors] } : null;
@@ -640,6 +660,7 @@ export function createPersistence(
 		clearHostTimeout(retryTimer);
 		clearHostTimeout(quietTimer);
 		quietTimer = undefined;
+		collected.clear();
 		document?.removeEventListener('visibilitychange', hidden);
 		metas = new Map();
 		prepared.clear();
@@ -747,6 +768,7 @@ export function createPersistence(
 		},
 		forget(key) {
 			dirty.delete(key);
+			collected.delete(key);
 			// After any save already under way, which may hold the value.
 			const forgetting = writing.then(async () => {
 				await ready;
@@ -785,7 +807,7 @@ export function createPersistence(
 				stop();
 				return writing;
 			}
-			closing ??= new Map([...dirty].map((key) => [key, collect(key)]));
+			closing ??= new Map([...collected, ...[...dirty].map((key) => [key, collect(key)] as const)]);
 			const finishing = writing.then(() => flush(false)).finally(stop);
 			writing = finishing.catch(() => {});
 			return finishing;

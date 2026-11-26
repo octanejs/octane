@@ -441,8 +441,8 @@ dependency that shows every edit at once is not built in.
   such as stale marks and feed cursors, save on the next host task, with any
   values waiting. Each save is one storage transaction. `dispose()` saves what
   is waiting; a value from the last `delay` before the worker or tab is killed
-  is lost, and loads again. With `delay: 0`, values also save on the next host
-  task.
+  is lost, and loads again. While the page is hidden, and with `delay: 0`,
+  values also save on the next host task.
 - After each save the partition is trimmed to 90% of `budget`, expired values
   first, then least recently used; values a mounted component shows are kept.
   `autoBudget(device)` is 1 MB at ≤2 GB memory, 2 MB to 4 GB or when hidden,

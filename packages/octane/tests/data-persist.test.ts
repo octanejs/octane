@@ -1103,6 +1103,31 @@ describe('octane/data persistent cache', () => {
 			await store.dispose();
 		});
 
+		it('saves a value whose read is let go before the quiet ends, instead of removing it', async () => {
+			const { storage, values } = counted();
+			const store = counting(storage, { delay: 100 });
+			// Prefetched and unobserved, the read is kept for 10 ms, well inside the wait.
+			await store.prefetch({ ...count, keep: 10 }, undefined);
+			await vi.waitFor(() => expect(values()).toBe(1), { timeout: 1_000 });
+			expect(await restored(storage)).toBe(1);
+			await store.dispose();
+		});
+
+		it('saves a value at once while the page is hidden, where timers are held back', async () => {
+			vi.stubGlobal('document', {
+				visibilityState: 'hidden',
+				addEventListener() {},
+				removeEventListener() {},
+			});
+			const { storage, values } = counted();
+			const store = counting(storage, { delay: 60_000 });
+			const shown = await value<number>(store, count);
+			await saved();
+			expect(values()).toBe(1);
+			shown.stop();
+			await store.dispose();
+		});
+
 		it('saves a value still waiting for quiet when the store is disposed', async () => {
 			const { storage } = counted();
 			const store = counting(storage, { delay: 60_000 });
