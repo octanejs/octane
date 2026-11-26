@@ -969,6 +969,62 @@ describe('octane/data persistent cache', () => {
 		await offline.dispose();
 	});
 
+	it.each([
+		[false, false],
+		[false, true],
+		[true, false],
+		[true, true],
+	])(
+		'restores a large value exactly, saved with native base64 %s and restored with it %s',
+		async (savedNative, restoredNative) => {
+			// Uint8Array.prototype.toBase64 and Uint8Array.fromBase64, which Node 24 lacks.
+			const codecs = (on: boolean) => {
+				if (on) {
+					Object.assign(Uint8Array, {
+						fromBase64: (text: string) => new Uint8Array(Buffer.from(text, 'base64')),
+					});
+					Object.assign(Uint8Array.prototype, {
+						toBase64(this: Uint8Array) {
+							return Buffer.from(this.buffer, this.byteOffset, this.byteLength).toString('base64');
+						},
+					});
+				} else {
+					delete (Uint8Array as any).fromBase64;
+					delete (Uint8Array.prototype as any).toBase64;
+				}
+			};
+			// Enough books that the saved text spans many encoding chunks, in titles beyond Latin-1.
+			const many = Array.from({ length: 2_000 }, (_, i) => ({
+				id: `b${i}`,
+				title: `Ćwiczenia ${i} — 読書 ✓`,
+			}));
+			const storage = memoryStorage();
+			try {
+				codecs(savedNative);
+				const before = createDataStore({
+					transport: server(many).transport,
+					persist: cache(storage, 'ada'),
+				});
+				const loaded = await value<Book[]>(before, shelf);
+				expect(loaded.value).toHaveLength(many.length);
+				await saved();
+				await before.dispose();
+
+				codecs(restoredNative);
+				const offline = createDataStore({
+					transport: () => new Promise(() => {}),
+					persist: cache(storage, 'ada'),
+				});
+				const restored = await value<Book[]>(offline, shelf);
+				expect(restored.value).toEqual(loaded.value);
+				restored.stop();
+				await offline.dispose();
+			} finally {
+				codecs(false);
+			}
+		},
+	);
+
 	it('shows a stale value from storage while it reloads', async () => {
 		const storage = memoryStorage();
 		const before = createDataStore({

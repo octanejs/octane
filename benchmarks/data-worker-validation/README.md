@@ -45,30 +45,33 @@ tab shows all `ROWS` rows. `BENCH_JSON=<file>` writes the results as JSON.
 
 ## Results
 
-Apple M5 Max, Node 24.18, 8 rounds × 20 iterations.
+Apple M5 Max, Node 24.18, 8 rounds × 20 iterations, after `cloneable()` and
+the cache's base64 were made faster.
 
 | Rows | Step | Lane | Tab schema calls | Tab busy (ms) | Wall (ms) |
 | ---: | --- | --- | ---: | ---: | ---: |
-| 5,000 | reply | page | 1 | 2.54 | 4.33 |
-| 5,000 | reply | worker | 0 | 2.37 | 10.56 |
-| 5,000 | restore | page | 1 | 1.87 | 5.04 |
-| 5,000 | restore | worker | 0 | 1.48 | 6.12 |
-| 20,000 | reply | page | 1 | 10.59 | 17.99 |
-| 20,000 | reply | worker | 0 | 9.48 | 43.76 |
-| 20,000 | restore | page | 1 | 7.34 | 21.15 |
-| 20,000 | restore | worker | 0 | 5.99 | 25.20 |
+| 5,000 | reply | page | 1 | 2.74 | 5.78 |
+| 5,000 | reply | worker | 0 | 2.41 | 8.83 |
+| 5,000 | restore | page | 1 | 2.04 | 5.52 |
+| 5,000 | restore | worker | 0 | 1.71 | 6.20 |
+| 20,000 | reply | page | 1 | 12.32 | 20.04 |
+| 20,000 | reply | worker | 0 | 10.20 | 33.02 |
+| 20,000 | restore | page | 1 | 8.40 | 23.08 |
+| 20,000 | restore | worker | 0 | 6.78 | 25.97 |
 
-- The tab saves 7–20% of its busy time: about 0.2 ms per 5,000-row reply and
-  1.1 ms per 20,000-row reply. Restores save a little more, 0.4 ms and 1.35 ms.
-  Warm, Zod validates 5,000 of these rows in well under a millisecond. Most of
-  the tab's time goes to receiving the value from the worker
-  (structured-clone deserialization, about 1.1 ms for 5,000 rows) and to the
-  store's own work, and moving validation leaves both alone.
-- A reply takes longer to reach the tab: about 6 ms more at 5,000 rows and
-  26 ms more at 20,000. In a CPU profile of the validating worker at 20,000
-  rows, `cloneable()`, the walk that checks the validated value survives the
-  trip to a tab, costs more than Zod's parse. The validating worker also saved
-  to the cache about twice as often (78 saves against 37 at 5,000 rows), since
-  its replies arrive further apart and fewer of them share a save. The bench
-  prints those save counts, but they depend on timing, so it doesn't check them.
+- The tab saves 12–20% of its busy time: about 0.3 ms per 5,000-row reply and
+  2 ms per 20,000-row reply, and a little less per restore. Warm, Zod
+  validates 5,000 of these rows in about 0.35 ms. Most of the tab's time goes
+  to receiving the value from the worker (structured-clone deserialization,
+  about 1.1 ms for 5,000 rows) and to the store's own work, and moving
+  validation leaves both alone.
+- Validation adds its own cost to each reply in the worker: Zod's parse, and
+  `cloneable()`, the walk that checks the value survives the trip to a tab.
+  At 5,000 rows they take 0.35 ms and 0.8 ms; at 20,000, 1.7 ms and 3.5 ms.
+- Most of the rest of the gap in wall time is the cache. Each save of the
+  20,000-row value (about 2 MB of text) holds the worker for tens of
+  milliseconds, and a refresh that arrives meanwhile waits for it. Both lanes
+  ask for one save per reply, but how many saves share one write depends on
+  timing, so which lane's requests wait varies from run to run. The bench
+  prints the writes but doesn't check them.
 - Neither step includes network time, which in an app usually dwarfs both.

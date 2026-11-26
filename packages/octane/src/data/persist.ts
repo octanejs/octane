@@ -258,15 +258,26 @@ function jsonExact(value: unknown, seen: Set<object>): boolean {
 	return true;
 }
 
+/** The engine's own codecs, where it has them (Node 24 does not): far faster on a large value. */
+type NativeBase64 = {
+	toBase64?(): string;
+	constructor: { fromBase64?(text: string): Uint8Array<ArrayBuffer> };
+};
+
 function toBase64(bytes: Uint8Array): string {
+	const native = bytes as unknown as NativeBase64;
+	if (native.toBase64) return native.toBase64();
 	let binary = '';
-	for (let i = 0; i < bytes.length; i += 0x8000) {
-		binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+	// `apply` reads the chunk as an array; a spread walks its iterator, several times slower.
+	for (let i = 0; i < bytes.length; i += 0x2000) {
+		binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x2000) as unknown as number[]);
 	}
 	return btoa(binary);
 }
 
 function fromBase64(text: string): Uint8Array<ArrayBuffer> {
+	const { fromBase64 } = Uint8Array as NativeBase64['constructor'];
+	if (fromBase64) return fromBase64(text);
 	const binary = atob(text);
 	const bytes = new Uint8Array(binary.length);
 	for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
