@@ -553,6 +553,8 @@ export function createPersistence(
 		const at = Math.max(now, markTime);
 		const keys = [...new Set([...collected.keys(), ...dirty])];
 		const early = new Map(collected);
+		// A key re-marked after collection carries a newer value; drop the stale snapshot.
+		for (const key of dirty) early.delete(key);
 		collected.clear();
 		dirty.clear();
 		// Disposal can end the source store while a prior key is encrypting.
