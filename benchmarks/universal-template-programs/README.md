@@ -12,18 +12,21 @@ click handler on the row element and one child:
 ```
 
 The `styled` variant also passes `style={{ opacity: ... }}` and runs with the
-`templateProgramStructuredValues` driver capability. Each sample mounts a
-fresh root, then times 20 updates of one kind:
+`templateProgramStructuredValues` driver capability. Each variant measures:
 
-- `toggle`: one row's item changes;
-- `replace`: every row's item changes, so no row can keep its memo.
+- `mount`: a fresh root mounts all rows, once per sample;
+- `toggle`: one row's item changes, 20 updates per sample;
+- `replace`: every row's item changes, so no row can keep its memo, 20 updates
+  per sample.
 
-`mount` rows report the mount time and the serialized size of the mount batch
-the driver receives (`JSON.stringify(batch.commands)`); update rows report the
-average serialized batch per update. Every run checks the final row props and
-labels, dispatches one row's handler, and checks that unmount releases every
+Updates run on one root mounted before sampling. Each target also reports the
+serialized size of the batches the driver receives
+(`JSON.stringify(batch.commands)`): the mount batch, or the average update
+batch. Every run checks the final row props and labels, that every row keeps
+its host, that one row's handler dispatches, and that unmount releases every
 host. On this checkout every row must mount from a prepared program, never a
-generic per-row template.
+generic per-row template, and every update batch must hold only `update`
+commands.
 
 ```bash
 node benchmarks/universal-template-programs/run.mjs 7

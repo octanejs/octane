@@ -56,6 +56,8 @@ const VARIANTS = {
 
 const makeRow = (id, on = false) => ({ id, on, label: `row-${id}-${on}` });
 const OPERATIONS = {
+	// A fresh root mounts every row.
+	mount: null,
 	// One row's item changes.
 	toggle: (rows, step) => {
 		const index = (step * 37) % rows.length;
@@ -125,6 +127,7 @@ function createProgramDriver(runtime, structured, metrics) {
 		},
 		prepareBatch(container, batch, context) {
 			metrics.bytes += JSON.stringify(batch.commands).length;
+			for (const command of batch.commands) metrics.ops.add(command.op);
 			const commands = [];
 			for (const command of batch.commands) {
 				if (command.op === 'mount-template') {
@@ -197,12 +200,11 @@ function createProgramDriver(runtime, structured, metrics) {
 	};
 }
 
-function mount({ runtime }, App, structured, operation) {
+function measure({ runtime }, App, structured, operation) {
 	const { createObjectContainer, createUniversalRoot, flushUniversalSync } = runtime;
-	const result = { mountSamples: [], stepSamples: [], mountBytes: 0, stepBytes: 0, metrics: null };
-	let state;
+	const result = { samples: [], bytes: 0, metrics: null };
 	const render = () => {
-		const metrics = { bytes: 0, templates: 0, programs: 0 };
+		const metrics = { bytes: 0, templates: 0, programs: 0, ops: new Set() };
 		const rows = Array.from({ length: ROWS }, (_, id) => makeRow(id));
 		const selected = [];
 		const container = createObjectContainer('object');
@@ -217,33 +219,46 @@ function mount({ runtime }, App, structured, operation) {
 			}),
 		);
 		const elapsed = performance.now() - start;
-		return { metrics, rows, selected, container, root, api: () => api, elapsed, steps: 0 };
+		const hosts = [...container.children[0].children];
+		return { metrics, rows, selected, container, root, hosts, api: () => api, elapsed, steps: 0 };
 	};
 	const step = () =>
 		flushUniversalSync(() => {
 			state.rows = OPERATIONS[operation](state.rows, state.steps++);
 			state.api().setRows(state.rows);
 		});
+	const record = () => {
+		const { bytes, templates, programs, ops } = state.metrics;
+		result.metrics = { templates, programs, ops: [...ops].sort() };
+		return bytes;
+	};
+	// Updates run on one root mounted up front, as in universal-for-row-memo.
+	let state = operation === 'mount' ? undefined : render();
+	if (state !== undefined) for (let index = 0; index < WARMUP_STEPS; index++) step();
 	return {
 		result,
 		sample() {
-			// Mount: a fresh root per sample; the previous one unmounts untimed.
-			if (state !== undefined) state.root.unmount();
-			state = render();
-			result.mountSamples.push(state.elapsed);
-			result.mountBytes = state.metrics.bytes;
-			result.metrics = { ...state.metrics };
-			for (let index = 0; index < WARMUP_STEPS; index++) step();
+			if (operation === 'mount') {
+				// A fresh root per sample; the previous one unmounts untimed.
+				state?.root.unmount();
+				state = render();
+				result.samples.push(state.elapsed);
+				result.bytes = record();
+				return;
+			}
 			state.metrics.bytes = 0;
+			state.metrics.ops.clear();
 			const start = performance.now();
 			for (let index = 0; index < STEPS; index++) step();
-			result.stepSamples.push((performance.now() - start) / STEPS);
-			result.stepBytes = state.metrics.bytes / STEPS;
+			result.samples.push((performance.now() - start) / STEPS);
+			result.bytes = record() / STEPS;
 		},
 		finish() {
 			const list = state.container.children[0];
 			assert.equal(list.children.length, ROWS);
 			list.children.forEach((child, index) => {
+				// Keyed rows keep their hosts across every update.
+				assert.equal(child, state.hosts[index]);
 				assert.equal(child.props.id, state.rows[index].id);
 				assert.equal(child.props.on, state.rows[index].on ? 'yes' : 'no');
 				assert.equal(child.children[0].props.text, state.rows[index].label);
@@ -266,18 +281,9 @@ try {
 	for (const side of sides) prepared.push(await prepare(side));
 	const targets = [];
 	const rows = [];
-	const row = (name, runs, samples, bytes) => {
-		const [base, head] = runs.length === 2 ? runs : [null, runs[0]];
-		const median = (run) => summarizeSamples(samples(run)).median.toFixed(3);
-		rows.push(
-			`| ${name} | ${base === null ? '' : `${median(base)} | `}${median(head)} | ${
-				base === null ? '' : `${formatRatio(pairedRatio(samples(base), samples(head)))} | `
-			}${base === null ? '' : `${kb(bytes(base))} | `}${kb(bytes(head))} |`,
-		);
-	};
 	for (const [variant, { structured }] of Object.entries(VARIANTS)) {
 		for (const operation of Object.keys(OPERATIONS)) {
-			const runs = prepared.map((side) => mount(side, side.apps[variant], structured, operation));
+			const runs = prepared.map((side) => measure(side, side.apps[variant], structured, operation));
 			// Alternate AB/BA so drift on a shared host moves both sides of a pair.
 			for (let iteration = 0; iteration < iterations; iteration++) {
 				const order = iteration % 2 === 0 ? runs : [...runs].reverse();
@@ -286,43 +292,34 @@ try {
 			runs.forEach((run, index) => {
 				run.finish();
 				const side = prepared[index].name;
-				// Every head row mounts from a prepared program, never a generic template.
-				if (side === 'head') assert.equal(run.result.metrics.templates, 0);
-				const prefix = side === 'head' ? '' : `${side}-`;
+				const { metrics } = run.result;
+				if (side === 'head') {
+					// Every row mounts from a prepared program, and an update only
+					// writes changed bindings to the retained hosts.
+					if (operation === 'mount') {
+						assert.equal(metrics.templates, 0);
+						assert.ok(metrics.programs > 0);
+					} else {
+						assert.deepEqual(metrics.ops, ['update']);
+					}
+				}
 				targets.push({
-					name: `${prefix}${variant}-${operation}`,
+					name: `${side === 'head' ? '' : `${side}-`}${variant}-${operation}`,
 					ops: {
-						mount_ms: timingStatForJson(summarizeSamples(run.result.mountSamples)),
-						step_ms: timingStatForJson(summarizeSamples(run.result.stepSamples)),
-						mount_bytes: {
-							score: run.result.mountBytes,
-							median: run.result.mountBytes,
-							samples: 1,
-						},
-						step_bytes: { score: run.result.stepBytes, median: run.result.stepBytes, samples: 1 },
+						ms: timingStatForJson(summarizeSamples(run.result.samples)),
+						bytes: { score: run.result.bytes, median: run.result.bytes, samples: 1 },
 					},
-					meta: {
-						variant,
-						operation,
-						rows: ROWS,
-						steps: iterations * STEPS,
-						...run.result.metrics,
-					},
+					meta: { variant, operation, rows: ROWS, ...metrics },
 				});
 			});
-			if (operation === 'toggle') {
-				row(
-					`${variant}-mount`,
-					runs,
-					(run) => run.result.mountSamples,
-					(run) => run.result.mountBytes,
-				);
-			}
-			row(
-				`${variant}-${operation}`,
-				runs,
-				(run) => run.result.stepSamples,
-				(run) => run.result.stepBytes,
+			const [base, head] = runs.length === 2 ? runs : [null, runs[0]];
+			const median = (run) => summarizeSamples(run.result.samples).median.toFixed(3);
+			rows.push(
+				`| ${variant}-${operation} | ${base === null ? '' : `${median(base)} | `}${median(head)} | ${
+					base === null
+						? ''
+						: `${formatRatio(pairedRatio(base.result.samples, head.result.samples))} | ${kb(base.result.bytes)} | `
+				}${kb(head.result.bytes)} |`,
 			);
 		}
 	}
