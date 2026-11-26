@@ -52,9 +52,20 @@ describe('controlled binding specialization', () => {
 		`);
 		expect(imports).toContain('setDefaultValue');
 		expect(imports).toContain('bindSignalChecked');
-		expect(imports).toContain('bindSignalHostPropSources');
+		expect(imports).toContain('bindCompiledSignalHostPropSources');
+		expect(imports).toContain('enableOrderedInputSources');
 		expect(imports).not.toContain('setDefaultValueUncontrolled');
 		expect(imports).not.toContain('setCheckedCheckable');
+	});
+
+	it.each([
+		['div', false],
+		['textarea', true],
+		['select', true],
+	])('installs form sources only when compiling a form host spread (%s)', (tag, formHost) => {
+		const imports = runtimeImports(`export function App(props) @{ <${tag} {...props} /> }`);
+		expect(imports.has('enableFormSources')).toBe(formHost);
+		expect(imports).not.toContain('enableOrderedInputSources');
 	});
 
 	it('keeps lean checked helpers for opaque values in signal-free modules', () => {

@@ -5,6 +5,7 @@
 export const VOID_ELEMENTS: Set<string>;
 export const RAW_TEXT_CONTENT: Set<string>;
 export const READ_ONLY_VALUE_INPUT_TYPES: Set<string>;
+export function inputValueConstraintType(name: string): 'range' | 'email' | 'color' | null;
 export const BOOLEAN_ATTR_PROPS: Set<string>;
 export const MUST_USE_PROPERTY_PROPS: Set<string>;
 export const POSITIVE_NUMERIC_ATTR_PROPS: Set<string>;

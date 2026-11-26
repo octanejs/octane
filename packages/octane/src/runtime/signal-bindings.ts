@@ -73,8 +73,9 @@ import {
 	formActionAttributeName,
 	isHostPropIdentityKey,
 	resolveHostPropSources,
-	setHostPropSources,
-	setSpread,
+	enableHostFormSources,
+	setCompiledHostPropSources,
+	setCompiledSpread,
 } from './host-props.js';
 import { coerceChildText, clearChildContent } from './component-slots.js';
 import { renderSignalChildSlot, type SignalChildSlotRenderer } from './child-slots.js';
@@ -1009,7 +1010,7 @@ function updateSignalHostPropSources(binding: SignalHostPropSourcesBinding): voi
 	try {
 		runWithBlockSignalOwner(binding.scope, () => {
 			const next = resolveSignalHostPropSources(binding.sources, binding.readStyle);
-			binding.resolved = setHostPropSources(
+			binding.resolved = setCompiledHostPropSources(
 				binding.element,
 				next.sources,
 				binding.resolved,
@@ -1308,7 +1309,7 @@ export function prepareSignalHostPropSources(
 				runWithBlockSignalOwner(scope, () => {
 					// A whole-style takeover replaces the early owner's complete style,
 					// including properties absent from the accepted snapshot.
-					setSpread(
+					setCompiledSpread(
 						element,
 						prepared,
 						'style' in prepared ? { style: '' } : undefined,
@@ -1324,8 +1325,8 @@ export function prepareSignalHostPropSources(
 	});
 }
 
-/** @internal Compiler target for spread-bearing hosts containing direct signals. */
-export function bindSignalHostPropSources(
+/** @internal Compiler target that uses the installed host capabilities. */
+export function bindCompiledSignalHostPropSources(
 	scope: Scope,
 	previous: unknown,
 	element: Element,
@@ -1377,7 +1378,7 @@ export function bindSignalHostPropSources(
 			: false;
 	}
 	const next = resolveSignalHostPropSources(sources, readStyle);
-	binding.resolved = setHostPropSources(
+	binding.resolved = setCompiledHostPropSources(
 		element,
 		next.sources,
 		binding.resolved,
@@ -1392,6 +1393,28 @@ export function bindSignalHostPropSources(
 		consumeHydrationControl(element, controlSnapshot.revision);
 	if (binding.pendingControl) queueSignalHostControlAdoption(binding, binding.resolved?.['value']);
 	return binding;
+}
+
+/** @internal Compiler target for input and legacy dynamic signal hosts. */
+export function bindSignalHostPropSources(
+	scope: Scope,
+	previous: unknown,
+	element: Element,
+	sources: readonly HostPropSource[],
+	site: string,
+	hasNestedChildren = false,
+	readStyle?: (value: unknown) => unknown,
+): unknown {
+	enableHostFormSources(element);
+	return bindCompiledSignalHostPropSources(
+		scope,
+		previous,
+		element,
+		sources,
+		site,
+		hasNestedChildren,
+		readStyle,
+	);
 }
 
 const DIRECT_SIGNAL_CHILD = /* @__PURE__ */ Symbol('octane.direct-signal-child');

@@ -76,6 +76,22 @@ export const READ_ONLY_VALUE_INPUT_TYPES = new Set([
 	'submit',
 ]);
 
+/** The input type whose native value sanitizer uses this attribute. */
+export function inputValueConstraintType(name) {
+	switch (name) {
+		case 'min':
+		case 'max':
+		case 'step':
+			return 'range';
+		case 'multiple':
+			return 'email';
+		case 'alpha':
+		case 'colorspace':
+			return 'color';
+	}
+	return null;
+}
+
 /**
  * React's BOOLEAN attribute props (ReactDOMComponent's boolean arm, `inert`
  * included): ANY truthy value renders the canonical presence form

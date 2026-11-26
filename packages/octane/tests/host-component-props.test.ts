@@ -30,6 +30,59 @@ const HostBody = (props: any, scope: any): void => {
 };
 
 describe('hostComponent — reused host and children', () => {
+	it('updates a controlled value against the final type while reading the props in order', () => {
+		const reads: string[] = [];
+		const config = (type: string, value: string) => ({
+			tag: 'input',
+			hp: {
+				get value() {
+					reads.push('value');
+					return value;
+				},
+				get type() {
+					reads.push('type');
+					return type;
+				},
+				readOnly: true,
+			},
+		});
+		const view = mount(HostBody, config('number', '12'));
+		try {
+			const input = view.find('input') as HTMLInputElement;
+			expect(input.value).toBe('12');
+			reads.length = 0;
+			view.update(HostBody, config('text', 'hello'));
+			expect(view.find('input')).toBe(input);
+			expect(input.type).toBe('text');
+			expect(input.value).toBe('hello');
+			expect(reads).toEqual(['value', 'type']);
+		} finally {
+			view.unmount();
+		}
+	});
+
+	it.each([{ NAME: 'changed', name: 'winner' }, { name: 'winner' }])(
+		'reapplies the final radio name after an alias changes or disappears (%j)',
+		(names) => {
+			const props = { tag: 'input', hp: { NAME: 'original', name: 'winner', type: 'radio' } };
+			const view = mount(HostBody, props);
+			try {
+				const input = view.find('input') as HTMLInputElement;
+				expect(input.name).toBe('winner');
+				const updated = { tag: 'input', hp: { ...names, type: 'radio' } };
+				view.update(HostBody, updated);
+				expect(view.find('input')).toBe(input);
+				expect(input.name).toBe('winner');
+
+				input.name = 'external';
+				view.update(HostBody, updated);
+				expect(input.name).toBe('winner');
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
 	it('accepts callable children after an empty mount and releases them when removed', () => {
 		const refs: string[] = [];
 		const hostRef = (element: Element | null) => {

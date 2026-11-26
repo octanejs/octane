@@ -4,7 +4,7 @@ import * as Server from 'octane/server';
 import * as Universal from 'octane/universal';
 import { mount } from './_helpers';
 import { KeysHost, TemplateHost, ValueHost } from './_fixtures/memo-props.tsrx';
-import { loadServerFixture } from './_server-fixture';
+import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture';
 
 const server = loadServerFixture('packages/octane/tests/_fixtures/memo-props.tsrx');
 const names = ['toString', 'constructor', 'valueOf', 'hasOwnProperty', '__proto__'] as const;
@@ -156,4 +156,34 @@ describe('memo own prop membership', () => {
 			).toBe('<output>updated</output>');
 		},
 	);
+});
+
+describe('memo factory and tag bindings', () => {
+	it.each([
+		['a shadowed tag', 'octane', 'const Input = wrap(Content);', "const Input = 'input';"],
+		['a reassigned tag', 'octane', "let Input = wrap(Content); Input = 'input';", ''],
+		['a foreign factory', 'test-memo', 'const Input = wrap(Content);', ''],
+	])('renders and updates a host through %s', (_, factory, module, setup) => {
+		const source = `import { memo as wrap } from '${factory}';
+			function Content() { return <em>component</em>; }
+			${module}
+			export function App({ value }) @{ ${setup} <Input readOnly value={value} /> }`;
+		const { App } = loadCompiledFixtureSource(source, {
+			id: 'memo-host-binding.tsrx',
+			mode: 'client',
+			compileOptions: {
+				dev: process.env['OCTANE_TEST_COMPILE_MODE'] !== 'prod',
+				hmr: false,
+			},
+			runtimeModules: { 'test-memo': { memo: () => 'input' } },
+		});
+		const r = mount(App, { value: 'first' });
+		try {
+			expect((r.find('input') as HTMLInputElement).value).toBe('first');
+			r.update(App, { value: 'second' });
+			expect((r.find('input') as HTMLInputElement).value).toBe('second');
+		} finally {
+			r.unmount();
+		}
+	});
 });

@@ -1,0 +1,20 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title>Controlled input updates</title>
+	</head>
+	<body>
+		<form id="destination">
+			<input type="radio" name="by-name" value="fixed" checked />
+			<input type="radio" name="by-form" value="fixed" checked />
+			<input type="radio" name="by-type" value="fixed" checked />
+		</form>
+		<form id="source"></form>
+		<form id="other">
+			<input type="radio" name="by-form" value="other" checked />
+		</form>
+		<div id="app"></div>
+		<script type="module" src="./main.ts"></script>
+	</body>
+</html>

@@ -19,6 +19,7 @@ import {
 } from '../signals/read-protocol.js';
 import { signalOwnerUse } from '../signals/owner-context.js';
 import { enableSignalDocument } from '../signals/document-owner.js';
+import { enableOrderedInputProps } from './host-props.js';
 import type {
 	HookSlot,
 	EffectEventCell,
@@ -411,6 +412,7 @@ export let HOST_PLACE_UPGRADED: typeof placeUpgradedList | null = null;
 export function enableHostDescriptors(): void {
 	// The public factories install on every call; later calls stay one check.
 	if (HOST_BODY) return;
+	enableOrderedInputProps();
 	HOST_BODY = hostElementBody;
 	HOST_RECONCILE = reconcileDeoptHost;
 	HOST_ADOPTS = adoptsPureHost;

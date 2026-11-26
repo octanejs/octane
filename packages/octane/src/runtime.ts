@@ -251,7 +251,11 @@ export {
 	errorBlock,
 	tryBlock,
 } from './runtime/suspense.js';
-export { componentSlotLite, commitHostSources } from './runtime/render.js';
+export {
+	componentSlotLite,
+	commitHostSources,
+	commitCompiledHostSources,
+} from './runtime/render.js';
 export {
 	createRoot,
 	__createRootDefaultOptions,
@@ -286,6 +290,7 @@ export {
 	bindSignalChecked,
 	bagRecordSignal,
 	bindSignalHostPropSources,
+	bindCompiledSignalHostPropSources,
 	bindSignalChild,
 } from './runtime/signal-bindings.js';
 export {
@@ -323,7 +328,11 @@ export {
 	setRenderStyleProperty,
 	setStyleProperties,
 	snapshotSpread,
+	setInputProps,
+	enableOrderedInputSources,
+	enableFormSources,
 	setHostPropSources,
+	setCompiledHostPropSources,
 	bagRecordHost,
 	hostSourceChildren,
 	setSpread,

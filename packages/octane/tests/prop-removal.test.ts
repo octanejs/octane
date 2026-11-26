@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from './_helpers';
 import { flushSync } from '../src/index.js';
-import { setSpread } from '../src/internal/client.js';
+import { setFormControlSources, setSpread } from '../src/internal/client.js';
 import { PropRemoval, setAlt } from './_fixtures/deopt-prop-removal.tsrx';
 
 // Prop REMOVAL parity across the three prop-diff loops (setSpread, patchDeoptProps,
@@ -13,6 +13,16 @@ import { PropRemoval, setAlt } from './_fixtures/deopt-prop-removal.tsrx';
 //   - a vanished `on*` handler must clear its delegated slot key.
 
 describe('setSpread — removal parity with the SET path', () => {
+	it('keeps input attributes when a separate compiled binding owns the controlled state', () => {
+		const input = document.createElement('input');
+		const props = { type: 'range', name: 'level', max: 200, value: 150 };
+		setSpread(input, props, undefined, undefined, true, true);
+		setFormControlSources(input, [[true, props]]);
+		expect(input.type).toBe('range');
+		expect(input.name).toBe('level');
+		expect(input.value).toBe('150');
+	});
+
 	it('removes the native `for` attribute when a spread `htmlFor` disappears', () => {
 		const el = document.createElement('label');
 		setSpread(el, { htmlFor: 'x' }, undefined);
