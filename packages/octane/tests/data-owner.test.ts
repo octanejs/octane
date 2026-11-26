@@ -722,6 +722,39 @@ describe('octane/data replies validated by the owner', () => {
 		expect(calls).toEqual(['worker', 'page']);
 	});
 
+	/** A list the schema makes with `extra` set as a property beside its items, as a clone would copy it. */
+	const listWith = (items: unknown[], extra: unknown) => Object.assign(items, { extra });
+	it.each([
+		['a class instance among its items', (at: string) => [at, new Start(at)]],
+		[
+			'a class instance as a property beside its items',
+			(at: string) => listWith([at], new Start(at)),
+		],
+		[
+			'a function beside the items of a list with a hole',
+			(at: string) => listWith([at, , at], () => at),
+		],
+	])('leaves a list holding %s to the page’s own validator', async (_, into) => {
+		const { stores, read: meeting, calls } = served({ start: '2026-11-24T10:00:00Z' }, into);
+		await observed(stores[0]!.read(meeting));
+		expect(calls).toEqual(['worker', 'page']);
+	});
+
+	it('adopts a list of plain data the owner validated, holes and other properties included', async () => {
+		const {
+			stores,
+			read: meeting,
+			calls,
+		} = served({ start: '2026-11-24T10:00:00Z' }, (at) => listWith([at, , { at }], [at]));
+		const shown = await observed(stores[0]!.read(meeting));
+		const list = shown().start as unknown as unknown[] & { extra: unknown };
+		expect(list).toHaveLength(3);
+		expect(1 in list).toBe(false);
+		expect(list[2]).toEqual({ at: '2026-11-24T10:00:00Z' });
+		expect(list.extra).toEqual(['2026-11-24T10:00:00Z']);
+		expect(calls).toEqual(['worker']);
+	});
+
 	it('leaves an invalid reply to the page, which reports what was wrong', async () => {
 		const { stores, read: meeting } = served({ begins: 'soon' }, (at) => at);
 		const handle = stores[0]!.read(meeting);

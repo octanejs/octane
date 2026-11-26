@@ -1703,7 +1703,23 @@ function cloneable(value: unknown, seen: Set<object>): boolean {
 	if (seen.has(value)) return true;
 	seen.add(value);
 	const proto = Object.getPrototypeOf(value);
-	if (proto === Object.prototype || proto === Array.prototype) {
+	if (proto === Array.prototype) {
+		// Items by index: reading a long list through the string keys `for...in`
+		// gives costs several times as much.
+		const array = value as unknown[];
+		let present = array.length;
+		for (let index = 0; index < array.length; index++) {
+			const item = array[index];
+			if (item === undefined && !(index in array)) present--;
+			else if (!cloneable(item, seen)) return false;
+		}
+		// A clone also copies a list's other properties, which `for...in` gives after its indices.
+		let keys = 0;
+		for (const key in array)
+			if (++keys > present && !cloneable((array as any)[key], seen)) return false;
+		return true;
+	}
+	if (proto === Object.prototype) {
 		for (const key in value) if (!cloneable((value as any)[key], seen)) return false;
 		return true;
 	}
