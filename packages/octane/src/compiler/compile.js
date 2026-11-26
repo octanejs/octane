@@ -22596,8 +22596,11 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 		// Statement scaffolding maps to the warmed construct it wraps.
 		return inheritOriginLoc(stmt, callExpr);
 	};
-	const warmMemoHelper = ctx.nativeReads ? 'nativeWarmMemo' : 'warmMemo';
-	const warmMemoAlias = ctx.nativeReads
+	// Native signal reads are witnessed only by the DOM renderers; a universal
+	// unit's core tracks reads while its owner renders.
+	const domNativeReads = ctx.nativeReads && ctx._universalRuntimeUnit == null;
+	const warmMemoHelper = domNativeReads ? 'nativeWarmMemo' : 'warmMemo';
+	const warmMemoAlias = domNativeReads
 		? requireRuntimeForContext(ctx, warmMemoHelper)
 		: runtimeAliasForContext(ctx, warmMemoHelper);
 	const warmChildAlias = runtimeAliasForContext(ctx, 'warmChild');
@@ -22656,7 +22659,7 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 	// In-body warm thunk: children only — the body's own creations already ran
 	// as real memos by the time the batch throws.
 	const warmBody = (statements) =>
-		ctx.nativeReads ? wrapNativeWarmScope(statements, nativeReadNames(ctx)) : statements;
+		domNativeReads ? wrapNativeWarmScope(statements, nativeReadNames(ctx)) : statements;
 	const thunk =
 		warmKids.length === 0
 			? null
