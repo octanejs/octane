@@ -97,6 +97,13 @@ export interface PersistOptions {
 	/** The most the partition may hold, in characters of saved text; `'auto'` sizes it by device. */
 	readonly budget?: number | 'auto' | ((device: DeviceHints) => number);
 	/**
+	 * Milliseconds without a new value before the cache saves the values that
+	 * changed, so a burst of replies or feed events is written once; never more
+	 * than ten times this after the first. Default 50. With 0, values save on the
+	 * next host task, as other changes do. `dispose()` saves what is waiting.
+	 */
+	readonly delay?: number;
+	/**
 	 * Keep these writes until their outcome is known, even across a restart.
 	 * Each is saved before it is sent. After a restart its edit shows again
 	 * while `receipt`, read with its operation ID, says whether the server
@@ -399,6 +406,16 @@ export function createPersistence(
 	const removed = new Set<string>();
 	let scheduled = false;
 	let retryTimer: unknown;
+	/** The pending save of changed values, and when the first of them changed. */
+	let quietTimer: unknown;
+	let firstChange = 0;
+	/**
+	 * Changed values collected on the host task after they changed, as they were before the
+	 * quiet window, while they wait for it: a read evicted in the meantime is saved, not removed.
+	 */
+	const collected = new Map<string, Saving | null | undefined>();
+	let collecting = false;
+	const delay = Math.max(0, options.delay ?? 50);
 	let writing: Promise<void> = Promise.resolve();
 
 	const ready = (async () => {
@@ -463,11 +480,42 @@ export function createPersistence(
 		}
 		if (scheduled || cleared || closing) return;
 		scheduled = true;
+		// The flush saves every changed value, including those waiting for quiet.
+		if (quietTimer !== undefined) {
+			clearHostTimeout(quietTimer);
+			quietTimer = undefined;
+		}
 		postHostTask(() => {
 			scheduled = false;
 			const save = () => flush(!retry);
 			writing = writing.then(save, save);
 		});
+	}
+
+	/** Save changed values once `delay` passes without another, or ten of it after the first. */
+	function scheduleValues(): void {
+		// A hidden page's timers are clamped or frozen, and it may be discarded: save now.
+		if (delay === 0 || document?.visibilityState === 'hidden') return schedule();
+		if (scheduled || cleared || closing) return;
+		if (!collecting) {
+			collecting = true;
+			postHostTask(() => {
+				collecting = false;
+				if (cleared || closing) return;
+				for (const key of dirty) collected.set(key, collect(key));
+				dirty.clear();
+			});
+		}
+		const now = hostDateNow();
+		if (quietTimer === undefined) firstChange = now;
+		else clearHostTimeout(quietTimer);
+		quietTimer = setHostTimeout(
+			() => {
+				quietTimer = undefined;
+				schedule();
+			},
+			Math.max(0, Math.min(delay, firstChange + delay * 10 - now)),
+		);
 	}
 
 	/** Delete expired values, then the least recently used, until the partition fits. */
@@ -503,10 +551,14 @@ export function createPersistence(
 		if (cleared) return;
 		const now = hostDateNow();
 		const at = Math.max(now, markTime);
-		const keys = [...dirty];
-		dirty.clear();
+		const keys = [...new Set([...collected.keys(), ...dirty])];
+		// A key marked again since it was collected is collected afresh: its value is newer.
 		// Disposal can end the source store while a prior key is encrypting.
-		const saves = keys.map((key) => (closing?.has(key) ? closing.get(key) : collect(key)));
+		const saves = keys.map((key) =>
+			closing?.has(key) ? closing.get(key) : dirty.has(key) ? collect(key) : collected.get(key),
+		);
+		collected.clear();
+		dirty.clear();
 		// Later frames can arrive while encryption or storage is pending. Their
 		// checkpoints belong to the next batch, with the values they changed.
 		const checkpoint = marksChanged ? { marks: [...marks], cursors: [...cursors] } : null;
@@ -606,6 +658,9 @@ export function createPersistence(
 	function stop(): void {
 		cleared = true;
 		clearHostTimeout(retryTimer);
+		clearHostTimeout(quietTimer);
+		quietTimer = undefined;
+		collected.clear();
 		document?.removeEventListener('visibilitychange', hidden);
 		metas = new Map();
 		prepared.clear();
@@ -653,7 +708,7 @@ export function createPersistence(
 		},
 		mark(key) {
 			dirty.add(key);
-			schedule();
+			scheduleValues();
 		},
 		discard(key, revision) {
 			void ready.then(async () => {
@@ -713,6 +768,7 @@ export function createPersistence(
 		},
 		forget(key) {
 			dirty.delete(key);
+			collected.delete(key);
 			// After any save already under way, which may hold the value.
 			const forgetting = writing.then(async () => {
 				await ready;
@@ -751,7 +807,7 @@ export function createPersistence(
 				stop();
 				return writing;
 			}
-			closing ??= new Map([...dirty].map((key) => [key, collect(key)]));
+			closing ??= new Map([...collected, ...[...dirty].map((key) => [key, collect(key)] as const)]);
 			const finishing = writing.then(() => flush(false)).finally(stop);
 			writing = finishing.catch(() => {});
 			return finishing;

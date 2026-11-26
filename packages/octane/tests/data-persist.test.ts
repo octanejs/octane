@@ -165,10 +165,12 @@ const books = (): Book[] => [
 /** A session's cache key: random, and different for each user. */
 const KEY = 'a session secret of at least sixteen bytes';
 
+/** Saves on the next host task, as `saved()` waits for; the tests of `delay` pass their own. */
 const cache = (storage: PersistentStorage, partition: string, options: object = {}) => ({
 	storage,
 	partition,
 	key: KEY,
+	delay: 0,
 	...options,
 });
 
@@ -1024,6 +1026,136 @@ describe('octane/data persistent cache', () => {
 			}
 		},
 	);
+
+	describe('waiting for quiet before saving', () => {
+		/** Storage that counts the values it was given to keep. */
+		function counted() {
+			const storage = memoryStorage();
+			let values = 0;
+			return {
+				values: () => values,
+				storage: {
+					...storage,
+					async commit(partition, put, remove) {
+						values += put.filter((item) => item.value !== undefined).length;
+						return storage.commit(partition, put, remove);
+					},
+				} satisfies PersistentStorage,
+			};
+		}
+		/** A store over `storage` whose `count` read answers 1, 2, 3… */
+		function counting(storage: PersistentStorage, options: object) {
+			let next = 0;
+			return createDataStore({
+				transport: async () => ({ ok: true, value: ++next }),
+				persist: cache(storage, 'ada', options),
+			});
+		}
+		const restored = async (storage: PersistentStorage) => {
+			const offline = createDataStore({
+				transport: () => new Promise(() => {}),
+				persist: cache(storage, 'ada'),
+			});
+			const shown = await value<number>(offline, count);
+			shown.stop();
+			await offline.dispose();
+			return shown.value;
+		};
+
+		it('saves a burst of values once, after they stop changing', async () => {
+			const { storage, values } = counted();
+			const store = counting(storage, { delay: 50 });
+			const shown = await value<number>(store, count);
+			await vi.waitFor(() => expect(values()).toBe(1), { timeout: 1_000 });
+			// Four new values, each well within 50 ms of the last.
+			for (let i = 0; i < 4; i++) await shown.handle.refresh();
+			expect(shown.handle.getSnapshot().value).toBe(5);
+			await vi.waitFor(() => expect(values()).toBe(2), { timeout: 1_000 });
+			await new Promise((resolve) => setTimeout(resolve, 100));
+			expect(values()).toBe(2);
+			expect(await restored(storage)).toBe(5);
+			shown.stop();
+			await store.dispose();
+		});
+
+		it('saves values that keep changing within ten quiet windows of the first', async () => {
+			const { storage, values } = counted();
+			const store = counting(storage, { delay: 30 });
+			const shown = await value<number>(store, count);
+			await vi.waitFor(() => expect(values()).toBe(1), { timeout: 1_000 });
+			// A new value every few milliseconds never leaves 30 ms of quiet.
+			const started = performance.now();
+			let last = started;
+			let longestGap = 0;
+			while (values() === 1 && performance.now() - started < 2_000) {
+				await shown.handle.refresh();
+				const now = performance.now();
+				longestGap = Math.max(longestGap, now - last);
+				last = now;
+				await new Promise((resolve) => setTimeout(resolve, 2));
+			}
+			expect(longestGap).toBeLessThan(30);
+			expect(values()).toBe(2);
+			// Saved by the cap, 300 ms after the first change, not after a quiet window.
+			expect(performance.now() - started).toBeGreaterThan(250);
+			expect(performance.now() - started).toBeLessThan(600);
+			shown.stop();
+			await store.dispose();
+		});
+
+		it('saves a value whose read is let go before the quiet ends, instead of removing it', async () => {
+			const { storage, values } = counted();
+			const store = counting(storage, { delay: 100 });
+			// Prefetched and unobserved, the read is kept for 10 ms, well inside the wait.
+			await store.prefetch({ ...count, keep: 10 }, undefined);
+			await vi.waitFor(() => expect(values()).toBe(1), { timeout: 1_000 });
+			expect(await restored(storage)).toBe(1);
+			await store.dispose();
+		});
+
+		it('saves a value at once while the page is hidden, where timers are held back', async () => {
+			vi.stubGlobal('document', {
+				visibilityState: 'hidden',
+				addEventListener() {},
+				removeEventListener() {},
+			});
+			const { storage, values } = counted();
+			const store = counting(storage, { delay: 60_000 });
+			const shown = await value<number>(store, count);
+			await saved();
+			expect(values()).toBe(1);
+			shown.stop();
+			await store.dispose();
+		});
+
+		it('saves the newer value when it changes again in the turn an immediate save is posted', async () => {
+			const { storage, values } = counted();
+			const store = counting(storage, { delay: 60_000 });
+			const shown = await value<number>(store, count);
+			// The first value is collected on the next host task and waits for quiet.
+			await new Promise((resolve) => setTimeout(resolve, 5));
+			// A stale mark posts a save at once; the value then changes before that save runs.
+			store.invalidate(['unrelated']);
+			await Promise.resolve();
+			await Promise.resolve();
+			store.publish(count, undefined, 7);
+			await vi.waitFor(() => expect(values()).toBeGreaterThan(0), { timeout: 1_000 });
+			await saved();
+			expect(await restored(storage)).toBe(7);
+			shown.stop();
+			await store.dispose();
+		});
+
+		it('saves a value still waiting for quiet when the store is disposed', async () => {
+			const { storage } = counted();
+			const store = counting(storage, { delay: 60_000 });
+			const shown = await value<number>(store, count);
+			await shown.handle.refresh();
+			shown.stop();
+			await store.dispose();
+			expect(await restored(storage)).toBe(2);
+		});
+	});
 
 	it('shows a stale value from storage while it reloads', async () => {
 		const storage = memoryStorage();

@@ -18,14 +18,14 @@ export function decode(text: string): unknown {
  */
 const JSON_REPLY = 'json\n';
 
-/** A reply's text: JSON after `JSON_REPLY` where JSON keeps it exactly, devalue otherwise. */
+/** A reply's or feed frame's text: JSON after `JSON_REPLY` where JSON keeps it exactly, devalue otherwise. */
 export function encodeReply(reply: object): string {
 	return jsonExact(reply, new Set())
 		? JSON_REPLY + JSON.stringify(reply)
 		: devalue.stringify(reply);
 }
 
-/** Read a reply `encodeReply` or `devalue.stringify` wrote; anything else throws. */
+/** Read a reply or frame `encodeReply` or `devalue.stringify` wrote; anything else throws. */
 export function decodeReply(text: string): unknown {
 	return text.startsWith(JSON_REPLY)
 		? JSON.parse(text.slice(JSON_REPLY.length))

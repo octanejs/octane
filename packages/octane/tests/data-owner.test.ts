@@ -1753,11 +1753,13 @@ describe('octane/data in a SharedWorker', () => {
 				await backing.commit(...args);
 			},
 		};
+		// Values save on the next host task: the owner below is replaced without being disposed.
 		const persist = (account: string) => ({
 			storage,
 			partition: account,
 			key: 'a session secret of at least sixteen bytes',
 			budget: 4096,
+			delay: 0,
 		});
 		let explicit = createDataOwner({ transport: server.transport, fence: 'explicit', persist });
 		vi.stubGlobal(
