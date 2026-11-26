@@ -125,6 +125,24 @@ describe('universal compiler renderer capabilities', () => {
 		expect(output).toContain('[count$, count$.get()]');
 	});
 
+	it('routes the client and server signal hook entries to the universal entry only with signal-bindings', () => {
+		const host = { ...baseRenderer, text: 'host' as const };
+		for (const entry of ['octane/signals/client', 'octane/signals/server']) {
+			const source = `import { useSignal$ } from '${entry}';
+				export function Scene() @{ const count$ = useSignal$(0); <label value={count$} /> }`;
+			const output = compile(source, '/src/Scene.object.tsrx', {
+				renderer: { ...host, capabilities: ['signal-bindings'] },
+				hmr: false,
+			}).code;
+			expect(output).toContain(`from "octane/signals/universal"`);
+			expect(output).not.toContain(`"${entry}"`);
+			expect(output).toMatch(/enableUniversalNativeReads as (\w+)[\s\S]*\n\1\(1\);/);
+			expect(() =>
+				compile(source, '/src/Scene.object.tsrx', { renderer: host, hmr: false }),
+			).toThrow(/native signal reads support only the DOM client and server/);
+		}
+	});
+
 	it('keeps a scoped class handle bindable and its pure rows memoized in a signals module', () => {
 		const source = `import { signal$ } from 'octane/signals';
 			const tone$ = signal$('row');

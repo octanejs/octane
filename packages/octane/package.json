@@ -109,6 +109,7 @@
     "./signals/core": "./src/signals/core.ts",
     "./signals/client": "./src/signals/client.ts",
     "./signals/server": "./src/signals/server.ts",
+    "./signals/universal": "./src/signals/universal.ts",
     "./signals/react": "./src/signals/react.ts",
     "./internal/client": "./src/internal/client.ts",
     "./internal/server": "./src/internal/server.ts",
@@ -411,6 +412,17 @@
         "import": "./dist/signals/server.js",
         "require": "./dist/cjs/signals/server.cjs",
         "default": "./dist/signals/server.js"
+      },
+      "./signals/universal": {
+        "types": "./dist/signals/universal.d.ts",
+        "node": {
+          "import": "./dist/node/signals/universal.js",
+          "require": "./dist/cjs/signals/universal.cjs",
+          "default": "./dist/node/signals/universal.js"
+        },
+        "import": "./dist/signals/universal.js",
+        "require": "./dist/cjs/signals/universal.cjs",
+        "default": "./dist/signals/universal.js"
       },
       "./signals/react": {
         "types": "./dist/signals/react.d.ts",

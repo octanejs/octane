@@ -16,6 +16,7 @@ import {
 	rowPicks,
 	tone$,
 } from './_fixtures/universal-signal-bindings.object.tsrx';
+import { ProgramStyled, orders } from './_fixtures/universal-signal-scopes.object.tsrx';
 
 // Signal handles in template-program slots: bound rows still mount as one
 // program run, and a write updates the bound program node by its id.
@@ -244,5 +245,39 @@ describe('universal signal bindings in template programs', () => {
 		expect(container.children[0].children.map((row) => row.props.class)).toEqual(
 			new Array(4).fill('loud scope-b'),
 		);
+	});
+});
+
+describe('universal style bindings in template programs', () => {
+	afterEach(() => orders.forEach((order, index) => order.set(index)));
+
+	// Style objects stay in programs only with structured program values.
+	function mountStructured(component: unknown) {
+		const container = createObjectContainer();
+		const batches: UniversalHostBatch[] = [];
+		const driver = createProgramDriver(batches);
+		driver.capabilities = { ...driver.capabilities, templateProgramStructuredValues: true };
+		const root = createUniversalRoot(container, driver);
+		root.render(component as never, undefined);
+		return { container, root, batches };
+	}
+
+	it('binds a style object holding a handle in every row', async () => {
+		const { container, root, batches } = mountStructured(ProgramStyled);
+		expect(mountRun(batches[0]).count).toBe(3);
+		unmount = () => root.unmount();
+		const styles = () => container.children[0].children.map((row) => row.props.style);
+		expect(styles()).toEqual([0, 1, 2].map((order) => ({ order, color: 'red' })));
+		const mounted = batches.length;
+		orders[1].set(5);
+		await microtask();
+		expect(batches.length).toBe(mounted + 1);
+		const commands = batches.at(-1)!.commands as Extract<UniversalHostCommand, { op: 'update' }>[];
+		expect(commands.map((command) => command.op)).toEqual(['update', 'update']);
+		expect(commands.map((command) => command.props)).toEqual([
+			{ style: { order: 5, color: 'red' } },
+			{ value: '5' },
+		]);
+		expect(styles()[1]).toEqual({ order: 5, color: 'red' });
 	});
 });

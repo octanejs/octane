@@ -141,6 +141,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'isWritableSignal',
 	],
 	'./signals/server': ['useSignal$'],
+	'./signals/universal': ['useSignal$'],
 	'./signals/react': ['SignalScopeProvider', 'useSignalScope', 'useSignalValue'],
 	'./react/server': ['OctaneCompat', 'OctaneCompatInline'],
 	'./server': [

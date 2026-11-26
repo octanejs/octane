@@ -112,6 +112,7 @@ describe('published package export contract', () => {
 			['./signals/core', './dist/cjs/signals/core.cjs'],
 			['./signals/client', './dist/cjs/signals/client.cjs'],
 			['./signals/server', './dist/cjs/signals/server.cjs'],
+			['./signals/universal', './dist/cjs/signals/universal.cjs'],
 			['./internal/client', './dist/cjs/internal/client.cjs'],
 			['./internal/server', './dist/cjs/internal/server.cjs'],
 			['./internal/universal-children', './dist/cjs/internal/universal-children.cjs'],
