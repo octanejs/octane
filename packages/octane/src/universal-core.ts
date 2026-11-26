@@ -53,7 +53,14 @@ import {
 	type UniversalHookUpdateQueue as KernelUniversalHookUpdateQueue,
 	type UniversalTrackedThenable,
 } from './owner-kernel/hooks.js';
-import { isThenable } from './signals/handle-protocol.js';
+import { isSignalHandle, isThenable } from './signals/handle-protocol.js';
+import { createNativeReadCollector } from './signals/native-read-collector.js';
+import type { NativeReadSource, NativeReadSubscription } from './signals/read-protocol.js';
+import {
+	SIGNAL_BINDING_READ,
+	SIGNAL_BINDING_SUBSCRIBE,
+	type SignalHandle,
+} from './signals/types.js';
 import { setHostTimeout } from './host-task.js';
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
@@ -119,6 +126,54 @@ function isUniversalHostBinding(value: unknown): value is UniversalHostBinding<u
 		typeof value === 'object' &&
 		(value as UniversalHostBinding<unknown>).$$kind === UNIVERSAL_HOST_BINDING
 	);
+}
+
+// One binding per handle and use, so a re-render that passes the same handle
+// keeps its subscription: bindings compare by identity at commit.
+let SIGNAL_PROP_BINDINGS: WeakMap<object, UniversalHostBinding<unknown>> | null = null;
+let SIGNAL_TEXT_BINDINGS: WeakMap<object, UniversalHostBinding<unknown>> | null = null;
+
+function signalBindingText(value: unknown): string {
+	return value == null || typeof value === 'boolean' ? '' : String(value);
+}
+
+/**
+ * A signal handle passed as a host prop or rendered as a text child binds the
+ * host directly: the root subscribes to the handle and a write publishes one
+ * `update` command for that host, without rendering the component again.
+ */
+function signalHostBinding(value: unknown, text: boolean): UniversalHostBinding<unknown> | null {
+	if (!isSignalHandle(value)) return null;
+	HOST_BINDING_SUPPORT = UNIVERSAL_HOST_BINDING_SUPPORT;
+	const cache = text
+		? (SIGNAL_TEXT_BINDINGS ??= new WeakMap())
+		: (SIGNAL_PROP_BINDINGS ??= new WeakMap());
+	let binding = cache.get(value);
+	if (binding === undefined) {
+		const handle = value as SignalHandle<unknown>;
+		const source = {
+			get: () => handle[SIGNAL_BINDING_READ](),
+			subscribe(notify: () => void): () => void {
+				const subscription = handle[SIGNAL_BINDING_SUBSCRIBE](notify);
+				return () => subscription();
+			},
+		};
+		const select = text ? signalBindingText : (raw: unknown) => raw;
+		binding = {
+			$$kind: UNIVERSAL_HOST_BINDING,
+			source,
+			select,
+			getSnapshot: () => select(source.get()),
+		};
+		cache.set(value, binding);
+	}
+	return binding;
+}
+
+/** A prop value as a host binding: an explicit binding or a signal handle. */
+function hostBindingOf(value: unknown): UniversalHostBinding<unknown> | null {
+	if (value === null || (typeof value !== 'object' && typeof value !== 'function')) return null;
+	return isUniversalHostBinding(value) ? value : signalHostBinding(value, false);
 }
 const UNIVERSAL_TRY = Symbol.for('octane.universal.try');
 const UNIVERSAL_CONTEXT = Symbol.for('octane.universal.context');
@@ -1335,6 +1390,8 @@ interface DraftOwner {
 	hooks: Map<unknown, UniversalHook>;
 	clonedHooks: Set<unknown>;
 	seenEffects: EffectHook[];
+	// Signal sources this render read, when native reads are enabled.
+	nativeReads?: Map<NativeReadSource, number> | null;
 	children: DraftOwner[];
 	// Committed child owners adopted without re-rendering, with the drafted-child
 	// index each was claimed at so commit can rebuild record.children in exact
@@ -2798,6 +2855,75 @@ function readOwnerContext<T>(
 	return value;
 }
 
+// Native signal reads (`count$.get()` during render). The engine reports each
+// read to the collector's owner; a component that read signals subscribes to
+// them when its render commits and renders again when one of them changes.
+let NATIVE_READS: ReturnType<typeof createNativeReadCollector> | null = null;
+const NATIVE_READ_STATE_SLOT = Symbol('octane.universal.native-reads');
+const NATIVE_READ_REVISION_SLOT = Symbol('octane.universal.native-reads.revision');
+const NATIVE_READ_SYNC_SLOT = Symbol('octane.universal.native-reads.sync');
+const NATIVE_READ_RELEASE_SLOT = Symbol('octane.universal.native-reads.release');
+const NO_NATIVE_READS: ReadonlyMap<NativeReadSource, number> = new Map();
+
+interface NativeReadState {
+	readonly subscriptions: Map<NativeReadSource, NativeReadSubscription>;
+	notify: () => void;
+}
+
+/** @internal Compiler capability: collect native signal reads per component render. */
+export function enableUniversalNativeReads(abi = 1): void {
+	if (abi !== 1) throw new TypeError(`Unsupported universal native-read ABI ${String(abi)}.`);
+	if (NATIVE_READS !== null) return;
+	HOST_BINDING_SUPPORT = UNIVERSAL_HOST_BINDING_SUPPORT;
+	NATIVE_READS = createNativeReadCollector((owner, source, version) => {
+		const draft = owner as DraftOwner;
+		const reads = (draft.nativeReads ??= new Map());
+		if (!reads.has(source)) reads.set(source, version);
+	});
+}
+
+function releaseNativeReads(state: NativeReadState): void {
+	for (const subscription of state.subscriptions.values()) subscription();
+	state.subscriptions.clear();
+}
+
+function trackNativeReads(owner: DraftOwner): void {
+	const reads = owner.nativeReads ?? null;
+	if (reads === null && !owner.hooks.has(NATIVE_READ_STATE_SLOT)) return;
+	const [state] = useState<NativeReadState>(
+		() => ({ subscriptions: new Map(), notify: () => {} }),
+		NATIVE_READ_STATE_SLOT,
+	);
+	const [, bump] = useState(0, NATIVE_READ_REVISION_SLOT);
+	state.notify = () => bump((revision) => revision + 1);
+	const observed = reads ?? NO_NATIVE_READS;
+	useLayoutEffect(
+		() => {
+			const subscriptions = state.subscriptions;
+			for (const [source, subscription] of subscriptions) {
+				if (observed.has(source)) continue;
+				subscriptions.delete(source);
+				subscription();
+			}
+			let stale = false;
+			for (const [source, version] of observed) {
+				if (!subscriptions.has(source)) {
+					subscriptions.set(
+						source,
+						source.subscribe(() => state.notify()),
+					);
+				}
+				// A write between this render and its commit missed the subscription.
+				if (source.getVersion() !== version) stale = true;
+			}
+			if (stale) state.notify();
+		},
+		[state, observed],
+		NATIVE_READ_SYNC_SLOT,
+	);
+	useLayoutEffect(() => () => releaseNativeReads(state), [state], NATIVE_READ_RELEASE_SLOT);
+}
+
 function executeOwner<T>(owner: DraftOwner, build: () => T, initialRenderCount = 0): T {
 	const attempt = currentAttempt();
 	const warmPlanCheckpoint = ACTIVE_UNIVERSAL_WARM_PLANS.length;
@@ -2835,8 +2961,19 @@ function executeOwner<T>(owner: DraftOwner, build: () => T, initialRenderCount =
 				: null;
 		let didThrow = false;
 		let thrown: unknown;
+		const nativeReads = component === null ? null : NATIVE_READS;
+		let readToken = -1;
+		if (nativeReads !== null) {
+			owner.nativeReads = null;
+			readToken = nativeReads.beginRender(owner);
+		}
 		try {
-			output = build();
+			try {
+				output = build();
+			} finally {
+				if (nativeReads !== null) nativeReads.endRender(readToken);
+			}
+			if (nativeReads !== null && !owner.needsRender) trackNativeReads(owner);
 		} catch (error) {
 			didThrow = true;
 			thrown = error;
@@ -3446,7 +3583,7 @@ function materializeOwnerlessLeafValue(
 	let hostBindings: Map<string, UniversalHostBinding<unknown>> | null = null;
 	const attempt = currentAttempt();
 	for (const name of Object.keys(props)) {
-		const handler = props[name];
+		const handler = hostBindingOf(props[name]) ?? props[name];
 		if (isUniversalHostBinding(handler)) {
 			if (attempt.root.hasHostBindingUnsupportedConfiguration() || name.startsWith('on')) {
 				throw new Error(
@@ -3514,6 +3651,33 @@ function materializeValue(
 	path: readonly unknown[],
 ): BlueprintNode[] {
 	if (value == null || value === false || value === true) return [];
+	const textBinding =
+		typeof value === 'object' || typeof value === 'function'
+			? signalHostBinding(value, true)
+			: null;
+	if (textBinding !== null && currentAttempt().root.textPolicy() === 'host') {
+		const root = currentAttempt().root;
+		if (root.hasHostBindingUnsupportedConfiguration()) {
+			throw new Error('Signal text children require a local direct root.');
+		}
+		markUniversalTreeFeature(UNIVERSAL_TREE_HOST_BINDING);
+		return [
+			{
+				kind: 'host',
+				key,
+				type: '#text',
+				props: { value: root.encodeHostProp('#text', 'value', textBinding.getSnapshot()) },
+				hostBindings: new Map([['value', textBinding]]),
+				ref: null,
+				owner: CURRENT_OWNER!.record,
+				events: EMPTY_BLUEPRINT_EVENTS,
+				lifecycles: EMPTY_BLUEPRINT_HOST_CALLBACKS,
+				localCallbacks: EMPTY_BLUEPRINT_HOST_CALLBACKS,
+				visibility: CURRENT_OWNER!.visibility,
+				children: [],
+			},
+		];
+	}
 	if ((value as UniversalKeyedValue)?.$$kind === UNIVERSAL_KEYED) {
 		const keyed = value as UniversalKeyedValue;
 		const nodes = materializeValue(keyed.value, expectedRenderer, keyed.key, [...path, keyed.key]);
@@ -3739,7 +3903,7 @@ function materializeValue(
 				const host = compactHost!;
 				if (itemIndex === 0 && host.props !== undefined) {
 					for (const name of Object.keys(host.props)) {
-						if (isUniversalHostBinding(host.props[name])) {
+						if (hostBindingOf(host.props[name]) !== null) {
 							throw new Error(
 								'Experimental host bindings cannot be used in compact universal leaf lists.',
 							);
@@ -3753,7 +3917,7 @@ function materializeValue(
 				if (bindings !== undefined) {
 					for (let bindingIndex = 0; bindingIndex < bindings.length; bindingIndex++) {
 						const binding = values[bindings[bindingIndex][1]];
-						if (isUniversalHostBinding(binding)) {
+						if (hostBindingOf(binding) !== null) {
 							throw new Error(
 								'Experimental host bindings cannot be used in compact universal leaf lists.',
 							);
@@ -4369,7 +4533,7 @@ function materializeNode(
 			if (props === sourceProps) props = copyUniversalHostPropPrefix(sourceProps, names, index);
 			continue;
 		}
-		const handler = sourceProps[name];
+		const handler = hostBindingOf(sourceProps[name]) ?? sourceProps[name];
 		if (isUniversalHostBinding(handler)) {
 			if (root.hasHostBindingUnsupportedConfiguration() || name.startsWith('on')) {
 				throw new Error(
@@ -4570,7 +4734,7 @@ function materializeCollapsedTemplate(value: UniversalPlanValue): BlueprintHost 
 			const name = names[propIndex];
 			const current = sourceProps[name];
 			if (
-				isUniversalHostBinding(current) ||
+				hostBindingOf(current) !== null ||
 				root.classifyLifecycle(name, current) !== null ||
 				root.classifyLocalCallback(name, current) !== null ||
 				isRendererRegion(current)

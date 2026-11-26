@@ -15,6 +15,7 @@ import { createContextSourceFacts } from './context-provider.js';
 import { inheritGeneratedOrigin } from './generated-origin.js';
 import { IMMUTABLE_AMBIENT_GLOBALS, SETUP_PURE_GLOBAL_CALLEES } from './ambient-globals.js';
 import { ARM_BREAK_MESSAGE, ARM_VALUE_RETURN_MESSAGE, armJump } from './arm-exits.js';
+import { importsSignalModule, nativeReadOptions } from './native-read-diagnostics.js';
 
 // Keep CSS transformation in the DOM/SSR scope pass; only delivery is host-specific.
 const { applyStyleScopes } = createStyleScopePass({
@@ -4243,7 +4244,9 @@ function compileForAst(authored, context, state) {
 	}
 	assertNoResidualTemplate(node.right, state, '@for source');
 	if (node.key) assertNoResidualTemplate(node.key, state, '@for key');
-	const host = !state.hmr ? ownerFreeForHost(node) : null;
+	// Rows of a signals module can carry handles, which bind their host; compact
+	// leaf lists keep raw values only.
+	const host = !state.hmr && !state.signalModule ? ownerFreeForHost(node) : null;
 	const component = host === null ? ownerFreeForThreeHostComponent(node, state) : null;
 	const templateComponent =
 		host === null && component === null && !state.hmr
@@ -4770,6 +4773,7 @@ export const UNIVERSAL_RENDERER_HELPER_IMPORTS = Object.freeze([
 	['firstScreenEvent', 'firstScreenEvent'],
 	['hmrUniversalComponent', 'hmr'],
 	['UNIVERSAL_HMR', 'hmrSymbol'],
+	['enableUniversalNativeReads', 'nativeReads'],
 ]);
 
 // Call only after every statement of the output has been built.
@@ -5457,6 +5461,7 @@ export function compileUniversal(
 		contextSourceFacts: null,
 		runtimeImports: new Map(),
 		ast,
+		signalModule: importsSignalModule(ast),
 	};
 	ast = scopeUniversalStyles(ast, state);
 	state.ast = ast;
@@ -5546,10 +5551,28 @@ export function compileUniversal(
 	const profileImport = universalProfileImportAst(state, moduleOrigin);
 	const threeHostIntrinsics = threeHostIntrinsicStatementsAst(state, moduleOrigin);
 	const planDeclarations = universalPlanDeclarationsAst(state, moduleOrigin);
+	// A runtime signals import opts the module into native reads, as on the DOM
+	// target: the root then collects the signals each component render reads.
+	const nativeReads = nativeReadOptions(ast, {}).nativeReads
+		? [
+				inheritGeneratedOrigin(
+					b.stmt(
+						generatedCall(
+							((state.helpers.nativeReads = allocName(state, '__octaneEnableNativeReads')),
+							referenceHelper(state, 'nativeReads')),
+							[b.literal(1)],
+							moduleOrigin,
+						),
+					),
+					moduleOrigin,
+				),
+			]
+		: [];
 	const program = {
 		...ast,
 		body: [
 			...universalHelperImportAsts(state, [], moduleOrigin),
+			...nativeReads,
 			...threeHostIntrinsics.imports,
 			...(profileImport === null ? [] : [profileImport]),
 			...styleStatements,

@@ -109,6 +109,22 @@ describe('universal compiler renderer capabilities', () => {
 		expect(output).not.toContain('"kind": "text"');
 	});
 
+	it('compiles signal reads only for a renderer with the signal-bindings capability', () => {
+		const source = `import { signal$ } from 'octane/signals';
+			const count$ = signal$(0);
+			export function Scene() @{ <label value={count$}>{count$.get()}</label> }`;
+		const host = { ...baseRenderer, text: 'host' as const };
+		expect(() => compile(source, '/src/Scene.object.tsrx', { renderer: host, hmr: false })).toThrow(
+			/native signal reads support only the DOM client and server/,
+		);
+		const output = compile(source, '/src/Scene.object.tsrx', {
+			renderer: { ...host, capabilities: ['signal-bindings'] },
+			hmr: false,
+		}).code;
+		expect(output).toMatch(/enableUniversalNativeReads as (\w+)[\s\S]*\n\1\(1\);/);
+		expect(output).toContain('[count$, count$.get()]');
+	});
+
 	it('keeps a same-line space between elements only where the host may parent text', () => {
 		const source = `export function Scene() @{
 			<view><text><raw-text text="a" /> <raw-text text="b" /></text> <text>c</text></view>

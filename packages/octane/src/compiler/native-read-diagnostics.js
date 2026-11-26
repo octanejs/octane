@@ -146,11 +146,25 @@ export function importsSignalModule(ast) {
 	);
 }
 
+/**
+ * A universal renderer opts into signals with the `signal-bindings` capability:
+ * its runtime binds signal handles to host props and re-renders components on
+ * the signals their render read. Other non-DOM renderers stay fail-closed.
+ */
+export function rendererSupportsSignals(renderer) {
+	return (
+		renderer?.target === 'universal' &&
+		Array.isArray(renderer.capabilities) &&
+		renderer.capabilities.includes('signal-bindings')
+	);
+}
+
 export function assertNativeReadOptions(options) {
 	if (
 		options?.nativeReads === true &&
 		options.renderer?.target != null &&
-		options.renderer.target !== 'dom'
+		options.renderer.target !== 'dom' &&
+		!rendererSupportsSignals(options.renderer)
 	) {
 		throw Object.assign(
 			new Error('Octane native signal reads support only the DOM client and server.'),
