@@ -1,5 +1,14 @@
 # @octanejs/octane-is
 
+## 0.0.27
+
+### Patch Changes
+
+- Updated dependencies [49c29fd]
+- Updated dependencies [022f8e2]
+- Updated dependencies [2e94006]
+  - octane@0.27.0
+
 ## 0.0.26
 
 ### Patch Changes

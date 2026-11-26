@@ -1,5 +1,15 @@
 # @octanejs/select
 
+## 0.1.30
+
+### Patch Changes
+
+- Updated dependencies [49c29fd]
+- Updated dependencies [022f8e2]
+- Updated dependencies [2e94006]
+  - octane@0.27.0
+  - @octanejs/transition-group@0.0.44
+
 ## 0.1.29
 
 ### Patch Changes

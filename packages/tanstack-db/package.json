@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tanstack-db",
-  "version": "0.0.40",
+  "version": "0.0.41",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -50,7 +50,7 @@
     "@tanstack/db": "^0.7.0"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.26.0"
+    "octane": "workspace:^0.27.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",
