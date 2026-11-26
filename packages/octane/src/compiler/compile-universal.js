@@ -1960,7 +1960,7 @@ function validateHostTemplates(ast, state, validation, isAuthored) {
 				textParents !== null &&
 				nearestHost !== null &&
 				isAuthored(node) &&
-				normalizeJsxText(node.value ?? '') !== '' &&
+				!isBlankJsxText(node.value ?? '') &&
 				!textParents.has(nearestHost)
 			) {
 				throw universalError(
@@ -2456,12 +2456,10 @@ function collectIdentifierNodes(root, names) {
 
 function normalizeJsxText(value) {
 	const lines = String(value).split(/\r\n|\n|\r/);
-	let lastNonEmptyLine = -1;
+	let lastNonEmptyLine = 0;
 	for (let index = 0; index < lines.length; index++) {
 		if (/[^ \t]/.test(lines[index])) lastNonEmptyLine = index;
 	}
-	// Dropping whitespace-only text keeps spacing between elements legal on renderers that reject text.
-	if (lastNonEmptyLine === -1) return '';
 	let output = '';
 	for (let index = 0; index < lines.length; index++) {
 		let text = lines[index].replace(/\t/g, ' ');
@@ -2471,6 +2469,22 @@ function normalizeJsxText(value) {
 		output += index === lastNonEmptyLine ? text : `${text} `;
 	}
 	return output;
+}
+
+// Whitespace-only JSX text: removed when it holds a line break, otherwise a
+// same-line space that only a host able to parent text renders.
+function isBlankJsxText(value) {
+	return /^[ \t\r\n]*$/.test(String(value));
+}
+
+// Where the nearest host may parent text, a same-line space between siblings is
+// text like any other. Elsewhere it stays out of the plan, so renderers that
+// reject text or limit its parents still accept `<mesh /> <mesh />`.
+function keepsBlankJsxText(state) {
+	if (state.renderer.text !== 'host') return false;
+	const textParents = state.renderer.validation?.textParents;
+	if (textParents === undefined) return true;
+	return state.textParent != null && textParents.includes(state.textParent);
 }
 
 function allocName(state, preferred) {
@@ -2549,14 +2563,14 @@ function ownerFreeForLeaf(node) {
 	if (node.empty != null) return null;
 	if (!isOwnerFreeForExpression(node.right) || !isOwnerFreeForKey(node)) return null;
 	const body = (node.body?.body ?? []).filter(
-		(statement) => statement.type !== 'JSXText' || normalizeJsxText(statement.value ?? '') !== '',
+		(statement) => statement.type !== 'JSXText' || !isBlankJsxText(statement.value ?? ''),
 	);
 	if (body.length !== 1) return null;
 	const leaf = body[0];
 	if (leaf.type !== 'JSXElement' && leaf.type !== 'Element') return null;
 	if (
 		(leaf.children ?? []).some(
-			(child) => child.type !== 'JSXText' || normalizeJsxText(child.value ?? '') !== '',
+			(child) => child.type !== 'JSXText' || !isBlankJsxText(child.value ?? ''),
 		)
 	) {
 		return null;
@@ -2686,7 +2700,7 @@ function templateProgramForHost(node, state) {
 		return false;
 	}
 	const body = (node.body?.body ?? []).filter(
-		(statement) => statement.type !== 'JSXText' || normalizeJsxText(statement.value ?? '') !== '',
+		(statement) => statement.type !== 'JSXText' || !isBlankJsxText(statement.value ?? ''),
 	);
 	return body.length === 1 && isTemplateProgramForHost(body[0]);
 }
@@ -2702,7 +2716,7 @@ function templateProgramForComponent(node, state) {
 		return null;
 	}
 	const body = (node.body?.body ?? []).filter(
-		(statement) => statement.type !== 'JSXText' || normalizeJsxText(statement.value ?? '') !== '',
+		(statement) => statement.type !== 'JSXText' || !isBlankJsxText(statement.value ?? ''),
 	);
 	if (body.length !== 1) return null;
 	const component = body[0];
@@ -2711,7 +2725,7 @@ function templateProgramForComponent(node, state) {
 		!isComponentElement(component) ||
 		(component.openingElement?.name ?? component.name)?.type !== 'JSXIdentifier' ||
 		(component.children ?? []).some(
-			(child) => child.type !== 'JSXText' || normalizeJsxText(child.value ?? '') !== '',
+			(child) => child.type !== 'JSXText' || !isBlankJsxText(child.value ?? ''),
 		)
 	) {
 		return null;
@@ -3475,7 +3489,14 @@ function compileHostElementAst(node, context, state) {
 			else props[compiled.name] = compiled.staticValue;
 		}
 	}
-	const children = compileChildrenAst(node.children ?? [], context, state);
+	const outerTextParent = state.textParent;
+	state.textParent = type;
+	let children;
+	try {
+		children = compileChildrenAst(node.children ?? [], context, state);
+	} finally {
+		state.textParent = outerTextParent;
+	}
 	return withPlanOrigin(
 		{
 			kind: 'host',
@@ -3955,7 +3976,7 @@ function forRowTemplateBody(node) {
 	for (const statement of statements) {
 		if (
 			!isForOutputStatement(statement) ||
-			(statement.type === 'JSXText' && normalizeJsxText(statement.value ?? '') === '')
+			(statement.type === 'JSXText' && isBlankJsxText(statement.value ?? ''))
 		) {
 			continue;
 		}
@@ -4396,6 +4417,7 @@ function compileChildAst(node, context, state) {
 	if (node.type === 'JSXText') {
 		const value = normalizeJsxText(node.value);
 		if (value === '' || state.renderer.text === 'ignore') return [];
+		if (isBlankJsxText(value) && !keepsBlankJsxText(state)) return [];
 		if (state.renderer.text !== 'host') {
 			throw universalError(
 				'OCTANE_RENDERER_VALIDATION',

@@ -109,6 +109,24 @@ describe('universal compiler renderer capabilities', () => {
 		expect(output).not.toContain('"kind": "text"');
 	});
 
+	it('keeps a same-line space between elements only where the host may parent text', () => {
+		const source = `export function Scene() @{
+			<view><text><raw-text text="a" /> <raw-text text="b" /></text> <text>c</text></view>
+		}`;
+		const output = compile(source, '/src/Scene.lynx.tsrx', {
+			renderer: resolvedLynxRenderer,
+			hmr: false,
+		}).code;
+
+		expect(output.match(/"kind": "text", "value": " "/g)).toHaveLength(1);
+		const host = compile(
+			'export function Scene() @{ <group><mesh />\n<mesh /> <mesh /></group> }',
+			'/src/Scene.object.tsrx',
+			{ renderer: { ...baseRenderer, text: 'host' as const }, hmr: false },
+		).code;
+		expect(host.match(/"kind": "text", "value": " "/g)).toHaveLength(1);
+	});
+
 	it('lowers or omits authored text according to the typed renderer policy', () => {
 		const source = 'export function Scene() @{ <label>authored text</label> }';
 		const host = compile(source, '/src/Scene.object.tsrx', {
