@@ -3,6 +3,25 @@ export interface InputProps {
 	read<T>(prop: string, value: T): T;
 }
 
+export interface UncontrolledProps {
+	type: 'range' | 'text';
+	max: number;
+	name: string;
+	defaultValue: number;
+}
+
+export function UncontrolledTypeFirst(props: UncontrolledProps) @{
+	<input type={props.type} max={props.max} defaultValue={props.defaultValue} name={props.name} />
+}
+
+export function UncontrolledConstraintFirst(props: UncontrolledProps) @{
+	<input max={props.max} type={props.type} defaultValue={props.defaultValue} name={props.name} />
+}
+
+export function UncontrolledSpread(props: UncontrolledProps) @{
+	<input {...props} />
+}
+
 export function Values({ next, read }: InputProps) @{
 	const spread = {
 		get value() {

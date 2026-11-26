@@ -17,6 +17,7 @@ import {
 	POSITIVE_NUMERIC_ATTR_PROPS,
 	cssStyleValue,
 } from '../constants.js';
+import { inputValueConstraintType } from '../dom-tables.js';
 import { hasOwnProp } from '../has-own.js';
 import {
 	isAriaAttributeName,
@@ -1735,11 +1736,11 @@ function isInputControlProp(name: string): boolean {
 }
 
 export function isOrderedInputProp(name: string): boolean {
-	if (name.length === 4) {
-		name = name.toLowerCase();
-		return name === 'name' || name === 'type' || name === 'form';
-	}
-	return isInputControlProp(name);
+	if (isInputControlProp(name)) return true;
+	name = name.toLowerCase();
+	return (
+		name === 'name' || name === 'type' || name === 'form' || inputValueConstraintType(name) !== null
+	);
 }
 
 function inputMembershipMatches(
@@ -1755,11 +1756,33 @@ function inputMembershipMatches(
 	);
 }
 
-/** Apply an input's type and form before its state, joining its final radio group last. */
+function setInputConstraints(
+	input: HTMLInputElement,
+	writes: unknown[],
+	previous: unknown[] | undefined,
+	oldType: string | null,
+	beforeType: boolean,
+	writeConstraint: typeof setAttribute,
+): void {
+	for (let i = 0; i < writes.length; i += 2) {
+		const name = writes[i] as string;
+		const constraint = inputValueConstraintType(name.toLowerCase());
+		const value = writes[i + 1];
+		if (
+			constraint !== null &&
+			(oldType === null || (constraint !== oldType) === beforeType) &&
+			(previous === undefined || value !== previous[i + 1])
+		)
+			writeConstraint(input, name, value);
+	}
+}
+
+/** Apply input configuration before state, joining its final radio group last. */
 export function setInputProps(
 	input: HTMLInputElement,
 	writes: unknown[] | null,
 	previous?: unknown[],
+	writeConstraint?: typeof setAttribute,
 	compareLive = false,
 	formSources?: Map<string, HostPropWriter>,
 	applySources?: typeof applyInputSources,
@@ -1767,12 +1790,17 @@ export function setInputProps(
 	let nameIndex = -1;
 	let typeIndex = -1;
 	let formIndex = -1;
+	let hasConstraints = false;
 	if (writes !== null) {
 		for (let i = 0; i < writes.length; i += 2) {
 			const rawName = writes[i] as string;
-			if (rawName.length !== 4 || (previous !== undefined && writes[i + 1] === previous[i + 1]))
+			if (
+				(rawName.length !== 4 && writeConstraint === undefined) ||
+				(previous !== undefined && writes[i + 1] === previous[i + 1])
+			)
 				continue;
-			switch (rawName.toLowerCase()) {
+			const name = rawName.toLowerCase();
+			switch (name) {
 				case 'name':
 					nameIndex = i;
 					break;
@@ -1782,6 +1810,10 @@ export function setInputProps(
 				case 'type':
 					typeIndex = i;
 					break;
+				default:
+					// Without the injected writer, radio-only groups keep the generic attribute path out.
+					hasConstraints ||=
+						writeConstraint !== undefined && inputValueConstraintType(name) !== null;
 			}
 		}
 		// A persistent host repairs foreign edits, comparing only the winners because
@@ -1792,6 +1824,7 @@ export function setInputProps(
 			if (inputMembershipMatches(input, writes, formIndex)) formIndex = -1;
 		}
 	}
+	const oldType = hasConstraints && typeIndex >= 0 ? input.type : null;
 	const type = typeIndex >= 0 ? writes![typeIndex + 1] : null;
 	const entersRadio =
 		typeof type === 'string'
@@ -1802,17 +1835,23 @@ export function setInputProps(
 	const oldName =
 		(nameIndex >= 0 || typeIndex >= 0 || formIndex >= 0) &&
 		(!hydrating || CURSOR === null) &&
-		(entersRadio || input.type === 'radio')
+		(entersRadio || (oldType ?? input.type) === 'radio')
 			? input.getAttribute('name')
 			: null;
 	if (oldName) setPlainAttribute(input, 'name', null);
 	let complete = false;
 	try {
 		if (writes !== null) {
+			// Prepare the new type's constraints before it can sanitize. Constraints
+			// that can sanitize the old value wait until the input leaves that type.
+			if (oldType !== null)
+				setInputConstraints(input, writes, previous, oldType, true, writeConstraint!);
 			if (typeIndex >= 0)
 				setPlainAttribute(input, writes[typeIndex] as string, writes[typeIndex + 1]);
 			if (formIndex >= 0)
 				setPlainAttribute(input, writes[formIndex] as string, writes[formIndex + 1]);
+			if (hasConstraints)
+				setInputConstraints(input, writes, previous, oldType, false, writeConstraint!);
 			for (let i = 0; i < writes.length; i += 2) {
 				const value = writes[i + 1];
 				switch (writes[i]) {
@@ -1883,7 +1922,7 @@ export function setHostPropSources(
 	// The raw writer Map already resolved source precedence and getter reads.
 	if (deferControl && prev !== undefined && inputWrites !== null) {
 		// A render can arrive before hydration adopts the live checked state. Keep
-		// membership at its last committed values so adoption applies both together.
+		// configuration at its last committed values so adoption applies both together.
 		for (let i = 0; i < inputWrites.length; i += 2) {
 			const name = inputWrites[i] as string;
 			if (Object.hasOwn(prev, name)) resolved[name] = prev[name];
@@ -1894,6 +1933,7 @@ export function setHostPropSources(
 			el as HTMLInputElement,
 			inputWrites,
 			undefined,
+			setAttribute,
 			false,
 			deferControl ? undefined : props,
 			applyInputSources,
@@ -2256,7 +2296,7 @@ export function setHostProps(
 		setAttribute(el, k, v);
 	}
 	if (inputWrites !== null && (flags & COLLECT_INPUT_PROPS) === 0)
-		setInputProps(input!, inputWrites);
+		setInputProps(input!, inputWrites, undefined, setAttribute);
 	if (needsCheckedInitialization) markInputCheckedness(input!);
 	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, mountScope);
 	return inputWrites;

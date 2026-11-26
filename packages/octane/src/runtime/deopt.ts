@@ -523,7 +523,8 @@ function applyHostProps(state: HostComponentSlot, props: any, scope: Scope): voi
 			}
 		}
 	}
-	if (inputWrites !== null) setInputProps(input!, inputWrites, undefined, compareLive);
+	if (inputWrites !== null)
+		setInputProps(input!, inputWrites, undefined, setAttribute, compareLive);
 	if (needsCheckedInitialization) markInputCheckedness(input!);
 	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, scope);
 }

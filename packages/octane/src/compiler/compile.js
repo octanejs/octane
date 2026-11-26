@@ -201,6 +201,7 @@ import {
 import {
 	VOID_ELEMENTS,
 	READ_ONLY_VALUE_INPUT_TYPES,
+	inputValueConstraintType,
 	BOOLEAN_ATTR_PROPS,
 	MUST_USE_PROPERTY_PROPS,
 	POSITIVE_NUMERIC_ATTR_PROPS,
@@ -30779,6 +30780,7 @@ function planJsx(
 			(COMMIT_ATTR_KINDS.has(b.kind) || COMMIT_CONTROLLED_KINDS.has(b.kind))
 		)
 			ctx.runtimeNeeded.add('renderWrite');
+		if (b.inputConstraintWriter) ctx.runtimeNeeded.add(b.inputConstraintWriter);
 		const attrHelper = b.signalDirect ? null : attrBindingHelper(b);
 		if (attrHelper !== null) {
 			if (
@@ -32635,6 +32637,17 @@ function optionalCallArgs(...entries) {
 	return entries.slice(0, end).map((entry) => entry ?? undefinedNode());
 }
 
+function inputPropsArgs(binding, element, writes, previous = null) {
+	return [
+		element,
+		writes,
+		...optionalCallArgs(
+			previous,
+			binding.inputConstraintWriter ? b.id(`_$${binding.inputConstraintWriter}`) : null,
+		),
+	];
+}
+
 // A full component slot's writer: void bodies skip return reconciliation, and
 // proven function tags skip the dynamic host-tag capability.
 function componentSlotHelper(call) {
@@ -33267,7 +33280,7 @@ function emitBindingMount(bind, elVar, bag) {
 			return st(
 				b.block([
 					b.stmt(b.assignment('=', props, bind.expr)),
-					b.stmt(b.call(callee(), el(), props)),
+					b.stmt(b.call(callee(), ...inputPropsArgs(bind, el(), props))),
 					...mountHost(),
 				]),
 			);
@@ -34082,7 +34095,7 @@ function emitCommitBindingUpdate(bind, bag, commit, F, org, inline) {
 			writeCell(cell, () => b.call(callee(), F('_el'), nameLit(), V(), prev()), prev, bind.expr);
 			return recordValue(cell, bind.expr, prev);
 		case 'inputGroup':
-			writeCell(cell, () => b.call(callee(), F('_el'), V(), prev()), prev);
+			writeCell(cell, () => b.call(callee(), ...inputPropsArgs(bind, F('_el'), V(), prev())), prev);
 			return recordScope('bagRecord', cell, bind.expr, b.id('_b'));
 		default:
 			if (COMMIT_CONTROLLED_KINDS.has(bind.kind)) {
@@ -34324,7 +34337,7 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false, commit = null
 			return st(
 				b.block([
 					b.const('_v', bind.expr),
-					b.stmt(write(F('_el'), V(), F('_prev'))),
+					b.stmt(write(...inputPropsArgs(bind, F('_el'), V(), F('_prev')))),
 					b.stmt(b.assignment('=', F('_prev'), V())),
 				]),
 			);
@@ -35051,26 +35064,16 @@ function canSetInputGroup(name) {
 }
 
 function isInputValueConstraint(name, inputType) {
-	switch (name?.toLowerCase()) {
-		case 'type':
-			return true;
-		case 'min':
-		case 'max':
-		case 'step':
-			return inputType === 'range' || inputType === null;
-		case 'multiple':
-			return inputType === 'email' || inputType === null;
-		case 'alpha':
-		case 'colorspace':
-			return inputType === 'color' || inputType === null;
-	}
-	return false;
+	name = name?.toLowerCase();
+	if (name === 'type') return true;
+	const constraint = inputValueConstraintType(name);
+	return constraint !== null && (inputType === null || inputType === constraint);
 }
 
 // Stage the JSX expressions where they were authored. A range or text-like
 // value then writes after the attributes that the browser uses to sanitize it.
 // Radios with dynamic membership share one commit for their group and checkedness.
-function orderInputBindings(bindings, start, inputType, orderRadio, ctx) {
+function orderInputBindings(bindings, start, inputType, orderRadio, orderConstraints, ctx) {
 	const capture = (binding) => {
 		const local = allocCompilerName(ctx, '_a');
 		bindings[binding.id] = {
@@ -35084,6 +35087,7 @@ function orderInputBindings(bindings, start, inputType, orderRadio, ctx) {
 	};
 	let value;
 	let hasConstraint = false;
+	let inputConstraintWriter;
 	const group = [];
 	for (let i = start; i < bindings.length; i++) {
 		const binding = bindings[i];
@@ -35091,20 +35095,30 @@ function orderInputBindings(bindings, start, inputType, orderRadio, ctx) {
 			value = binding;
 			continue;
 		}
+		const valueConstraint = isInputValueConstraint(binding.name, inputType);
 		if (
-			isInputValueConstraint(binding.name, inputType) ||
+			valueConstraint ||
 			(binding.kind === 'nativeProjection' &&
 				binding.fields.some((field) => isInputValueConstraint(field, inputType)))
 		)
 			hasConstraint = true;
-		if (!orderRadio) continue;
+		if (!orderRadio && !orderConstraints) continue;
 		const name =
 			binding.kind === 'checkedCheckable' || binding.kind === 'checked'
 				? 'checked'
 				: binding.kind === 'defaultChecked'
 					? 'defaultChecked'
 					: binding.name;
-		if (name === 'checked' || name === 'defaultChecked' || canSetInputGroup(name)) {
+		const groupedConstraint = orderConstraints && valueConstraint;
+		if (groupedConstraint && !canSetInputGroup(name)) {
+			if (attrBindingHelper(binding) === 'setPlainAttribute')
+				inputConstraintWriter ??= 'setPlainAttribute';
+			else inputConstraintWriter = 'setAttribute';
+		}
+		if (
+			groupedConstraint ||
+			(orderRadio && (name === 'checked' || name === 'defaultChecked' || canSetInputGroup(name)))
+		) {
 			group.push(inheritOriginLoc(b.literal(name), binding.nameOrigin), capture(binding));
 		}
 	}
@@ -35121,6 +35135,7 @@ function orderInputBindings(bindings, start, inputType, orderRadio, ctx) {
 			path,
 			expr: b.array(group),
 			inputOrdered: true,
+			inputConstraintWriter,
 		});
 	}
 	if (orderValue) {
@@ -35291,15 +35306,31 @@ function emitElementHtml(
 					const name = directAttrName(attr);
 					return canSetInputGroup(name) && hasInputAttrBinding(attr, name);
 				})));
+	const hasOrderedInputConstraints =
+		tag === 'input' &&
+		staticInputType === null &&
+		typeWriters.some(
+			(attr) =>
+				!attr._octaneKnownProjectionSource && hasInputAttrBinding(attr, directAttrName(attr)),
+		) &&
+		directAttrs.some((attr) => {
+			const name = directAttrName(attr);
+			return (
+				!attr._octaneKnownProjectionSource &&
+				inputValueConstraintType(name.toLowerCase()) !== null &&
+				hasInputAttrBinding(attr, name)
+			);
+		});
 	// A signal can republish either side without rendering this component.
 	// The source-aware subscriber sees the latest configuration and state.
 	const hasOrderedSignalInput =
-		(hasOrderedValueProps || hasOrderedRadioProps) &&
+		(hasOrderedValueProps || hasOrderedRadioProps || hasOrderedInputConstraints) &&
 		directAttrs.some((attr) => {
 			const name = directAttrName(attr);
 			return (
 				(controlledKindFor(tag, name) !== null ||
-					(hasOrderedValueProps && isInputValueConstraint(name, inputType)) ||
+					((hasOrderedValueProps || hasOrderedInputConstraints) &&
+						isInputValueConstraint(name, inputType)) ||
 					(hasOrderedRadioProps && canSetInputGroup(name))) &&
 				canCarrySignalHandle(ctx, attrExpression(attr))
 			);
@@ -36102,8 +36133,18 @@ function emitElementHtml(
 			);
 		}
 	}
-	if (!resolveHostPropsAcrossSources && (hasOrderedValueProps || hasOrderedRadioProps)) {
-		orderInputBindings(bindings, firstAttrBinding, inputType, hasOrderedRadioProps, ctx);
+	if (
+		!resolveHostPropsAcrossSources &&
+		(hasOrderedValueProps || hasOrderedRadioProps || hasOrderedInputConstraints)
+	) {
+		orderInputBindings(
+			bindings,
+			firstAttrBinding,
+			inputType,
+			hasOrderedRadioProps,
+			hasOrderedInputConstraints,
+			ctx,
+		);
 	}
 	if (resolveHostPropsAcrossSources) {
 		const signalHostSources =

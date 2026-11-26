@@ -1,5 +1,22 @@
-import { createElement, createRoot, flushSync, hydrateRoot, type Root } from 'octane';
-import { RadioMoves, RadioSwap, Values, type InputProps } from './Inputs.tsrx';
+import {
+	createElement,
+	createRoot,
+	flushSync,
+	hydrateRoot,
+	type ComponentBody,
+	type Root,
+} from 'octane';
+import { hostComponent } from 'octane/internal/client';
+import {
+	RadioMoves,
+	RadioSwap,
+	UncontrolledConstraintFirst,
+	UncontrolledSpread,
+	UncontrolledTypeFirst,
+	Values,
+	type InputProps,
+	type UncontrolledProps,
+} from './Inputs.tsrx';
 import { SignalInputs, SignalRadio } from './SignalInputs.tsrx';
 import { initializeHydrationEventCapture } from 'octane/hydration';
 import { createScope } from 'octane/signals';
@@ -30,6 +47,70 @@ function DescriptorValues({ next, read }: InputProps) {
 
 const components = { Values, DescriptorValues, RadioSwap, RadioMoves };
 const host = document.querySelector('#app')!;
+
+function UncontrolledDescriptor(props: UncontrolledProps) {
+	return createElement('input', props);
+}
+
+const UncontrolledPersistent: ComponentBody<UncontrolledProps> = (props, scope) => {
+	hostComponent(scope, 0, 'input', props);
+};
+
+const uncontrolledComponents = {
+	UncontrolledTypeFirst,
+	UncontrolledConstraintFirst,
+	UncontrolledSpread,
+	UncontrolledDescriptor,
+	UncontrolledPersistent,
+};
+
+function runUncontrolledTypeChange(Body: ComponentBody<UncontrolledProps>, entering: boolean) {
+	const form = document.createElement('form');
+	host.append(form);
+	const root = createRoot(form);
+	const reads: string[] = [];
+	const props = (type: UncontrolledProps['type'], max: number): UncontrolledProps => ({
+		get type() {
+			reads.push('type');
+			return type;
+		},
+		get max() {
+			reads.push('max');
+			return max;
+		},
+		name: 'level',
+		defaultValue: 50,
+	});
+	try {
+		flushSync(() => root.render(Body, props(entering ? 'text' : 'range', 100)));
+		const input = form.querySelector('input')!;
+		input.value = entering ? '150' : '75';
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		const before = input.value;
+		reads.length = 0;
+		flushSync(() => root.render(Body, props(entering ? 'range' : 'text', entering ? 200 : 0)));
+		const after = new FormData(form).get('level');
+		form.reset();
+		return {
+			before,
+			after,
+			type: input.type,
+			max: input.max,
+			reset: input.value,
+			keptInput: form.querySelector('input') === input,
+			reads,
+		};
+	} finally {
+		root.unmount();
+		form.remove();
+	}
+}
+
+function runUncontrolledTypeChanges(entering: boolean) {
+	return Object.entries(uncontrolledComponents).map(
+		([component, Body]) => [component, runUncontrolledTypeChange(Body, entering)] as const,
+	);
+}
 
 function snapshot() {
 	return {
@@ -140,11 +221,13 @@ function moveRadioBeforeEditAdoption(markup: string) {
 window.moveRadioBeforeEditAdoption = moveRadioBeforeEditAdoption;
 window.runInputUpdate = runInputUpdate;
 window.runSignalUpdate = runSignalUpdate;
+window.runUncontrolledTypeChanges = runUncontrolledTypeChanges;
 
 declare global {
 	interface Window {
 		moveRadioBeforeEditAdoption: typeof moveRadioBeforeEditAdoption;
 		runInputUpdate: typeof runInputUpdate;
 		runSignalUpdate: typeof runSignalUpdate;
+		runUncontrolledTypeChanges: typeof runUncontrolledTypeChanges;
 	}
 }

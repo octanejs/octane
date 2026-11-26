@@ -41,7 +41,7 @@ const nextValues = {
 };
 
 describe.each(['development', 'production'] as const)(
-	'controlled inputs in Chromium (%s)',
+	'controlled and uncontrolled inputs in Chromium (%s)',
 	(mode) => {
 		let browser: Browser;
 		let server: ViteDevServer | PreviewServer;
@@ -129,6 +129,35 @@ describe.each(['development', 'production'] as const)(
 			expect(result.after.forms['values']).toEqual({ max: '150', label: 'hello' });
 			expect(result.reads).toEqual(['value', 'max']);
 		});
+
+		it.each(['entering', 'leaving'] as const)(
+			'preserves an uncontrolled edit when %s range type',
+			async (direction) => {
+				const page = await openPage();
+				try {
+					const entering = direction === 'entering';
+					const results = await page.evaluate(
+						(entering) => window.runUncontrolledTypeChanges(entering),
+						entering,
+					);
+					const edited = entering ? '150' : '75';
+					for (const [component, result] of results) {
+						expect(result, component).toEqual({
+							before: edited,
+							after: edited,
+							type: entering ? 'range' : 'text',
+							max: entering ? '200' : '0',
+							reset: '50',
+							keptInput: true,
+							reads:
+								component === 'UncontrolledConstraintFirst' ? ['max', 'type'] : ['type', 'max'],
+						});
+					}
+				} finally {
+					await page.close();
+				}
+			},
+		);
 
 		it('keeps both checked radios selected when they exchange names', async () => {
 			const result = await render('RadioSwap');
