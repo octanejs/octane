@@ -672,4 +672,15 @@ the original seed again when hydrating the placed content.
 
 DevTools can inspect native reads when profiling is enabled. Historical performance measurements are in the [implementation evidence](experimental-scoped-signals-evidence.md). Scoped ownership, async coordination, and retained values have costs beyond raw Alien Signals; engine measurements alone do not establish browser rendering speed.
 
-The supported native rendering targets are the DOM client and server. Deep stores, mutation journals, cross-root atomic reveal, cross-realm handoff, and native reads in non-DOM hosts are outside this API.
+The supported native rendering targets are the DOM client and server, and universal renderers that declare the `signal-bindings` capability (see below). Deep stores, mutation journals, cross-root atomic reveal, cross-realm handoff, and native reads in other non-DOM hosts are outside this API.
+
+## Universal renderers
+
+A universal renderer config that lists `signal-bindings` in `capabilities` accepts modules with a runtime signals import. Other universal renderers still reject them with `OCTANE_NATIVE_READ_TARGET`.
+
+- A signal handle passed as a host prop (`<label value={count$} />`) or rendered as a child (`{count$}`) binds that host directly. The host mounts with the signal's current value; a write publishes one `update` command for each bound host in a binding-only batch, without rendering the component again. Writes in the same task are coalesced into one batch on the root's microtask, and a write while a render is pending waits for that commit.
+- A read during render (`count$.get()`) subscribes the component when its render commits. A change renders the component again through the root's ordinary scheduling, as a state update does; a later render that no longer reads a signal drops its subscription.
+- Bound hosts follow the experimental host-binding rules: an ordinary prop (not `ref`, `key`, `children` or an event), a local direct root (no transport or DOM bridge), and an update-only host without lifecycle callbacks. A handle inside a style object, and a signal whose value is an element, are not bound; read them during render instead.
+- Global signals need a document owner. Without a DOM document, a universal module's `__enableSignalDocument(1, true)` (emitted by the compiler) gives the host one document-scoped owner; on a DOM page the document's owner is used as before.
+- With the `scoped-styles` capability, a dynamic `class` in a signals module goes through `universalScopedClass(value, scope)`, which appends the scope classes at runtime, so a class handle stays bound. Rows that only call it remain memoizable.
+- Rows of an `@for` in a signals module are not compacted into leaf lists, since their values can carry handles. Hosts with a bound prop mount through ordinary host commands rather than template programs.

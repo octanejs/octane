@@ -109,6 +109,48 @@ describe('universal compiler renderer capabilities', () => {
 		expect(output).not.toContain('"kind": "text"');
 	});
 
+	it('compiles signal reads only for a renderer with the signal-bindings capability', () => {
+		const source = `import { signal$ } from 'octane/signals';
+			const count$ = signal$(0);
+			export function Scene() @{ <label value={count$}>{count$.get()}</label> }`;
+		const host = { ...baseRenderer, text: 'host' as const };
+		expect(() => compile(source, '/src/Scene.object.tsrx', { renderer: host, hmr: false })).toThrow(
+			/native signal reads support only the DOM client and server/,
+		);
+		const output = compile(source, '/src/Scene.object.tsrx', {
+			renderer: { ...host, capabilities: ['signal-bindings'] },
+			hmr: false,
+		}).code;
+		expect(output).toMatch(/enableUniversalNativeReads as (\w+)[\s\S]*\n\1\(1\);/);
+		expect(output).toContain('[count$, count$.get()]');
+	});
+
+	it('keeps a scoped class handle bindable and its pure rows memoized in a signals module', () => {
+		const source = `import { signal$ } from 'octane/signals';
+			const tone$ = signal$('row');
+			export function Scene({ rows }) @{
+				<list>
+					<style>.row { color: red; }</style>
+					@for (const row of rows; key row.id) {
+						<item class={row.tone$}>{row.label as string}</item>
+					}
+				</list>
+			}`;
+		const output = compile(source, '/src/Scene.object.tsrx', {
+			renderer: {
+				...baseRenderer,
+				text: 'host' as const,
+				capabilities: ['scoped-styles', 'signal-bindings'],
+				registerUniversalStyles: true,
+			},
+			hmr: false,
+		}).code;
+		expect(output).toMatch(/universalScopedClass as (\w+)[\s\S]*\1\(row\.tone\$, "tsrx-\w+"\)/);
+		expect(output).not.toContain('NormalizeClass(row.tone$)');
+		// The row reads only its item: the memo inputs list stays present (and empty).
+		expect(output).toMatch(/\[\],\s*false\s*\)/);
+	});
+
 	it('keeps a same-line space between elements only where the host may parent text', () => {
 		const source = `export function Scene() @{
 			<view><text><raw-text text="a" /> <raw-text text="b" /></text> <text>c</text></view>

@@ -175,6 +175,14 @@ function compilerRuntimeImports(renderer: UniversalRendererConfig): Map<string, 
 		) {
 			continue;
 		}
+		// Only a signals module imports these, and it compiles only for a renderer
+		// that declares `signal-bindings`.
+		if (
+			(name === 'universalScopedClass' || name === 'enableUniversalNativeReads') &&
+			!renderer.capabilities?.includes('signal-bindings')
+		) {
+			continue;
+		}
 		add(renderer.module, name);
 	}
 	add(renderer.module, 'rendererRegion');

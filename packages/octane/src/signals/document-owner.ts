@@ -41,11 +41,22 @@ export function documentSignalOwner(container: Node): SignalOwnerIdentity {
 	return owner;
 }
 
-/** @internal Compiler capability for global signals without a rendering engine. */
-export function enableSignalDocument(abi = 1): void {
+// A universal (non-DOM) host's single document: what a page's document owner is
+// to the browser. Only universal modules opt into it, so a server process that
+// evaluates client code still finds no owner without a request.
+let hostDocument = false;
+const HOST_DOCUMENT_OWNER: SignalOwnerIdentity = Object.freeze({ scopeKey: 'octane:document' });
+
+/**
+ * @internal Compiler capability for global signals without a rendering engine.
+ * `host` marks a universal renderer's module: without a DOM document, global
+ * signals then belong to the host's one document owner.
+ */
+export function enableSignalDocument(abi = 1, host = false): void {
 	if (abi !== 1) throw new TypeError(formatClientError(74));
 	signalDocumentEnabled = true;
 	signalOwnerUse.active = true;
+	if (host) hostDocument = true;
 	if (defaultInstalled) return;
 	defaultInstalled = true;
 	signalOwnerFrame = {
@@ -54,7 +65,11 @@ export function enableSignalDocument(abi = 1): void {
 		restore: restoreSynchronousSignalOwner,
 	};
 	installDefaultSignalOwner(() =>
-		typeof document === 'undefined' ? null : documentSignalOwner(document),
+		typeof document === 'undefined'
+			? hostDocument
+				? HOST_DOCUMENT_OWNER
+				: null
+			: documentSignalOwner(document),
 	);
 }
 

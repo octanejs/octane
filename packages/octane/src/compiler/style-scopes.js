@@ -1026,6 +1026,26 @@ function addScopeClasses(element, state) {
 			}
 			if (expression.type === 'Literal' && typeof expression.value === 'string') {
 				base = expression.value;
+			} else if (ctx.scopedClassName) {
+				// A renderer that binds signal handles appends the chain at runtime, so a
+				// handle stays a binding instead of being stringified here.
+				ctx.runtimeNeeded.add('scopedClass');
+				newAttrs = attrs.slice();
+				newAttrs[index] = {
+					...existing,
+					value: tools.inheritOriginLoc(
+						b.jsx_expression_container(
+							tools.inheritOriginLoc(
+								b.call(ctx.scopedClassName, expression, buildClassValue(chain)),
+								expression,
+							),
+						),
+						value,
+					),
+				};
+				const out = { ...element, openingElement: { ...openingElement, attributes: newAttrs } };
+				if ('attributes' in element) out.attributes = newAttrs;
+				return out;
 			} else {
 				// Normalize a dynamic value (clsx arrays/objects, null) BEFORE the
 				// chain is appended so the template-literal slot is a plain string.

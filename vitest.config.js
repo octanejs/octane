@@ -928,7 +928,7 @@ export default defineConfig({
 								object: {
 									module: 'octane/universal',
 									text: 'host',
-									capabilities: ['visibility'],
+									capabilities: ['visibility', 'signal-bindings'],
 								},
 							},
 							boundaries: {
@@ -1014,7 +1014,7 @@ export default defineConfig({
 								object: {
 									module: 'octane/universal',
 									text: 'host',
-									capabilities: ['visibility'],
+									capabilities: ['visibility', 'signal-bindings'],
 								},
 							},
 							boundaries: {
