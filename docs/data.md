@@ -427,7 +427,9 @@ dependency that shows every edit at once is not built in.
 
 - Values are encrypted with a key derived from `key` (at least 128 random
   bits, or an HKDF `CryptoKey` with `deriveKey` usage), and every name the
-  storage sees is a keyed hash.
+  storage sees is a keyed hash. A string or byte key shorter than 16 bytes
+  throws when the store is made; one a `key` function returns leaves the
+  cache in memory only, so nothing is encrypted with it.
 - Only confirmed values are saved. Values saved under another output schema
   shape or `version` are discarded unread; values that fail validation on
   restore are discarded.
