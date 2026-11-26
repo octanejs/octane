@@ -552,13 +552,13 @@ export function createPersistence(
 		const now = hostDateNow();
 		const at = Math.max(now, markTime);
 		const keys = [...new Set([...collected.keys(), ...dirty])];
-		const early = new Map(collected);
-		collected.clear();
-		dirty.clear();
+		// A key marked again since it was collected is collected afresh: its value is newer.
 		// Disposal can end the source store while a prior key is encrypting.
 		const saves = keys.map((key) =>
-			closing?.has(key) ? closing.get(key) : early.has(key) ? early.get(key) : collect(key),
+			closing?.has(key) ? closing.get(key) : dirty.has(key) ? collect(key) : collected.get(key),
 		);
+		collected.clear();
+		dirty.clear();
 		// Later frames can arrive while encryption or storage is pending. Their
 		// checkpoints belong to the next batch, with the values they changed.
 		const checkpoint = marksChanged ? { marks: [...marks], cursors: [...cursors] } : null;

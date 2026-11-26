@@ -1128,6 +1128,24 @@ describe('octane/data persistent cache', () => {
 			await store.dispose();
 		});
 
+		it('saves the newer value when it changes again in the turn an immediate save is posted', async () => {
+			const { storage, values } = counted();
+			const store = counting(storage, { delay: 60_000 });
+			const shown = await value<number>(store, count);
+			// The first value is collected on the next host task and waits for quiet.
+			await new Promise((resolve) => setTimeout(resolve, 5));
+			// A stale mark posts a save at once; the value then changes before that save runs.
+			store.invalidate(['unrelated']);
+			await Promise.resolve();
+			await Promise.resolve();
+			store.publish(count, undefined, 7);
+			await vi.waitFor(() => expect(values()).toBeGreaterThan(0), { timeout: 1_000 });
+			await saved();
+			expect(await restored(storage)).toBe(7);
+			shown.stop();
+			await store.dispose();
+		});
+
 		it('saves a value still waiting for quiet when the store is disposed', async () => {
 			const { storage } = counted();
 			const store = counting(storage, { delay: 60_000 });
