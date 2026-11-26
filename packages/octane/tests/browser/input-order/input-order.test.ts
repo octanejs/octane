@@ -165,6 +165,27 @@ describe.each(['development', 'production'] as const)(
 			expect(result.after.forms['swap']).toEqual({ second: 'a', first: 'b' });
 		});
 
+		it('preserves the destination radio while adopting an edit from before hydration', async () => {
+			const page = await openPage();
+			try {
+				expect(
+					await page.evaluate(
+						(html) => window.moveRadioBeforeEditAdoption(html),
+						markup.signalRadio,
+					),
+				).toEqual({
+					before: [
+						['source', 'moving'],
+						['destination', 'peer'],
+					],
+					after: [['destination', 'peer']],
+					name: 'destination',
+				});
+			} finally {
+				await page.close();
+			}
+		});
+
 		it.each(['mount', 'hydrate'] as const)(
 			'reprojects the model when a prop or signal changes the limit after %s',
 			async (start) => {

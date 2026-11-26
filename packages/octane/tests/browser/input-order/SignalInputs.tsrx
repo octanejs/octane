@@ -20,3 +20,10 @@ export function SignalInputs(props: SignalProps) @{
 		<input name="constraint" type="range" value={150} max={props.limit$} readOnly />
 	</form>
 }
+
+export function SignalRadio(props: { name: string; value$: SignalHandle<string> }) @{
+	<form>
+		<input type="radio" name={props.name} value={props.value$} checked={false} readOnly />
+		<input type="radio" name="destination" value="peer" defaultChecked />
+	</form>
+}

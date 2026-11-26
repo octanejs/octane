@@ -1,7 +1,7 @@
 import { renderToString } from 'octane/server';
 import { createScope } from 'octane/signals';
 import { RadioSwap, Values, type InputProps } from './Inputs.tsrx';
-import { SignalInputs } from './SignalInputs.tsrx';
+import { SignalInputs, SignalRadio } from './SignalInputs.tsrx';
 
 export function renderForHydration() {
 	const props: InputProps = { next: false, read: (_name, value) => value };
@@ -12,6 +12,10 @@ export function renderForHydration() {
 		return {
 			values: renderToString(Values, props).html,
 			radios: renderToString(RadioSwap, props).html,
+			signalRadio: renderToString(SignalRadio, {
+				name: 'source',
+				value$: scope.signal$('radio', 'moving'),
+			}).html,
 			signals: renderToString(SignalInputs, { value$, limit$, max: 100 }).html,
 		};
 	} finally {

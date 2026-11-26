@@ -1,6 +1,7 @@
 import { createElement, createRoot, flushSync, hydrateRoot, type Root } from 'octane';
 import { RadioMoves, RadioSwap, Values, type InputProps } from './Inputs.tsrx';
-import { SignalInputs } from './SignalInputs.tsrx';
+import { SignalInputs, SignalRadio } from './SignalInputs.tsrx';
+import { initializeHydrationEventCapture } from 'octane/hydration';
 import { createScope } from 'octane/signals';
 
 function DescriptorValues({ next, read }: InputProps) {
@@ -118,11 +119,31 @@ function runSignalUpdate(markup?: string) {
 	return { before, changedMax, changedLimit, changedModelAndMax, keptInput, upgraded };
 }
 
+function moveRadioBeforeEditAdoption(markup: string) {
+	initializeHydrationEventCapture(document);
+	host.innerHTML = markup;
+	const form = host.querySelector('form')!;
+	const moving = form.querySelector('input')!;
+	moving.click();
+	const before = [...new FormData(form)];
+	const scope = createScope({ scopeKey: 'ordered-inputs' });
+	const props = { name: 'source', value$: scope.signal$('radio', 'moving') };
+	const root = hydrateRoot(host, SignalRadio, props);
+	flushSync(() => root.render(SignalRadio, { ...props, name: 'destination' }));
+	const after = [...new FormData(form)];
+	const name = moving.name;
+	root.unmount();
+	scope.dispose();
+	return { before, after, name };
+}
+
+window.moveRadioBeforeEditAdoption = moveRadioBeforeEditAdoption;
 window.runInputUpdate = runInputUpdate;
 window.runSignalUpdate = runSignalUpdate;
 
 declare global {
 	interface Window {
+		moveRadioBeforeEditAdoption: typeof moveRadioBeforeEditAdoption;
 		runInputUpdate: typeof runInputUpdate;
 		runSignalUpdate: typeof runSignalUpdate;
 	}

@@ -1881,7 +1881,15 @@ export function setHostPropSources(
 	// Form writers use the exact JSX spelling, independently of DOM aliases:
 	// e.g. a later VALUE attribute must not replace the controlled value prop.
 	// The raw writer Map already resolved source precedence and getter reads.
-	if (tag === 'input')
+	if (deferControl && prev !== undefined && inputWrites !== null) {
+		// A render can arrive before hydration adopts the live checked state. Keep
+		// membership at its last committed values so adoption applies both together.
+		for (let i = 0; i < inputWrites.length; i += 2) {
+			const name = inputWrites[i] as string;
+			if (Object.hasOwn(prev, name)) resolved[name] = prev[name];
+			else delete resolved[name];
+		}
+	} else if (tag === 'input')
 		setInputProps(
 			el as HTMLInputElement,
 			inputWrites,
