@@ -97,6 +97,13 @@ export interface PersistOptions {
 	/** The most the partition may hold, in characters of saved text; `'auto'` sizes it by device. */
 	readonly budget?: number | 'auto' | ((device: DeviceHints) => number);
 	/**
+	 * Milliseconds without a new value before the cache saves the values that
+	 * changed, so a burst of replies or feed events is written once; never more
+	 * than ten times this after the first. Default 50. With 0, values save on the
+	 * next host task, as other changes do. `dispose()` saves what is waiting.
+	 */
+	readonly delay?: number;
+	/**
 	 * Keep these writes until their outcome is known, even across a restart.
 	 * Each is saved before it is sent. After a restart its edit shows again
 	 * while `receipt`, read with its operation ID, says whether the server
@@ -399,6 +406,10 @@ export function createPersistence(
 	const removed = new Set<string>();
 	let scheduled = false;
 	let retryTimer: unknown;
+	/** The pending save of changed values, and when the first of them changed. */
+	let quietTimer: unknown;
+	let firstChange = 0;
+	const delay = Math.max(0, options.delay ?? 50);
 	let writing: Promise<void> = Promise.resolve();
 
 	const ready = (async () => {
@@ -463,11 +474,32 @@ export function createPersistence(
 		}
 		if (scheduled || cleared || closing) return;
 		scheduled = true;
+		// The flush saves every changed value, including those waiting for quiet.
+		if (quietTimer !== undefined) {
+			clearHostTimeout(quietTimer);
+			quietTimer = undefined;
+		}
 		postHostTask(() => {
 			scheduled = false;
 			const save = () => flush(!retry);
 			writing = writing.then(save, save);
 		});
+	}
+
+	/** Save changed values once `delay` passes without another, or ten of it after the first. */
+	function scheduleValues(): void {
+		if (delay === 0) return schedule();
+		if (scheduled || cleared || closing) return;
+		const now = hostDateNow();
+		if (quietTimer === undefined) firstChange = now;
+		else clearHostTimeout(quietTimer);
+		quietTimer = setHostTimeout(
+			() => {
+				quietTimer = undefined;
+				schedule();
+			},
+			Math.max(0, Math.min(delay, firstChange + delay * 10 - now)),
+		);
 	}
 
 	/** Delete expired values, then the least recently used, until the partition fits. */
@@ -606,6 +638,8 @@ export function createPersistence(
 	function stop(): void {
 		cleared = true;
 		clearHostTimeout(retryTimer);
+		clearHostTimeout(quietTimer);
+		quietTimer = undefined;
 		document?.removeEventListener('visibilitychange', hidden);
 		metas = new Map();
 		prepared.clear();
@@ -653,7 +687,7 @@ export function createPersistence(
 		},
 		mark(key) {
 			dirty.add(key);
-			schedule();
+			scheduleValues();
 		},
 		discard(key, revision) {
 			void ready.then(async () => {

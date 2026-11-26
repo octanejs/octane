@@ -419,7 +419,7 @@ dependency that shows every edit at once is not built in.
 
 ## Persistence
 
-`persist: { storage, partition, key, budget?, journal? }`.
+`persist: { storage, partition, key, budget?, delay?, journal? }`.
 
 - Values are encrypted with a key derived from `key` (at least 128 random
   bits, or an HKDF `CryptoKey` with `deriveKey` usage), and every name the
@@ -435,7 +435,14 @@ dependency that shows every edit at once is not built in.
   can still show alongside the error. `persist: false` disables restoration.
 - Stale marks survive restarts: each tag and entity keeps when it was last
   marked.
-- Saves coalesce into one storage transaction per host task.
+- A changed value saves once `delay` (default 50 ms) passes with no other
+  value changing, and never more than ten times `delay` after the first
+  change, so a burst of replies or feed events is written once. Other changes,
+  such as stale marks and feed cursors, save on the next host task, with any
+  values waiting. Each save is one storage transaction. `dispose()` saves what
+  is waiting; a value from the last `delay` before the worker or tab is killed
+  is lost, and loads again. With `delay: 0`, values also save on the next host
+  task.
 - After each save the partition is trimmed to 90% of `budget`, expired values
   first, then least recently used; values a mounted component shows are kept.
   `autoBudget(device)` is 1 MB at ≤2 GB memory, 2 MB to 4 GB or when hidden,
