@@ -1,0 +1,21 @@
+{
+  "include": ["*.ts"],
+  "compilerOptions": {
+    "strict": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["DOM", "DOM.Iterable", "ES2024"],
+    "types": ["node"],
+    "typeRoots": ["../../node_modules/@types"],
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "target": "ES2024",
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "octane/data": ["../../packages/octane/src/data/index.ts"],
+      "devalue": ["../../packages/octane/node_modules/devalue"],
+      "zod": ["../../packages/octane-mcp-server/node_modules/zod"]
+    }
+  }
+}
