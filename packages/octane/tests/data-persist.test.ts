@@ -925,6 +925,50 @@ describe('octane/data persistent cache', () => {
 		expect(second.log).toEqual([]);
 	});
 
+	it.each([
+		[
+			'plain data',
+			() => ({ list: [{ id: 'a', n: 1.5, ok: true, none: null }], text: 'Ćwiczenia ✓' }),
+		],
+		['a Date', () => ({ at: new Date('2026-11-26T10:00:00Z') })],
+		['an undefined property', () => ({ id: 'a', note: undefined })],
+		['-0', () => ({ zero: -0 })],
+		['NaN', () => ({ nan: NaN })],
+		[
+			'one object reached twice',
+			() => {
+				const shared = { id: 'a' };
+				return { first: shared, second: shared };
+			},
+		],
+		['a Map', () => ({ map: new Map([['a', 1]]) })],
+		['a list with a hole', () => ({ list: [1, , 3] })],
+	])('restores a saved value holding %s exactly as it was', async (_, make) => {
+		const anything = read({ name: 'anything', output: schema<any>(() => true) });
+		const storage = memoryStorage();
+		const before = createDataStore({
+			transport: async () => ({ ok: true, value: make() }),
+			persist: cache(storage, 'ada'),
+		});
+		const loaded = await value<any>(before, anything);
+		await saved();
+		loaded.stop();
+		await before.dispose();
+
+		const offline = createDataStore({
+			transport: () => new Promise(() => {}),
+			persist: cache(storage, 'ada'),
+		});
+		const restored = await value<any>(offline, anything);
+		const expected = make();
+		expect(restored.value).toStrictEqual(expected);
+		if ('second' in expected) expect(restored.value.second).toBe(restored.value.first);
+		if ('zero' in expected) expect(Object.is(restored.value.zero, -0)).toBe(true);
+		if ('note' in expected) expect('note' in restored.value).toBe(true);
+		restored.stop();
+		await offline.dispose();
+	});
+
 	it('shows a stale value from storage while it reloads', async () => {
 		const storage = memoryStorage();
 		const before = createDataStore({

@@ -220,6 +220,44 @@ export interface Persistence {
 
 const encoder = new TextEncoder();
 
+/**
+ * A cached value's text: JSON where JSON keeps the record exactly, which writes
+ * and reads several times faster than devalue on a large list, and devalue for
+ * anything else. Devalue's text of an object starts with `[`, never `{`.
+ */
+function encodeStored(record: Stored & { at: number }): string {
+	return jsonExact(record, new Set()) ? JSON.stringify(record) : devalue.stringify(record);
+}
+
+function decodeStored(text: string): Stored & { at: number } {
+	return text.startsWith('{') ? JSON.parse(text) : devalue.parse(text);
+}
+
+/**
+ * Whether `JSON.parse(JSON.stringify(value))` equals `value`, as devalue's
+ * would: plain objects and arrays, each reached once, of strings, booleans,
+ * null and finite numbers other than -0. JSON would drop `undefined` (which a
+ * hole reads as), write a Date as text, and copy a value reached twice.
+ * Neither keeps a list's other properties.
+ */
+function jsonExact(value: unknown, seen: Set<object>): boolean {
+	if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
+	if (typeof value === 'number') return Number.isFinite(value) && !Object.is(value, -0);
+	if (typeof value !== 'object' || seen.has(value)) return false;
+	seen.add(value);
+	const proto = Object.getPrototypeOf(value);
+	if (proto === Array.prototype) {
+		const array = value as unknown[];
+		for (let index = 0; index < array.length; index++)
+			if (!jsonExact(array[index], seen)) return false;
+		return true;
+	}
+	if (proto !== Object.prototype) return false;
+	for (const key in value)
+		if (!jsonExact((value as Record<string, unknown>)[key], seen)) return false;
+	return true;
+}
+
 function toBase64(bytes: Uint8Array): string {
 	let binary = '';
 	for (let i = 0; i < bytes.length; i += 0x8000) {
@@ -490,7 +528,7 @@ export function createPersistence(
 			}
 			const { stored, read } = saving;
 			// `at` is when the value was last known current, which marks are compared with.
-			const value = await cipher.seal(devalue.stringify({ ...stored, at }), name);
+			const value = await cipher.seal(encodeStored({ ...stored, at }), name);
 			const meta: StoredMeta = {
 				key: name,
 				size: value.length,
@@ -599,7 +637,7 @@ export function createPersistence(
 				prepared.get(name)?.value ?? (await storage.get(partition, name).catch(() => undefined));
 			if (cleared || text === undefined) return undefined;
 			try {
-				const stored = devalue.parse(await cipher.open(text, name)) as Stored & { at: number };
+				const stored = decodeStored(await cipher.open(text, name));
 				// Purging reads this order, so it must see the use now, not after the next save.
 				const current = currentRevision(name, revision);
 				if (!current) return undefined;
