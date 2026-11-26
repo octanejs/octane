@@ -1,4 +1,5 @@
 import { createElement } from 'octane';
+import { normalizeClass } from 'octane/internal/client';
 import { useLucideContext } from './context';
 import defaultAttributes from './defaultAttributes';
 import { hasA11yProp, mergeClasses } from './shared';
@@ -15,6 +16,10 @@ export function Icon(props: IconComponentProps) {
 		strokeWidth,
 		absoluteStrokeWidth,
 		className = '',
+		// Octane's `class` composes clsx-style. Merge it like `className`: left in
+		// `rest`, it would sit beside the merged `className` on the svg and replace
+		// the icon's own classes (or, server-rendered, be dropped).
+		class: classValue,
 		children,
 		iconNode,
 		ref,
@@ -39,7 +44,12 @@ export function Icon(props: IconComponentProps) {
 		height: size ?? contextSize ?? defaultAttributes.height,
 		stroke: color ?? contextColor,
 		strokeWidth: calculatedStrokeWidth,
-		className: mergeClasses('lucide', contextClass as string, className as string),
+		className: mergeClasses(
+			'lucide',
+			contextClass as string,
+			className as string,
+			normalizeClass(classValue),
+		),
 		...(!children && !hasA11yProp(rest) ? { 'aria-hidden': 'true' } : {}),
 		...rest,
 		children: [

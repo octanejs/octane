@@ -13,6 +13,12 @@ describe('@octanejs/lucide — server rendering', () => {
 		expect(octane).toBe(react);
 	});
 
+	it('renders a single merged class attribute for an Octane `class` prop', () => {
+		const { html } = renderToStaticMarkup(Camera, { class: 'size-5', className: 'toolbar-icon' });
+		expect(html.match(/ class="/g)).toHaveLength(1);
+		expect(html).toContain('class="lucide lucide-camera toolbar-icon size-5"');
+	});
+
 	it('applies provider defaults on the server', () => {
 		const App = () =>
 			createElement(LucideProvider, {
