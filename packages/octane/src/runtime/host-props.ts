@@ -1994,10 +1994,8 @@ function setDynamicHostPropSources(
 	return setHostPropSources(el, sources, prev, scope, hasNestedChildren, readStyle, deferControl);
 }
 
-export {
-	setDynamicHostPropSources as setHostPropSources,
-	setHostPropSources as setCompiledHostPropSources,
-};
+export const setCompiledHostPropSources = setHostPropSources;
+export { setDynamicHostPropSources as setHostPropSources };
 
 /**
  * Record a host's prop sources (bagRecord). Every render's sources reach the
@@ -2122,7 +2120,8 @@ function setDynamicSpread(
 	return setSpread(el, value, prev, mountScope, skipDangerouslySetInnerHTML, skipFormControls);
 }
 
-export { setDynamicSpread as setSpread, setSpread as setCompiledSpread };
+export const setCompiledSpread = setSpread;
+export { setDynamicSpread as setSpread };
 
 // A spread copies own enumerable keys. Descriptor props are plain own objects.
 function isOwnEnumerable(object: unknown, key: string): boolean {
