@@ -323,6 +323,7 @@ export {
 	setRenderStyleProperty,
 	setStyleProperties,
 	snapshotSpread,
+	setInputProps,
 	setHostPropSources,
 	bagRecordHost,
 	hostSourceChildren,

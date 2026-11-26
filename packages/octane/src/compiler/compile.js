@@ -1046,6 +1046,7 @@ const CONTROLLED_KIND_HELPERS = {
 	defaultValue: 'setDefaultValue',
 	defaultValueUncontrolled: 'setDefaultValueUncontrolled',
 	defaultChecked: 'setDefaultChecked',
+	inputGroup: 'setInputProps',
 	autoFocus: 'setAutoFocus',
 };
 
@@ -1169,6 +1170,14 @@ function needsDevStaticAttrValidation(attrName, lv, tag, namespace = 'html') {
 		MUST_USE_PROPERTY_PROPS.has(lower) ||
 		lower === 'download' ||
 		lower === 'capture'
+	);
+}
+
+function canBakeHostAttr(name, value, tag, namespace, dev) {
+	return (
+		!isEventAttrName(name) &&
+		!MUST_USE_PROPERTY_PROPS.has(name.toLowerCase()) &&
+		!(dev && needsDevStaticAttrValidation(name, value, tag, namespace))
 	);
 }
 
@@ -30643,6 +30652,7 @@ function planJsx(
 		if ((sharesSpreadHost || sharesEventSlot) && b.mountOnly) b.mountOnly = false;
 		b.deferred =
 			DEFERRABLE_MOUNT_KINDS.has(b.kind) &&
+			!b.inputOrdered &&
 			!sharesSpreadHost &&
 			!b.beforeConnect &&
 			b.name !== 'dangerouslySetInnerHTML';
@@ -30763,6 +30773,12 @@ function planJsx(
 		// that writer behind an inline guard or its compact comparison helper.
 		// Claim both authored-name tokens when both paths exist, and do not retain
 		// a mount-only import for deferred writes.
+		if (
+			b.inputOrdered &&
+			b.commitCell < 0 &&
+			(COMMIT_ATTR_KINDS.has(b.kind) || COMMIT_CONTROLLED_KINDS.has(b.kind))
+		)
+			ctx.runtimeNeeded.add('renderWrite');
 		const attrHelper = b.signalDirect ? null : attrBindingHelper(b);
 		if (attrHelper !== null) {
 			if (
@@ -33246,6 +33262,16 @@ function emitBindingMount(bind, elVar, bag) {
 				]),
 			);
 		}
+		case 'inputGroup': {
+			const props = local(`_prev$${bind.id}`);
+			return st(
+				b.block([
+					b.stmt(b.assignment('=', props, bind.expr)),
+					b.stmt(b.call(callee(), el(), props)),
+					...mountHost(),
+				]),
+			);
+		}
 		case 'value':
 		case 'checked':
 		case 'checkedCheckable':
@@ -33522,6 +33548,7 @@ const COMMIT_CONTROLLED_KINDS = new Set([
 	'defaultValue',
 	'defaultValueUncontrolled',
 	'defaultChecked',
+	'inputGroup',
 ]);
 // Writers that stay in render; a host carrying one keeps its other writers there.
 // So does a host collector that commitBindingKind keeps in render.
@@ -34054,6 +34081,9 @@ function emitCommitBindingUpdate(bind, bag, commit, F, org, inline) {
 		case 'formAction':
 			writeCell(cell, () => b.call(callee(), F('_el'), nameLit(), V(), prev()), prev, bind.expr);
 			return recordValue(cell, bind.expr, prev);
+		case 'inputGroup':
+			writeCell(cell, () => b.call(callee(), F('_el'), V(), prev()), prev);
+			return recordScope('bagRecord', cell, bind.expr, b.id('_b'));
 		default:
 			if (COMMIT_CONTROLLED_KINDS.has(bind.kind)) {
 				// A controlled property reasserts on every commit (React's contract).
@@ -34088,8 +34118,12 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false, commit = null
 		return st(emitCommitBindingUpdate(bind, bag, commit, F, org, inline));
 	// See emitBindingMount: the helper and the name literal carry the authored
 	// attribute name, so the name resolves to the update write too.
-	const callee = () =>
-		attrLoweringToken(b.id(`_$${attrBindingUpdateHelper(bind, inlineBindingGuards)}`), bind);
+	const helper = attrBindingUpdateHelper(bind, inlineBindingGuards);
+	const callee = () => attrLoweringToken(b.id(`_$${helper}`), bind);
+	const write = (...args) =>
+		bind.inputOrdered
+			? b.call('_$renderWrite', callee(), b.literal(helper), ...args)
+			: b.call(callee(), ...args);
 	const nameLit = () => attrLoweringToken(b.literal(bind.name), bind);
 	const signalHelper = directSignalBindingHelper(bind);
 	if (signalHelper !== null) {
@@ -34274,7 +34308,7 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false, commit = null
 						b.if(
 							b.binary('!==', F('_prev'), V()),
 							b.block([
-								b.stmt(b.call(callee(), F('_el'), nameLit(), V())),
+								b.stmt(write(F('_el'), nameLit(), V())),
 								b.stmt(b.assignment('=', F('_prev'), V())),
 							]),
 							null,
@@ -34283,15 +34317,17 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false, commit = null
 				);
 			}
 			return st(
-				b.stmt(
-					b.assignment(
-						'=',
-						F('_prev'),
-						b.call(callee(), bind.expr, F('_prev'), F('_el'), nameLit()),
-					),
-				),
+				b.stmt(b.assignment('=', F('_prev'), write(bind.expr, F('_prev'), F('_el'), nameLit()))),
 			);
 		}
+		case 'inputGroup':
+			return st(
+				b.block([
+					b.const('_v', bind.expr),
+					b.stmt(write(F('_el'), V(), F('_prev'))),
+					b.stmt(b.assignment('=', F('_prev'), V())),
+				]),
+			);
 		case 'value':
 		case 'checked':
 		case 'checkedCheckable':
@@ -34303,7 +34339,7 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false, commit = null
 			// reasserts on every commit — the helper's DOM-diff makes an
 			// unchanged value free, and a prev-guard would skip exactly the
 			// "unrelated re-render while the DOM drifted" reassert case.
-			return st(b.stmt(b.call(callee(), F('_el'), bind.expr)));
+			return st(b.stmt(write(F('_el'), bind.expr)));
 		}
 		case 'class': {
 			// Recompose fresh literal values on every render, including when their
@@ -35009,6 +35045,89 @@ function collectClientHtmlNestingWarnings(root, ctx, inheritedNamespace, identit
 	visit(root, inheritedNamespace, []);
 }
 
+function canSetInputGroup(name) {
+	name = name?.toLowerCase();
+	return name === 'name' || name === 'form' || name === 'type';
+}
+
+function isInputValueConstraint(name, inputType) {
+	switch (name?.toLowerCase()) {
+		case 'type':
+			return true;
+		case 'min':
+		case 'max':
+		case 'step':
+			return inputType === 'range' || inputType === null;
+		case 'multiple':
+			return inputType === 'email' || inputType === null;
+		case 'alpha':
+		case 'colorspace':
+			return inputType === 'color' || inputType === null;
+	}
+	return false;
+}
+
+// Stage the JSX expressions where they were authored. A range or text-like
+// value then writes after the attributes that the browser uses to sanitize it.
+// Radios with dynamic membership share one commit for their group and checkedness.
+function orderInputBindings(bindings, start, inputType, orderRadio, ctx) {
+	const capture = (binding) => {
+		const local = allocCompilerName(ctx, '_a');
+		bindings[binding.id] = {
+			id: binding.id,
+			kind: 'hostValue',
+			knownSpreadLocal: local,
+			expr: binding.expr,
+			path: binding.path,
+		};
+		return inheritOriginLoc(b.id(local), binding.expr);
+	};
+	let value;
+	let hasConstraint = false;
+	const group = [];
+	for (let i = start; i < bindings.length; i++) {
+		const binding = bindings[i];
+		if (binding.kind === 'value' || binding.kind === 'defaultValueUncontrolled') {
+			value = binding;
+			continue;
+		}
+		if (
+			isInputValueConstraint(binding.name, inputType) ||
+			(binding.kind === 'nativeProjection' &&
+				binding.fields.some((field) => isInputValueConstraint(field, inputType)))
+		)
+			hasConstraint = true;
+		if (!orderRadio) continue;
+		const name =
+			binding.kind === 'checkedCheckable' || binding.kind === 'checked'
+				? 'checked'
+				: binding.kind === 'defaultChecked'
+					? 'defaultChecked'
+					: binding.name;
+		if (name === 'checked' || name === 'defaultChecked' || canSetInputGroup(name)) {
+			group.push(inheritOriginLoc(b.literal(name), binding.nameOrigin), capture(binding));
+		}
+	}
+	const orderValue = value !== undefined && hasConstraint;
+	if (!orderValue && group.length === 0) return;
+	const path = bindings[start].path;
+	// The deferred-mount optimization would move sibling prop reads out of
+	// this host's authored sequence and write constraints after its control.
+	for (let i = start; i < bindings.length; i++) bindings[i].inputOrdered = true;
+	if (group.length > 0) {
+		bindings.push({
+			id: bindings.length,
+			kind: 'inputGroup',
+			path,
+			expr: b.array(group),
+			inputOrdered: true,
+		});
+	}
+	if (orderValue) {
+		bindings.push({ ...value, id: bindings.length, expr: capture(value), inputOrdered: true });
+	}
+}
+
 function emitElementHtml(
 	node,
 	path,
@@ -35122,19 +35241,71 @@ function emitElementHtml(
 			.filter((attr) => attr.type === 'Attribute' || attr.type === 'JSXAttribute')
 			.map((attr) => normalizeJsxAttrName(jsxAttrRawName(attr), tag, hostNs)),
 	);
-	// React validates a customized built-in from its complete final prop set,
-	// so an authored `is` must be visible before any sibling attr is checked even
-	// when it appears last. Reuse the existing DEV whole-host snapshot; keeping
-	// this proof behind ctx.dev preserves byte-identical production output.
-	const resolveDevCustomizedHost =
-		ctx.dev &&
-		(hostNs === 'html' || hostNs === 'opaque') &&
-		!tag.includes('-') &&
-		directPropNames.has('is');
+	const formHost = tag === 'input' || tag === 'textarea' || tag === 'select';
+	const hasCustomizedHostProp =
+		(hostNs === 'html' || hostNs === 'opaque') && !tag.includes('-') && directPropNames.has('is');
+	// Validate customized built-ins against the final `is`, even when authored last.
+	const resolveDevCustomizedHost = ctx.dev && hasCustomizedHostProp;
+	const directAttrs = attrs.filter((a) => a.type === 'Attribute' || a.type === 'JSXAttribute');
+	const directAttrName = (a) => normalizeJsxAttrName(jsxAttrRawName(a), tag, hostNs);
+	const valueWriters = directAttrs.filter((a) => directAttrName(a) === 'value');
+	const defaultValueWriters = directAttrs.filter((a) => directAttrName(a) === 'defaultValue');
+	const checkedWriters = directAttrs.filter((a) => directAttrName(a) === 'checked');
+	const typeWriters = directAttrs.filter((a) => directAttrName(a).toLowerCase() === 'type');
+	const typeValue = typeWriters[0]?.value;
+	const typeExpr = unwrapTsExpr(
+		typeValue?.type === 'JSXExpressionContainer' ? typeValue.expression : typeValue,
+	);
+	const staticInputType =
+		typeExpr &&
+		(typeExpr.type === 'Literal' || typeExpr.type === 'StringLiteral') &&
+		typeof typeExpr.value === 'string'
+			? typeExpr.value.toLowerCase()
+			: null;
+	const inputType = typeWriters.length === 0 ? 'text' : staticInputType;
+	const attrExpression = (attr) => {
+		const { value } = attr;
+		return value?.type === 'JSXExpressionContainer' ? value.expression : value;
+	};
+	const hasInputAttrBinding = (attr, name) => {
+		const expr = attrExpression(attr);
+		return (
+			(expr != null && expr.type !== 'Literal') ||
+			!canBakeHostAttr(name, expr == null ? true : expr.value, tag, hostNs, ctx.dev)
+		);
+	};
+	const hasOrderedValueProps =
+		tag === 'input' &&
+		(valueWriters.length > 0 || defaultValueWriters.length > 0) &&
+		directAttrs.some((attr) => {
+			const name = directAttrName(attr);
+			return isInputValueConstraint(name, inputType) && hasInputAttrBinding(attr, name);
+		});
+	const hasOrderedRadioProps =
+		tag === 'input' &&
+		(checkedWriters.length > 0 || directPropNames.has('defaultChecked')) &&
+		directAttrs.some((attr) => directAttrName(attr).toLowerCase() === 'name') &&
+		(inputType === null ||
+			(inputType === 'radio' &&
+				directAttrs.some((attr) => {
+					const name = directAttrName(attr);
+					return canSetInputGroup(name) && hasInputAttrBinding(attr, name);
+				})));
+	// A signal can republish either side without rendering this component.
+	// The source-aware subscriber sees the latest configuration and state.
+	const hasOrderedSignalInput =
+		(hasOrderedValueProps || hasOrderedRadioProps) &&
+		directAttrs.some((attr) => {
+			const name = directAttrName(attr);
+			return (
+				(controlledKindFor(tag, name) !== null ||
+					(hasOrderedValueProps && isInputValueConstraint(name, inputType)) ||
+					(hasOrderedRadioProps && canSetInputGroup(name))) &&
+				canCarrySignalHandle(ctx, attrExpression(attr))
+			);
+		});
 	const hasDirectFormCascade =
-		((tag === 'input' || tag === 'textarea' || tag === 'select') &&
-			directPropNames.has('value') &&
-			directPropNames.has('defaultValue')) ||
+		(formHost && directPropNames.has('value') && directPropNames.has('defaultValue')) ||
 		(tag === 'input' && directPropNames.has('checked') && directPropNames.has('defaultChecked')) ||
 		(tag === 'select' &&
 			directPropNames.has('multiple') &&
@@ -35152,6 +35323,7 @@ function emitElementHtml(
 		firstSpreadIdx !== -1 ||
 		hasDuplicateDirectProp ||
 		hasDirectFormCascade ||
+		hasOrderedSignalInput ||
 		resolveDevCustomizedHost ||
 		hasDirectSignalStyle;
 	const hostClientSources = [];
@@ -35164,20 +35336,6 @@ function emitElementHtml(
 	// spread or duplicate/conflicting writer makes source-order ownership
 	// ambiguous, so those elements keep the generic helpers. Select is excluded:
 	// its default projection is commit-deferred and option-aware.
-	const directAttrs = attrs.filter((a) => a.type === 'Attribute' || a.type === 'JSXAttribute');
-	const directAttrName = (a) => normalizeJsxAttrName(jsxAttrRawName(a), tag, hostNs);
-	const valueWriters = directAttrs.filter((a) => directAttrName(a) === 'value');
-	const defaultValueWriters = directAttrs.filter((a) => directAttrName(a) === 'defaultValue');
-	const checkedWriters = directAttrs.filter((a) => directAttrName(a) === 'checked');
-	const typeWriters = directAttrs.filter((a) => directAttrName(a) === 'type');
-	const typeValue = typeWriters[0]?.value;
-	const typeExpr = typeValue?.type === 'JSXExpressionContainer' ? typeValue.expression : typeValue;
-	const staticInputType =
-		typeExpr &&
-		(typeExpr.type === 'Literal' || typeExpr.type === 'StringLiteral') &&
-		typeof typeExpr.value === 'string'
-			? typeExpr.value.toLowerCase()
-			: null;
 	const leanDefaultValue =
 		firstSpreadIdx === -1 &&
 		(tag === 'input' || tag === 'textarea') &&
@@ -35202,7 +35360,7 @@ function emitElementHtml(
 		directSignalControlSite = site;
 		appendTemplatePart(attrTemplate, ` data-octane-input="${escapeAttr(site)}"`, 'attribute', null);
 	};
-	const markDirectControl = (binding, expression, origin) => {
+	const markDirectControl = (binding, expression) => {
 		const carriesHandle = canCarrySignalHandle(ctx, expression);
 		if (!carriesHandle && !canCarrySignalHandle(ctx, expression, false, true)) return binding;
 		const site = directSignalSite(ctx, node, 'input');
@@ -35212,11 +35370,16 @@ function emitElementHtml(
 		if (!carriesHandle) return binding;
 		return { ...binding, signalDirect: true, signalSite: site };
 	};
-	const hostSignalSite = directSignalSite(ctx, node, 'binding');
-	if (firstSpreadIdx !== -1 && (tag === 'input' || tag === 'textarea' || tag === 'select')) {
+	const hostSignalSite = directSignalSite(
+		ctx,
+		node,
+		formHost && firstSpreadIdx === -1 ? 'input' : 'binding',
+	);
+	if (firstSpreadIdx !== -1 && formHost) {
 		ensureDirectControlSite(hostSignalSite);
 	}
 	let sawRef = false;
+	const firstAttrBinding = bindings.length;
 	for (let attrI = 0; attrI < attrs.length; attrI++) {
 		const attr = attrs[attrI];
 		if (attr._octaneKnownProjectionSource) continue;
@@ -35296,7 +35459,7 @@ function emitElementHtml(
 					cssHash,
 				);
 				if (
-					resolveDevCustomizedHost &&
+					hasCustomizedHostProp &&
 					firstSpreadIdx === -1 &&
 					!hasDuplicateDirectProp &&
 					rawAttrName === 'is' &&
@@ -35304,7 +35467,7 @@ function emitElementHtml(
 					typeof inner.value === 'string'
 				) {
 					// Customized built-ins must carry `is` when the browser constructs
-					// the template node; the diagnostic snapshot still needs its source.
+					// the template node; the snapshot still needs its source.
 					appendBakedAttribute(
 						attrTemplate,
 						bakeStaticAttr('is', inner.value, tag, hostNs),
@@ -35314,14 +35477,15 @@ function emitElementHtml(
 						ctx.inspect,
 					);
 				}
+				expr = tsrxExprNode(inner, ctx, componentName, inlinedSubs);
 				if (
-					(tag === 'input' || tag === 'textarea' || tag === 'select') &&
+					formHost &&
 					(rawAttrName === 'value' || (tag === 'input' && rawAttrName === 'checked')) &&
-					isDirectSignalHandleExpression(inner)
+					canCarrySignalHandle(ctx, expr, false, true)
 				) {
 					ensureDirectControlSite(hostSignalSite);
+					ctx.signalBindingsUsed = true;
 				}
-				expr = tsrxExprNode(inner, ctx, componentName, inlinedSubs);
 			}
 			const binding = {
 				id: bindings.length,
@@ -35518,7 +35682,7 @@ function emitElementHtml(
 					ctlKind === 'selectValue' ||
 					ctlKind === 'checked' ||
 					ctlKind === 'checkedCheckable'
-					? markDirectControl(binding, sourceExpr, attr)
+					? markDirectControl(binding, sourceExpr)
 					: binding,
 			);
 			continue;
@@ -35554,11 +35718,9 @@ function emitElementHtml(
 			// attribute. Events and source-ordered writers need the ordinary binding
 			// path; valid static attrs still bake with their real boolean semantics.
 			if (
-				isEventAttrName(attrName) ||
-				MUST_USE_PROPERTY_PROPS.has(attrName.toLowerCase()) ||
 				isAfterSpread ||
 				classBeforeSpread ||
-				(ctx.dev && needsDevStaticAttrValidation(attrName, true, tag, hostNs))
+				!canBakeHostAttr(attrName, true, tag, hostNs, ctx.dev)
 			) {
 				inner = b.literal(true, 'true', attr);
 			} else {
@@ -35710,11 +35872,9 @@ function emitElementHtml(
 		// `attr=""`/absent, booleans on non-boolean attrs drop).
 		if (
 			inner.type === 'Literal' &&
-			!isEventAttrName(attrName) &&
-			!MUST_USE_PROPERTY_PROPS.has(attrName.toLowerCase()) &&
 			!isAfterSpread &&
 			!classBeforeSpread &&
-			!(ctx.dev && needsDevStaticAttrValidation(attrName, inner.value, tag, hostNs))
+			canBakeHostAttr(attrName, inner.value, tag, hostNs, ctx.dev)
 		) {
 			const baked = bakeStaticAttr(attrName, inner.value, tag, hostNs);
 			appendBakedAttribute(attrTemplate, baked, attrName, attr.name, inner, ctx.inspect);
@@ -35941,6 +36101,9 @@ function emitElementHtml(
 				),
 			);
 		}
+	}
+	if (!resolveHostPropsAcrossSources && (hasOrderedValueProps || hasOrderedRadioProps)) {
+		orderInputBindings(bindings, firstAttrBinding, inputType, hasOrderedRadioProps, ctx);
 	}
 	if (resolveHostPropsAcrossSources) {
 		const signalHostSources =

@@ -79,6 +79,8 @@ import {
 	setClassAttr,
 	setStyle,
 	removeHostProp,
+	isOrderedInputProp,
+	setInputProps,
 	formActionAttributeName,
 	DESCRIPTOR_HOST,
 	setHostProps,
@@ -421,7 +423,10 @@ function applyHostProps(state: HostComponentSlot, props: any, scope: Scope): voi
 	const prev = state.props;
 	const compareLive =
 		prev !== undefined && (!hydrating || CURSOR === null) && !isHtmlCustomElement(el);
-	let needsCheckedInitialization = prev === undefined && el.localName === 'input';
+	const input =
+		el.localName === 'input' && el.namespaceURI === HTML_NS ? (el as HTMLInputElement) : null;
+	let needsCheckedInitialization = prev === undefined && input !== null;
+	let inputWrites: unknown[] | null = null;
 	if (ROOT_RENDER_TRANSACTION !== null && prev !== props) journalObjectOnce(state);
 	// REMOVE props/events present last render but gone now, via the shared removeHostProp
 	// (parity with setHostProps) — a reused element must not keep stale
@@ -438,15 +443,11 @@ function applyHostProps(state: HostComponentSlot, props: any, scope: Scope): voi
 				}
 				continue;
 			}
-			removeHostProp(el, k, prev[k]);
+			if (input !== null && isOrderedInputProp(k)) (inputWrites ??= []).push(k, null);
+			else removeHostProp(el, k, prev[k]);
 		}
 	}
 	state.props = props;
-	if (props == null) {
-		if (needsCheckedInitialization) markInputCheckedness(el as HTMLInputElement);
-		if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, scope);
-		return;
-	}
 	for (const name in props) {
 		if (name === 'key' || name === 'children') continue;
 		const v = props[name];
@@ -455,6 +456,10 @@ function applyHostProps(state: HostComponentSlot, props: any, scope: Scope): voi
 			(name === 'defaultChecked' || (name === 'checked' && v != null))
 		)
 			needsCheckedInitialization = false;
+		if (input !== null && isOrderedInputProp(name)) {
+			(inputWrites ??= []).push(name, v);
+			continue;
+		}
 		const actionName = formActionAttributeName(el, name);
 		if (actionName !== null) {
 			DESCRIPTOR_FORM_ACTION(el, actionName, v, prev?.[name]);
@@ -518,7 +523,8 @@ function applyHostProps(state: HostComponentSlot, props: any, scope: Scope): voi
 			}
 		}
 	}
-	if (needsCheckedInitialization) markInputCheckedness(el as HTMLInputElement);
+	if (inputWrites !== null) setInputProps(input!, inputWrites, undefined, compareLive);
+	if (needsCheckedInitialization) markInputCheckedness(input!);
 	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, scope);
 }
 

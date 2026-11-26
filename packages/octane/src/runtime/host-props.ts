@@ -1728,6 +1728,134 @@ export function resolveHostPropSources(
 	return resolved;
 }
 
+function isInputControlProp(name: string): boolean {
+	return (
+		name === 'value' || name === 'defaultValue' || name === 'checked' || name === 'defaultChecked'
+	);
+}
+
+export function isOrderedInputProp(name: string): boolean {
+	if (name.length === 4) {
+		name = name.toLowerCase();
+		return name === 'name' || name === 'type' || name === 'form';
+	}
+	return isInputControlProp(name);
+}
+
+function inputMembershipMatches(
+	input: HTMLInputElement,
+	writes: unknown[],
+	index: number,
+): boolean {
+	if (index < 0) return false;
+	const value = writes[index + 1];
+	return (
+		(value == null || typeof value === 'string') &&
+		input.getAttribute(writes[index] as string) === (value ?? null)
+	);
+}
+
+/** Apply an input's type and form before its state, joining its final radio group last. */
+export function setInputProps(
+	input: HTMLInputElement,
+	writes: unknown[] | null,
+	previous?: unknown[],
+	compareLive = false,
+	formSources?: Map<string, HostPropWriter>,
+	applySources?: typeof applyInputSources,
+): void {
+	let nameIndex = -1;
+	let typeIndex = -1;
+	let formIndex = -1;
+	if (writes !== null) {
+		for (let i = 0; i < writes.length; i += 2) {
+			const rawName = writes[i] as string;
+			if (rawName.length !== 4 || (previous !== undefined && writes[i + 1] === previous[i + 1]))
+				continue;
+			switch (rawName.toLowerCase()) {
+				case 'name':
+					nameIndex = i;
+					break;
+				case 'form':
+					formIndex = i;
+					break;
+				case 'type':
+					typeIndex = i;
+					break;
+			}
+		}
+		// A persistent host repairs foreign edits, comparing only the winners because
+		// an alias or removal can target the same attribute. Avoid rejoining an unchanged group.
+		if (compareLive) {
+			if (inputMembershipMatches(input, writes, nameIndex)) nameIndex = -1;
+			if (inputMembershipMatches(input, writes, typeIndex)) typeIndex = -1;
+			if (inputMembershipMatches(input, writes, formIndex)) formIndex = -1;
+		}
+	}
+	const type = typeIndex >= 0 ? writes![typeIndex + 1] : null;
+	const entersRadio =
+		typeof type === 'string'
+			? type.toLowerCase() === 'radio'
+			: type != null && typeof type === 'object';
+	// A still-checked radio can clear a destination group's selected radio
+	// during a type/name/form write. Isolate it until its new state is known.
+	const oldName =
+		(nameIndex >= 0 || typeIndex >= 0 || formIndex >= 0) &&
+		(!hydrating || CURSOR === null) &&
+		(entersRadio || input.type === 'radio')
+			? input.getAttribute('name')
+			: null;
+	if (oldName) setPlainAttribute(input, 'name', null);
+	let complete = false;
+	try {
+		if (writes !== null) {
+			if (typeIndex >= 0)
+				setPlainAttribute(input, writes[typeIndex] as string, writes[typeIndex + 1]);
+			if (formIndex >= 0)
+				setPlainAttribute(input, writes[formIndex] as string, writes[formIndex + 1]);
+			for (let i = 0; i < writes.length; i += 2) {
+				const value = writes[i + 1];
+				switch (writes[i]) {
+					case 'value':
+						setValue(input, value);
+						break;
+					case 'defaultValue':
+						setDefaultValue(input, value);
+						break;
+					case 'checked':
+						setChecked(input, value);
+						break;
+					case 'defaultChecked':
+						setDefaultChecked(input, value);
+						break;
+				}
+			}
+		}
+		if (formSources !== undefined) applySources!(input, formSources);
+		if (nameIndex >= 0)
+			setPlainAttribute(input, writes![nameIndex] as string, writes![nameIndex + 1]);
+		else if (oldName) setPlainAttribute(input, 'name', oldName);
+		complete = true;
+	} finally {
+		if (!complete && oldName) setPlainAttribute(input, 'name', oldName);
+	}
+}
+
+function applyInputSources(
+	input: HTMLInputElement,
+	formSources: Map<string, HostPropWriter>,
+): void {
+	applyFormControlValues(
+		input,
+		'input',
+		formSources.get('value')?.value,
+		formSources.get('defaultValue')?.value,
+		formSources.get('checked')?.value,
+		formSources.get('defaultChecked')?.value,
+		undefined,
+	);
+}
+
 export function setHostPropSources(
 	el: Element,
 	sources: readonly HostPropSource[],
@@ -1741,12 +1869,28 @@ export function setHostPropSources(
 	const resolved = resolveHostPropSources(el, sources, props, readStyle);
 	const tag = el.localName;
 	const formHost = tag === 'input' || tag === 'textarea' || tag === 'select';
-	setSpread(el, resolved, prev, scope, true, formHost);
+	const inputWrites = setSpread(
+		el,
+		resolved,
+		prev,
+		scope,
+		true,
+		tag === 'input' ? 'input' : formHost,
+	);
 	setDangerouslySetInnerHTMLSources(el, sources, hasNestedChildren);
 	// Form writers use the exact JSX spelling, independently of DOM aliases:
 	// e.g. a later VALUE attribute must not replace the controlled value prop.
 	// The raw writer Map already resolved source precedence and getter reads.
-	if (formHost && !deferControl)
+	if (tag === 'input')
+		setInputProps(
+			el as HTMLInputElement,
+			inputWrites,
+			undefined,
+			false,
+			deferControl ? undefined : props,
+			applyInputSources,
+		);
+	else if (formHost && !deferControl)
 		applyFormControlValues(
 			el,
 			tag,
@@ -1825,12 +1969,7 @@ export function hostSourceChildren(
 function isAggregatedFormControlProp(el: Element, name: string): boolean {
 	switch (el.localName) {
 		case 'input':
-			return (
-				name === 'value' ||
-				name === 'defaultValue' ||
-				name === 'checked' ||
-				name === 'defaultChecked'
-			);
+			return isInputControlProp(name);
 		case 'textarea':
 			return name === 'value' || name === 'defaultValue';
 		case 'select':
@@ -1845,8 +1984,8 @@ export function setSpread(
 	prev: any,
 	mountScope?: Scope,
 	skipDangerouslySetInnerHTML = false,
-	skipFormControls = false,
-): void {
+	skipFormControls: boolean | 'input' = false,
+): unknown[] | null {
 	// Spread-only capabilities stay out of descriptor-only bundles: a function
 	// form action (descriptor factories install it themselves, see
 	// DESCRIPTOR_FORM_ACTION) and the keys the host's own bindings write.
@@ -1865,12 +2004,14 @@ export function setSpread(
 			(el as any)[DANGER_HTML_SPREAD_CHILD] = undefined;
 		}
 	}
-	setHostProps(
+	return setHostProps(
 		el,
 		value,
 		prev,
 		mountScope,
-		(skipDangerouslySetInnerHTML ? SKIP_RAW_HTML : 0) | (skipFormControls ? SKIP_FORM_CONTROLS : 0),
+		(skipDangerouslySetInnerHTML ? SKIP_RAW_HTML : 0) |
+			(skipFormControls ? SKIP_FORM_CONTROLS : 0) |
+			(skipFormControls === 'input' ? COLLECT_INPUT_PROPS : 0),
 	);
 }
 
@@ -1886,6 +2027,9 @@ const SKIP_RAW_HTML = 1;
 const SKIP_FORM_CONTROLS = 2;
 const SKIP_SPREAD_KEYS = SKIP_RAW_HTML | SKIP_FORM_CONTROLS;
 export const DESCRIPTOR_HOST = 4;
+// Only setHostPropSources takes ownership of the remaining input writes.
+// Older setSpread callers using the boolean flag still apply ordinary attrs.
+const COLLECT_INPUT_PROPS = 8;
 let SKIP_SPREAD_KEY: typeof skipSpreadKey | null = null;
 function skipSpreadKey(el: Element, k: string, flags: number): boolean {
 	return (
@@ -1943,9 +2087,12 @@ export function setHostProps(
 	prev: any,
 	mountScope: Scope | undefined,
 	flags: number,
-): void {
+): unknown[] | null {
 	const descriptor = (flags & DESCRIPTOR_HOST) !== 0;
-	let needsCheckedInitialization = descriptor && prev === undefined && el.localName === 'input';
+	const input =
+		el.localName === 'input' && el.namespaceURI === HTML_NS ? (el as HTMLInputElement) : null;
+	let needsCheckedInitialization = descriptor && prev === undefined && input !== null;
+	let inputWrites: unknown[] | null = null;
 	if (process.env.NODE_ENV !== 'production' && value != null) {
 		devValidateAriaProps(el, Object(value) as Record<string, unknown>);
 		devValidateHostProps(el, Object(value) as Record<string, unknown>);
@@ -2004,13 +2151,9 @@ export function setHostProps(
 				continue;
 			}
 			if (value != null && (descriptor ? k in value : isOwnEnumerable(value, k))) continue;
-			removeHostProp(el, k, prev[k]);
+			if (input !== null && isOrderedInputProp(k)) (inputWrites ??= []).push(k, null);
+			else removeHostProp(el, k, prev[k]);
 		}
-	}
-	if (value == null) {
-		if (needsCheckedInitialization) markInputCheckedness(el as HTMLInputElement);
-		if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, mountScope);
-		return;
 	}
 	// A fresh props cache is not a snapshot of attributes already present in SSR.
 	const hydration = prev === undefined && hydrating ? CURSOR : null;
@@ -2075,6 +2218,10 @@ export function setHostProps(
 		// Controlled fields reassert live DOM drift; other unchanged props need no
 		// event-name parsing or custom-element routing.
 		if (v === pv && !isControlledHostProp(el, k) && !initialHydration) continue;
+		if (input !== null && isOrderedInputProp(k)) {
+			(inputWrites ??= []).push(k, v);
+			continue;
+		}
 		const ev = eventSlot(k, el);
 		if (ev) {
 			if (v === pv) continue;
@@ -2100,8 +2247,11 @@ export function setHostProps(
 		if (prev !== undefined && k === 'autoFocus' && !isHtmlCustomElement(el)) continue;
 		setAttribute(el, k, v);
 	}
-	if (needsCheckedInitialization) markInputCheckedness(el as HTMLInputElement);
+	if (inputWrites !== null && (flags & COLLECT_INPUT_PROPS) === 0)
+		setInputProps(input!, inputWrites);
+	if (needsCheckedInitialization) markInputCheckedness(input!);
 	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, mountScope);
+	return inputWrites;
 }
 
 // setHostProps receives a FUNCTION form action only from a spread or an element

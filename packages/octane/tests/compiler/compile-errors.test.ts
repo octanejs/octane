@@ -10,6 +10,18 @@ import { parseModule } from '../../src/compiler/parser.node.js';
 // the user-facing contract, not the throw itself.
 
 describe('compile errors — rejected authoring patterns', () => {
+	it.each(['client', 'server'] as const)(
+		'reserves the hydration marker for a signal range control in %s output',
+		(mode) => {
+			const source = (value: string) =>
+				`export function App(props) @{ <input type="range" value={${value}} max={props.max} data-octane-input="custom" /> }`;
+			expect(() =>
+				compile(source('props.primary$ ?? props.secondary$'), 'signal-range.tsrx', { mode }),
+			).toThrow(expect.objectContaining({ code: 'OCTANE_RESERVED_ATTRIBUTE' }));
+			expect(compile(source('props.value'), 'plain-range.tsrx', { mode }).diagnostics).toEqual([]);
+		},
+	);
+
 	it.each(['client', 'server'] as const)('accepts literal less-than text in %s output', (mode) => {
 		const source = `export function Text() @{ <p><3 and 1 < 2 and <= 3</p> }`;
 		expect(compile(source, 'text.tsrx', { mode }).diagnostics).toEqual([]);
