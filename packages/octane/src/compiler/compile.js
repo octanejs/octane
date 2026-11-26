@@ -12968,6 +12968,8 @@ function compileInternal(
 	const ctx = {
 		authoredModuleAst: parsedAst,
 		filename,
+		// Lowered universal output: its renderer, not the DOM runtime, owns signals.
+		universalModule: options?.__universal != null,
 		usedCompilerNames: collectIdentifierNames(ast),
 		compilerNameSuffixes: null,
 		profileFilename: (options && options.profileFilename) || filename,
@@ -14458,7 +14460,11 @@ function compileInternal(
 		vtHintNodes.push(inheritOriginLoc(b.stmt(b.call(rtAlias('__vtSeen'))), moduleOrigin));
 	}
 	const signalBindingNodes = [];
-	if (ctx.signalBindingsUsed && ctx.signalBindingsEager && !doesRendererWork(ctx)) {
+	if (
+		ctx.signalBindingsUsed &&
+		(ctx.signalBindingsEager || ctx.universalModule) &&
+		!doesRendererWork(ctx)
+	) {
 		// Declarations alone own document signal state, not renderer work. Every
 		// module that renders their reads imports octane/signals and activates the
 		// renderer itself, so this module must not load it (see slot-hooks.js).
@@ -14468,7 +14474,17 @@ function compileInternal(
 				b.imports([['__enableSignalDocument', enableDocument]], 'octane/signals'),
 				moduleOrigin,
 			),
-			inheritOriginLoc(b.stmt(b.call(enableDocument, b.literal(1))), moduleOrigin),
+			inheritOriginLoc(
+				b.stmt(
+					b.call(
+						enableDocument,
+						b.literal(1),
+						// A universal host has no DOM document: it owns global signals itself.
+						...(ctx.universalModule ? [b.literal(true)] : []),
+					),
+				),
+				moduleOrigin,
+			),
 		);
 	} else if (ctx.signalBindingsUsed) {
 		ctx.runtimeNeeded.add('enableSignalBindings');
@@ -14701,6 +14717,8 @@ function compileServer(
 	const ctx = {
 		authoredModuleAst: parsedAst,
 		filename,
+		// Lowered universal output: its renderer, not the DOM runtime, owns signals.
+		universalModule: options?.__universal != null,
 		usedCompilerNames: collectIdentifierNames(ast),
 		compilerNameSuffixes: null,
 		mode: 'server',
@@ -29783,6 +29801,7 @@ function stripTsOnlyWrappers(node, env, topLevel = false) {
 // renderer directly (hand-authored createElement/root calls). Mirrors the
 // plain-module policy in slot-hooks.js.
 function doesRendererWork(ctx) {
+	if (ctx.universalModule) return false;
 	return (
 		ctx.runtimeNeeded.size !== 0 ||
 		ctx.activityModuleAst.body.some(

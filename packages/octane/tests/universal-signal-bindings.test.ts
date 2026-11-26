@@ -5,6 +5,7 @@ import {
 	createUniversalRoot,
 	type ObjectHostInstance,
 	type UniversalHostBatch,
+	universalScopedClass,
 } from '../src/universal.js';
 import {
 	Counter,
@@ -12,6 +13,7 @@ import {
 	Gated,
 	Reader,
 	Rows,
+	ScopedTone,
 	cells,
 	gate$,
 	renders,
@@ -162,5 +164,23 @@ describe('universal signal bindings through props and derived values', () => {
 		await microtask();
 		await microtask();
 		expect(text(container)).toBe('9');
+	});
+});
+
+describe('universal scoped classes over signals', () => {
+	it('appends scope classes to a plain class value', () => {
+		expect(universalScopedClass(['a', { b: true }], 'scope-a')).toBe('a b scope-a');
+	});
+
+	it('binds a class handle with the scope classes appended', async () => {
+		const { container, root, batches } = mountObject(ScopedTone);
+		unmount = () => root.unmount();
+		expect(container.children[0].props.class).toBe('calm scope-a');
+		const batchesAfterMount = batches.length;
+		tone$.set('loud');
+		await microtask();
+		expect(container.children[0].props.class).toBe('loud scope-a');
+		expect(batches.length).toBe(batchesAfterMount + 1);
+		expect(renders.counter).toBe(1);
 	});
 });

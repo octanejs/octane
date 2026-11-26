@@ -56,9 +56,17 @@ function scopeUniversalStyles(ast, state) {
 		runtimeNeeded: new Set(),
 		mode: 'client',
 		normalizeClassName: state.helpers.normalizeClass,
+		// A signals module keeps class handles bindable: the chain is appended at runtime.
+		scopedClassName: state.signalModule
+			? (state.helpers.scopedClass = allocName(
+					state,
+					`${state.planPrefix ?? '__octane'}ScopedClass`,
+				))
+			: undefined,
 	};
 	const body = ast.body.map((node) => applyStyleScopes(node, ctx).node);
 	if (ctx.runtimeNeeded.has('normalizeClass')) referenceHelper(state, 'normalizeClass');
+	if (ctx.runtimeNeeded.has('scopedClass')) referenceHelper(state, 'scopedClass');
 	state.styles = ctx.cssInjections.sort((a, b) => a.order - b.order);
 	return { ...ast, body };
 }
@@ -4071,7 +4079,8 @@ function forItemMemo(node, state) {
 				if (
 					!deferred &&
 					!IMMUTABLE_AMBIENT_GLOBALS.has(n.name) &&
-					n.name !== state.helpers.normalizeClass
+					n.name !== state.helpers.normalizeClass &&
+					n.name !== state.helpers.scopedClass
 				) {
 					safe = false;
 				}
@@ -4114,12 +4123,14 @@ function forItemMemo(node, state) {
 				type === 'NewExpression'
 			) {
 				const callee = n.callee;
-				// Scoped styles wrap a dynamic class in the pure normalizeClass helper.
+				// Scoped styles wrap a dynamic class in the pure normalizeClass helper, or
+				// in a signals module the pure scopedClass helper.
 				if (
 					type === 'NewExpression' ||
 					callee?.type !== 'Identifier' ||
 					(!SETUP_PURE_GLOBAL_CALLEES.has(callee.name) &&
-						callee.name !== state.helpers.normalizeClass) ||
+						callee.name !== state.helpers.normalizeClass &&
+						callee.name !== state.helpers.scopedClass) ||
 					resolveBinding(nodeScopes.get(callee) ?? rootScope, callee.name) !== null
 				) {
 					return void (safe = false);
@@ -4755,6 +4766,7 @@ function threadHelperImportPairs(state) {
 export const UNIVERSAL_RENDERER_HELPER_IMPORTS = Object.freeze([
 	['registerUniversalStyles', 'styles'],
 	['normalizeClass', 'normalizeClass'],
+	['universalScopedClass', 'scopedClass'],
 	['defineUniversalComponent', 'component'],
 	['universalPlan', 'plan'],
 	['universalValue', 'value'],

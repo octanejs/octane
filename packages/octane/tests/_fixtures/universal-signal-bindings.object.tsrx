@@ -50,3 +50,10 @@ export function Gated() @{
 	renders.reader++;
 	<label>{gate$.get() ? ticks$.get() : 'off'}</label>
 }
+
+import { universalScopedClass } from 'octane/universal';
+
+export function ScopedTone() @{
+	renders.counter++;
+	<view class={universalScopedClass(tone$, 'scope-a')} />
+}

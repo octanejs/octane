@@ -54,6 +54,7 @@ import {
 	type UniversalTrackedThenable,
 } from './owner-kernel/hooks.js';
 import { isSignalHandle, isThenable } from './signals/handle-protocol.js';
+import { normalizeClass } from './class-names.js';
 import { createNativeReadCollector } from './signals/native-read-collector.js';
 import type { NativeReadSource, NativeReadSubscription } from './signals/read-protocol.js';
 import {
@@ -166,6 +167,35 @@ function signalHostBinding(value: unknown, text: boolean): UniversalHostBinding<
 			getSnapshot: () => select(source.get()),
 		};
 		cache.set(value, binding);
+	}
+	return binding;
+}
+
+let SCOPED_CLASS_BINDINGS: WeakMap<object, Map<string, UniversalHostBinding<unknown>>> | null =
+	null;
+
+/**
+ * A dynamic class with the element's scoped-style classes appended. A signal
+ * handle stays a binding whose value carries the scope classes, so a write
+ * updates the class without rendering the component again.
+ */
+export function universalScopedClass(value: unknown, scope: string): unknown {
+	const handle = signalHostBinding(value, false);
+	if (handle === null) return `${normalizeClass(value)} ${scope}`;
+	const byScope = (SCOPED_CLASS_BINDINGS ??= new WeakMap()).get(value as object);
+	let binding = byScope?.get(scope);
+	if (binding === undefined) {
+		const select = (raw: unknown) => `${normalizeClass(raw)} ${scope}`;
+		const source = handle.source;
+		binding = {
+			$$kind: UNIVERSAL_HOST_BINDING,
+			source,
+			select,
+			getSnapshot: () => select(source.get()),
+		};
+		if (byScope === undefined)
+			SCOPED_CLASS_BINDINGS.set(value as object, new Map([[scope, binding]]));
+		else byScope.set(scope, binding);
 	}
 	return binding;
 }
