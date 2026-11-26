@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/solana-kit",
-  "version": "0.0.48",
+  "version": "0.0.49",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -46,7 +46,7 @@
   "peerDependencies": {
     "@octanejs/tanstack-query": "workspace:*",
     "@solana/kit": "^7.0.0",
-    "octane": "workspace:^0.25.0"
+    "octane": "workspace:^0.26.0"
   },
   "peerDependenciesMeta": {
     "@octanejs/tanstack-query": {

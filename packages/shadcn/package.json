@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/shadcn",
-  "version": "0.0.69",
+  "version": "0.0.70",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -172,7 +172,7 @@
     "cn": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.25.0"
+    "octane": "workspace:^0.26.0"
   },
   "devDependencies": {
     "@base-ui/react": "1.8.0",

@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/embla-carousel",
-  "version": "0.0.42",
+  "version": "0.0.43",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -37,7 +37,7 @@
     "embla-carousel-reactive-utils": "8.6.0"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.25.0"
+    "octane": "workspace:^0.26.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",
