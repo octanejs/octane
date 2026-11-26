@@ -167,6 +167,39 @@ describe('universal compiler renderer capabilities', () => {
 		);
 	});
 
+	it('memoizes the creations of a signals module with the universal runtime', () => {
+		const source = `import { use, useMemo } from 'octane';
+			import { signal$ } from 'octane/signals';
+			const count$ = signal$(0);
+			export function Scene({ load, items }) @{
+				const data = use(load());
+				const total = useMemo(() => items.length + count$.value);
+				<view><label value={count$} /><text>{data}{total}</text></view>
+			}`;
+		const output = compile(source, '/src/Scene.object.tsrx', {
+			renderer: { ...baseRenderer, text: 'host' as const, capabilities: ['signal-bindings'] },
+			hmr: false,
+		}).code;
+		expect(output).not.toContain('octane/internal/client');
+		expect(output).not.toContain('nativePuMemo');
+		expect(output).toMatch(/useMemo as ([\w$]+)[\s\S]*\1\(\(\) => load\(\), \[load\]/);
+		expect(output).toMatch(/useMemo\(\(\) => items\.length \+ count\$\.value, \[items\.length\]/);
+		// The DOM client keeps witnessing native reads in its creation caches.
+		const dom = compile(source, '/src/Scene.tsrx', { hmr: false }).code;
+		expect(dom).toMatch(/_\$nativePuTake1\([\s\S]*\(\) => load\(\)[\s\S]*_\$nativePuPub\(/);
+		expect(dom).toMatch(/_\$nativePuMemo\(\(\) => items\.length \+ count\$\.value/);
+	});
+
+	it('imports the native warm memo only for a warm plan with creations', () => {
+		const source = `import { signal$ } from 'octane/signals';
+			import { Label } from './Label.tsrx';
+			const count$ = signal$(0);
+			export function Scene() @{ <view><Label /><button onClick={() => count$.set(1)} /></view> }`;
+		const dom = compile(source, '/src/Scene.tsrx', { hmr: false }).code;
+		expect(dom).toMatch(/_\$beginNativeReadWitness\(true\);[\s\S]*_\$warmChild\(Label, \{\}\)/);
+		expect(dom).not.toContain('nativeWarmMemo');
+	});
+
 	it('keeps a scoped class handle bindable and its pure rows memoized in a signals module', () => {
 		const source = `import { signal$ } from 'octane/signals';
 			const tone$ = signal$('row');

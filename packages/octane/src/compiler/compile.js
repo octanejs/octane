@@ -21453,7 +21453,7 @@ function makeCreationMemoCall(
 	);
 	// Server mirror: `puMemo` — keyed CROSS-PASS creation cache (a fresh
 	// SSRScope per pass makes client useMemo semantics useless there).
-	const memoHelper = ctx.nativeReads
+	const memoHelper = domNativeReads(ctx)
 		? 'nativePuMemo'
 		: ctx.mode === 'server'
 			? 'puMemo'
@@ -22596,13 +22596,11 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 		// Statement scaffolding maps to the warmed construct it wraps.
 		return inheritOriginLoc(stmt, callExpr);
 	};
-	// Native signal reads are witnessed only by the DOM renderers; a universal
-	// unit's core tracks reads while its owner renders.
-	const domNativeReads = ctx.nativeReads && ctx._universalRuntimeUnit == null;
-	const warmMemoHelper = domNativeReads ? 'nativeWarmMemo' : 'warmMemo';
-	const warmMemoAlias = domNativeReads
-		? requireRuntimeForContext(ctx, warmMemoHelper)
-		: runtimeAliasForContext(ctx, warmMemoHelper);
+	const nativeWarm = domNativeReads(ctx);
+	const warmMemoAlias =
+		warmMemos.length > 0 || warmKids.some((w) => w.props.some((p) => p.memo))
+			? requireRuntimeForContext(ctx, nativeWarm ? 'nativeWarmMemo' : 'warmMemo')
+			: null;
 	const warmChildAlias = runtimeAliasForContext(ctx, 'warmChild');
 	const memoCall = (c) =>
 		inheritOriginLoc(
@@ -22652,14 +22650,12 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 			w.origin,
 		);
 
-	if (warmMemos.length > 0 || warmKids.some((w) => w.props.some((p) => p.memo)))
-		requireRuntimeForContext(ctx, warmMemoHelper);
 	if (warmKids.length > 0) requireRuntimeForContext(ctx, 'warmChild');
 
 	// In-body warm thunk: children only — the body's own creations already ran
 	// as real memos by the time the batch throws.
 	const warmBody = (statements) =>
-		domNativeReads ? wrapNativeWarmScope(statements, nativeReadNames(ctx)) : statements;
+		nativeWarm ? wrapNativeWarmScope(statements, nativeReadNames(ctx)) : statements;
 	const thunk =
 		warmKids.length === 0
 			? null
@@ -23715,7 +23711,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					(isBuiltin || isServerUse);
 				const forceSymbol = !numericSlot;
 				const getterHelper = stateGetterMarks.get(n) ? STATE_GETTER_HELPERS[name] : null;
-				const nativeMemo = ctx.nativeReads && n._octaneNativeInferredMemo === true;
+				const nativeMemo = domNativeReads(ctx) && n._octaneNativeInferredMemo === true;
 				// A builtin hook call site is USER code (the user's own identifier), so
 				// its import stays bare — EXCEPT compiler-inserted calls (auto-callback's
 				// `useCallback`), whose callee is renamed to the `_$` alias below so a
@@ -23836,7 +23832,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				const annotatedOwner = ctx.profile ? ctx.profileOwnerMarks?.get(n) : null;
 				const profileOwner = annotatedOwner?.name || componentName;
 				const getterHelper = stateGetterMarks.get(n) ? STATE_GETTER_HELPERS[name] : null;
-				const nativeMemo = ctx.nativeReads && n._octaneNativeInferredMemo === true;
+				const nativeMemo = domNativeReads(ctx) && n._octaneNativeInferredMemo === true;
 				if (getterHelper !== null) requireRuntimeForContext(ctx, getterHelper);
 				if (nativeMemo) requireRuntimeForContext(ctx, 'nativePuMemo');
 				const numericSlot =
@@ -29850,6 +29846,13 @@ function nativeReadActivationNodes(ctx, origin) {
 			origin,
 		),
 	];
+}
+
+// Native signal reads are witnessed only by the DOM renderers. Universal output
+// (a universal renderer module or unit) tracks them in its core while the owner
+// renders, so it uses the renderer's own memo helpers.
+function domNativeReads(ctx) {
+	return ctx.nativeReads && ctx.domRuntime && ctx._universalRuntimeUnit == null;
 }
 
 function nativeReadNames(ctx) {
