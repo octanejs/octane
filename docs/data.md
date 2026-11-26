@@ -534,8 +534,8 @@ dependency that shows every edit at once is not built in.
 - A read's value crosses to a tab once. Where the owner validated it, or the
   tab's output validator returns the value it was given, the tab tells the
   owner it validated and the owner saves its own copy; the tab sends the value back only where its
-  validator returned another representation, the value changed since, or an
-  earlier reply to that read was still waiting to be saved. A read with
+  validator returned another representation, the value changed since, or two
+  earlier replies to that read were still waiting to be saved. A read with
   `persist: false` is never kept by the owner. A view saves its rows as
   before.
 - A durable write in flight to an owner that crashes settles by itself: once

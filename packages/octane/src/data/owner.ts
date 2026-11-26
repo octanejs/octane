@@ -475,12 +475,14 @@ export function createDataOwner(options: {
 	/** When the newest request whose value was saved for each key started. */
 	const newestSaved = new Map<string, number>();
 	/**
-	 * A reply to each read a tab saves, and when its request started, until a
-	 * tab saves it or a newer request's value: one that validated it unchanged
-	 * says so, and the owner saves this copy. A reply that lands while another
-	 * is still kept is not kept, so its tabs send it back.
+	 * The replies to each read a tab saves, by when their request started, until
+	 * a tab saves that reply or a newer one: one that validated it unchanged says
+	 * so, and the owner saves this copy. A newer reply lands beside an older one
+	 * still waiting, since a newer one no tab can validate leaves the older as
+	 * the only value to save. Past `KEPT` waiting replies, a reply is not kept,
+	 * and its tabs send it back.
 	 */
-	const kept = new Map<string, { readonly at: number; readonly value: unknown }>();
+	const kept = new Map<string, Map<number, unknown>>();
 	/** Keys some tab restored or saved this session, which purging leaves alone. */
 	const shown = new Set<string>();
 	/** Only the first tab to ask recovers the journal, so each write is looked up once. */
@@ -523,10 +525,14 @@ export function createDataOwner(options: {
 				if (args[2]) {
 					// The tab validated the reply unchanged and sent no value. Unless it is still
 					// kept, a save of it, or of a newer request's value, came first.
-					if (held?.at !== at) return;
-					saving = { ...saving!, stored: { ...saving!.stored, value: held.value } };
+					if (!held?.has(at)) return;
+					saving = { ...saving!, stored: { ...saving!.stored, value: held.get(at) } };
 				}
-				if (held && held.at <= at) kept.delete(key);
+				if (held) {
+					// This save supersedes every reply it is not older than.
+					for (const waiting of held.keys()) if (waiting <= at) held.delete(waiting);
+					if (held.size === 0) kept.delete(key);
+				}
 				// A reply to an older request can land after a newer one's value was saved.
 				if (at < (newestSaved.get(key) ?? 0)) return;
 				newestSaved.set(key, at);
@@ -801,11 +807,12 @@ export function createDataOwner(options: {
 				started.then(
 					(reply) => {
 						if (!reply.ok) return;
-						// Kept for the tabs that save it. One kept before it may be the only value a tab
-						// can save, so it stays; one saved from a newer request needs no older one.
-						const saves = asking.keep && !receipt && options.persist && !kept.has(cacheKey);
+						// Kept for the tabs that save it, beside any older reply still waiting.
+						const held = kept.get(cacheKey);
+						const saves = asking.keep && !receipt && options.persist && (held?.size ?? 0) < KEPT;
 						if (saves && (newestSaved.get(cacheKey) ?? 0) < at) {
-							kept.set(cacheKey, { at, value: reply.value });
+							if (held) held.set(at, reply.value);
+							else kept.set(cacheKey, new Map([[at, reply.value]]));
 						}
 						// A newer read has replaced this one; its value is the one to share.
 						if (newest.get(key) !== started) return;
@@ -816,7 +823,7 @@ export function createDataOwner(options: {
 							input: payload.input,
 							value: reply.value,
 							at,
-							kept: kept.get(cacheKey)?.at === at,
+							kept: kept.get(cacheKey)?.has(at) === true,
 							validated: validated.has(reply),
 						};
 						for (const port of replicas)
@@ -839,7 +846,7 @@ export function createDataOwner(options: {
 					id,
 					reply,
 					at,
-					kept: kept.get(cacheKey)?.at === at,
+					kept: kept.get(cacheKey)?.has(at) === true,
 					validated: validated.has(reply),
 				}),
 			fail,
@@ -1688,6 +1695,11 @@ export function sharedOwner(name: string, url: string | URL = DATA_WORKER_PATH):
 
 /** What an owner's validation gives where the tab must validate instead. */
 const NOT: unique symbol = Symbol('not validated');
+/**
+ * The most replies to one read the owner keeps while they wait for a tab's
+ * save: an older one, and the newer one a refresh brings before the older is saved.
+ */
+const KEPT = 2;
 /** Adopt `value`, which the owner validated with this build's schemas, as it came. */
 const trust = (value: unknown) => {
 	if (typeof value === 'object' && value !== null) validatedReplies.add(value);
