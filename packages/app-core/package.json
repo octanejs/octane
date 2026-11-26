@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/app-core",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "license": "MIT",
   "type": "module",
   "engines": {

@@ -1,5 +1,47 @@
 # octane
 
+## 0.26.0
+
+### Minor Changes
+
+- d0ad25e: Extend `createReactCompatHost` to native HTML and SVG elements. Strong templates can derive presentation attributes from a typed private `input` while React streams and hydrates the original element and its children.
+- fd8f2a3: Add `createReactCompatHost` to `octane/react` and `octane/react/server`.
+  A Strong DOM-binding template can manage selected properties of a streamed
+  div while its children hydrate and update in the original React tree.
+
+### Patch Changes
+
+- 604f4fc: Reduce the memory used by retained React signal readers by memoizing the snapshot reader and subscription together.
+- f5f036b: `octane/testing`: each `installTestClock()` clock opens its own shared producer budget window. A window an earlier clock left open no longer makes a ready promise wait on a real timer after that clock was removed, which made tests that install a clock in `beforeEach` fail now and then on a loaded machine.
+- a3cb80c: Skip unchanged `@for` rows on universal renderers, like the DOM target's DEP-PURE
+  rows.
+
+  The universal compiler now proves when a row body renders only from its item, its
+  index (when the body reads one) and the values it closes over: no hooks, no
+  components, no refs or attachments, no render-time calls other than conversion
+  globals such as `String` and the scoped-class `normalizeClass` wrapper, no writes,
+  and no mutable module or global reads. Event handlers and
+  other nested functions run after render, so only their captures count. For such
+  a row it passes those captured values to `universalFor`, and a production render
+  adopts every survivor whose item, index and captures are unchanged with the same
+  retained-subtree path an unchanged child component already takes. Dev, HMR and
+  profiling compiles keep re-rendering every row.
+
+  A 1,000-row list with a counter beside it no longer re-renders every row when only
+  the counter changes, and toggling one row re-renders that row alone.
+- 82bf618: Keep a same-line space between sibling elements in universal plans the way the DOM template does. `<span>a</span> <span>b</span>` now renders "a b" instead of "ab" on renderers whose hosts parent text, and `<p> <span>x</span> </p>` keeps its edge spaces. Whitespace that contains a line break is still removed, and renderers that reject text or limit its parents (`textParents`) still drop the space where text is not allowed, so `<mesh /> <mesh />` stays legal.
+- 7c4e749: Keep more universal hosts in prepared template programs and patch pure rows in place.
+
+  A template program may now carry events on its root node: rows whose click
+  handler sits on the row element mount as one program run instead of one full
+  template per row. A driver that declares `templateProgramStructuredValues`
+  also receives plain-data values (style objects, modifier lists) in programs;
+  they compare by content like ordinary host props. A compiler-proven pure
+  `@for` row whose output stays the same program is adopted in place when its
+  inputs change: the commit writes only the changed bindings and swaps event
+  handlers under their committed listener IDs, without re-materializing or
+  reconciling the row.
+
 ## 0.25.0
 
 ### Minor Changes
