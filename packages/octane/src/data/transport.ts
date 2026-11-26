@@ -14,7 +14,7 @@ import type {
  * asking for a reply in JSON where JSON keeps it exactly, which a server that
  * knows how sends (see codec.ts). An older server ignores the ask.
  */
-const sent = (request: DataRequest) => devalue.stringify({ ...request, json: true });
+const sent = (request: DataRequest | FeedRequest) => devalue.stringify({ ...request, json: true });
 
 /**
  * Send requests to a `createDataHandler` endpoint. The request is devalue, and
@@ -65,8 +65,8 @@ export function serverListener(
 	) => Promise<AsyncIterable<string>> | AsyncIterable<string>,
 ): Listener {
 	return async function* (request, signal) {
-		for await (const text of await send(devalue.stringify(request), { signal })) {
-			yield devalue.parse(text) as FeedFrame;
+		for await (const text of await send(sent(request), { signal })) {
+			yield decodeReply(text) as FeedFrame;
 		}
 	};
 }
@@ -125,8 +125,9 @@ export function webSocketListener(
 		WebSocket?: typeof WebSocket;
 	} = {},
 ): Listener {
-	const encode = options.encode ?? devalue.stringify;
-	const decode = options.decode ?? ((data) => devalue.parse(String(data)) as FeedFrame);
+	// `accept`'s own protocol asks for JSON frames; a custom `encode` speaks for itself.
+	const encode = options.encode ?? sent;
+	const decode = options.decode ?? ((data) => decodeReply(String(data)) as FeedFrame);
 	return (request, signal) =>
 		pushed(signal, (push, end) => {
 			const socket = new (options.WebSocket ?? WebSocket)(url, options.protocols);

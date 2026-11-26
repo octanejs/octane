@@ -227,10 +227,11 @@ const FEED_CONNECTION = 25_000;
 const MAX_REFRESH = 8;
 
 /**
- * A reply's text: JSON where JSON keeps it exactly, for a client that asked
- * (see codec.ts), and devalue for one that did not, which reads nothing else.
+ * A reply's or feed frame's text: JSON where JSON keeps it exactly, for a
+ * client that asked (see codec.ts), and devalue for one that did not, which
+ * reads nothing else.
  */
-const replyText = (reply: DataReply, payload?: DataRequest) =>
+const replyText = (reply: DataReply | FeedFrame, payload?: DataRequest | FeedRequest) =>
 	(payload as { json?: unknown } | undefined)?.json === true
 		? encodeReply(reply)
 		: devalue.stringify(reply);
@@ -554,13 +555,9 @@ export function createDataHandler<C extends object = {}>(
 			return replyText(await answer(payload, call.request, call), payload);
 		},
 		async *listen(request: string, call: ServerCallContext) {
-			for await (const frame of frames(
-				devalue.parse(request),
-				call.request,
-				call,
-				FEED_CONNECTION,
-			)) {
-				yield devalue.stringify(frame);
+			const payload = devalue.parse(request) as FeedRequest;
+			for await (const frame of frames(payload, call.request, call, FEED_CONNECTION)) {
+				yield replyText(frame, payload);
 			}
 		},
 		accept(socket: FeedSocket, request: Request, caller?: DataCaller) {
@@ -574,10 +571,10 @@ export function createDataHandler<C extends object = {}>(
 				started = true;
 				void (async () => {
 					try {
-						const payload = devalue.parse(String(message.data));
+						const payload = devalue.parse(String(message.data)) as FeedRequest;
 						const connection = { ...caller, signal: closed.signal };
 						for await (const frame of frames(payload, request, connection, Infinity)) {
-							socket.send(devalue.stringify(frame));
+							socket.send(replyText(frame, payload));
 						}
 						socket.close(1000);
 					} catch {

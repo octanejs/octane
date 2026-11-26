@@ -201,7 +201,11 @@ numbers, with no value reached twice), which encodes, parses and compresses
 better on a large list. Such a reply starts with `json` and a newline, so a
 proxy's JSON error page still rejects rather than reading as a reply. A request
 without the field, such as one from an earlier client, always gets devalue, and
-both transports read devalue from an earlier server. Feed frames are devalue.
+both transports read devalue from an earlier server. Feeds do the same:
+`serverListener`, and `webSocketListener` with its default encoding, ask with
+`json: true`, and `listen` and `accept` then send each frame as JSON where
+exact. A `webSocketListener` given its own `encode` gets devalue frames unless
+that encoding asks.
 
 ```ts
 interface DataRequest {
