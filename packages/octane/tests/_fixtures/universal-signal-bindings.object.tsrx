@@ -85,3 +85,19 @@ export function ProgramScoped() @{
 		}
 	</view>
 }
+
+// Rows whose `detail` turns into an object: without structured program values
+// the committed programs expand into ordinary hosts, which keep their bindings.
+export const detailPicks = { set: null as null | ((mode: number) => void) };
+
+export function ProgramExpanding() @{
+	const [mode, setMode] = useState(0);
+	detailPicks.set = setMode;
+	<view>
+		@for (const cell of cells; key cells.indexOf(cell)) {
+			<item value={cell} detail={mode === 0 ? 'flat' : { mode }}>
+				<label>{cell}</label>
+			</item>
+		}
+	</view>
+}

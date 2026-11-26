@@ -8,9 +8,11 @@ import {
 	universalHostTemplates,
 } from '../src/universal.js';
 import {
+	ProgramExpanding,
 	ProgramRows,
 	ProgramScoped,
 	cells,
+	detailPicks,
 	rowPicks,
 	tone$,
 } from './_fixtures/universal-signal-bindings.object.tsrx';
@@ -122,6 +124,7 @@ afterEach(() => {
 	unmount?.();
 	unmount = null;
 	rowPicks.set = null;
+	detailPicks.set = null;
 	tone$.set('calm');
 	cells.forEach((cell, index) => cell.set(index));
 });
@@ -204,6 +207,25 @@ describe('universal signal bindings in template programs', () => {
 		cells[2].set(5);
 		await microtask();
 		expect(batches.length).toBe(after);
+	});
+
+	it('keeps the slot bindings of programs expanded into ordinary hosts', async () => {
+		const { container, root, batches } = mountPrograms(ProgramExpanding);
+		unmount = () => root.unmount();
+		expect(mountRun(batches[0]).count).toBe(4);
+		const hosts = [...container.children[0].children];
+		// An object value cannot stay in a program here: every row expands.
+		detailPicks.set!(1);
+		await microtask();
+		expect(container.children[0].children).toEqual(hosts);
+		expect(hosts.map((row) => row.props.detail)).toEqual(new Array(4).fill({ mode: 1 }));
+		const expanded = batches.length;
+		cells[2].set(22);
+		await microtask();
+		expect(batches.length).toBe(expanded + 1);
+		expect(batches.at(-1)!.commands.every((command) => command.op === 'update')).toBe(true);
+		expect(hosts[2].props.value).toBe(22);
+		expect(hosts[2].children[0].children[0].props.value).toBe('22');
 	});
 
 	it('binds one handle in every row through a scoped class', async () => {
