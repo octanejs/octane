@@ -1016,6 +1016,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Universal prepared template programs (Node-only): 1,000 compiled rows with
+		// a root click handler, mount payload and in-place row updates.
+		name: 'universal-template-programs',
+		cwd: 'universal-template-programs',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Universal object-driver teardown (Node-only): wide sibling unmounts through
 		// transactional simulation and apply, with exact remove/destroy controls.
 		name: 'universal-object-teardown',

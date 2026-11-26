@@ -447,6 +447,12 @@ export interface UniversalHostCapabilities {
 	readonly lazyPublicInstances?: boolean;
 	/** Accepts consecutive contiguous instances of one immutable intrinsic host program. */
 	readonly templateProgramRuns?: boolean;
+	/**
+	 * Accepts plain data (arrays and plain objects of primitives, a few levels
+	 * deep, such as a style object) as template program values and static props,
+	 * not only primitives.
+	 */
+	readonly templateProgramStructuredValues?: boolean;
 	/** Accepts one destroy-run command per removed contiguous program-run range. */
 	readonly teardownRuns?: boolean;
 }
@@ -626,6 +632,57 @@ function isUniversalHostTemplateProgramValue(
 		typeof value === 'number' ||
 		typeof value === 'boolean' ||
 		typeof value === 'bigint'
+	);
+}
+
+const STRUCTURED_TEMPLATE_VALUE_DEPTH = 4;
+
+// Plain data a driver with `templateProgramStructuredValues` accepts in a
+// program: primitives, and arrays and plain objects of them (no symbols, no
+// functions, no other prototypes), at most STRUCTURED_TEMPLATE_VALUE_DEPTH deep.
+function isStructuredTemplateProgramValue(
+	value: unknown,
+	depth = STRUCTURED_TEMPLATE_VALUE_DEPTH,
+): boolean {
+	if (isUniversalHostTemplateProgramValue(value)) return true;
+	if (depth === 0 || typeof value !== 'object') return false;
+	if (Array.isArray(value)) {
+		for (let index = 0; index < value.length; index++) {
+			if (!isStructuredTemplateProgramValue(value[index], depth - 1)) return false;
+		}
+		return true;
+	}
+	const prototype = Object.getPrototypeOf(value);
+	if (
+		(prototype !== Object.prototype && prototype !== null) ||
+		Object.getOwnPropertySymbols(value).length !== 0
+	) {
+		return false;
+	}
+	for (const key in value) {
+		if (!hasOwnProp.call(value, key)) continue;
+		if (!isStructuredTemplateProgramValue((value as Record<string, unknown>)[key], depth - 1)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+function acceptsTemplateProgramValue(root: UniversalRootImpl<any, any>, value: unknown): boolean {
+	return (
+		isUniversalHostTemplateProgramValue(value) ||
+		(root.driver.capabilities?.templateProgramStructuredValues === true &&
+			!isUniversalHostBinding(value) &&
+			!isRendererRegion(value) &&
+			isStructuredTemplateProgramValue(value))
+	);
+}
+
+// Program values compare like host props: structured values by content.
+function samePreparedTemplateValue(left: unknown, right: unknown): boolean {
+	return (
+		Object.is(left, right) ||
+		(typeof left === 'object' && left !== null && sameUniversalHostPropValue(left, right))
 	);
 }
 
@@ -980,6 +1037,31 @@ interface BlueprintRange {
 	// The committed range this marker stands for: the subtree neither re-rendered
 	// nor re-drafted, so reconciliation must adopt the committed records as-is.
 	retained?: LogicalRecord;
+	// New slot values for the retained range's single template-program host.
+	patch?: RetainedTemplatePatch | undefined;
+}
+
+/**
+ * A retained pure row whose output is the same prepared template program with
+ * new slot values. The commit compares the values slot by slot against the
+ * committed ones and writes only the changed bindings; event handlers are
+ * swapped in place under their committed listener ids.
+ */
+interface RetainedTemplatePatch {
+	readonly owner: UniversalOwnerRecord;
+	readonly host: LogicalRecord;
+	readonly state: CommittedCollapsedTemplate;
+	readonly plan: UniversalPlan;
+	readonly compiled: CompiledCollapsedTemplateProgram;
+	readonly prepared: PreparedCollapsedTemplateProgram;
+	readonly values: readonly UniversalHostTemplateProgramValue[];
+	readonly captures: readonly unknown[];
+	readonly inputs: unknown;
+	// Set when the marker could not adopt its committed range in place; the
+	// row then mounts from an ordinary blueprint carrying these values.
+	expanded: boolean;
+	// The root host's new props when a root binding changed (written at accept).
+	rootProps: Record<string, unknown> | null;
 }
 
 interface BlueprintHost {
@@ -1223,6 +1305,8 @@ interface RenderAttempt {
 	// re-executed for their own bookkeeping.
 	retainEligible: boolean;
 	retainedCount: number;
+	// Retained template rows with new slot values (see RetainedTemplatePatch).
+	templatePatches: RetainedTemplatePatch[] | null;
 	// The dirty epoch this attempt consumed. An owner stamped with it contains
 	// scheduled work, so its subtree must re-render even when its props, update
 	// queues, and contexts look clean.
@@ -2918,6 +3002,16 @@ function retainCommittedOwner(
 	parent: DraftOwner,
 	record: UniversalOwnerRecord,
 ): BlueprintNode[] | null {
+	const features = committedOwnerRetainableFeatures(parent, record);
+	return features === -1 ? null : retainCommittedOwnerRange(parent, record, features);
+}
+
+// The committed tree features of an owner whose subtree may be adopted as-is,
+// or -1 when it must re-render.
+function committedOwnerRetainableFeatures(
+	parent: DraftOwner,
+	record: UniversalOwnerRecord,
+): number {
 	const attempt = currentAttempt();
 	if (
 		!attempt.retainEligible ||
@@ -2931,23 +3025,106 @@ function retainCommittedOwner(
 		!ancestorContextsStable(parent) ||
 		!ownerSubtreeRetainable(record)
 	) {
-		return null;
+		return -1;
 	}
 	const features = logicalTreeFeatures(record.range);
-	if ((features & (UNIVERSAL_TREE_PORTAL | UNIVERSAL_TREE_REGION)) !== 0) return null;
+	return (features & (UNIVERSAL_TREE_PORTAL | UNIVERSAL_TREE_REGION)) !== 0 ? -1 : features;
+}
+
+function retainCommittedOwnerRange(
+	parent: DraftOwner,
+	record: UniversalOwnerRecord,
+	features: number,
+	patch?: RetainedTemplatePatch,
+): BlueprintNode[] {
+	const attempt = currentAttempt();
 	parent.claimedChildren.add(record);
 	(parent.retainedChildren ??= []).push({ record, position: parent.children.length });
 	attempt.treeFeatures |= features;
 	attempt.retainedCount++;
+	if (patch !== undefined) (attempt.templatePatches ??= []).push(patch);
+	// One literal for plain and patched markers, so both share a map.
 	return [
 		{
 			kind: 'range',
-			key: record.range.key,
+			key: record.range!.key,
 			owner: record,
-			retained: record.range,
+			retained: record.range!,
 			children: [],
+			patch,
 		},
 	];
+}
+
+// A pure row (no hooks, components, refs or callbacks; see `forItemMemo`)
+// whose committed output is one prepared template program, re-rendered to the
+// same program, is adopted in place with its new slot values: the commit
+// patches only the changed bindings instead of re-materializing the row.
+function patchCommittedTemplateRow(
+	parent: DraftOwner,
+	record: UniversalOwnerRecord,
+	rendered: UniversalRenderable,
+	expectedRenderer: string,
+	inputs: unknown,
+): BlueprintNode[] | null {
+	const value = rendered as UniversalPlanValue;
+	if (
+		value?.$$kind !== UNIVERSAL_VALUE ||
+		value.key !== null ||
+		value.plan.renderer !== expectedRenderer ||
+		value.plan.root.kind !== 'host' ||
+		record.children.length !== 0 ||
+		record.hooks.size !== 0
+	) {
+		return null;
+	}
+	const range = record.range;
+	const host = range?.children.length === 1 ? range.children[0] : undefined;
+	const state = host?.collapsedTemplate;
+	if (
+		host === undefined ||
+		state === undefined ||
+		state.prepared === undefined ||
+		state.values === undefined ||
+		state.nodes !== null ||
+		state.firstId === undefined ||
+		host.kind !== 'host' ||
+		host.type !== value.plan.root.type ||
+		host.ref != null ||
+		host.visibility !== 'visible' ||
+		host.events.size !== 0 ||
+		host.lifecycles.size !== 0 ||
+		host.localCallbacks.size !== 0
+	) {
+		return null;
+	}
+	// Handlers are swapped in place at accept, under their committed listener
+	// ids and owner.
+	const events = state.events;
+	for (let index = 0; index < events.length; index++) {
+		if (events[index].event.owner !== record) return null;
+	}
+	const features = committedOwnerRetainableFeatures(parent, record);
+	if (features === -1) return null;
+	const root = currentAttempt().root;
+	const templates = root.templates as UniversalHostTemplateSupport | null;
+	const compiled = templates?.compile(value.plan.root) ?? null;
+	if (compiled === null || templates!.prepare(root, compiled) !== state.prepared) return null;
+	const values = templates!.values(value, root, compiled, state.prepared);
+	if (values === null) return null;
+	return retainCommittedOwnerRange(parent, record, features, {
+		owner: record,
+		host,
+		state,
+		plan: value.plan,
+		compiled,
+		prepared: state.prepared,
+		values,
+		captures: value.values,
+		inputs,
+		expanded: false,
+		rootProps: null,
+	});
 }
 
 function sameForRowDeps(previous: readonly unknown[], next: readonly unknown[]): boolean {
@@ -2984,17 +3161,36 @@ function materializeMemoForRow(
 		if (retained !== null) return retained;
 	}
 	const inputs: UniversalForRowInputs = { item, index, deps: list.memoDeps! };
+	// A pure row renders the same outside its owner, so it can be rendered
+	// once here to try the in-place patch and reused by the full path.
+	let rendered: UniversalRenderable | typeof NOT_RENDERED_ROW = NOT_RENDERED_ROW;
+	if (
+		previous != null &&
+		record!.range?.children.length === 1 &&
+		record!.range.children[0].collapsedTemplate?.prepared !== undefined
+	) {
+		rendered = list.render(item, index);
+		const patched = patchCommittedTemplateRow(parent, record!, rendered, expectedRenderer, inputs);
+		if (patched !== null) return patched;
+	}
 	return materializeScoped(
 		parent,
 		path,
 		key,
-		() => materializeRawUniversalListValue(list, list.render(item, index), expectedRenderer),
+		() =>
+			materializeRawUniversalListValue(
+				list,
+				rendered === NOT_RENDERED_ROW ? list.render(item, index) : rendered,
+				expectedRenderer,
+			),
 		null,
 		outputPath,
 		record,
 		inputs,
 	);
 }
+
+const NOT_RENDERED_ROW: unique symbol = Symbol('not rendered');
 
 function materializeScoped(
 	parent: DraftOwner,
@@ -3100,6 +3296,9 @@ function blueprintFromLogical(record: LogicalRecord): BlueprintNode {
 			registration: record.portalRegistration,
 			children: record.children.map(blueprintFromLogical),
 		};
+	}
+	if (record.collapsedTemplate !== undefined) {
+		currentAttempt().root.templates?.expand(currentAttempt().root, record);
 	}
 	if (record.events.size !== 0) markUniversalTreeFeature(UNIVERSAL_TREE_EVENT);
 	if (record.lifecycles.size !== 0) markUniversalTreeFeature(UNIVERSAL_TREE_LIFECYCLE);
@@ -4448,31 +4647,45 @@ function prepareCollapsedTemplateValues(
 	program: CompiledCollapsedTemplateProgram,
 	prepared: PreparedCollapsedTemplateProgram,
 ): readonly UniversalHostTemplateProgramValue[] | null {
-	for (const site of prepared.events) {
-		if (typeof value.values[site.slot] !== 'function') return null;
+	const sources = value.values;
+	const sites = prepared.events;
+	for (let index = 0; index < sites.length; index++) {
+		if (typeof sources[sites[index].slot] !== 'function') return null;
 	}
-	const values: UniversalHostTemplateProgramValue[] = new Array(prepared.values.length);
-	for (let index = 0; index < prepared.values.length; index++) {
-		const binding = prepared.values[index];
-		const source = value.values[binding.slot];
-		if (isUniversalHostBinding(source)) return null;
+	// Without lifecycle, local-callback or prop codecs and without a transport,
+	// an accepted value is its own encoding.
+	const driver = root.driver;
+	const plain =
+		driver.lifecycles === undefined &&
+		driver.localCallbacks === undefined &&
+		driver.props === undefined &&
+		root.transport === null;
+	const bindings = prepared.values;
+	const values: UniversalHostTemplateProgramValue[] = new Array(bindings.length);
+	for (let index = 0; index < bindings.length; index++) {
+		const binding = bindings[index];
+		const source = sources[binding.slot];
 		if (binding.text) {
 			if (typeof source !== 'string' && typeof source !== 'number' && typeof source !== 'bigint') {
 				return null;
 			}
-			values[index] = String(source);
+			values[index] = typeof source === 'string' ? source : String(source);
+			continue;
+		}
+		if (!acceptsTemplateProgramValue(root, source)) return null;
+		if (plain) {
+			values[index] = source as UniversalHostTemplateProgramValue;
 			continue;
 		}
 		if (
-			!isUniversalHostTemplateProgramValue(source) ||
 			root.classifyLifecycle(binding.name, source) !== null ||
 			root.classifyLocalCallback(binding.name, source) !== null
 		) {
 			return null;
 		}
 		const encoded = root.encodeHostProp(program.shape[binding.node].type, binding.name, source);
-		if (!isUniversalHostTemplateProgramValue(encoded)) return null;
-		values[index] = encoded;
+		if (!acceptsTemplateProgramValue(root, encoded)) return null;
+		values[index] = encoded as UniversalHostTemplateProgramValue;
 	}
 	return Object.freeze(values);
 }
@@ -4717,7 +4930,7 @@ function collapsedTemplateRootPropsEqual(
 	}
 	for (let index = 0; index < previous.prepared.values.length; index++) {
 		if (previous.prepared.values[index].node !== 0) break;
-		if (!Object.is(previous.values[index], next.values[index])) return false;
+		if (!samePreparedTemplateValue(previous.values[index], next.values[index])) return false;
 	}
 	return true;
 }
@@ -4953,9 +5166,21 @@ function collectUniversalHostTemplateDrafts(
 	return visit(root, -1) && output.length === shape.length ? output : null;
 }
 
+// Whether a prepared program carries event sites on its root node. Sites are
+// in node order, so only the first can be a root site.
+function preparedRootEventSites(program: PreparedCollapsedTemplateProgram | undefined): boolean {
+	return program !== undefined && program.events.length !== 0 && program.events[0].node === 0;
+}
+
 function expandCollapsedTemplateBlueprint(host: BlueprintHost): void {
 	const collapsed = host.collapsedTemplate;
 	if (collapsed === undefined) return;
+	if (collapsed.prepared !== undefined && preparedRootEventSites(collapsed.prepared)) {
+		const root = materializeCollapsedBlueprintNode(collapsed, 0, host.owner);
+		if (root.events !== undefined) {
+			host.events = new Map(root.events.map((event) => [event.type, event]));
+		}
+	}
 	const blueprints: BlueprintHost[] = [host];
 	for (let index = 1; index < collapsed.program.shape.length; index++) {
 		const node = materializeCollapsedBlueprintNode(collapsed, index, host.owner);
@@ -5091,7 +5316,7 @@ function prepareCollapsedTemplateProgram(
 				if (overwritten.has(name)) continue;
 				const entry = source[name];
 				if (
-					!isUniversalHostTemplateProgramValue(entry) ||
+					!acceptsTemplateProgramValue(root, entry) ||
 					root.classifyLifecycle(name, entry) !== null ||
 					root.classifyLocalCallback(name, entry) !== null ||
 					root.classifyEvent(name) !== null
@@ -5099,7 +5324,7 @@ function prepareCollapsedTemplateProgram(
 					return reject();
 				}
 				const encoded = root.encodeHostProp(node.type, name, entry);
-				if (!isUniversalHostTemplateProgramValue(encoded)) return reject();
+				if (!acceptsTemplateProgramValue(root, encoded)) return reject();
 				(output ??= {})[name] = encoded;
 			}
 			staticProps = output === null ? EMPTY_STATIC_HOST_PROPS : Object.freeze(output);
@@ -5110,7 +5335,8 @@ function prepareCollapsedTemplateProgram(
 		for (const [name, slot] of node.bindings ?? []) {
 			const definition = root.classifyEvent(name);
 			if (definition !== null) {
-				if (index === 0 || types.has(definition.type)) return reject();
+				// One listener per event type and host, as on an expanded host.
+				if (types.has(definition.type)) return reject();
 				types.add(definition.type);
 				const priority = definition.priority ?? 'default';
 				wireEvents.push(Object.freeze({ node: index, type: definition.type, priority }));
@@ -5152,6 +5378,13 @@ function expandCollapsedTemplate(root: UniversalRootImpl<any, any>, record: Logi
 		let current = events.get(entry.index);
 		if (current === undefined) events.set(entry.index, (current = new Map()));
 		current.set(entry.event.type, entry.event);
+	}
+	// A prepared program keeps its root's event sites with the rest of the
+	// program; an expanded root host owns them like any other host.
+	const rootEvents = events.get(0);
+	if (rootEvents !== undefined) {
+		record.events =
+			record.events.size === 0 ? rootEvents : new Map([...record.events, ...rootEvents]);
 	}
 	// New child records start uncached, so invalidate the previously compact union.
 	invalidateLogicalTreeFeatures(record);
@@ -5367,7 +5600,7 @@ function tryCreateCompactTemplateUpdateTransaction(
 			const values = list.values[row];
 			let previousChangedNode = -1;
 			for (let valueIndex = 0; valueIndex < program.values.length; valueIndex++) {
-				if (Object.is(accepted.values![valueIndex], values[valueIndex])) continue;
+				if (samePreparedTemplateValue(accepted.values![valueIndex], values[valueIndex])) continue;
 				const index = program.values[valueIndex].node;
 				if (previousChangedNode === index) continue;
 				previousChangedNode = index;
@@ -5490,6 +5723,8 @@ function tryCreateCompactTemplateUpdateTransaction(
 		attempt.transitionBatches,
 	);
 }
+
+const EMPTY_TEMPLATE_PATCHES: readonly RetainedTemplatePatch[] = Object.freeze([]);
 
 function walkLogical(record: LogicalRecord, visit: (record: LogicalRecord) => void): void {
 	visit(record);
@@ -10002,6 +10237,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			// attempt, which is exactly the retain-eligible shape.
 			retainEligible: true,
 			retainedCount: 0,
+			templatePatches: null,
 			dirtyEpoch: this.attemptDirtyEpoch,
 		};
 		ACTIVE_UNIVERSAL_WARM_PLANS.length = 0;
@@ -10347,6 +10583,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				transitionBatches.size === 0 &&
 				!transitionRender,
 			retainedCount: 0,
+			templatePatches: null,
 			dirtyEpoch: this.attemptDirtyEpoch,
 		};
 		// A nested universal root is a separate render attempt. Do not let the
@@ -10992,7 +11229,26 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			const previousAttempt = CURRENT_ATTEMPT;
 			CURRENT_ATTEMPT = attempt;
 			try {
-				return blueprintFromLogical(marker.retained!) as BlueprintRange;
+				const patch = marker.patch;
+				if (patch === undefined) return blueprintFromLogical(marker.retained!) as BlueprintRange;
+				// The row mounts afresh under its new parent, from its new values.
+				patch.expanded = true;
+				const host = this.templates!.blueprint(
+					patch.plan,
+					patch.compiled,
+					patch.prepared,
+					patch.values,
+					patch.captures,
+					patch.owner,
+				);
+				host.key = patch.host.key;
+				const range = marker.retained!;
+				return {
+					kind: 'range',
+					key: range.key,
+					...(range.owner === null ? null : { owner: range.owner }),
+					children: [host],
+				};
 			} finally {
 				CURRENT_ATTEMPT = previousAttempt;
 			}
@@ -11002,7 +11258,13 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			const previous = record.collapsedTemplate;
 			const collapsed = next.collapsedTemplate;
 			if (previous !== undefined) {
-				if (collapsed === undefined || previous.shape !== collapsed.program.shape) {
+				if (
+					collapsed === undefined ||
+					previous.shape !== collapsed.program.shape ||
+					(previous.prepared !== collapsed.prepared &&
+						(preparedRootEventSites(previous.prepared) ||
+							preparedRootEventSites(collapsed.prepared)))
+				) {
 					this.templates?.expand(this, record);
 					if (collapsed !== undefined) expandCollapsedTemplateBlueprint(next);
 				}
@@ -11812,7 +12074,9 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				let previousChangedNode = -1;
 				let recreatedNodes: Set<number> | null = null;
 				for (let valueIndex = 0; valueIndex < program.values.length; valueIndex++) {
-					if (Object.is(previous.values[valueIndex], next.values[valueIndex])) continue;
+					if (samePreparedTemplateValue(previous.values[valueIndex], next.values[valueIndex])) {
+						continue;
+					}
 					const index = program.values[valueIndex].node;
 					if (index === previousChangedNode) continue;
 					previousChangedNode = index;
@@ -12038,6 +12302,52 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 						? null
 						: { prepared: next.prepared, values: next.values }),
 				});
+			}
+		}
+		for (const patch of attempt.templatePatches ?? EMPTY_TEMPLATE_PATCHES) {
+			if (patch.expanded) continue;
+			const { host, state, prepared: program, values } = patch;
+			const previousValues = state.values!;
+			let previousChangedNode = -1;
+			for (let valueIndex = 0; valueIndex < program.values.length; valueIndex++) {
+				if (samePreparedTemplateValue(previousValues[valueIndex], values[valueIndex])) continue;
+				const index = program.values[valueIndex].node;
+				if (index === previousChangedNode) continue;
+				previousChangedNode = index;
+				const next = materializePreparedCollapsedHostProps(program, values, index);
+				const id = state.firstId! + index;
+				const type = state.shape[index].type;
+				const kind =
+					this.driver.updates?.classify(
+						type,
+						index === 0
+							? host.props
+							: materializePreparedCollapsedHostProps(program, previousValues, index),
+						next,
+					) ?? 'update';
+				if (kind !== 'update' && kind !== 'recreate') {
+					throw new TypeError(
+						`Universal update classifier returned invalid kind ${JSON.stringify(kind)}.`,
+					);
+				}
+				updates.push(
+					kind === 'recreate'
+						? { op: 'recreate', id, type, props: next }
+						: { op: 'update', id, props: next },
+				);
+				if (index === 0) patch.rootProps = next;
+				if (kind === 'recreate') {
+					for (let eventIndex = 0; eventIndex < program.events.length; eventIndex++) {
+						const site = program.events[eventIndex];
+						if (site.node !== index) continue;
+						eventCommands.push({
+							op: 'event',
+							id,
+							type: site.type,
+							listener: { id: state.events[eventIndex].event.listener, priority: site.priority },
+						});
+					}
+				}
 			}
 		}
 		for (const template of templateMounts.values()) {
@@ -12545,6 +12855,20 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					for (const [record, state] of stagedCollapsedTemplates) {
 						record.collapsedTemplate = state;
 						collapsed.add(record);
+					}
+				}
+				// Patched template rows: like the compact list update, the committed
+				// program state takes the new values and handlers in place.
+				for (const patch of attempt.templatePatches ?? EMPTY_TEMPLATE_PATCHES) {
+					patch.owner.componentProps = patch.inputs;
+					if (patch.expanded) continue;
+					if (patch.rootProps !== null) patch.host.props = patch.rootProps;
+					const state = patch.state;
+					(state as { values: readonly UniversalHostTemplateProgramValue[] }).values = patch.values;
+					const sites = patch.prepared.events;
+					for (let eventIndex = 0; eventIndex < sites.length; eventIndex++) {
+						const event = state.events[eventIndex].event as { handler: (...args: any[]) => any };
+						event.handler = patch.captures[sites[eventIndex].slot] as (...args: any[]) => any;
 					}
 				}
 				if (this.hostAttachments !== null && (treeFeatures & UNIVERSAL_TREE_REF) !== 0) {
