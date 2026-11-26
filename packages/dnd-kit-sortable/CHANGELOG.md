@@ -1,5 +1,16 @@
 # @octanejs/dnd-kit-sortable
 
+## 0.0.12
+
+### Patch Changes
+
+- Updated dependencies [49c29fd]
+- Updated dependencies [022f8e2]
+- Updated dependencies [2e94006]
+  - octane@0.27.0
+  - @octanejs/dnd-kit-core@0.0.12
+  - @octanejs/dnd-kit-utilities@0.0.12
+
 ## 0.0.11
 
 ### Patch Changes

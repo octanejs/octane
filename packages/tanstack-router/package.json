@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tanstack-router",
-  "version": "0.3.12",
+  "version": "0.3.13",
   "license": "MIT",
   "type": "module",
   "engines": {

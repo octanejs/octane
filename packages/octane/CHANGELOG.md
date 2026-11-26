@@ -1,5 +1,16 @@
 # octane
 
+## 0.27.0
+
+### Minor Changes
+
+- 022f8e2: Universal renderers can opt into signals with the `signal-bindings` capability. A signal handle passed as a host prop or rendered as a child binds that host: a write publishes one `update` command in a binding-only batch, coalesced per microtask, without rendering the component again. A signal read during render (`count$.get()`) subscribes the component when it commits and renders it again on change. Renderers without the capability still reject modules with a runtime signals import.
+
+### Patch Changes
+
+- 49c29fd: Apply controlled input state against the final input type and constraints. Keep radio selections stable when inputs change names, form owners, or types in the same update. Preserve user edits in uncontrolled inputs when the type and its constraints change together.
+- 2e94006: Universal signal bindings in template programs: a signal handle in a prepared program's slot no longer forces its row out of the program. The program carries the handle's current value, rows still mount as one `mount-template-run`, and the binding attaches to the row's host record and slot, so a write sends one `update` for the bound program node. Retained rows rebind their slots when they are patched in place, and a program expanded into ordinary hosts hands its slot bindings to them. Signal bindings and native reads are installed by `enableUniversalNativeReads`, which only modules with a runtime signals import call, so renderers without signals do not ship them. Bound sources and their bindings are prototype objects instead of per-handle closures, and a flush reads each notified source once and skips the other bindings of a notified row.
+
 ## 0.26.0
 
 ### Minor Changes

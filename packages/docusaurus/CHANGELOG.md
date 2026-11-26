@@ -1,5 +1,17 @@
 # @octanejs/docusaurus
 
+## 0.0.70
+
+### Patch Changes
+
+- Updated dependencies [49c29fd]
+- Updated dependencies [022f8e2]
+- Updated dependencies [2e94006]
+  - octane@0.27.0
+  - @octanejs/mdx@0.1.79
+  - @octanejs/remix-router@0.1.76
+  - @octanejs/seo@0.0.65
+
 ## 0.0.69
 
 ### Patch Changes
