@@ -86,6 +86,7 @@ import {
 	setHostProps,
 	DESCRIPTOR_FORM_ACTION,
 	enableDescriptorFormActions,
+	enableOrderedInputProps,
 } from './host-props.js';
 import {
 	Fragment,
@@ -2088,6 +2089,7 @@ export function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 	// the actual destination rather than assuming every dynamic host is HTML.
 	const elNs = inferTagNs(tag, deoptChildNamespace(block.parentNode));
 	if (el === null) {
+		if (tag.length === 5 && tag.toLowerCase() === 'input') enableOrderedInputProps();
 		if (
 			hydration !== null &&
 			hydration.node !== null &&

@@ -80,6 +80,12 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		after: 'second',
 		cleaned: true,
 	},
+	'host-spread': {
+		before: 'first',
+		after: 'second',
+		titleRemoved: true,
+		kept: true,
+	},
 	context: {
 		before: 'light',
 		after: 'dark',

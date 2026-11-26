@@ -90,10 +90,11 @@ export function Heading(props: { title: string }) @{
 export function App() @{
 	const [count, setCount] = useState(0);
 	const emphasis = count === 3 ? { fontWeight: 'bold' } : {};
+	const groupProps = { role: 'group', 'aria-label': 'Seats' };
 
 	<main>
 		<Heading title="Seat selector" />
-		<div role="group" aria-label="Seats" style={{ ...emphasis, opacity: count === 0 ? 0.5 : 1 }}>
+		<div {...groupProps} style={{ ...emphasis, opacity: count === 0 ? 0.5 : 1 }}>
 			<button
 				aria-label="Remove seat"
 				disabled={count === 0}

@@ -12,6 +12,7 @@ import {
 	RadioSwap,
 	UncontrolledConstraintFirst,
 	UncontrolledSpread,
+	UncontrolledTag,
 	UncontrolledTypeFirst,
 	Values,
 	type InputProps,
@@ -57,6 +58,8 @@ const UncontrolledPersistent: ComponentBody<UncontrolledProps> = (props, scope) 
 };
 
 const uncontrolledComponents = {
+	// Exercise a runtime host tag before any other input path installs its writer.
+	UncontrolledTag,
 	UncontrolledTypeFirst,
 	UncontrolledConstraintFirst,
 	UncontrolledSpread,

@@ -22,6 +22,13 @@ export function UncontrolledSpread(props: UncontrolledProps) @{
 	<input {...props} />
 }
 
+export function UncontrolledTag({
+	as: Tag = 'input',
+	...props
+}: UncontrolledProps & { as?: 'input' }) @{
+	<Tag {...props} />
+}
+
 export function Values({ next, read }: InputProps) @{
 	const spread = {
 		get value() {

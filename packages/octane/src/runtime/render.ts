@@ -253,8 +253,8 @@ import {
 	isAdoptionControl,
 	markHydrationDiscard,
 } from './hydration-presentation.js';
-import { bindSignalHostPropSources } from './signal-bindings.js';
-import { setHostPropSources } from './host-props.js';
+import { bindCompiledSignalHostPropSources } from './signal-bindings.js';
+import { enableHostFormSources, setCompiledHostPropSources } from './host-props.js';
 import {
 	componentSlotImpl,
 	spliceOffscreenCapture,
@@ -1500,9 +1500,10 @@ export let RESUME_REPLAY = false;
  * Commit recorded host sources in the Scope that rendered them, so handler
  * authority and signal owners resolve as they did in render. Refs attach and
  * subscriptions switch here, at commit. A host with no signal site resolves
- * its plain props (setHostPropSources).
+ * its plain props (setHostPropSources). Compiled form mounts install their
+ * capabilities before recording the first committed props.
  */
-export function commitHostSources(
+export function commitCompiledHostSources(
 	scope: Scope,
 	binding: unknown,
 	el: Element,
@@ -1515,7 +1516,7 @@ export function commitHostSources(
 	CURRENT_SCOPE = scope;
 	try {
 		if (site === null)
-			return setHostPropSources(
+			return setCompiledHostPropSources(
 				el,
 				sources,
 				binding as Record<string, unknown> | undefined,
@@ -1525,7 +1526,7 @@ export function commitHostSources(
 			);
 		return signalDocumentEnabled || scope.block.idState.renderOwner?.signalOwner !== undefined
 			? runWithBlockSignalOwner(scope, () =>
-					bindSignalHostPropSources(
+					bindCompiledSignalHostPropSources(
 						scope,
 						binding,
 						el,
@@ -1535,10 +1536,31 @@ export function commitHostSources(
 						readStyle,
 					),
 				)
-			: bindSignalHostPropSources(scope, binding, el, sources, site, hasNestedChildren, readStyle);
+			: bindCompiledSignalHostPropSources(
+					scope,
+					binding,
+					el,
+					sources,
+					site,
+					hasNestedChildren,
+					readStyle,
+				);
 	} finally {
 		CURRENT_SCOPE = previous;
 	}
+}
+
+export function commitHostSources(
+	scope: Scope,
+	binding: unknown,
+	el: Element,
+	sources: readonly HostPropSource[],
+	site: string | null,
+	hasNestedChildren: boolean,
+	readStyle?: (value: unknown) => unknown,
+): unknown {
+	enableHostFormSources(el);
+	return commitCompiledHostSources(scope, binding, el, sources, site, hasNestedChildren, readStyle);
 }
 
 // Invoke one event slot — a bare handler `fn(event)` or a nominal arity-specific

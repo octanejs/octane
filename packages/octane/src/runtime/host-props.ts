@@ -1895,7 +1895,38 @@ function applyInputSources(
 	);
 }
 
-export function setHostPropSources(
+let ORDERED_INPUT_PROPS: {
+	matches: typeof isOrderedInputProp;
+	write: typeof setInputProps;
+} | null = null;
+let APPLY_INPUT_SOURCES: typeof applyInputSources | null = null;
+let APPLY_FORM_SOURCES: typeof applyFormControlValues | null = null;
+
+/** @internal Installed by descriptor factories and legacy input spread writers. */
+export function enableOrderedInputProps(): void {
+	if (ORDERED_INPUT_PROPS) return;
+	ORDERED_INPUT_PROPS = { matches: isOrderedInputProp, write: setInputProps };
+}
+
+/** @internal Source-resolved inputs also own the exact JSX control writers. */
+export function enableOrderedInputSources(): void {
+	if (APPLY_INPUT_SOURCES) return;
+	enableOrderedInputProps();
+	APPLY_INPUT_SOURCES = applyInputSources;
+}
+
+/** @internal Used by source-resolved textarea and select elements. */
+export function enableFormSources(): void {
+	APPLY_FORM_SOURCES ||= applyFormControlValues;
+}
+
+export function enableHostFormSources(el: Element): void {
+	const tag = el.localName;
+	if (tag === 'input') enableOrderedInputSources();
+	else if (tag === 'textarea' || tag === 'select') enableFormSources();
+}
+
+function setHostPropSources(
 	el: Element,
 	sources: readonly HostPropSource[],
 	prev: Record<string, unknown> | undefined,
@@ -1907,39 +1938,37 @@ export function setHostPropSources(
 	const props = new Map<string, HostPropWriter>();
 	const resolved = resolveHostPropSources(el, sources, props, readStyle);
 	const tag = el.localName;
-	const formHost = tag === 'input' || tag === 'textarea' || tag === 'select';
-	const inputWrites = setSpread(
-		el,
-		resolved,
-		prev,
-		scope,
-		true,
-		tag === 'input' ? 'input' : formHost,
-	);
+	const applyInput = APPLY_INPUT_SOURCES;
+	const orderedInput = applyInput && tag === 'input';
+	const formHost =
+		orderedInput || !!(APPLY_FORM_SOURCES && (tag === 'textarea' || tag === 'select'));
+	const inputWrites = setSpread(el, resolved, prev, scope, true, orderedInput ? 'input' : formHost);
 	setDangerouslySetInnerHTMLSources(el, sources, hasNestedChildren);
 	// Form writers use the exact JSX spelling, independently of DOM aliases:
 	// e.g. a later VALUE attribute must not replace the controlled value prop.
 	// The raw writer Map already resolved source precedence and getter reads.
-	if (deferControl && prev !== undefined && inputWrites !== null) {
-		// A render can arrive before hydration adopts the live checked state. Keep
-		// configuration at its last committed values so adoption applies both together.
-		for (let i = 0; i < inputWrites.length; i += 2) {
-			const name = inputWrites[i] as string;
-			if (Object.hasOwn(prev, name)) resolved[name] = prev[name];
-			else delete resolved[name];
+	if (orderedInput) {
+		if (deferControl && prev !== undefined && inputWrites !== null) {
+			// Keep configuration at its last committed values until hydration
+			// adopts the live control state and can apply both together.
+			for (let i = 0; i < inputWrites.length; i += 2) {
+				const name = inputWrites[i] as string;
+				if (Object.hasOwn(prev, name)) resolved[name] = prev[name];
+				else delete resolved[name];
+			}
+		} else {
+			ORDERED_INPUT_PROPS!.write(
+				el as HTMLInputElement,
+				inputWrites,
+				undefined,
+				setAttribute,
+				false,
+				deferControl ? undefined : props,
+				applyInput,
+			);
 		}
-	} else if (tag === 'input')
-		setInputProps(
-			el as HTMLInputElement,
-			inputWrites,
-			undefined,
-			setAttribute,
-			false,
-			deferControl ? undefined : props,
-			applyInputSources,
-		);
-	else if (formHost && !deferControl)
-		applyFormControlValues(
+	} else if (APPLY_FORM_SOURCES && formHost && !deferControl)
+		APPLY_FORM_SOURCES(
 			el,
 			tag,
 			props.get('value')?.value,
@@ -1951,6 +1980,24 @@ export function setHostPropSources(
 		);
 	return resolved;
 }
+
+function setDynamicHostPropSources(
+	el: Element,
+	sources: readonly HostPropSource[],
+	prev: Record<string, unknown> | undefined,
+	scope: Scope,
+	hasNestedChildren = false,
+	readStyle?: (value: unknown) => unknown,
+	deferControl = false,
+): Record<string, unknown> {
+	enableHostFormSources(el);
+	return setHostPropSources(el, sources, prev, scope, hasNestedChildren, readStyle, deferControl);
+}
+
+export {
+	setDynamicHostPropSources as setHostPropSources,
+	setHostPropSources as setCompiledHostPropSources,
+};
 
 /**
  * Record a host's prop sources (bagRecord). Every render's sources reach the
@@ -2026,7 +2073,7 @@ function isAggregatedFormControlProp(el: Element, name: string): boolean {
 	return false;
 }
 
-export function setSpread(
+function setSpread(
 	el: Element,
 	value: any,
 	prev: any,
@@ -2062,6 +2109,20 @@ export function setSpread(
 			(skipFormControls === 'input' ? COLLECT_INPUT_PROPS : 0),
 	);
 }
+
+function setDynamicSpread(
+	el: Element,
+	value: any,
+	prev: any,
+	mountScope?: Scope,
+	skipDangerouslySetInnerHTML = false,
+	skipFormControls: boolean | 'input' = false,
+): unknown[] | null {
+	if (el.localName === 'input') enableOrderedInputProps();
+	return setSpread(el, value, prev, mountScope, skipDangerouslySetInnerHTML, skipFormControls);
+}
+
+export { setDynamicSpread as setSpread, setSpread as setCompiledSpread };
 
 // A spread copies own enumerable keys. Descriptor props are plain own objects.
 function isOwnEnumerable(object: unknown, key: string): boolean {
@@ -2138,7 +2199,9 @@ export function setHostProps(
 ): unknown[] | null {
 	const descriptor = (flags & DESCRIPTOR_HOST) !== 0;
 	const input =
-		el.localName === 'input' && el.namespaceURI === HTML_NS ? (el as HTMLInputElement) : null;
+		ORDERED_INPUT_PROPS && el.localName === 'input' && el.namespaceURI === HTML_NS
+			? (el as HTMLInputElement)
+			: null;
 	let needsCheckedInitialization = descriptor && prev === undefined && input !== null;
 	let inputWrites: unknown[] | null = null;
 	if (process.env.NODE_ENV !== 'production' && value != null) {
@@ -2199,7 +2262,7 @@ export function setHostProps(
 				continue;
 			}
 			if (value != null && (descriptor ? k in value : isOwnEnumerable(value, k))) continue;
-			if (input !== null && isOrderedInputProp(k)) (inputWrites ??= []).push(k, null);
+			if (input !== null && ORDERED_INPUT_PROPS!.matches(k)) (inputWrites ??= []).push(k, null);
 			else removeHostProp(el, k, prev[k]);
 		}
 	}
@@ -2266,7 +2329,7 @@ export function setHostProps(
 		// Controlled fields reassert live DOM drift; other unchanged props need no
 		// event-name parsing or custom-element routing.
 		if (v === pv && !isControlledHostProp(el, k) && !initialHydration) continue;
-		if (input !== null && isOrderedInputProp(k)) {
+		if (input !== null && ORDERED_INPUT_PROPS!.matches(k)) {
 			(inputWrites ??= []).push(k, v);
 			continue;
 		}
@@ -2296,7 +2359,7 @@ export function setHostProps(
 		setAttribute(el, k, v);
 	}
 	if (inputWrites !== null && (flags & COLLECT_INPUT_PROPS) === 0)
-		setInputProps(input!, inputWrites, undefined, setAttribute);
+		ORDERED_INPUT_PROPS!.write(input!, inputWrites, undefined, setAttribute);
 	if (needsCheckedInitialization) markInputCheckedness(input!);
 	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, mountScope);
 	return inputWrites;

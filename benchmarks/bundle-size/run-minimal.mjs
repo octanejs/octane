@@ -53,6 +53,7 @@ const existingScenarios = [
 	['signal-counter', 'tsrx'],
 	['signal-instance-derived', 'tsrx'],
 	['prop-attributes', 'tsrx'],
+	['host-spread', 'tsrx'],
 	['context', 'tsrx'],
 	['guarded-component-tag', 'tsrx'],
 	['context-arms', 'tsrx'],
@@ -333,6 +334,7 @@ const contextDependencyDeclarations = [
 	'refreshBlockForContext',
 ];
 const memoBailDeclarations = ['tryMemoBail', 'shallowEqualProps'];
+const orderedInputDeclarations = ['setInputProps', 'setInputConstraints'];
 // The layout queue ships only to apps that call it or setLayoutSnapshotTiming,
 // although the engine imports it to read its phase.
 const layoutQueueDeclarations = ['readLayout', 'writeLayout', 'flushLayoutSync'];
@@ -381,12 +383,16 @@ const featureControls = {
 		kept: ['useContextInternal'],
 	},
 	'memo-context': {
-		dropped: [],
+		dropped: ['hostStringTagBody', ...orderedInputDeclarations],
 		kept: [...contextDependencyDeclarations, ...memoBailDeclarations],
+	},
+	'host-spread': {
+		dropped: orderedInputDeclarations,
+		kept: ['setHostProps'],
 	},
 	// Only a controlled select value installs the select projection.
 	'controlled-input': {
-		dropped: ['projectSelectValue', 'restoreCheckedState'],
+		dropped: ['projectSelectValue', 'restoreCheckedState', ...orderedInputDeclarations],
 		kept: ['restoreControlledElement'],
 	},
 	'signal-counter': { dropped: ['childSlot', 'bindSignalChild'], kept: ['enableSignalBindings'] },

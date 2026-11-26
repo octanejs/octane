@@ -19367,6 +19367,8 @@ function preparePresentationHydration(body, node, ctx, hostEnd) {
 		'queueOwnRefDetach',
 		'readNativeDomStyle',
 		'readNativeDomProps',
+		'enableOrderedInputSources',
+		'enableFormSources',
 	]);
 	if (proof.structural) {
 		preparation.add('snapshotSpread');
@@ -19405,7 +19407,7 @@ function preparePresentationHydration(body, node, ctx, hostEnd) {
 				? helpers.get(value.callee.name)
 				: undefined;
 		const host =
-			helper === 'bindSignalHostPropSources' &&
+			helper === 'bindCompiledSignalHostPropSources' &&
 			proof.structural &&
 			value._octanePresentationHostSources?.length > 0;
 		if (
@@ -30803,9 +30805,10 @@ function planJsx(
 		if (b.kind === 'htmlOnlyChild') ctx.runtimeNeeded.add('setDangerouslySetInnerHTML');
 		if (b.kind === 'hostCommit') {
 			if (ctx.nativeReads) b.readStyle = requireRuntimeForContext(ctx, 'readNativeDomStyle');
-			if (b.signalHostSources) ctx.runtimeNeeded.add('bindSignalHostPropSources');
+			if (b.formSourceInstaller) ctx.runtimeNeeded.add(b.formSourceInstaller);
+			if (b.signalHostSources) ctx.runtimeNeeded.add('bindCompiledSignalHostPropSources');
 			else {
-				ctx.runtimeNeeded.add('setHostPropSources');
+				ctx.runtimeNeeded.add('setCompiledHostPropSources');
 				ctx.runtimeNeeded.add('queueOwnRefDetach');
 			}
 		}
@@ -32838,7 +32841,7 @@ function commitSourceRows(sources, valueOf) {
 // Preserve the authored rest site's identity through known-spread expansion.
 // Its authored spread ordinal is not the eventual host-source row index.
 function presentationHostSourcesCall(bind, ...args) {
-	const call = b.call('_$bindSignalHostPropSources', ...args);
+	const call = b.call('_$bindCompiledSignalHostPropSources', ...args);
 	const receipts = bind.sources.flatMap(({ binding }, source) =>
 		binding.bindingRest ? [{ ...binding.bindingRest, source }] : [],
 	);
@@ -33180,6 +33183,7 @@ function emitBindingMount(bind, elVar, bag) {
 		}
 		case 'hostCommit': {
 			const hostMount = mountHost();
+			if (bind.formSourceInstaller) hostMount.push(b.stmt(b.call(`_$${bind.formSourceInstaller}`)));
 			const propsLocal = local(`_host$${bind.id}`);
 			const sources = commitSourceRows(bind.sources, (binding, spread) =>
 				b.id(bag.local(`${spread ? '_sp' : '_prev'}$${binding.id}`)),
@@ -33225,7 +33229,7 @@ function emitBindingMount(bind, elVar, bag) {
 							'=',
 							propsLocal,
 							b.call(
-								'_$setHostPropSources',
+								'_$setCompiledHostPropSources',
 								el(),
 								sources,
 								undefinedNode(),
@@ -33633,7 +33637,7 @@ function commitBindingKind(bind) {
 
 function commitRuntimeHelpers(bind) {
 	if (bind.signalDirect) return ['bagRecordSignal'];
-	if (bind.kind === 'hostCommit') return ['bagRecordHost', 'commitHostSources'];
+	if (bind.kind === 'hostCommit') return ['bagRecordHost', 'commitCompiledHostSources'];
 	if (bind.kind === 'event')
 		return ['bagRecord', 'setEventSlot', 'setEventHandler', 'signalOwnerUse'];
 	if (bind.kind === 'event-bundle')
@@ -33910,7 +33914,7 @@ function emitCommitBindingUpdate(bind, bag, commit, F, org, inline) {
 					'=',
 					F('_host'),
 					b.call(
-						'_$commitHostSources',
+						'_$commitCompiledHostSources',
 						scope,
 						F('_host'),
 						F('_el'),
@@ -34298,7 +34302,7 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false, commit = null
 						'=',
 						F('_host'),
 						b.call(
-							'_$setHostPropSources',
+							'_$setCompiledHostPropSources',
 							F('_el'),
 							sources,
 							F('_host'),
@@ -36172,6 +36176,8 @@ function emitElementHtml(
 			origin: node,
 			sources: hostClientSources,
 			hasNestedChildren: hasNestedJsxChildren,
+			formSourceInstaller:
+				tag === 'input' ? 'enableOrderedInputSources' : formHost ? 'enableFormSources' : null,
 			signalHostSources,
 			signalSite: signalHostSources ? hostSignalSite : null,
 		};
@@ -37898,10 +37904,9 @@ function isImmutableComponentTag(tag, ctx) {
 	);
 }
 
-// A module `const` initialized by Octane's `lazy()` always holds the lazy
-// wrapper, and a module function declaration the module never reassigns always
-// holds that function, so their call sites never resolve a host string at
-// runtime and can skip the generic entry's dynamic-tag capability.
+// Octane's memo()/lazy() produce function wrappers. An immutable module const
+// holding one, or an unreassigned module function, never resolves a host string
+// at runtime and can skip the generic entry's dynamic-tag capability.
 function isFunctionComponentTag(tag, ctx) {
 	if (tag?.type !== 'JSXIdentifier' && tag?.type !== 'Identifier') return false;
 	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
@@ -37911,8 +37916,8 @@ function isFunctionComponentTag(tag, ctx) {
 	if (scope === undefined || lexical.resolveBinding(scope, tag.name)?.scope !== lexical.rootScope)
 		return false;
 	if (ctx.moduleFunctionDeclarations?.has(tag.name)) return true;
-	ctx.lazyComponentBindings ??= collectLazyComponentBindings(ctx, lexical);
-	return ctx.lazyComponentBindings.has(tag.name);
+	ctx.wrappedComponentBindings ??= collectWrappedComponentBindings(ctx, lexical);
+	return ctx.wrappedComponentBindings.has(tag.name);
 }
 
 // Tags of a `const` local inside the consequent of `typeof Local === 'function'`
@@ -37969,7 +37974,7 @@ function collectFunctionGuardedTags(ast, lexical) {
 	return tags;
 }
 
-function collectLazyComponentBindings(ctx, lexical) {
+function collectWrappedComponentBindings(ctx, lexical) {
 	const names = new Set();
 	for (const statement of ctx.activityModuleAst.body) {
 		const declaration =
@@ -37978,7 +37983,8 @@ function collectLazyComponentBindings(ctx, lexical) {
 		for (const item of declaration.declarations) {
 			const callee = item.init?.type === 'CallExpression' ? item.init.callee : null;
 			if (item.id.type !== 'Identifier' || callee?.type !== 'Identifier') continue;
-			if (ctx.octaneImportLocals?.get(callee.name) !== 'lazy') continue;
+			const factory = ctx.octaneImportLocals?.get(callee.name);
+			if (factory !== 'memo' && factory !== 'lazy') continue;
 			const binding = lexical.resolveBinding(lexical.nodeScopes.get(callee), callee.name);
 			if (binding?.scope === lexical.rootScope && binding.importSource?.value === 'octane')
 				names.add(item.id.name);

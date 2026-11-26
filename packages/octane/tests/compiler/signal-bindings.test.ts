@@ -425,7 +425,8 @@ export function App() @{ <input value={draft$.get()} /> }`,
 			mode: 'server',
 			hmr: false,
 		}).code;
-		expect(client).toContain('bindSignalHostPropSources');
+		expect(client).toContain('bindCompiledSignalHostPropSources');
+		expect(callArguments(client, '_$enableOrderedInputSources')).toHaveLength(1);
 		expect(client).toContain('snapshotSpread');
 		expect(client).toContain('data-octane-input');
 		expect(server).toContain('ssrSnapshotSpread');
