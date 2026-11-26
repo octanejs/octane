@@ -1421,7 +1421,7 @@ interface DraftOwner {
 	clonedHooks: Set<unknown>;
 	seenEffects: EffectHook[];
 	// Signal sources this render read, when native reads are enabled.
-	nativeReads?: Map<NativeReadSource, number> | null;
+	nativeReads: Map<NativeReadSource, number> | null;
 	children: DraftOwner[];
 	// Committed child owners adopted without re-rendering, with the drafted-child
 	// index each was claimed at so commit can rebuild record.children in exact
@@ -2601,6 +2601,7 @@ function draftOwner(
 		hooks: new Map(record.hooks),
 		clonedHooks: new Set(),
 		seenEffects: [],
+		nativeReads: null,
 		children: [],
 		retainedChildren: null,
 		claimedChildren: new Set(),
@@ -2918,7 +2919,7 @@ function releaseNativeReads(state: NativeReadState): void {
 }
 
 function trackNativeReads(owner: DraftOwner): void {
-	const reads = owner.nativeReads ?? null;
+	const reads = owner.nativeReads;
 	if (reads === null && !owner.hooks.has(NATIVE_READ_STATE_SLOT)) return;
 	const [state] = useState<NativeReadState>(
 		() => ({ subscriptions: new Map(), notify: () => {} }),
