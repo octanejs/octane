@@ -7801,6 +7801,11 @@
       "message": "Multiple retained signal subscriptions failed to release.",
       "runtime": ["client", "server"],
       "status": "active"
+    },
+    "374": {
+      "message": "useSignal$ in a universal renderer module requires a renderer with the signal-bindings capability.",
+      "runtime": ["client", "server"],
+      "status": "active"
     }
   },
   "strongDiagnostics": {

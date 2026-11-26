@@ -57,6 +57,7 @@ import { isSignalHandle, isThenable } from './signals/handle-protocol.js';
 import { normalizeClass } from './class-names.js';
 import { createNativeReadCollector } from './signals/native-read-collector.js';
 import type { NativeReadSource, NativeReadSubscription } from './signals/read-protocol.js';
+import { installUniversalLocalHook } from './signals/local-hook.js';
 import {
 	SIGNAL_BINDING_READ,
 	SIGNAL_BINDING_SUBSCRIBE,
@@ -164,9 +165,12 @@ class SignalBindingSource {
 
 class SignalHostBinding {
 	readonly $$kind: typeof UNIVERSAL_HOST_BINDING;
-	readonly source: SignalBindingSource;
+	readonly source: SignalBindingSource | StyleBindingSource;
 	readonly select: (value: unknown) => unknown;
-	constructor(source: SignalBindingSource, select: (value: unknown) => unknown) {
+	constructor(
+		source: SignalBindingSource | StyleBindingSource,
+		select: (value: unknown) => unknown,
+	) {
 		this.$$kind = UNIVERSAL_HOST_BINDING;
 		this.source = source;
 		this.select = select;
@@ -243,11 +247,104 @@ export function universalScopedClass(value: unknown, scope: string): unknown {
 	return binding;
 }
 
-/** A prop value as a host binding: an explicit binding or a signal handle. */
-function hostBindingOf(value: unknown): UniversalHostBinding<unknown> | null {
+/**
+ * A style object whose values include signal handles, as one binding source:
+ * it reads the object with each handle's current value and subscribes to every
+ * handle, so a write to any of them sends one `update` with the whole style.
+ */
+class StyleBindingSource {
+	readonly style: Record<string, unknown>;
+	readonly keys: readonly string[];
+	constructor(style: Record<string, unknown>, keys: readonly string[]) {
+		this.style = style;
+		this.keys = keys;
+	}
+	get(): unknown {
+		const style = this.style;
+		const value: Record<string, unknown> = { ...style };
+		for (const key of this.keys) {
+			value[key] = (style[key] as SignalHandle<unknown>)[SIGNAL_BINDING_READ]();
+		}
+		return value;
+	}
+	subscribe(notify: () => void): () => void {
+		const style = this.style;
+		const stops = this.keys.map((key) =>
+			(style[key] as SignalHandle<unknown>)[SIGNAL_BINDING_SUBSCRIBE](notify),
+		);
+		return () => {
+			for (const stop of stops) stop();
+		};
+	}
+}
+
+// One binding per style object, so the checks that only ask whether a prop is
+// bound and the binding the commit keeps are the same object.
+let STYLE_HOST_BINDINGS: WeakMap<object, UniversalHostBinding<unknown> | null> | null = null;
+
+function styleHostBinding(value: object): UniversalHostBinding<unknown> | null {
+	const cache = (STYLE_HOST_BINDINGS ??= new WeakMap());
+	let binding = cache.get(value);
+	if (binding !== undefined) return binding;
+	binding = null;
+	if (!Array.isArray(value) && hasCrossRealmPlainPrototype(value)) {
+		let keys: string[] | null = null;
+		for (const key in value) {
+			if (hasOwnProp.call(value, key) && isSignalHandle((value as Record<string, unknown>)[key])) {
+				(keys ??= []).push(key);
+			}
+		}
+		if (keys !== null) {
+			binding = new SignalHostBinding(
+				new StyleBindingSource(value as Record<string, unknown>, keys),
+				signalBindingRaw,
+			) as unknown as UniversalHostBinding<unknown>;
+		}
+	}
+	cache.set(value, binding);
+	return binding;
+}
+
+/** A prop value as a signal binding: a signal handle, or a `style` object holding them. */
+function signalPropBinding(value: object, name?: string): UniversalHostBinding<unknown> | null {
+	if (name === 'style' && typeof value === 'object') {
+		const style = styleHostBinding(value);
+		if (style !== null) return style;
+	}
+	return signalHostBinding(value, false);
+}
+
+// Installed with native reads, like SIGNAL_HOST_BINDING.
+let SIGNAL_PROP_BINDING: typeof signalPropBinding | null = null;
+
+/**
+ * A prop value as a host binding: an explicit binding, a signal handle, or a
+ * `style` object holding signal handles.
+ */
+function hostBindingOf(value: unknown, name?: string): UniversalHostBinding<unknown> | null {
 	if (value === null || (typeof value !== 'object' && typeof value !== 'function')) return null;
 	if (isUniversalHostBinding(value)) return value;
-	return SIGNAL_HOST_BINDING === null ? null : SIGNAL_HOST_BINDING(value, false);
+	return SIGNAL_PROP_BINDING === null ? null : SIGNAL_PROP_BINDING(value, name);
+}
+
+/**
+ * A signal handle passed as a host event handler. A write updates ordinary
+ * props, so the handler has to be a function that reads the handle. Installed
+ * with native reads: without them a handle is never a binding.
+ */
+function signalHandlerPropError(name: string): Error {
+	return new Error(
+		`A signal handle cannot be the host event handler ${name}: host bindings update ordinary props only. Pass a function that reads the handle instead, such as ${name}={(event) => handler$.get()(event)}.`,
+	);
+}
+
+let SIGNAL_HANDLER_PROP_ERROR: typeof signalHandlerPropError | null = null;
+
+/** A host binding on a prop it cannot patch. */
+function hostBindingPropError(name: string): Error {
+	return SIGNAL_HANDLER_PROP_ERROR !== null && name.startsWith('on')
+		? SIGNAL_HANDLER_PROP_ERROR(name)
+		: new Error('Experimental host bindings require an ordinary prop on a local direct root.');
 }
 
 /** A signal handle rendered as a text child: one bound '#text' host. */
@@ -2997,12 +3094,41 @@ export function enableUniversalNativeReads(abi = 1): void {
 	if (NATIVE_READS !== null) return;
 	HOST_BINDING_SUPPORT = UNIVERSAL_HOST_BINDING_SUPPORT;
 	SIGNAL_HOST_BINDING = signalHostBinding;
+	SIGNAL_PROP_BINDING = signalPropBinding;
+	SIGNAL_HANDLER_PROP_ERROR = signalHandlerPropError;
 	TRACK_NATIVE_READS = trackNativeReads;
+	installUniversalLocalHook(universalLocalHook);
 	NATIVE_READS = createNativeReadCollector((owner, source, version) => {
 		const draft = owner as DraftOwner;
 		const reads = (draft.nativeReads ??= new Map());
 		if (!reads.has(source)) reads.set(source, version);
 	});
+}
+
+// The cleanup of a local hook keys its own insertion effect: one symbol per
+// compiler slot, resolved through the same custom-hook path as the slot.
+const LOCAL_HOOK_DISPOSE_SLOTS = new Map<unknown, symbol>();
+
+/**
+ * A value created once per component instance for an optional signal hook
+ * (`useSignal$`), disposed when the component unmounts. Insertion effects stay
+ * live while an Activity hides the component, so hiding keeps the value.
+ */
+function universalLocalHook<T>(
+	name: string,
+	initialize: () => T,
+	dispose: (value: T) => void,
+	slot?: unknown,
+): T {
+	if (slot === undefined) throw new Error(`${name} requires a compiler-assigned hook slot.`);
+	const cell = useLazyRef(() => ({ value: initialize() }), slot).current;
+	let disposeSlot = LOCAL_HOOK_DISPOSE_SLOTS.get(slot);
+	if (disposeSlot === undefined) {
+		disposeSlot = Symbol(name);
+		LOCAL_HOOK_DISPOSE_SLOTS.set(slot, disposeSlot);
+	}
+	useInsertionEffect(() => () => dispose(cell.value), [cell], disposeSlot);
+	return cell.value;
 }
 
 function releaseNativeReads(state: NativeReadState): void {
@@ -3708,12 +3834,10 @@ function materializeOwnerlessLeafValue(
 	let hostBindings: Map<string, UniversalHostBinding<unknown>> | null = null;
 	const attempt = currentAttempt();
 	for (const name of Object.keys(props)) {
-		const handler = hostBindingOf(props[name]) ?? props[name];
+		const handler = hostBindingOf(props[name], name) ?? props[name];
 		if (isUniversalHostBinding(handler)) {
 			if (attempt.root.hasHostBindingUnsupportedConfiguration() || name.startsWith('on')) {
-				throw new Error(
-					'Experimental host bindings require an ordinary prop on a local direct root.',
-				);
+				throw hostBindingPropError(name);
 			}
 			markUniversalTreeFeature(UNIVERSAL_TREE_HOST_BINDING);
 			(hostBindings ??= new Map()).set(name, handler);
@@ -4005,7 +4129,7 @@ function materializeValue(
 				const host = compactHost!;
 				if (itemIndex === 0 && host.props !== undefined) {
 					for (const name of Object.keys(host.props)) {
-						if (hostBindingOf(host.props[name]) !== null) {
+						if (hostBindingOf(host.props[name], name) !== null) {
 							throw new Error(
 								'Experimental host bindings cannot be used in compact universal leaf lists.',
 							);
@@ -4019,7 +4143,7 @@ function materializeValue(
 				if (bindings !== undefined) {
 					for (let bindingIndex = 0; bindingIndex < bindings.length; bindingIndex++) {
 						const binding = values[bindings[bindingIndex][1]];
-						if (hostBindingOf(binding) !== null) {
+						if (hostBindingOf(binding, bindings[bindingIndex][0]) !== null) {
 							throw new Error(
 								'Experimental host bindings cannot be used in compact universal leaf lists.',
 							);
@@ -4635,12 +4759,10 @@ function materializeNode(
 			if (props === sourceProps) props = copyUniversalHostPropPrefix(sourceProps, names, index);
 			continue;
 		}
-		const handler = hostBindingOf(sourceProps[name]) ?? sourceProps[name];
+		const handler = hostBindingOf(sourceProps[name], name) ?? sourceProps[name];
 		if (isUniversalHostBinding(handler)) {
 			if (root.hasHostBindingUnsupportedConfiguration() || name.startsWith('on')) {
-				throw new Error(
-					'Experimental host bindings require an ordinary prop on a local direct root.',
-				);
+				throw hostBindingPropError(name);
 			}
 			markUniversalTreeFeature(UNIVERSAL_TREE_HOST_BINDING);
 			(hostBindings ??= new Map()).set(name, handler);
@@ -4836,7 +4958,7 @@ function materializeCollapsedTemplate(value: UniversalPlanValue): BlueprintHost 
 			const name = names[propIndex];
 			const current = sourceProps[name];
 			if (
-				hostBindingOf(current) !== null ||
+				hostBindingOf(current, name) !== null ||
 				root.classifyLifecycle(name, current) !== null ||
 				root.classifyLocalCallback(name, current) !== null ||
 				isRendererRegion(current)
@@ -4939,7 +5061,7 @@ function prepareCollapsedTemplateValues(
 		) {
 			// A host binding (a signal handle) in a slot: the program carries its
 			// current value and the commit binds the slot (see TEMPLATE_SLOT_BINDINGS).
-			const hostBinding = HOST_BINDING_SUPPORT.slot(source, binding.text);
+			const hostBinding = HOST_BINDING_SUPPORT.slot(source, binding.text, binding.name);
 			if (hostBinding !== null) {
 				if (root.hasHostBindingUnsupportedConfiguration()) return null;
 				source = hostBinding.getSnapshot();
@@ -14041,7 +14163,7 @@ interface UniversalHostBindingSupport {
 		bound: readonly (UniversalHostBinding<unknown> | undefined)[],
 	): void;
 	/** A prepared program slot's value as a host binding (a signal handle), if it is one. */
-	slot(value: object, text: boolean): UniversalHostBinding<unknown> | null;
+	slot(value: object, text: boolean, name?: string): UniversalHostBinding<unknown> | null;
 	/** A value rendered as a child, as one bound text host, if it is a signal handle. */
 	text(value: object, key: UniversalKey | null): BlueprintNode[] | null;
 	/** Hand a blueprint program's bound slots to its expanded hosts. */
@@ -14532,7 +14654,7 @@ const UNIVERSAL_HOST_BINDING_SUPPORT: UniversalHostBindingSupport = {
 	commit: commitHostBindings,
 	patches: commitTemplatePatchBindings,
 	bindSlots: bindTemplateSlots,
-	slot: (value, text) => (text ? textBindingOf(value) : hostBindingOf(value)),
+	slot: (value, text, name) => (text ? textBindingOf(value) : hostBindingOf(value, name)),
 	text: materializeBoundText,
 	expandBlueprint: expandTemplateSlotBlueprints,
 	expandRecord: rebindExpandedTemplateSlots,

@@ -34,6 +34,7 @@ export const COMMONJS_ENTRIES = [
 	'src/signals/core.ts',
 	'src/signals/client.ts',
 	'src/signals/server.ts',
+	'src/signals/universal.ts',
 ];
 
 const catalogPath = fileURLToPath(new URL('../error-codes/codes.json', import.meta.url));

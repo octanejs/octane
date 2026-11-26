@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 374,
+  "nextCode": 375,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -2239,6 +2239,12 @@
     },
     "373": {
       "message": "Multiple retained signal subscriptions failed to release.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "374": {
+      "message": "useSignal$ in a universal renderer module requires a renderer with the signal-bindings capability.",
       "argumentCount": 0,
       "runtime": ["client", "server"],
       "status": "active"

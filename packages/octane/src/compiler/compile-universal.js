@@ -669,6 +669,45 @@ function assertNoResidualTemplate(node, state, context) {
 	}
 }
 
+// Signal hook entries whose hooks need the DOM or server runtime, and the twin a
+// universal module imports in their place: its hooks use the universal owner.
+const UNIVERSAL_SIGNAL_REQUESTS = {
+	'octane/signals/client': 'octane/signals/universal',
+	'octane/signals/server': 'octane/signals/universal',
+};
+
+function rendererBindsSignals(renderer) {
+	return Array.isArray(renderer?.capabilities) && renderer.capabilities.includes('signal-bindings');
+}
+
+/**
+ * A renderer with signal bindings owns the optional signal hooks of its modules
+ * (`useSignal$`): route their entry to the universal twin, so the module never
+ * reaches the DOM runtime. Hook slots key the call by its imported name, which
+ * the twin keeps.
+ */
+function routeUniversalSignalImports(ast, renderer) {
+	if (!rendererBindsSignals(renderer)) return ast;
+	let body = null;
+	for (let index = 0; index < (ast.body?.length ?? 0); index++) {
+		const node = ast.body[index];
+		if (
+			(node.type !== 'ImportDeclaration' &&
+				node.type !== 'ExportNamedDeclaration' &&
+				node.type !== 'ExportAllDeclaration') ||
+			!Object.hasOwn(UNIVERSAL_SIGNAL_REQUESTS, node.source?.value)
+		)
+			continue;
+		const target = UNIVERSAL_SIGNAL_REQUESTS[node.source.value];
+		body ??= ast.body.slice();
+		body[index] = {
+			...node,
+			source: { ...node.source, value: target, raw: JSON.stringify(target) },
+		};
+	}
+	return body === null ? ast : { ...ast, body };
+}
+
 function validateRuntimeImports(ast, state) {
 	for (const node of ast.body ?? []) {
 		if (node.type !== 'ImportDeclaration' || node.source?.value !== 'octane') continue;
@@ -5504,6 +5543,10 @@ export function compileUniversal(
 	}
 	if (state.profile) state.helpers.profile = allocName(state, '__octaneProfileComponent');
 	validateRuntimeImports(ast, state);
+	// Native reads follow the authored imports, before signal hooks are routed.
+	const authoredNativeReads = nativeReadOptions(ast, {}).nativeReads;
+	ast = routeUniversalSignalImports(ast, renderer);
+	state.ast = ast;
 	prepareThreadFunctionAstReplacements(ast, state);
 	if (renderer.validation !== undefined) {
 		if (options.__universalValidationAst && options.__universalValidationRanges) {
@@ -5565,7 +5608,7 @@ export function compileUniversal(
 	const planDeclarations = universalPlanDeclarationsAst(state, moduleOrigin);
 	// A runtime signals import opts the module into native reads, as on the DOM
 	// target: the root then collects the signals each component render reads.
-	const nativeReads = nativeReadOptions(ast, {}).nativeReads
+	const nativeReads = authoredNativeReads
 		? [
 				inheritGeneratedOrigin(
 					b.stmt(

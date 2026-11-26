@@ -12718,7 +12718,13 @@ function compileInternal(
 						universalRuntime: undefined,
 						rendererBoundaries: undefined,
 						rendererRegistry: undefined,
-						__hookRuntimeModules: [...(options?.__hookRuntimeModules || []), renderer.module],
+						// The universal signals twin (routed from octane/signals/client) holds
+						// `useSignal$`, which keys its cell by the trailing hook slot.
+						__hookRuntimeModules: [
+							...(options?.__hookRuntimeModules || []),
+							renderer.module,
+							'octane/signals/universal',
+						],
 						__runtimeImportRoutes: [
 							...(options?.__runtimeImportRoutes ?? []),
 							...(renderer.threadFunctionsModule === undefined

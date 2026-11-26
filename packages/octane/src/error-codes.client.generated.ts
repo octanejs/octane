@@ -333,6 +333,7 @@ type ClientErrorArguments = {
 	371: [];
 	372: [];
 	373: [];
+	374: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -1473,6 +1474,11 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 			case 373:
 				return formatDevErrorMessage(
 					'Multiple retained signal subscriptions failed to release.',
+					args,
+				);
+			case 374:
+				return formatDevErrorMessage(
+					'useSignal$ in a universal renderer module requires a renderer with the signal-bindings capability.',
 					args,
 				);
 			default:
