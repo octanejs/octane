@@ -1038,7 +1038,7 @@ interface BlueprintRange {
 	// nor re-drafted, so reconciliation must adopt the committed records as-is.
 	retained?: LogicalRecord;
 	// New slot values for the retained range's single template-program host.
-	patch?: RetainedTemplatePatch;
+	patch?: RetainedTemplatePatch | undefined;
 }
 
 /**
@@ -3042,18 +3042,18 @@ function retainCommittedOwnerRange(
 	(parent.retainedChildren ??= []).push({ record, position: parent.children.length });
 	attempt.treeFeatures |= features;
 	attempt.retainedCount++;
-	const marker: BlueprintRange = {
-		kind: 'range',
-		key: record.range!.key,
-		owner: record,
-		retained: record.range!,
-		children: [],
-	};
-	if (patch !== undefined) {
-		marker.patch = patch;
-		(attempt.templatePatches ??= []).push(patch);
-	}
-	return [marker];
+	if (patch !== undefined) (attempt.templatePatches ??= []).push(patch);
+	// One literal for plain and patched markers, so both share a map.
+	return [
+		{
+			kind: 'range',
+			key: record.range!.key,
+			owner: record,
+			retained: record.range!,
+			children: [],
+			patch,
+		},
+	];
 }
 
 // A pure row (no hooks, components, refs or callbacks; see `forItemMemo`)
