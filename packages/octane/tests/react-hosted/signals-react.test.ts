@@ -475,6 +475,26 @@ describe('octane/signals/react', () => {
 		expect(container.textContent).toBe('null');
 	});
 
+	it('moves an optional reader between equal handles and a matching fallback', async () => {
+		const scope = createScope({ scopeKey: 'optional-replacement' });
+		const first = scope.signal$('first', 0);
+		const second = scope.signal$('second', 0);
+		function Reader({ source }: { source: SignalHandle<number> | number }) {
+			return h('output', null, useOptionalRetainedSignalValue(source));
+		}
+		const { root, container } = mount(h(Reader, { source: first }));
+		await act(() => root.render(h(Reader, { source: second })));
+		expect(subscribers(scope, 'first')).toBe(0);
+		await act(() => second.set(1));
+		expect(container.textContent).toBe('1');
+		await act(() => root.render(h(Reader, { source: 1 })));
+		expect(subscribers(scope, 'second')).toBe(0);
+		await act(() => second.set(2));
+		expect(container.textContent).toBe('1');
+		await act(() => root.render(h(Reader, { source: second })));
+		expect(container.textContent).toBe('2');
+	});
+
 	it('releases a replaced retained handle and follows changes to the retention policy', async () => {
 		const scope = createScope({ scopeKey: 'retention-policy' });
 		const first = scope.signal$('first', 'first');

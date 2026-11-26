@@ -164,15 +164,7 @@ export function useRetainedSignalValue<T>(
 	getServerSnapshot?: () => T,
 	retainOnHide?: boolean,
 ): T {
-	const defaults = use(RetainedSignalContext);
-	const subscribe = useActivitySubscription(handle$, defaults, retainOnHide);
-	const read = useCallback(() => handle$[SIGNAL_BINDING_READ](), [handle$]);
-	const resolve = defaults.getServerSnapshot;
-	return useSyncExternalStore(
-		subscribe,
-		read,
-		getServerSnapshot ?? (resolve ? () => resolve(handle$) : read),
-	);
+	return useRetainedReader(handle$, getServerSnapshot, retainOnHide);
 }
 
 export type SignalFallback = string | number | boolean | bigint | symbol | null | undefined;
@@ -182,19 +174,33 @@ type OptionalSignalValue<Source> = Source extends SignalHandle<infer T> ? T : So
 export function useOptionalRetainedSignalValue<
 	Source extends SignalHandle<unknown> | SignalFallback,
 >(source: Source): OptionalSignalValue<Source> {
+	return useRetainedReader(source);
+}
+
+function useRetainedReader<Source extends SignalHandle<unknown> | SignalFallback>(
+	source: Source,
+	getServerSnapshot?: () => unknown,
+	retainOnHide?: boolean,
+): OptionalSignalValue<Source> {
 	const defaults = use(RetainedSignalContext);
-	const handle = isSignalHandle(source) ? source : null;
-	const subscribe = useActivitySubscription(handle, defaults);
-	const read = useCallback(
-		() => (handle ? handle[SIGNAL_BINDING_READ]() : source) as OptionalSignalValue<Source>,
-		[handle, source],
+	const { binding, read, handle } = useMemo(
+		() =>
+			isSignalHandle(source)
+				? {
+						binding: activityBinding(source),
+						read: () => source[SIGNAL_BINDING_READ](),
+						handle: source,
+					}
+				: { binding: null, read: () => source, handle: null },
+		[source],
 	);
+	const subscribe = useActivitySubscription(binding, defaults, retainOnHide);
 	const resolve = defaults.getServerSnapshot;
 	return useSyncExternalStore(
 		subscribe,
 		read,
-		handle && resolve ? () => resolve(handle) as OptionalSignalValue<Source> : read,
-	);
+		getServerSnapshot ?? (handle && resolve ? () => resolve(handle) : read),
+	) as OptionalSignalValue<Source>;
 }
 
 type Subscribe = (notify: () => void) => () => void;
@@ -212,27 +218,28 @@ export function useSignalSubscription<T>(
 	retainOnHide?: boolean,
 ): Subscribe {
 	const defaults = use(RetainedSignalContext);
-	return useActivitySubscription(source, defaults, retainOnHide);
+	const binding = useMemo(() => (source === null ? null : activityBinding(source)), [source]);
+	return useActivitySubscription(binding, defaults, retainOnHide);
 }
 
-function useActivitySubscription<T>(
-	source: SignalHandle<T> | Subscribe | null,
+function useActivitySubscription(
+	binding: ReturnType<typeof activityBinding> | null,
 	defaults: RetainedSignalDefaults,
 	retainOnHide?: boolean,
 ): Subscribe {
-	const binding = useMemo(() => {
-		if (source === null) return null;
-		return activityBinding(
-			typeof source === 'function' ? source : (notify) => source[SIGNAL_BINDING_SUBSCRIBE](notify),
-		);
-	}, [source]);
 	const retention = (retainOnHide ?? defaults.retainOnHide) && (defaults.handoff ?? true);
 	useInsertionEffect(() => binding?.retain(retention), [binding, retention]);
 	useLayoutEffect(binding?.prepare ?? noop, [binding]);
 	return binding?.subscribe ?? subscribeToNothing;
 }
 
-function activityBinding(subscribe: Subscribe) {
+type SubscriptionSource = SignalHandle<unknown> | Subscribe;
+
+function attach(source: SubscriptionSource, notify: () => void) {
+	return typeof source === 'function' ? source(notify) : source[SIGNAL_BINDING_SUBSCRIBE](notify);
+}
+
+function activityBinding(source: SubscriptionSource) {
 	let handoff: Handoff | undefined;
 	let release: (() => void) | undefined;
 	let notify: (() => void) | undefined;
@@ -266,13 +273,13 @@ function activityBinding(subscribe: Subscribe) {
 			// On reveal, connect before React disconnects outgoing passive readers.
 			// Initial observation still starts in the passive subscription.
 			if (needsSnapshotCheck && !release) {
-				release = subscribe(invalidate);
+				release = attach(source, invalidate);
 				return releaseIfIdle;
 			}
 		},
 		subscribe(listener: () => void) {
 			notify = listener;
-			release ??= subscribe(invalidate);
+			release ??= attach(source, invalidate);
 			if (needsSnapshotCheck) {
 				needsSnapshotCheck = false;
 				listener();
