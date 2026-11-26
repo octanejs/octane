@@ -254,13 +254,26 @@ export function createDataHandler<C extends object = {}>(
 		context?: (request: Request, caller?: DataCaller) => C | Promise<C>;
 		/** Origins other than the request's own that may call this endpoint. */
 		allowedOrigins?: readonly string[];
-		/** Signs form tokens. Required for `forms()`; keep it out of client code. */
+		/**
+		 * Signs form tokens. Required for `forms()`; keep it out of client code. At
+		 * least 16 bytes (128 bits) of random text, the same for every server process.
+		 */
 		secret?: string;
 		/** The account a request acts for. A form signed for one account is refused for another. */
 		grant?: (context: C) => string;
 	},
 	define: (handle: Handle<C>, defineHandler: DefineHandler<C>) => readonly DataHandler[],
 ): DataServer {
+	const { secret } = options;
+	// A secret an attacker can guess lets them sign tokens for any account; an empty one from a
+	// blank variable would otherwise fail on every form instead of at startup.
+	if (
+		secret !== undefined &&
+		(typeof secret !== 'string' || new TextEncoder().encode(secret).length < 16)
+	)
+		throw new Error(
+			'octane/data: createDataHandler needs a `secret` of at least 16 bytes (128 bits) of random text',
+		);
 	const byName = new Map<string, DataHandler>();
 	for (const handler of define(handle, defineHandler)) {
 		const { name } = handler.contract;

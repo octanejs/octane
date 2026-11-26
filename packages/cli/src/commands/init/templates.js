@@ -593,8 +593,9 @@ const shelf: Book[] = [
 
 /**
  * Signs the tokens that tie a native form post to the page that served it. Set
- * FORMS_SECRET once more than one server process serves the app; without it,
- * each process signs with a secret of its own, which a restart replaces.
+ * FORMS_SECRET, at least 16 bytes of random text (\`openssl rand -base64 32\`),
+ * once more than one server process serves the app; without it, each process
+ * signs with a secret of its own, which a restart replaces.
  */
 const secret = process.env.FORMS_SECRET ?? crypto.randomUUID();
 
