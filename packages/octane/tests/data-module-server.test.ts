@@ -169,7 +169,7 @@ describe('octane/data over module server', () => {
 		const handler = createDataHandler(
 			{
 				context: (_request, caller) => ({ viewer: String(caller?.viewer) }),
-				secret: 'test secret',
+				secret: 'a test secret of at least sixteen bytes',
 				grant: ({ viewer }) => viewer,
 			},
 			(handle) => [

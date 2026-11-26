@@ -60,7 +60,7 @@ function createServer(contract = addNote, notes: Array<Note & { operationId: str
 	};
 	const handler = createDataHandler(
 		{
-			secret: 'test secret',
+			secret: 'a test secret of at least sixteen bytes',
 			context: (request) => ({ account: request.headers.get('x-account') ?? 'ada' }),
 			grant: (context) => context.account,
 		},
@@ -233,6 +233,27 @@ describe('octane/data forms on the server', () => {
 			priority: 'Required',
 		});
 		expect(server.log).toEqual([]);
+	});
+
+	it.each([
+		['an empty secret, as a blank variable gives', ''],
+		['a secret shorter than 16 bytes', 'fifteen bytes!!'],
+	])('refuses %s when the handler is made, not on each form', (_, secret) => {
+		expect(() => createDataHandler({ secret }, () => [])).toThrow(/at least 16 bytes/);
+	});
+
+	it('signs forms with a secret of 16 bytes, counted in UTF-8', async () => {
+		// Eight characters of two bytes each.
+		const handler = createDataHandler({ secret: 'ąćęłńóśź' }, (handle) => [
+			handle(addNote, () => {}),
+		]);
+		const session = await handler.forms(page());
+		expect(session.form.token).toMatch(/^[\w-]{43}$/);
+	});
+
+	it('refuses forms() without a secret, with a clear error', async () => {
+		const handler = createDataHandler({}, (handle) => [handle(addNote, () => {})]);
+		await expect(handler.forms(page())).rejects.toThrow(/needs a `secret`/);
 	});
 
 	it('refuses a form signed for another account, or posted from another origin', async () => {

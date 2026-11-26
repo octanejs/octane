@@ -244,7 +244,7 @@ An empty frame says the connection is open.
 | --- | --- |
 | `context(request, caller?)` | Authenticates a request and returns what handlers receive. `caller.viewer` and `caller.platform` come from server-function or middleware context. |
 | `allowedOrigins` | Origins other than the request's own that may call. Requests with no `Origin` are allowed. |
-| `secret` | Signs form tokens. Required for `forms()`. |
+| `secret` | Signs form tokens. Required for `forms()`. At least 16 bytes of random text, the same in every server process; a shorter or empty one throws when the handler is made. |
 | `grant(context)` | The account a request acts for; a form signed for one account is refused for another. |
 
 `define(handle, defineHandler)` returns `handle(contract, run)` entries; names
