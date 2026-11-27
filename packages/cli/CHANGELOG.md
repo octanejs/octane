@@ -1,5 +1,11 @@
 # @octanejs/cli
 
+## 0.4.1
+
+### Patch Changes
+
+- a5e5561: `createDataHandler` throws when it is given a `secret` shorter than 16 bytes, or an empty one such as a blank environment variable gives, instead of signing form tokens with a guessable key or failing on every form. The `data` template says how long `FORMS_SECRET` must be.
+
 ## 0.4.0
 
 ### Minor Changes

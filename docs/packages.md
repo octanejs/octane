@@ -26,9 +26,9 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/better-auth` | [`packages/better-auth`](../packages/better-auth) | framework binding | `0.0.31` | 1 |
 | `@octanejs/blocknote` | [`packages/blocknote`](../packages/blocknote) | framework binding | `0.1.23` | 2 |
 | `@octanejs/calendar` | [`packages/calendar`](../packages/calendar) | framework binding | `0.0.35` | 4 |
-| `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.4.0` | 4 |
+| `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.4.1` | 4 |
 | `@octanejs/cmdk` | [`packages/cmdk`](../packages/cmdk) | framework binding | `0.1.65` | 1 |
-| `@octanejs/codemod` | [`packages/codemod`](../packages/codemod) | developer tooling | `0.2.15` | 2 |
+| `@octanejs/codemod` | [`packages/codemod`](../packages/codemod) | developer tooling | `0.2.16` | 2 |
 | `@octanejs/colorful` | [`packages/colorful`](../packages/colorful) | framework binding | `0.0.44` | 1 |
 | `@octanejs/content-loader` | [`packages/content-loader`](../packages/content-loader) | framework binding | `0.0.34` | 2 |
 | `@octanejs/day-picker` | [`packages/day-picker`](../packages/day-picker) | framework binding | `0.0.45` | 12 |
@@ -143,8 +143,8 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/xyflow` | [`packages/xyflow`](../packages/xyflow) | framework binding | `0.1.36` | 3 |
 | `@octanejs/zag` | [`packages/zag`](../packages/zag) | framework binding | `0.0.45` | 1 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.80` | 8 |
-| `create-octane` | [`packages/create-octane`](../packages/create-octane) | project scaffolder | `0.0.26` | 1 |
-| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.27.0` | 61 |
+| `create-octane` | [`packages/create-octane`](../packages/create-octane) | project scaffolder | `0.0.27` | 1 |
+| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.27.1` | 61 |
 
 ## Private packages
 
