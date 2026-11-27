@@ -81,6 +81,7 @@ import {
 	type Stored,
 } from './persist.js';
 import { DATA_WORKER_PATH } from './worker-path.js';
+import { jsonExact } from './codec.js';
 
 /** The part of a `MessagePort` the owner and its replicas use. */
 export interface OwnerPort {
@@ -97,7 +98,13 @@ type ToOwner =
 	 * fences by account, and its build's contracts, which must match the first
 	 * build the owner served.
 	 */
-	| { readonly t: 'hello'; readonly account: string | undefined; readonly identity: string }
+	| {
+			readonly t: 'hello';
+			readonly account: string | undefined;
+			readonly identity: string;
+			/** The tab reads a message sent as JSON text, which an earlier one does not. */
+			readonly text?: true;
+	  }
 	/** Sign the account out, in every tab. */
 	| { readonly t: 'retire' }
 	/** Drop only this replica; its account and other replicas remain live. */
@@ -397,12 +404,29 @@ export function createDataOwner(options: {
 	/** Receipts looked up, by wire key, so every tab settles a write by the same answer. */
 	const receipts = new Map<string, Promise<DataReply>>();
 
+	/** The tabs that read a message sent as JSON text. */
+	const readsText = new WeakSet<OwnerPort>();
+	/**
+	 * Send `message` to each port it is given: as JSON text where JSON keeps it
+	 * exactly and the tab reads text, written once for them all. A tab parses a
+	 * large value's text faster than it takes a structured clone of its objects.
+	 */
+	const sender = (message: ToReplica) => {
+		let text: string | false | undefined;
+		return (port: OwnerPort) =>
+			port.postMessage(
+				(readsText.has(port) &&
+					(text ??= jsonExact(message, new Set()) && JSON.stringify(message))) ||
+					message,
+			);
+	};
 	const others = (from: OwnerPort, message: ToReplica) => {
-		for (const port of replicas) if (port !== from) port.postMessage(message);
+		const send = sender(message);
+		for (const port of replicas) if (port !== from) send(port);
 	};
 	/** Answer a replica, unless its account was retired since it asked. */
 	const post = (port: OwnerPort, message: ToReplica) => {
-		if (replicas.has(port)) port.postMessage(message);
+		if (replicas.has(port)) sender(message)(port);
 	};
 
 	/** The contracts of the first build served; a tab of another build is refused. */
@@ -993,6 +1017,7 @@ export function createDataOwner(options: {
 			port.addEventListener('message', ({ data }) => {
 				const message = data as ToOwner;
 				if (message.t === 'hello') {
+					if (message.text) readsText.add(port);
 					// The first build served decides which builds share this owner.
 					if (identity === undefined) {
 						identity = message.identity;
@@ -1519,7 +1544,7 @@ export function createReplica(
 		next.addEventListener('message', ({ data }) => {
 			if (port !== next) return;
 			unanswered = 0;
-			const message = data as ToReplica;
+			const message = (typeof data === 'string' ? JSON.parse(data) : data) as ToReplica;
 			switch (message.t) {
 				case 'live':
 					decide(true);
@@ -1593,6 +1618,7 @@ export function createReplica(
 			t: 'hello',
 			account: opened.get(next)?.account,
 			identity,
+			text: true,
 		} satisfies ToOwner);
 	}
 

@@ -35,9 +35,9 @@ export function decodeReply(text: string): unknown {
 /**
  * Whether `JSON.parse(JSON.stringify(value))` equals `value`, as devalue's
  * would: plain objects and arrays, each reached once, of strings, booleans,
- * null and finite numbers other than -0. JSON would drop `undefined` (which a
- * hole reads as), write a Date as text, and copy a value reached twice.
- * Neither keeps a list's other properties.
+ * null and finite numbers other than -0, and arrays with no other properties.
+ * JSON would drop `undefined` (which a hole reads as) and a list's other
+ * properties, write a Date as text, and copy a value reached twice.
  */
 export function jsonExact(value: unknown, seen: Set<object>): boolean {
 	if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
@@ -49,7 +49,8 @@ export function jsonExact(value: unknown, seen: Set<object>): boolean {
 		const array = value as unknown[];
 		for (let index = 0; index < array.length; index++)
 			if (!jsonExact(array[index], seen)) return false;
-		return true;
+		// Holes failed above, so any further key is a property beside the items.
+		return Object.keys(array).length === array.length;
 	}
 	if (proto !== Object.prototype) return false;
 	for (const key in value)

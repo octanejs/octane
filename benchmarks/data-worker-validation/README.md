@@ -95,6 +95,25 @@ Tab schema calls are 1 for `page` and 0 for `worker` throughout.
   tab as much in the worker lane as in the page lane, where the tab runs Zod
   itself. Copying the lists into packed ones in the worker costs what it saves
   there.
+- Since then, the worker sends a message that JSON keeps exactly as JSON text,
+  to a tab that reads text, and the tab parses it. A string crosses to a tab as
+  one copy, and the tab's `JSON.parse` builds its lists packed, whoever made
+  them. Main against that change, 8 rounds × 20 iterations, tab busy (ms):
+
+  | Rows | Runtime | Step | Page lane | Worker lane |
+  | ---: | --- | --- | ---: | ---: |
+  | 5,000 | Node | reply | 2.58 → 2.35 | 1.49 → 0.95 |
+  | 5,000 | Node | restore | 1.62 → 1.36 | 1.60 → 1.01 |
+  | 5,000 | Chromium | reply | 2.30 → 2.02 | 1.36 → 0.71 |
+  | 5,000 | Chromium | restore | 1.46 → 1.26 | 1.46 → 0.92 |
+  | 20,000 | Node | reply | 11.51 → 9.37 | 6.08 → 3.53 |
+  | 20,000 | Node | restore | 6.30 → 4.75 | 6.14 → 3.55 |
+  | 20,000 | Chromium | reply | 9.65 → 8.67 | 5.54 → 3.07 |
+  | 20,000 | Chromium | restore | 5.20 → 4.24 | 5.27 → 2.91 |
+
+  Worker-lane wall time fell too, by 0.3–3.6 ms. Page-lane replies, which the
+  worker does not validate, reached the tab up to 0.55 ms later (Chromium, 20,000
+  rows): the worker now checks that JSON keeps the value and writes it.
 - Most of the rest of a reply's wall time is the cache. The worker saves each
   reply, and a refresh that arrives during a save waits for it. Both lanes ask
   for one save per reply. In Node, where base64 is slow, how many share a
