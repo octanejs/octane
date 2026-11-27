@@ -82,9 +82,19 @@ Tab schema calls are 1 for `page` and 0 for `worker` throughout.
   and moving validation leaves both alone.
 - Validation adds its own cost to each reply in the worker: Zod's parse, and
   `cloneable()`, the walk that checks the value survives the trip to a tab.
-  In Node at 5,000 rows they take 0.35 ms and 0.8 ms; at 20,000, 1.7 ms and
-  3.5 ms. In Chromium, a 20,000-row reply reaches the tab 2.6 ms later when
-  the worker validates.
+  In Node at 5,000 rows they took 0.35 ms and 0.8 ms; at 20,000, 1.7 ms and
+  3.5 ms. In Chromium, a 20,000-row reply reached the tab 2.6 ms later when
+  the worker validated. Since then, the walk records the objects it has seen
+  only for a value deep or large enough to need it, which cut its share at
+  5,000 rows to about 0.33 ms (a CPU profile of the worker).
+- Zod builds its output lists holey, as `new Array(n)` does, and V8 copies a
+  holey list item by item, with each index. So a value the worker validated is
+  slower to post and to receive than the same rows decoded from JSON or the
+  cache: at 5,000 rows, 1.11 ms against 0.79 ms to serialize, 1.52 ms against
+  1.18 ms to deserialize, and 7% more bytes. That is why a restore costs the
+  tab as much in the worker lane as in the page lane, where the tab runs Zod
+  itself. Copying the lists into packed ones in the worker costs what it saves
+  there.
 - Most of the rest of a reply's wall time is the cache. The worker saves each
   reply, and a refresh that arrives during a save waits for it. Both lanes ask
   for one save per reply. In Node, where base64 is slow, how many share a
