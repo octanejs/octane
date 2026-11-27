@@ -1113,6 +1113,18 @@ describe('octane/data persistent cache', () => {
 			await store.dispose();
 		});
 
+		it('saves a value whose read is let go before the host task that collects it', async () => {
+			const { storage, values } = counted();
+			const store = counting(storage, { delay: 100 });
+			await store.prefetch({ ...count, keep: 10 }, undefined);
+			// A busy page runs the expired keep timer before the task that collects the change.
+			const busy = performance.now();
+			while (performance.now() - busy < 30);
+			await vi.waitFor(() => expect(values()).toBe(1), { timeout: 1_000 });
+			expect(await restored(storage)).toBe(1);
+			await store.dispose();
+		});
+
 		it('saves a value at once while the page is hidden, where timers are held back', async () => {
 			vi.stubGlobal('document', {
 				visibilityState: 'hidden',

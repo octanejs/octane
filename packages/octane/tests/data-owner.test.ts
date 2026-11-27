@@ -532,6 +532,31 @@ describe('octane/data owner and replicas', () => {
 		expect((await observed(offline.read(todos)))()[0]!.title).toBe('Latest');
 	});
 
+	it('forwards a replica’s save whose read is let go before the host task that sends it', async () => {
+		const server = createServer();
+		const backing = memoryStorage();
+		let saved = 0;
+		const storage = {
+			...backing,
+			async commit(...args: Parameters<typeof backing.commit>) {
+				saved += args[1].length;
+				await backing.commit(...args);
+			},
+		};
+		const persist = {
+			storage,
+			partition: 'ada',
+			key: 'a session secret of at least sixteen bytes',
+			budget: 4096,
+		};
+		const [first] = tabs(server.transport, 2, undefined, persist);
+		await first!.prefetch({ ...todos, keep: 10 }, undefined);
+		// A busy page runs the expired keep timer before the task that sends the change.
+		const busy = performance.now();
+		while (performance.now() - busy < 30);
+		await vi.waitFor(() => expect(saved).toBe(1), { timeout: 1_000 });
+	});
+
 	it('holds one feed connection for every tab, and closes it when the last tab stops listening', async () => {
 		const server = createServer();
 		const connections: Array<{ signal: AbortSignal; send(frame: FeedFrame): void }> = [];

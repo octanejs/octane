@@ -1191,7 +1191,7 @@ export function createReplica(
 	const marked = new Set<string>();
 	/** Send what changed once per host task, as a local store saves once per task. */
 	const flush = () => {
-		if (disposed) return marked.clear();
+		if (disposed) return (marked.clear(), released.clear());
 		const keys = [...marked];
 		marked.clear();
 		for (const key of keys) {
@@ -1213,8 +1213,15 @@ export function createReplica(
 			send({ t: 'persist', id: 0, op: 'save', args: [key, unchanged, true] });
 		}
 	};
+	/** Marked values collected before their reads were evicted, for the next flush. */
+	const released = new Map<string, ReturnType<Parameters<PersistenceFactory>[0]>>();
 	const forwarded: PersistenceFactory = (collectSaving, keyInUse) => {
-		collect = collectSaving;
+		collect = (key) => {
+			if (!released.has(key)) return collectSaving(key);
+			const saving = released.get(key);
+			released.delete(key);
+			return saving;
+		};
 		inUse = keyInUse;
 		return {
 			restore: (key, read) => persistAsk('restore', [key, read]),
@@ -1222,6 +1229,10 @@ export function createReplica(
 				if (disposed) return;
 				if (marked.size === 0) void served.then(() => postHostTask(flush));
 				marked.add(key);
+				released.delete(key);
+			},
+			release(key) {
+				if (marked.has(key)) released.set(key, collectSaving(key));
 			},
 			discard: (key, revision) => persistTell('discard', [key, revision]),
 			journal: (write) => persistAsk('journal', [write]),

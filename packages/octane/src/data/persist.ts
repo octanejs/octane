@@ -201,6 +201,8 @@ export interface Persistence {
 	restore(key: string, read: PersistedRead): Promise<(Stored & { revision: string }) | undefined>;
 	/** Save `key` in the next host task; `collect` reads its value then, and `null` deletes it. */
 	mark(key: string): void;
+	/** Collect `key`'s marked value now, before its read is evicted, so it is saved, not deleted. */
+	release(key: string): void;
 	/** Drop a saved value that failed validation or expired. */
 	discard(key: string, revision?: string): void;
 	/** Save a durable write; resolves once it is stored, or once storage has failed. */
@@ -727,6 +729,9 @@ export function createPersistence(
 		mark(key) {
 			dirty.add(key);
 			scheduleValues();
+		},
+		release(key) {
+			if (dirty.delete(key)) collected.set(key, collect(key));
 		},
 		discard(key, revision) {
 			void ready.then(async () => {

@@ -1326,6 +1326,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			entry.keepTimer = undefined;
 			// A handle outlives its entry; an evicted one must not show what it once held.
 			const view = isView(entry.read) ? entry.read.view : undefined;
+			// A busy page can run this before the host task that collects a marked value.
+			persisted?.release(entry.key);
 			forget(entry);
 			entries.delete(entry.key);
 			const lookup = lookupKey(entry.input);
