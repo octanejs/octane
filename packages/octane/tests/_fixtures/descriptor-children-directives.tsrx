@@ -136,3 +136,23 @@ export function KeyedSetupArmRows(props: { ids: string[]; inspect: Inspect }) @{
 		}
 	</Inspector>
 }
+
+export function KeylessEmptyKeyRows(props: { ids: string[]; inspect: Inspect }) @{
+	<Inspector inspect={props.inspect}>
+		@for (const id of props.ids) {
+			<Item key value={id} />
+		}
+	</Inspector>
+}
+
+export function KeylessIfEmptyKeyRows(props: { ids: string[]; hidden: string; inspect: Inspect }) @{
+	<Inspector inspect={props.inspect}>
+		@for (const id of props.ids) {
+			@if (id === 'c') {
+				<b key>{id}</b>
+			} @else if (id !== props.hidden) {
+				<Item key value={id} />
+			}
+		}
+	</Inspector>
+}
