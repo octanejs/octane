@@ -1,5 +1,11 @@
 # octane
 
+## 0.27.3
+
+### Patch Changes
+
+- eb95e5b: `octane/data` saves a changed value to the persistent cache even when its unobserved read is evicted before the next host task, as on a busy page, instead of deleting the saved copy.
+
 ## 0.27.2
 
 ### Patch Changes
