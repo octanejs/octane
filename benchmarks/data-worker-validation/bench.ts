@@ -7,7 +7,15 @@
 import { performance } from 'node:perf_hooks';
 import { MessageChannel, Worker } from 'node:worker_threads';
 import { counter } from './contracts.ts';
-import { LANES, add, report, type Lane, type Sample, type WorkerStats } from './report.ts';
+import {
+	LANES,
+	add,
+	report,
+	wireFrom,
+	type Lane,
+	type Sample,
+	type WorkerStats,
+} from './report.ts';
 import { replies, restores, type Link, type Measure } from './steps.ts';
 
 const args = process.argv.slice(2);
@@ -15,10 +23,11 @@ const quick = args.includes('--quick');
 const ROUNDS = Number(args.find((arg) => /^\d+$/.test(arg)) ?? (quick ? 2 : 8));
 const ITERATIONS = quick ? 5 : 20;
 const COUNT = Number(process.env.ROWS ?? 5000);
+const WIRE = wireFrom(args);
 
 function startWorker(validate: boolean): Link & { worker: Worker } {
 	const worker = new Worker(new URL('./worker.mjs', import.meta.url), {
-		workerData: { count: COUNT, validate },
+		workerData: { count: COUNT, validate, wire: WIRE },
 	});
 	return {
 		worker,
@@ -59,4 +68,11 @@ const workers = {
 	worker: await links.worker.ask<WorkerStats>({ calls: true }),
 };
 for (const link of Object.values(links)) await link.worker.terminate();
-report({ title: 'Node', count: COUNT, rounds: ROUNDS, iterations: ITERATIONS, workers });
+report({
+	title: 'Node',
+	wire: WIRE,
+	count: COUNT,
+	rounds: ROUNDS,
+	iterations: ITERATIONS,
+	workers,
+});

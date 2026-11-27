@@ -10,13 +10,14 @@ import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { LANES, STEPS, add, report, type Lane, type WorkerStats } from './report.ts';
+import { LANES, STEPS, add, report, wireFrom, type Lane, type WorkerStats } from './report.ts';
 
 const args = process.argv.slice(2);
 const quick = args.includes('--quick');
 const ROUNDS = Number(args.find((arg) => /^\d+$/.test(arg)) ?? (quick ? 2 : 8));
 const ITERATIONS = quick ? 5 : 20;
 const COUNT = Number(process.env.ROWS ?? 5000);
+const WIRE = wireFrom(args);
 
 const DIST = path.dirname(fileURLToPath(import.meta.url));
 const types: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript' };
@@ -47,7 +48,7 @@ try {
 		const { metrics } = await cdp.send('Performance.getMetrics');
 		return metrics.find((metric) => metric.name === 'TaskDuration')!.value;
 	};
-	await page.goto(`http://127.0.0.1:${port}/?count=${COUNT}`);
+	await page.goto(`http://127.0.0.1:${port}/?count=${COUNT}&wire=${WIRE}`);
 	await page.waitForFunction(() => '__bench' in globalThis);
 
 	for (let index = 0; index < ROUNDS; index++) {
@@ -77,6 +78,7 @@ try {
 	if (errors.length) throw new Error(`page errors: ${errors.join('; ')}`);
 	report({
 		title: `Chromium ${browser.version()}`,
+		wire: WIRE,
 		count: COUNT,
 		rounds: ROUNDS,
 		iterations: ITERATIONS,

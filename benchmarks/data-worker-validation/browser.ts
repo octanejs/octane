@@ -12,9 +12,13 @@ const search = new URLSearchParams(location.search);
 const count = Number(search.get('count'));
 
 function startWorker(validate: boolean): Link {
-	const worker = new Worker(`./browser-worker.js?count=${count}&validate=${validate ? 1 : 0}`, {
-		type: 'module',
-	});
+	const wire = search.get('wire') ?? 'none';
+	const worker = new Worker(
+		`./browser-worker.js?count=${count}&validate=${validate ? 1 : 0}&wire=${wire}`,
+		{
+			type: 'module',
+		},
+	);
 	return {
 		port() {
 			const channel = new MessageChannel();

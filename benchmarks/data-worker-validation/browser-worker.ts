@@ -1,5 +1,5 @@
 /** The data worker as a Chromium dedicated worker. See owner.ts. */
-import { startOwner, type Control } from './owner.ts';
+import { startOwner, type Control, type Wire } from './owner.ts';
 
 const scope = globalThis as unknown as {
 	location: { search: string };
@@ -7,7 +7,11 @@ const scope = globalThis as unknown as {
 	postMessage(message: unknown): void;
 };
 const search = new URLSearchParams(scope.location.search);
-const handle = startOwner(Number(search.get('count')), search.get('validate') === '1');
+const handle = startOwner(
+	Number(search.get('count')),
+	search.get('validate') === '1',
+	(search.get('wire') ?? 'none') as Wire,
+);
 scope.onmessage = ({ data }) => {
 	const answer = handle(data);
 	if (answer) scope.postMessage(answer);
