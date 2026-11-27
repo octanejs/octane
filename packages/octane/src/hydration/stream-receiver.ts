@@ -14,6 +14,7 @@ import {
 } from './control-capture.js';
 import {
 	hasStreamedControlEdit,
+	rememberStreamedSelectEdit,
 	retireStreamedControlEdit,
 	settleStreamedControlResets,
 	trackStreamedControlResets,
@@ -242,6 +243,15 @@ function updateControlPresentation(
 	return false;
 }
 
+function hasEditedRadioSelection(input: HTMLInputElement, template: HTMLTemplateElement): boolean {
+	if (input.type !== 'radio') return false;
+	if (!input.defaultChecked) return true;
+	// The inert document copies the dirty flag without upgrading customized inputs.
+	const probe = template.content.ownerDocument!.importNode(input, false);
+	probe.defaultChecked = false;
+	return probe.checked;
+}
+
 function restoreControl(control: PreservedControl): void {
 	const { element, snapshot, edited } = control;
 	if (edited && element.localName === 'input') {
@@ -282,20 +292,30 @@ function placeFullRegion(registration: StreamedRegionRegistration, html: string)
 	const oldNodes = rangeNodes(start, end);
 	const oldControls = keyedControls(oldNodes);
 	const ownerDocument = start.ownerDocument!;
+	const template = ownerDocument.createElement('template');
 	settleStreamedControlResets(ownerDocument);
 	const snapshots = new Map<string, PreservedControl>();
 	for (const [key, element] of oldControls) {
 		const snapshot = snapshotHydrationControl(element);
 		if (snapshot === null) continue;
-		const edited =
+		let edited =
 			hasStreamedControlEdit(element, snapshot.editRevision) ||
-			(element.localName === 'select' &&
-				element.namespaceURI === 'http://www.w3.org/1999/xhtml' &&
-				hasNonDefaultSelection(element as HTMLSelectElement));
+			(snapshot.checked === true &&
+				element.localName === 'input' &&
+				hasEditedRadioSelection(element as HTMLInputElement, template));
+		if (
+			!edited &&
+			element.localName === 'select' &&
+			element.namespaceURI === 'http://www.w3.org/1999/xhtml' &&
+			hasNonDefaultSelection(element as HTMLSelectElement)
+		) {
+			// A later frame can make the live selection its reset default.
+			rememberStreamedSelectEdit(element as HTMLSelectElement);
+			edited = true;
+		}
 		snapshots.set(key, { element, snapshot, edited });
 	}
 
-	const template = ownerDocument.createElement('template');
 	// This sink receives only a protocol-validated renderer artifact.
 	template.innerHTML = FRAMEWORK_POLICY ? FRAMEWORK_POLICY.createHTML(html) : html;
 	const incomingOpen = template.content.firstChild;
@@ -334,11 +354,7 @@ function placeFullRegion(registration: StreamedRegionRegistration, html: string)
 		// live group. Install the retained control with its final attributes.
 		current.remove();
 		const preserved = snapshots.get(key);
-		if (
-			updateControlPresentation(current, replacement, preserved) &&
-			preserved !== undefined &&
-			preserved.snapshot.editRevision !== 0
-		) {
+		if (updateControlPresentation(current, replacement, preserved) && preserved !== undefined) {
 			(discardedEdits ??= []).push(preserved);
 		}
 		replacement.replaceWith(current);

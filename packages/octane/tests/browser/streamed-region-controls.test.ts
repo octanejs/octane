@@ -117,6 +117,117 @@ it.each(['keyboard', 'eventless'])(
 	},
 );
 
+it('preserves eventless radio writes while refreshing untouched defaults', async () => {
+	const content = await buildReceiver();
+	const browser = await launchBrowser({ headless: true });
+	try {
+		const page = await browser.newPage();
+		await page.addScriptTag({ content });
+		const cases = await page.evaluate(async (identity) => {
+			const radio = (value: string, checked = false, group = 'choice') =>
+				`<input type="radio" data-octane-input="${value}" name="${group}" value="${value}"${checked ? ' checked' : ''}>`;
+			async function refresh(
+				initial: string,
+				incoming: string,
+				edit?: boolean,
+				stationary = false,
+			) {
+				const form = document.createElement('form');
+				if (stationary) {
+					form.innerHTML = radio('outside', false, 'destination');
+					form.querySelector('input')!.checked = true;
+				}
+				const start = document.createComment('[');
+				const end = document.createComment(']');
+				form.append(start, end);
+				document.body.append(form);
+				const receiver = window.OctaneStreamReceiver.createStreamedRegionReceiver(identity);
+				receiver.registerSelection(identity);
+				receiver.registerRegion({
+					identity,
+					start,
+					end,
+					contentRevision: 0,
+					isActive: () => false,
+					loadStyles() {},
+					adoptHistoricalFrame: () => ({ release() {} }),
+				});
+				const place = (sequence: number, html: string) =>
+					receiver.receive({
+						identity,
+						sequence,
+						channel: 'placement',
+						kind: 'html',
+						mode: 'full',
+						contentRevision: sequence + 1,
+						html: '<!--[-->' + html + '<!--]-->',
+						historicalFrame: { version: 1, scopeKey: identity.ownerKey, entries: [] },
+						styles: [],
+					});
+				await place(0, initial);
+				const original = form.querySelector<HTMLInputElement>('[value="b"]')!;
+				if (edit !== undefined) original.checked = edit;
+				const submitted = () => Object.fromEntries(new FormData(form));
+				const before = submitted();
+				const disposition = await place(1, incoming);
+				const after = submitted();
+				const same = form.querySelector('[value="b"]') === original;
+				form.reset();
+				const reset = submitted();
+				receiver.dispose();
+				form.remove();
+				return { before, disposition, after, same, reset };
+			}
+			return {
+				selected: await refresh(radio('a') + radio('b'), radio('b') + radio('a', true), true),
+				selectedAtDefault: await refresh(
+					radio('a') + radio('b', true),
+					radio('b') + radio('a', true),
+					true,
+				),
+				pristine: await refresh(radio('a', true) + radio('b'), radio('a') + radio('b', true)),
+				pristinePeers: await refresh(
+					radio('a', true) + radio('b'),
+					radio('a', true) + radio('b', true),
+				),
+				cleared: await refresh(
+					radio('a') + radio('b', true),
+					radio('a') + radio('b', true, 'destination'),
+					false,
+					true,
+				),
+			};
+		}, identity);
+		const retained = { disposition: 'accepted', same: true };
+		const edited = {
+			...retained,
+			before: { choice: 'b' },
+			after: { choice: 'b' },
+			reset: { choice: 'a' },
+		};
+		const untouched = {
+			...retained,
+			before: { choice: 'a' },
+			after: { choice: 'b' },
+			reset: { choice: 'b' },
+		};
+		expect(cases).toEqual({
+			selected: edited,
+			selectedAtDefault: edited,
+			pristine: untouched,
+			pristinePeers: untouched,
+			cleared: {
+				...retained,
+				before: { destination: 'outside' },
+				after: { destination: 'outside' },
+				reset: { destination: 'b' },
+			},
+		});
+	} finally {
+		await browser.close();
+	}
+});
+
 it('releases a removed form after its reset control moves out of a live streamed region', async () => {
 	const content = await buildReceiver();
 	const browser = await launchBrowser({ headless: true });

@@ -198,6 +198,32 @@ describe('form controls in dormant streamed regions', () => {
 		},
 	);
 
+	it.each(['keep', 'reset', 'cancel reset', 'remove option'])(
+		'remembers an eventless selection when a streamed default catches up (%s)',
+		async (action) => {
+			const { form, place } = dormantForm();
+			await place(0, choices('a'));
+			const choice = form.querySelector('select')!;
+			choice.value = 'b';
+			await place(1, choices('b'));
+			expect(choice.value).toBe('b');
+
+			if (action === 'cancel reset') {
+				form.addEventListener('reset', (event) => event.preventDefault(), { once: true });
+			}
+			if (action === 'reset' || action === 'cancel reset') form.reset();
+			if (action === 'remove option') {
+				await place(2, choices('c', ['a', 'c']));
+				expect(choice.value).toBe('c');
+			}
+			await place(action === 'remove option' ? 3 : 2, choices('a', ['a', 'b', 'c']));
+			expect(form.querySelector('select')).toBe(choice);
+			expect(new FormData(form).get('choice')).toBe(
+				action === 'keep' || action === 'cancel reset' ? 'b' : 'a',
+			);
+		},
+	);
+
 	it('preserves a later edit back to the default after a streamed selection fallback', async () => {
 		const { form, place } = dormantForm();
 		expect(await place(0, choices('a'))).toBe('accepted');

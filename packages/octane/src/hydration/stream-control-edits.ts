@@ -22,13 +22,19 @@ interface ResetCapture {
 
 const RESET_CAPTURES = /* @__PURE__ */ new WeakMap<Document, ResetCapture>();
 const RETIRED_EDITS = /* @__PURE__ */ new WeakMap<Element, number>();
+const INFERRED_SELECT_EDITS = /* @__PURE__ */ new WeakSet<Element>();
+
+export function rememberStreamedSelectEdit(select: HTMLSelectElement): void {
+	INFERRED_SELECT_EDITS.add(select);
+}
 
 export function hasStreamedControlEdit(control: Element, revision: number): boolean {
-	return revision > (RETIRED_EDITS.get(control) ?? 0);
+	return revision > (RETIRED_EDITS.get(control) ?? 0) || INFERRED_SELECT_EDITS.has(control);
 }
 
 export function retireStreamedControlEdit(control: Element, revision: number): void {
-	if (hasStreamedControlEdit(control, revision)) RETIRED_EDITS.set(control, revision);
+	INFERRED_SELECT_EDITS.delete(control);
+	if (revision > (RETIRED_EDITS.get(control) ?? 0)) RETIRED_EDITS.set(control, revision);
 }
 
 function settleControlResets(capture: ResetCapture): void {
