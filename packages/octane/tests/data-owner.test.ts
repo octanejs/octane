@@ -813,6 +813,22 @@ describe('octane/data replies validated by the owner', () => {
 		expect(calls).toEqual(['worker']);
 	});
 
+	it('keeps an object the value reaches twice as one object in the tab', async () => {
+		const {
+			stores,
+			calls,
+			read: meeting,
+		} = served({ start: '2026-11-24T10:00:00Z' }, (at) => {
+			const shared = { at };
+			return [shared, shared];
+		});
+		const shown = await observed(stores[0]!.read(meeting));
+		const [first, second] = shown().start as unknown as [object, object];
+		expect(first).toEqual({ at: '2026-11-24T10:00:00Z' });
+		expect(first).toBe(second);
+		expect(calls).toEqual(['worker']);
+	});
+
 	it('leaves an invalid reply to the page, which reports what was wrong', async () => {
 		const { stores, read: meeting } = served({ begins: 'soon' }, (at) => at);
 		const handle = stores[0]!.read(meeting);
@@ -1645,6 +1661,42 @@ describe('octane/data in a SharedWorker', () => {
 		);
 		expect(clears).toBe(0);
 		expect((await recordedExplicitAccount()).account).toBe('ada');
+	});
+
+	it('sends a reply as JSON text to a tab that reads it, and as objects to an earlier tab', async () => {
+		const owner = createDataOwner({
+			transport: async () => ({ ok: true, value: [{ id: 'a', title: 'Write' }] }),
+		});
+		/** A tab's port, saying in its hello whether it reads text, and what it hears. */
+		const tab = (text: boolean) => {
+			const channel = new MessageChannel();
+			owner.connect(channel.port1);
+			closers.push(() => (channel.port1.close(), channel.port2.close()));
+			const heard: unknown[] = [];
+			channel.port2.addEventListener('message', ({ data }) => heard.push(data));
+			channel.port2.start();
+			const identity = contractIdentity(contracts);
+			channel.port2.postMessage(
+				text
+					? { t: 'hello', account: undefined, identity, text }
+					: { t: 'hello', account: undefined, identity },
+			);
+			return { port: channel.port2, heard };
+		};
+		const earlier = tab(false);
+		const current = tab(true);
+		const request = { kind: 'read', name: 'todos.list', input: {} };
+		earlier.port.postMessage({ t: 'request', id: 1, request, fresh: false, receipt: false });
+		current.port.postMessage({ t: 'request', id: 1, request, fresh: false, receipt: false });
+		const reply = { t: 'reply', id: 1, reply: { ok: true, value: [{ id: 'a', title: 'Write' }] } };
+		await vi.waitFor(() => expect(earlier.heard).toContainEqual(expect.objectContaining(reply)));
+		await vi.waitFor(() =>
+			expect(
+				current.heard.map((data) => (typeof data === 'string' ? JSON.parse(data) : data)),
+			).toContainEqual(expect.objectContaining(reply)),
+		);
+		expect(current.heard.some((data) => typeof data === 'string')).toBe(true);
+		expect(earlier.heard.some((data) => typeof data === 'string')).toBe(false);
 	});
 
 	it('does not restore a delayed prior-grant commit into a new same-account grant', async () => {
