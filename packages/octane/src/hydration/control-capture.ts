@@ -57,7 +57,7 @@ function isHydrationElement(target: EventTarget | null): target is Element {
 }
 
 export interface HydrationControlSnapshot {
-	/** Advances for every captured input, including a clear-to-empty-string edit. */
+	/** Revision of the latest captured edit, or zero once adopted. */
 	readonly editRevision: number;
 	/** Advances independently when the platform reports a selection change. */
 	readonly selectionRevision: number;
@@ -123,8 +123,7 @@ function recordHydrationControlEvent(event: Event): void {
 	const record = hydrationControlRecord(control);
 	switch (event.type) {
 		case 'input':
-			record.editRevision++;
-			record.revision++;
+			record.editRevision = ++record.revision;
 			publishHydrationControlSignalValues(control, record.revision);
 			break;
 		case 'compositionstart':
@@ -151,6 +150,13 @@ function recordHydrationSelection(event: Event): void {
 	const record = hydrationControlRecord(control);
 	record.selectionRevision++;
 	record.revision++;
+}
+
+/** @internal Read edit provenance without taking a snapshot of the live value. */
+export function readHydrationControlEditRevision(control: Element): number {
+	return (
+		HYDRATE_CONTROL_RECORDS.get(control)?.editRevision ?? readEarlyHydrationControlRevision(control)
+	);
 }
 
 /**
@@ -311,8 +317,7 @@ export function applyHydrationControlCandidate(
 		}
 	}
 	const record = hydrationControlRecord(control);
-	record.editRevision++;
-	record.revision++;
+	record.editRevision = ++record.revision;
 	publishHydrationControlSignalValues(control, record.revision);
 	return true;
 }

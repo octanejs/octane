@@ -71,7 +71,7 @@ export interface StreamedSelectionState {
 	result: ResultState;
 	placementSequence: number;
 	contentRevision: number;
-	region?: StreamedRegionRegistration | undefined;
+	region?: { registration: StreamedRegionRegistration; unregister(): void } | undefined;
 	historical?: HistoricalFrameLease;
 	pendingPlacement?: { cancel(): void } | undefined;
 	failure?: StreamedReceiverError;
@@ -155,7 +155,7 @@ export function createStreamedResultReceiverState(
 		if (state !== undefined) {
 			if (state.failure !== undefined) return;
 			state.failure = error;
-			state.pendingPlacement?.cancel();
+			state.region?.unregister();
 			// A completed result stays useful if a later HTML placement fails.
 			// Pending results retain their failure even before their module joins.
 			if (!state.result.terminal) {
@@ -196,6 +196,7 @@ export function createStreamedResultReceiverState(
 		}, timeoutMs);
 	};
 	const registerSelection = (identity: StreamFrameIdentity, contentRevision = 0): void => {
+		if (disposed) return;
 		if (!isStreamFrameIdentity(identity)) {
 			throw new StreamedReceiverError('identity', formatClientError(253));
 		}
@@ -211,7 +212,7 @@ export function createStreamedResultReceiverState(
 		const key = slotKey(identity);
 		const previous = selections.get(key);
 		if (previous !== undefined) {
-			previous.pendingPlacement?.cancel();
+			previous.region?.unregister();
 			if (previous.result.timer !== undefined) clearHostTimeout(previous.result.timer);
 			previous.historical?.release();
 		}
@@ -332,7 +333,7 @@ export function createStreamedResultReceiverState(
 			throw new StreamedReceiverError('sequence', formatClientError(263));
 		}
 		state.placementSequence++;
-		const registration = state.region;
+		const registration = state.region?.registration;
 		if (registration === undefined || registration.isActive()) return 'stale';
 		if (frame.contentRevision <= state.contentRevision) return 'stale';
 		if (frame.mode === 'delta' && frame.baseRevision !== state.contentRevision) return 'stale';
