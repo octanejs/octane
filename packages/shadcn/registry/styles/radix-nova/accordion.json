@@ -12,7 +12,7 @@
     }
   ],
   "dependencies": [
-    "@octanejs/lucide@0.1.73",
+    "@octanejs/lucide@0.1.74",
     "@octanejs/radix@0.1.81",
     "cn"
   ]

@@ -28,7 +28,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/calendar` | [`packages/calendar`](../packages/calendar) | framework binding | `0.0.35` | 4 |
 | `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.4.1` | 4 |
 | `@octanejs/cmdk` | [`packages/cmdk`](../packages/cmdk) | framework binding | `0.1.65` | 1 |
-| `@octanejs/codemod` | [`packages/codemod`](../packages/codemod) | developer tooling | `0.2.18` | 2 |
+| `@octanejs/codemod` | [`packages/codemod`](../packages/codemod) | developer tooling | `0.2.19` | 2 |
 | `@octanejs/colorful` | [`packages/colorful`](../packages/colorful) | framework binding | `0.0.44` | 1 |
 | `@octanejs/content-loader` | [`packages/content-loader`](../packages/content-loader) | framework binding | `0.0.34` | 2 |
 | `@octanejs/day-picker` | [`packages/day-picker`](../packages/day-picker) | framework binding | `0.0.45` | 12 |
@@ -66,7 +66,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/lexical` | [`packages/lexical`](../packages/lexical) | framework binding | `0.2.23` | 50 |
 | `@octanejs/livestore` | [`packages/livestore`](../packages/livestore) | framework binding | `0.0.49` | 2 |
 | `@octanejs/lottie-react` | [`packages/lottie-react`](../packages/lottie-react) | framework binding | `0.0.11` | 1 |
-| `@octanejs/lucide` | [`packages/lucide`](../packages/lucide) | framework binding | `0.1.73` | 4 |
+| `@octanejs/lucide` | [`packages/lucide`](../packages/lucide) | framework binding | `0.1.74` | 4 |
 | `@octanejs/mantine-hooks` | [`packages/mantine-hooks`](../packages/mantine-hooks) | framework binding | `0.1.59` | 1 |
 | `@octanejs/markdown` | [`packages/markdown`](../packages/markdown) | framework binding | `0.0.44` | 1 |
 | `@octanejs/mcp-server` | [`packages/octane-mcp-server`](../packages/octane-mcp-server) | agent tooling | `0.3.15` | 3 |
@@ -101,7 +101,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/sanity-logos` | [`packages/sanity-logos`](../packages/sanity-logos) | framework binding | `0.1.28` | 2 |
 | `@octanejs/select` | [`packages/select`](../packages/select) | framework binding | `0.1.30` | 6 |
 | `@octanejs/seo` | [`packages/seo`](../packages/seo) | document metadata | `0.0.65` | 1 |
-| `@octanejs/shadcn` | [`packages/shadcn`](../packages/shadcn) | framework binding | `0.0.71` | 124 |
+| `@octanejs/shadcn` | [`packages/shadcn`](../packages/shadcn) | framework binding | `0.0.72` | 124 |
 | `@octanejs/solana-kit` | [`packages/solana-kit`](../packages/solana-kit) | framework binding | `0.0.50` | 2 |
 | `@octanejs/sonner` | [`packages/sonner`](../packages/sonner) | framework binding | `0.1.74` | 2 |
 | `@octanejs/spring` | [`packages/spring`](../packages/spring) | framework binding | `0.0.45` | 2 |
@@ -144,7 +144,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/zag` | [`packages/zag`](../packages/zag) | framework binding | `0.0.45` | 1 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.80` | 8 |
 | `create-octane` | [`packages/create-octane`](../packages/create-octane) | project scaffolder | `0.0.27` | 1 |
-| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.27.3` | 61 |
+| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.27.4` | 61 |
 
 ## Private packages
 
