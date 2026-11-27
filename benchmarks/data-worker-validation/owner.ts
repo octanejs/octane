@@ -35,7 +35,8 @@ export interface Control {
 export function startOwner(count: number, validate: boolean, wire: Wire = 'none') {
 	let round = 0;
 	let offline = false;
-	/** The characters of every reply sent over the wire. */
+	/** The replies sent over the wire, and their characters. */
+	let replies = 0;
 	let replyChars = 0;
 	const handler = createDataHandler({}, (handle) => [
 		handle(servedRows, () => makeRows(count, ++round)),
@@ -43,6 +44,7 @@ export function startOwner(count: number, validate: boolean, wire: Wire = 'none'
 	const call = { request: new Request('http://bench.test/'), signal: new AbortController().signal };
 	const send = async (text: string) => {
 		const reply = await handler.serve(text, call as never);
+		replies++;
 		replyChars += reply.length;
 		return reply;
 	};
@@ -70,9 +72,11 @@ export function startOwner(count: number, validate: boolean, wire: Wire = 'none'
 		persist: () => ({ storage, partition: PARTITION, key: KEY }),
 		contracts: validate ? [rows] : undefined,
 	});
-	return (message: Control): { calls: number; saves: number; replyChars: number } | undefined => {
+	return (
+		message: Control,
+	): { calls: number; saves: number; replies: number; replyChars: number } | undefined => {
 		if (message.port) owner.connect(message.port);
 		if (message.offline !== undefined) offline = message.offline;
-		return message.calls ? { calls: counter.calls, saves, replyChars } : undefined;
+		return message.calls ? { calls: counter.calls, saves, replies, replyChars } : undefined;
 	};
 }

@@ -110,14 +110,14 @@ lane (the worker validates):
 
 | Rows | Runtime | Wire | Reply text (chars) | Tab busy (ms) | Wall (ms) |
 | ---: | --- | --- | ---: | ---: | ---: |
-| 5,000 | Node | devalue | 480,738 | 1.57 | 11.57 |
-| 5,000 | Node | JSON | 565,266 | 1.63 | 7.93 |
-| 20,000 | Node | devalue | 1,979,625 | 6.21 | 54.09 |
-| 20,000 | Node | JSON | 2,286,540 | 6.18 | 32.58 |
-| 5,000 | Chromium | devalue | 480,738 | 1.42 | 9.20 |
-| 5,000 | Chromium | JSON | 565,266 | 1.49 | 6.30 |
-| 20,000 | Chromium | devalue | 1,979,625 | 5.72 | 42.63 |
-| 20,000 | Chromium | JSON | 2,286,540 | 5.63 | 26.40 |
+| 5,000 | Node | devalue | 501,640 | 1.57 | 11.57 |
+| 5,000 | Node | JSON | 589,843 | 1.63 | 7.93 |
+| 20,000 | Node | devalue | 2,065,696 | 6.21 | 54.09 |
+| 20,000 | Node | JSON | 2,385,955 | 6.18 | 32.58 |
+| 5,000 | Chromium | devalue | 501,640 | 1.42 | 9.20 |
+| 5,000 | Chromium | JSON | 589,843 | 1.49 | 6.30 |
+| 20,000 | Chromium | devalue | 2,065,696 | 5.72 | 42.63 |
+| 20,000 | Chromium | JSON | 2,385,955 | 5.63 | 26.40 |
 
 - JSON replies reach the tab about 30–40% sooner: the server encodes and the
   worker decodes several times faster than devalue.

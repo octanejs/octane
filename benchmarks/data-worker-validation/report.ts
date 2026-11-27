@@ -20,7 +20,8 @@ export interface Sample {
 export interface WorkerStats {
 	calls: number;
 	saves: number;
-	/** The characters of every reply the worker received over the wire (see owner.ts). */
+	/** The replies the worker received over the wire, and their characters (see owner.ts). */
+	replies: number;
 	replyChars: number;
 }
 
@@ -90,7 +91,7 @@ export function report(options: {
 			`\nWorker cache saves: page lane ${workers.page.saves}, worker lane ${workers.worker.saves}.` +
 			(wire === 'none'
 				? ''
-				: `\nReply text: ${Math.round(workers.page.replyChars / (rounds * (1 + iterations)))} characters per reply.`),
+				: `\nReply text: ${Math.round(workers.page.replyChars / workers.page.replies)} characters per reply.`),
 	);
 
 	// The work contract: the worker lane's tab never runs the schema; the page lane's runs it once per value.
