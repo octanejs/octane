@@ -17,6 +17,27 @@ function elementMarkup(node: Element): string {
 }
 
 describe('@octanejs/lucide — hydration', () => {
+	it('keeps an Octane `class` prop merged through server render and hydration', () => {
+		const props = { class: 'size-5', 'aria-label': 'Camera' };
+		const container = document.createElement('div');
+		container.innerHTML = renderToString(Camera, props).html;
+		document.body.appendChild(container);
+		const serverSvg = container.querySelector('svg')!;
+		expect(serverSvg.getAttribute('class')).toBe('lucide lucide-camera size-5');
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+		const root = hydrateRoot(container, Camera, props);
+		expect(container.querySelector('svg')).toBe(serverSvg);
+		expect(serverSvg.getAttribute('class')).toBe('lucide lucide-camera size-5');
+		expect(error).not.toHaveBeenCalled();
+		flushSync(() => root.render(Camera, { ...props, class: ['size-6', { spin: true }] }));
+		expect(serverSvg.getAttribute('class')).toBe('lucide lucide-camera size-6 spin');
+
+		root.unmount();
+		error.mockRestore();
+		container.remove();
+	});
+
 	it('adopts the server-rendered SVG host', () => {
 		const props = { size: 32, color: 'purple', className: 'hydrated', 'aria-label': 'Camera' };
 		const container = document.createElement('div');

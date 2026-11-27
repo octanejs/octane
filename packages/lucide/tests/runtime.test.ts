@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { mount } from '../../octane/tests/_helpers.js';
-import { createLucideIcon } from '@octanejs/lucide';
+import { Camera, createLucideIcon } from '@octanejs/lucide';
 import { IconGallery } from './_fixtures/icons.tsrx';
 
 describe('@octanejs/lucide — runtime behavior', () => {
@@ -46,6 +46,23 @@ describe('@octanejs/lucide — runtime behavior', () => {
 		expect(new Set(tokens).size).toBe(tokens.length);
 		mounted.unmount();
 		warn.mockRestore();
+	});
+
+	it('merges an Octane `class` prop with the icon classes', () => {
+		const cases: [Record<string, unknown>, string][] = [
+			[{ class: 'size-5' }, 'lucide lucide-camera size-5'],
+			[
+				{ class: ['size-5', false, { spin: true, hidden: false }] },
+				'lucide lucide-camera size-5 spin',
+			],
+			[{ className: 'toolbar-icon', class: 'size-5' }, 'lucide lucide-camera toolbar-icon size-5'],
+		];
+		for (const [props, expected] of cases) {
+			const mounted = mount(Camera, { id: 'classed', ...props });
+			const svg = mounted.find('#classed');
+			expect(svg.getAttribute('class')).toBe(expected);
+			mounted.unmount();
+		}
 	});
 
 	it('normalizes custom icon names like lucide-react', () => {
