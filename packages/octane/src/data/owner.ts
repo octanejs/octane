@@ -302,24 +302,54 @@ export function createDataOwner(options: {
 	let validating = false;
 	/** The replies and frames whose values this owner validated. */
 	const validated = new WeakSet<object>();
+	/** The values this owner validated that JSON keeps exactly. */
+	const exact = new WeakSet<object>();
+	/** No objects: `jsonExact` reads it for a primitive, which it never adds. */
+	const NONE = new Set<object>();
 	/**
 	 * `value` through `schema`, where the result survives the trip to a tab
 	 * unchanged; `NOT` where it fails or would not, and the tab validates it,
-	 * reporting what was wrong.
+	 * reporting what was wrong. With `json`, for a value its message holds
+	 * beside no other object, a result JSON keeps exactly also survives the
+	 * trip, and is marked so the message goes as text without a second walk.
 	 */
-	const validate = async (schema: StandardSchema<unknown, unknown>, value: unknown) => {
+	const validate = async (
+		schema: StandardSchema<unknown, unknown>,
+		value: unknown,
+		json = false,
+	) => {
 		try {
 			const output = await parse(schema, value);
-			return cloneable(output) ? output : NOT;
+			if (!json || !jsonExact(output, new Set())) return cloneable(output) ? output : NOT;
+			if (typeof output === 'object' && output) exact.add(output);
+			return output;
 		} catch {
 			return NOT;
 		}
+	};
+	/**
+	 * Whether JSON keeps `value` exactly, from what `exact` knows: a value in
+	 * it, or, `depth` levels down, a plain object of JSON's primitives and at
+	 * most one such value. With one object on each level, none is reached twice.
+	 */
+	const known = (value: object, depth: number): boolean => {
+		if (exact.has(value)) return true;
+		if (!depth || Object.getPrototypeOf(value) !== Object.prototype) return false;
+		let held = false;
+		for (const key in value) {
+			const item = (value as Record<string, unknown>)[key];
+			if (typeof item !== 'object' || item === null) {
+				if (!jsonExact(item, NONE)) return false;
+			} else if (held || !known(item, depth - 1)) return false;
+			else held = true;
+		}
+		return true;
 	};
 	/** A read's reply as the tabs should take it: validated here, where the value survives the trip. */
 	const check = async (name: string, reply: DataReply): Promise<DataReply> => {
 		const read = outputs.get(name);
 		if (!validating || !read || !reply.ok) return reply;
-		const value = await validate(read.output, reply.value);
+		const value = await validate(read.output, reply.value, true);
 		if (value === NOT) return reply;
 		const checked: DataReply = { ...reply, value };
 		validated.add(checked);
@@ -346,7 +376,7 @@ export function createDataOwner(options: {
 	const checkFrame = async (name: string, frame: FeedFrame): Promise<FeedFrame> => {
 		const feed = feedContracts.get(name);
 		if (!validating || !feed || !('event' in frame)) return frame;
-		const event = await validate(feed.event, frame.event);
+		const event = await validate(feed.event, frame.event, true);
 		if (event === NOT) return frame;
 		const checked = { ...frame, event };
 		validated.add(checked);
@@ -416,7 +446,8 @@ export function createDataOwner(options: {
 		return (port: OwnerPort) =>
 			port.postMessage(
 				(readsText.has(port) &&
-					(text ??= jsonExact(message, new Set()) && JSON.stringify(message))) ||
+					(text ??=
+						(known(message, 2) || jsonExact(message, new Set())) && JSON.stringify(message))) ||
 					message,
 			);
 	};
