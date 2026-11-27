@@ -114,6 +114,16 @@ Tab schema calls are 1 for `page` and 0 for `worker` throughout.
   Worker-lane wall time fell too, by 0.3–3.6 ms. Page-lane replies, which the
   worker does not validate, reached the tab up to 0.55 ms later (Chromium, 20,000
   rows): the worker now checks that JSON keeps the value and writes it.
+- Since then, a worker that validates a read's reply or a feed event checks
+  once that JSON keeps it, which also shows it survives a structured clone, so
+  the message sending it, which holds no other object, needs no second walk. On
+  this bench's Zod output, those checks went from 1.05 ms to 0.67 ms at 5,000
+  rows, and from 4.45 ms to 2.86 ms at 20,000 (a Node microbench of the two).
+  Worker-lane replies reached the tab 0.27–0.38 ms sooner at 5,000 rows and
+  about 1.6 ms sooner at 20,000; restores and the tab's busy time did not
+  move. A restore, a write and a reply told to the other tabs keep the old
+  walk: their messages hold other objects, such as the read's input or the
+  cache's tags, which could share an object with the value.
 - Most of the rest of a reply's wall time is the cache. The worker saves each
   reply, and a refresh that arrives during a save waits for it. Both lanes ask
   for one save per reply. In Node, where base64 is slow, how many share a

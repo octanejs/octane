@@ -36,6 +36,7 @@ import {
 	addTodo,
 	createServer,
 	removeTodo,
+	schema,
 	setDone,
 	todoChanges,
 	Todo,
@@ -1674,6 +1675,38 @@ describe('octane/data in a SharedWorker', () => {
 		);
 		expect(clears).toBe(0);
 		expect((await recordedExplicitAccount()).account).toBe('ada');
+	});
+
+	it('keeps a write’s output and the read it returns as one object in the tab, when the owner validated both', async () => {
+		// Schemas that return what they are given, as one that only checks does.
+		const rename = write({
+			name: 'todos.rename',
+			input: schema<{ title: string }>(() => true),
+			output: schema<TodoItem[]>(() => true),
+		});
+		const shared = [{ id: 'a', title: 'Renamed', done: false }];
+		const owner = createDataOwner({
+			transport: async (request) =>
+				request.kind === 'write'
+					? {
+							ok: true,
+							value: shared,
+							refreshed: [{ name: 'todos.list', input: undefined, value: shared }],
+						}
+					: { ok: true, value: [{ id: 'a', title: 'Write', done: false }] },
+			contracts: [...contracts, rename],
+		});
+		const channel = new MessageChannel();
+		owner.connect(channel.port1);
+		const store = createReplica(channel.port2, {
+			...replicaOptions,
+			contracts: [...contracts, rename],
+		});
+		closers.push(() => (void store.dispose(), channel.port1.close(), channel.port2.close()));
+		const list = await observed(store.read(todos));
+		const output = await store.write(rename, { title: 'Renamed' });
+		await vi.waitFor(() => expect(list()[0]!.title).toBe('Renamed'));
+		expect(output).toBe(list());
 	});
 
 	it('sends a reply as JSON text to a tab that reads it, and as objects to an earlier tab', async () => {
