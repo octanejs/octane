@@ -26805,8 +26805,9 @@ function inspectableDirectiveValue(directive, ctx) {
 		directive.left?.declarations?.length !== 1
 	)
 		return null;
-	const row = renderOnlyArmOutput(directive.body);
-	if (row === null || row === undefined) return null;
+	const output = renderOnlyArmOutput(directive.body);
+	if (output === null || output === undefined) return null;
+	const row = withoutEmptyRowKeys(output);
 	const keyed =
 		row.type === 'JSXElement' &&
 		keyAttributeExpression(row.openingElement.attributes.find(isKeyAttribute)) !== null;
@@ -26877,6 +26878,32 @@ function keyedRowValue(arm, key, ctx) {
 		children,
 		output,
 	);
+}
+
+// A row without the empty `key` of its own elements: the row element, or the one
+// each arm of a render-only @if renders. An empty key names nothing, as the
+// template list reads it, so the row is identified by the header key or by its
+// position. Left in place, it becomes every row's shared key, `true`.
+function withoutEmptyRowKeys(arm) {
+	const output = arm.type === 'IfStatement' ? arm : renderOnlyArmOutput(arm);
+	if (output == null) return arm;
+	let value = output;
+	if (output.type === 'JSXElement') {
+		const { attributes } = output.openingElement;
+		const own = attributes.find(isKeyAttribute);
+		if (own !== undefined && keyAttributeExpression(own) === null) {
+			const kept = attributes.filter((attribute) => !isKeyAttribute(attribute));
+			value = { ...output, openingElement: { ...output.openingElement, attributes: kept } };
+		}
+	} else if (output.type === 'JSXIfExpression' || output.type === 'IfStatement') {
+		const consequent = withoutEmptyRowKeys(output.consequent);
+		const alternate =
+			output.alternate == null ? output.alternate : withoutEmptyRowKeys(output.alternate);
+		if (consequent !== output.consequent || alternate !== output.alternate)
+			value = { ...output, consequent, alternate };
+	}
+	if (value === output) return arm;
+	return arm === output ? value : { ...arm, body: [value] };
 }
 
 // An arm's single output node, undefined for an empty arm, or null when the arm

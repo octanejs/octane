@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Children, flushSync, Fragment, hydrateRoot, isValidElement } from 'octane';
 import { renderToString } from 'octane/server';
 import { mount } from './_helpers.js';
@@ -11,6 +11,8 @@ import {
 	KeyedGroupRows,
 	KeyedIfRows,
 	KeyedSetupArmRows,
+	KeylessEmptyKeyRows,
+	KeylessIfEmptyKeyRows,
 	KeylessIfRows,
 	NestedForChildren,
 	SetupArmChildren,
@@ -107,6 +109,49 @@ describe('descriptorChildren template directives', () => {
 		expect(mounted.container.textContent).toBe('cba');
 		expect(mounted.container.querySelectorAll('.item')[2]).toBe(first);
 		mounted.unmount();
+	});
+
+	it('keys keyless @for rows with a valueless `key` by position, without a warning', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		try {
+			const { seen, inspect } = inspector();
+			const mounted = mount(KeylessEmptyKeyRows, { ids: ['a', 'b'], inspect });
+			expect(seen.at(-1)).toEqual(['Item.0', 'Item.1']);
+
+			flushSync(() => mounted.root.render(KeylessEmptyKeyRows, { ids: ['b', 'a'], inspect }));
+			expect(seen.at(-1)).toEqual(['Item.0', 'Item.1']);
+			expect(mounted.container.textContent).toBe('ba');
+			mounted.unmount();
+			expect(error).not.toHaveBeenCalled();
+			expect(warn).not.toHaveBeenCalled();
+		} finally {
+			error.mockRestore();
+			warn.mockRestore();
+		}
+	});
+
+	it('keys keyless @for rows whose nested @if arms have a valueless `key` by position', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		try {
+			const { seen, inspect } = inspector();
+			const props = { ids: ['a', 'b', 'c'], hidden: 'b', inspect };
+			const mounted = mount(KeylessIfEmptyKeyRows, props);
+			expect(seen.at(-1)).toEqual(['Item.0', 'b.2']);
+
+			flushSync(() =>
+				mounted.root.render(KeylessIfEmptyKeyRows, { ...props, ids: ['c', 'b', 'a'] }),
+			);
+			expect(seen.at(-1)).toEqual(['b.0', 'Item.2']);
+			expect(mounted.container.textContent).toBe('ca');
+			mounted.unmount();
+			expect(error).not.toHaveBeenCalled();
+			expect(warn).not.toHaveBeenCalled();
+		} finally {
+			error.mockRestore();
+			warn.mockRestore();
+		}
 	});
 
 	it('lowers directives nested in a host child of a marked part', () => {
@@ -277,6 +322,13 @@ describe('descriptorChildren template directives', () => {
 			[IfChildren, server.IfChildren, { shown: true, other: false }, ''],
 			[ForChildren, server.ForChildren, { ids: ['a', 'b'] }, 'ab'],
 			[NestedForChildren, server.NestedForChildren, { ids: ['a', 'b', 'c'] }, 'bc'],
+			[KeylessEmptyKeyRows, server.KeylessEmptyKeyRows, { ids: ['a', 'b'] }, 'ab'],
+			[
+				KeylessIfEmptyKeyRows,
+				server.KeylessIfEmptyKeyRows,
+				{ ids: ['a', 'b', 'c'], hidden: 'b' },
+				'ac',
+			],
 		] as const) {
 			const serverSeen = inspector(server.Item);
 			const html = renderToString(serverComponent, {
