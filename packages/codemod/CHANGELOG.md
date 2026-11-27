@@ -1,5 +1,12 @@
 # @octanejs/codemod
 
+## 0.2.17
+
+### Patch Changes
+
+- Updated dependencies [fa216c1]
+  - octane@0.27.2
+
 ## 0.2.16
 
 ### Patch Changes
