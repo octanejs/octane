@@ -13,7 +13,7 @@
   ],
   "dependencies": [
     "@octanejs/base-ui@0.1.81",
-    "@octanejs/lucide@0.1.73",
+    "@octanejs/lucide@0.1.74",
     "cn"
   ],
   "registryDependencies": [

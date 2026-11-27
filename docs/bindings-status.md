@@ -946,7 +946,7 @@ See also: [`packages/lottie-react/README.md`](../packages/lottie-react/README.md
 
 ## @octanejs/lucide
 
-[`packages/lucide`](../packages/lucide) `0.1.73` — ports `lucide-react@1.24.0`. Status data: [`packages/lucide/status.json`](../packages/lucide/status.json).
+[`packages/lucide`](../packages/lucide) `0.1.74` — ports `lucide-react@1.24.0`. Status data: [`packages/lucide/status.json`](../packages/lucide/status.json).
 
 Complete against the published `lucide-react@1.24.0` runtime surface: every canonical icon and alias, the `icons` namespace, `Icon`, `createLucideIcon`, `LucideProvider`, `useLucideContext`, `DynamicIcon`, `iconNames`, `dynamicIconImports`, and per-icon subpath imports.
 
@@ -1514,7 +1514,7 @@ Scope/evidence last checked: 2026-08-03.
 
 ## @octanejs/shadcn
 
-[`packages/shadcn`](../packages/shadcn) `0.0.71` — ports `shadcn-ui/ui (component registry)@7c9eaba1c0a6404c990c144a654792e3313c650d + shadcn@4.21.0`. Status data: [`packages/shadcn/status.json`](../packages/shadcn/status.json).
+[`packages/shadcn`](../packages/shadcn) `0.0.72` — ports `shadcn-ui/ui (component registry)@7c9eaba1c0a6404c990c144a654792e3313c650d + shadcn@4.21.0`. Status data: [`packages/shadcn/status.json`](../packages/shadcn/status.json).
 
 Registry-first source binding with Radix (44 families, bare subpaths), React Aria (33, react-aria/<Family>), and Base UI (43, base-ui/<Family>) implementations. The registry emits base-nova (default), radix-nova, and aria-nova styles. The 4.21.0 update migrates class merging to cn@0.2.6 across all existing families while preserving tested Octane adaptations and local style choices. Base UI Select, Navigation Menu, and Scroll Area are transcribed from the release registry, resolved with its Nova style and Lucide icons, and target Base UI 1.8.0. The 44-family inventory is the current Octane scope, not the complete upstream registry: Base UI Sonner and additional upstream families such as Combobox remain outside it. Existing derived styles retain their unverified upstream-fidelity status.
 

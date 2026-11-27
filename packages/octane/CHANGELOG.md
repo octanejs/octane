@@ -1,5 +1,13 @@
 # octane
 
+## 0.27.4
+
+### Patch Changes
+
+- 036063e: A data worker that validates a read's reply or a feed event now checks once that JSON keeps it, in place of walking it twice before sending it to a tab as text.
+- 7418b57: The data worker sends a reply, a restored value, or any other message that JSON keeps exactly to its tabs as JSON text, and the tab parses it. That's faster to receive than a structured clone of the same objects. In Chromium, a tab takes a 20,000-row reply the worker validated in 3.1 ms instead of 5.5 ms. A tab says it reads text when it connects, so a tab from an earlier version still gets objects.
+- 3baf57f: Apply the latest attributes and reset defaults to keyed form controls in dormant streamed SSR regions. Compatible controls keep their DOM identity and native edits, and newly disabled fields are excluded from form submission.
+
 ## 0.27.3
 
 ### Patch Changes

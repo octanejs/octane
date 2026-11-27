@@ -13,7 +13,7 @@
   ],
   "dependencies": [
     "@octanejs/aria@0.0.76",
-    "@octanejs/lucide@0.1.73",
+    "@octanejs/lucide@0.1.74",
     "cn"
   ]
 }

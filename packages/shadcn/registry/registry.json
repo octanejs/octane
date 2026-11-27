@@ -63,7 +63,7 @@
       "title": "Accordion",
       "dependencies": [
         "@octanejs/base-ui@0.1.81",
-        "@octanejs/lucide@0.1.73",
+        "@octanejs/lucide@0.1.74",
         "cn"
       ],
       "files": [
@@ -171,7 +171,7 @@
       "type": "registry:ui",
       "title": "Breadcrumb",
       "dependencies": [
-        "@octanejs/lucide@0.1.73",
+        "@octanejs/lucide@0.1.74",
         "cn"
       ],
       "files": [
@@ -223,7 +223,7 @@
       "title": "Checkbox",
       "dependencies": [
         "@octanejs/base-ui@0.1.81",
-        "@octanejs/lucide@0.1.73",
+        "@octanejs/lucide@0.1.74",
         "cn"
       ],
       "files": [
@@ -255,7 +255,7 @@
       "title": "Context Menu",
       "dependencies": [
         "@octanejs/base-ui@0.1.81",
-        "@octanejs/lucide@0.1.73",
+        "@octanejs/lucide@0.1.74",
         "cn"
       ],
       "files": [
@@ -272,7 +272,7 @@
       "title": "Dialog",
       "dependencies": [
         "@octanejs/base-ui@0.1.81",
-        "@octanejs/lucide@0.1.73",
+        "@octanejs/lucide@0.1.74",
         "cn"
       ],
       "registryDependencies": [
@@ -292,7 +292,7 @@
       "title": "Dropdown Menu",
       "dependencies": [
         "@octanejs/base-ui@0.1.81",
-        "@octanejs/lucide@0.1.73",
+        "@octanejs/lucide@0.1.74",
         "cn"
       ],
       "files": [
@@ -435,7 +435,7 @@
       "title": "Menubar",
       "dependencies": [
         "@octanejs/base-ui@0.1.81",
-        "@octanejs/lucide@0.1.73",
+        "@octanejs/lucide@0.1.74",
         "cn"
       ],
       "files": [
@@ -451,7 +451,7 @@
       "type": "registry:ui",
       "title": "Native Select",
       "dependencies": [
-        "@octanejs/lucide@0.1.73",
+        "@octanejs/lucide@0.1.74",
         "cn"
       ],
       "registryDependencies": [
@@ -471,7 +471,7 @@
       "title": "Navigation Menu",
       "dependencies": [
         "@octanejs/base-ui@0.1.81",
-        "@octanejs/lucide@0.1.73",
+        "@octanejs/lucide@0.1.74",
         "class-variance-authority",
         "cn"
       ],
@@ -488,7 +488,7 @@
       "type": "registry:ui",
       "title": "Pagination",
       "dependencies": [
-        "@octanejs/lucide@0.1.73",
+        "@octanejs/lucide@0.1.74",
         "cn"
       ],
       "registryDependencies": [
@@ -540,7 +540,7 @@
       "title": "Radio Group",
       "dependencies": [
         "@octanejs/base-ui@0.1.81",
-        "@octanejs/lucide@0.1.73",
+        "@octanejs/lucide@0.1.74",
         "cn"
       ],
       "files": [
@@ -573,7 +573,7 @@
       "title": "Select",
       "dependencies": [
         "@octanejs/base-ui@0.1.81",
-        "@octanejs/lucide@0.1.73",
+        "@octanejs/lucide@0.1.74",
         "cn"
       ],
       "files": [
@@ -606,7 +606,7 @@
       "title": "Sheet",
       "dependencies": [
         "@octanejs/base-ui@0.1.81",
-        "@octanejs/lucide@0.1.73",
+        "@octanejs/lucide@0.1.74",
         "cn"
       ],
       "registryDependencies": [
@@ -625,7 +625,7 @@
       "type": "registry:ui",
       "title": "Sidebar",
       "dependencies": [
-        "@octanejs/lucide@0.1.73",
+        "@octanejs/lucide@0.1.74",
         "class-variance-authority",
         "cn"
       ],
@@ -685,7 +685,7 @@
       "type": "registry:ui",
       "title": "Spinner",
       "dependencies": [
-        "@octanejs/lucide@0.1.73",
+        "@octanejs/lucide@0.1.74",
         "cn"
       ],
       "files": [

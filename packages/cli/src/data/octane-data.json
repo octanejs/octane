@@ -948,7 +948,7 @@
     },
     {
       "name": "@octanejs/lucide",
-      "version": "0.1.73",
+      "version": "0.1.74",
       "category": "Icons",
       "upstream": { "package": "lucide-react", "version": "1.24.0" },
       "surface": "Complete against the published `lucide-react@1.24.0` runtime surface: every canonical icon and alias, the `icons` namespace, `Icon`, `createLucideIcon`, `LucideProvider`, `useLucideContext`, `DynamicIcon`, `iconNames`, `dynamicIconImports`, and per-icon subpath imports.",
@@ -1688,7 +1688,7 @@
     },
     {
       "name": "@octanejs/shadcn",
-      "version": "0.0.71",
+      "version": "0.0.72",
       "category": "UI Libraries",
       "upstream": {
         "package": "shadcn-ui/ui (component registry)",
