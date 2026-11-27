@@ -34,6 +34,8 @@ Each lane times two steps, 20 times per round:
 node benchmarks/data-worker-validation/run.mjs              # Node, 8 rounds × 20 iterations
 node benchmarks/data-worker-validation/run.mjs --chromium   # headless Chromium
 node benchmarks/data-worker-validation/run.mjs --quick      # 2 rounds × 5 iterations
+node benchmarks/data-worker-validation/run.mjs --wire=json  # replies over the wire, JSON where exact
+node benchmarks/data-worker-validation/run.mjs --wire=devalue
 ROWS=20000 node benchmarks/data-worker-validation/run.mjs 4
 ```
 
@@ -90,3 +92,35 @@ Tab schema calls are 1 for `page` and 0 for `worker` throughout.
   run. In Chromium every reply was written on its own (168 of 168 in both
   lanes). The bench prints the writes but doesn't check them.
 - Neither step includes network time, which in an app usually dwarfs both.
+
+## Over the wire
+
+With `--wire=json` or `--wire=devalue`, each reply goes through a
+`createDataHandler`, encoded as text, and back through a client transport, all
+inside the worker, as a reply from the app's server would be decoded there.
+`json` uses `serverTransport`, which asks for JSON where it keeps the reply
+exactly. `devalue` uses a client that does not ask, as one from before JSON
+replies. The server validates with Zod alone (`servedRows`), so the schema-call
+contract still counts only the client's validation. The report adds each
+reply's length. Neither includes the network, or compression: compressed, the
+JSON text of these rows is less than half the size of devalue's.
+
+Apple M5 Max, Node 24.18 and Chromium 149, 8 rounds × 20 iterations, worker
+lane (the worker validates):
+
+| Rows | Runtime | Wire | Reply text (chars) | Tab busy (ms) | Wall (ms) |
+| ---: | --- | --- | ---: | ---: | ---: |
+| 5,000 | Node | devalue | 501,640 | 1.57 | 11.57 |
+| 5,000 | Node | JSON | 589,843 | 1.63 | 7.93 |
+| 20,000 | Node | devalue | 2,065,696 | 6.21 | 54.09 |
+| 20,000 | Node | JSON | 2,385,955 | 6.18 | 32.58 |
+| 5,000 | Chromium | devalue | 501,640 | 1.42 | 9.20 |
+| 5,000 | Chromium | JSON | 589,843 | 1.49 | 6.30 |
+| 20,000 | Chromium | devalue | 2,065,696 | 5.72 | 42.63 |
+| 20,000 | Chromium | JSON | 2,385,955 | 5.63 | 26.40 |
+
+- JSON replies reach the tab about 30–40% sooner: the server encodes and the
+  worker decodes several times faster than devalue.
+- The tab's busy time does not change, since the worker decodes the reply, and
+  restores, which read the cache, are the same with either wire.
+

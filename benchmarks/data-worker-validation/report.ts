@@ -20,6 +20,17 @@ export interface Sample {
 export interface WorkerStats {
 	calls: number;
 	saves: number;
+	/** The replies the worker received over the wire, and their characters (see owner.ts). */
+	replies: number;
+	replyChars: number;
+}
+
+/** `--wire=json|devalue`: how replies reach the owner (see owner.ts); none by default. */
+export function wireFrom(args: string[]): 'none' | 'json' | 'devalue' {
+	const wire = args.find((arg) => arg.startsWith('--wire='))?.slice(7) ?? 'none';
+	if (wire !== 'none' && wire !== 'json' && wire !== 'devalue')
+		throw new Error(`--wire must be json or devalue, not ${wire}`);
+	return wire;
 }
 
 export const median = (values: number[]) => {
@@ -50,12 +61,14 @@ export function add(lane: Lane, step: Step, samples: Sample[]): void {
 
 export function report(options: {
 	title: string;
+	wire?: string;
 	count: number;
 	rounds: number;
 	iterations: number;
 	workers: Record<Lane, WorkerStats>;
 }): void {
 	const { title, count, rounds, iterations, workers } = options;
+	const wire = options.wire ?? 'none';
 	const rowsOut = STEPS.flatMap((step) =>
 		LANES.map((lane) => {
 			const { busy, wall, pageCalls } = results[lane][step];
@@ -63,7 +76,7 @@ export function report(options: {
 		}),
 	);
 	console.log(
-		`data-worker-validation (${title}): ${count} rows, ${rounds} rounds × ${iterations} iterations, median of round medians\n`,
+		`data-worker-validation (${title}, wire: ${wire}): ${count} rows, ${rounds} rounds × ${iterations} iterations, median of round medians\n`,
 	);
 	console.log('| Step | Lane | Tab schema calls | Tab busy (ms) | Wall (ms) | Busy ÷ page |');
 	console.log('| --- | --- | ---: | ---: | ---: | ---: |');
@@ -75,7 +88,10 @@ export function report(options: {
 	}
 	console.log(
 		`\nWorker schema calls: page lane ${workers.page.calls}, worker lane ${workers.worker.calls}.` +
-			`\nWorker cache saves: page lane ${workers.page.saves}, worker lane ${workers.worker.saves}.`,
+			`\nWorker cache saves: page lane ${workers.page.saves}, worker lane ${workers.worker.saves}.` +
+			(wire === 'none'
+				? ''
+				: `\nReply text: ${Math.round(workers.page.replyChars / workers.page.replies)} characters per reply.`),
 	);
 
 	// The work contract: the worker lane's tab never runs the schema; the page lane's runs it once per value.
@@ -96,6 +112,6 @@ export function report(options: {
 	if (process.env.BENCH_JSON)
 		writeFileSync(
 			process.env.BENCH_JSON,
-			JSON.stringify({ runtime: title, count, rows: rowsOut, workers }, null, 2),
+			JSON.stringify({ runtime: title, wire, count, rows: rowsOut, workers }, null, 2),
 		);
 }

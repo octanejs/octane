@@ -24,6 +24,7 @@ const shared = {
 	logLevel: 'warning',
 	define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
 	alias: {
+		'octane/data/server': path.join(source, 'data/server.ts'),
 		'octane/data': path.join(source, 'data/index.ts'),
 		devalue: fromOctane.resolve('devalue'),
 		// Zod 4, from a workspace package that depends on it.

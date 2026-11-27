@@ -13,6 +13,7 @@
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "paths": {
+      "octane/data/server": ["../../packages/octane/src/data/server.ts"],
       "octane/data": ["../../packages/octane/src/data/index.ts"],
       "devalue": ["../../packages/octane/node_modules/devalue"],
       "zod": ["../../packages/octane-mcp-server/node_modules/zod"]

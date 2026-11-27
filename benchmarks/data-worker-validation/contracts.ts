@@ -32,6 +32,8 @@ const rowsSchema: StandardSchema<unknown, Row[]> = {
 // Never stale on its own, so a first load served from the owner's memory or
 // cache starts no refetch: each step's `refresh()` is the round's only request.
 export const rows = read({ name: 'bench.rows', output: rowsSchema, fresh: Infinity });
+/** The same read as the server knows it, validating with Zod alone, so the counts above stay the client's. */
+export const servedRows = read({ name: 'bench.rows', output: list, fresh: Infinity });
 
 export function makeRows(count: number, round: number): Row[] {
 	return Array.from({ length: count }, (_, id) => ({
