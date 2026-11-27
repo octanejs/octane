@@ -813,6 +813,19 @@ describe('octane/data replies validated by the owner', () => {
 		expect(calls).toEqual(['worker']);
 	});
 
+	it('keeps a property beside the items of a list with no hole', async () => {
+		const {
+			stores,
+			calls,
+			read: meeting,
+		} = served({ start: '2026-11-24T10:00:00Z' }, (at) => listWith([at], [at]));
+		const shown = await observed(stores[0]!.read(meeting));
+		const list = shown().start as unknown as unknown[] & { extra: unknown };
+		expect([...list]).toEqual(['2026-11-24T10:00:00Z']);
+		expect(list.extra).toEqual(['2026-11-24T10:00:00Z']);
+		expect(calls).toEqual(['worker']);
+	});
+
 	it('keeps an object the value reaches twice as one object in the tab', async () => {
 		const {
 			stores,
