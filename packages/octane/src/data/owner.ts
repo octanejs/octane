@@ -303,7 +303,7 @@ export function createDataOwner(options: {
 	const validate = async (schema: StandardSchema<unknown, unknown>, value: unknown) => {
 		try {
 			const output = await parse(schema, value);
-			return cloneable(output, new Set()) ? output : NOT;
+			return cloneable(output) ? output : NOT;
 		} catch {
 			return NOT;
 		}
@@ -1430,7 +1430,7 @@ export function createReplica(
 	/** Offer the others what this tab holds for `entry`. */
 	const offer = (entry: Entry) => {
 		const held = inner.held(entry);
-		if (held) send({ t: 'offer', ...held, validated: cloneable(held.value, new Set()) });
+		if (held) send({ t: 'offer', ...held, validated: cloneable(held.value) });
 	};
 	inner.onSeed((entry, wireKey) => {
 		// A reload of a seeded read must not join a request that may predate what it reloads for.
@@ -1706,14 +1706,38 @@ const trust = (value: unknown) => {
 };
 
 /**
+ * How many objects, and how deep, `cloneable` walks without tracking which it
+ * has seen. Tracking costs most of the walk, and only a value that shares or
+ * cycles needs it: a cycle runs past the depth, and enough sharing to matter
+ * past the count.
+ */
+const QUICK_OBJECTS = 1 << 20;
+const QUICK_DEPTH = 256;
+/** Thrown when an untracked walk passes either limit, to start it over tracking. */
+const TRACK = {};
+let quickLeft = 0;
+
+/**
  * Whether a structured clone of `value` equals it: plain data, with nothing a
  * clone would drop or turn into a plain object, such as a class instance.
  */
-function cloneable(value: unknown, seen: Set<object>): boolean {
+function cloneable(value: unknown): boolean {
+	quickLeft = QUICK_OBJECTS;
+	try {
+		return walk(value, undefined, 0);
+	} catch (error) {
+		if (error !== TRACK) throw error;
+		return walk(value, new Set(), 0);
+	}
+}
+
+function walk(value: unknown, seen: Set<object> | undefined, depth: number): boolean {
 	if (typeof value !== 'object' || value === null)
 		return typeof value !== 'function' && typeof value !== 'symbol';
-	if (seen.has(value)) return true;
-	seen.add(value);
+	if (seen) {
+		if (seen.has(value)) return true;
+		seen.add(value);
+	} else if (--quickLeft < 0 || ++depth > QUICK_DEPTH) throw TRACK;
 	const proto = Object.getPrototypeOf(value);
 	if (proto === Array.prototype) {
 		// Items by index: reading a long list through the string keys `for...in`
@@ -1723,25 +1747,27 @@ function cloneable(value: unknown, seen: Set<object>): boolean {
 		for (let index = 0; index < array.length; index++) {
 			const item = array[index];
 			if (item === undefined && !(index in array)) present--;
-			else if (!cloneable(item, seen)) return false;
+			else if (!walk(item, seen, depth)) return false;
 		}
-		// A clone also copies a list's other properties, which `for...in` gives after its indices.
+		// A clone also copies a list's other properties, which `for...in` gives
+		// after its indices. Counting the keys first is cheaper than enumerating them.
+		if (Object.keys(array).length === present) return true;
 		let keys = 0;
 		for (const key in array)
-			if (++keys > present && !cloneable((array as any)[key], seen)) return false;
+			if (++keys > present && !walk((array as any)[key], seen, depth)) return false;
 		return true;
 	}
 	if (proto === Object.prototype) {
-		for (const key in value) if (!cloneable((value as any)[key], seen)) return false;
+		for (const key in value) if (!walk((value as any)[key], seen, depth)) return false;
 		return true;
 	}
 	if (proto === Map.prototype) {
 		for (const [key, item] of value as Map<unknown, unknown>)
-			if (!cloneable(key, seen) || !cloneable(item, seen)) return false;
+			if (!walk(key, seen, depth) || !walk(item, seen, depth)) return false;
 		return true;
 	}
 	if (proto === Set.prototype) {
-		for (const item of value as Set<unknown>) if (!cloneable(item, seen)) return false;
+		for (const item of value as Set<unknown>) if (!walk(item, seen, depth)) return false;
 		return true;
 	}
 	return proto === Date.prototype || proto === RegExp.prototype || ArrayBuffer.isView(value);

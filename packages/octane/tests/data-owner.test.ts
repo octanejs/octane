@@ -734,6 +734,7 @@ describe('octane/data replies validated by the owner', () => {
 			'a function beside the items of a list with a hole',
 			(at: string) => listWith([at, , at], () => at),
 		],
+		['a class instance 1,000 lists deep', (at: string) => nested(1000, new Start(at))],
 	])('leaves a list holding %s to the page’s own validator', async (_, into) => {
 		const { stores, read: meeting, calls } = served({ start: '2026-11-24T10:00:00Z' }, into);
 		await observed(stores[0]!.read(meeting));
@@ -752,6 +753,38 @@ describe('octane/data replies validated by the owner', () => {
 		expect(1 in list).toBe(false);
 		expect(list[2]).toEqual({ at: '2026-11-24T10:00:00Z' });
 		expect(list.extra).toEqual(['2026-11-24T10:00:00Z']);
+		expect(calls).toEqual(['worker']);
+	});
+
+	/** `inner`, in `depth` lists, each inside the next. */
+	const nested = (depth: number, inner: unknown) => {
+		let value = inner;
+		for (let level = 0; level < depth; level++) value = [value];
+		return value;
+	};
+	it.each([
+		[
+			'a list that holds itself',
+			(at: string) => {
+				const list: unknown[] = [at];
+				list.push(list);
+				return list;
+			},
+		],
+		[
+			// 2^40 paths to one object: a walk that followed each would never end.
+			'one object reached by many paths',
+			(at: string) => {
+				let value: unknown = { at };
+				for (let level = 0; level < 40; level++) value = [value, value];
+				return value;
+			},
+		],
+		['plain data 1,000 lists deep', (at: string) => nested(1000, { at })],
+	])('adopts %s, which the owner validated', async (_, into) => {
+		const { stores, read: meeting, calls } = served({ start: '2026-11-24T10:00:00Z' }, into);
+		const shown = await observed(stores[0]!.read(meeting));
+		expect(shown().start).toBeInstanceOf(Array);
 		expect(calls).toEqual(['worker']);
 	});
 
