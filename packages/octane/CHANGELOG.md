@@ -1,5 +1,21 @@
 # octane
 
+## 0.27.1
+
+### Patch Changes
+
+- d0c4b9a: `octane/data`'s encrypted cache saves a value as JSON where JSON keeps it exactly, which writes and restores several times faster than before on a large list, and as before otherwise. Values saved by earlier versions still restore. An earlier version reading a value saved this way discards it, as it would a value from another build, and loads it again.
+- b99e014: `createDataStore` and `createReplica` throw when `persist.key` is a string or bytes shorter than 16 bytes, which the docs already required. A short key from a `key` function leaves the cache in memory only, so nothing is encrypted with it.
+- 5c827d7: `octane/data`'s encrypted cache waits for 50 ms without a new value before saving the values that changed, and never more than half a second after the first, so a burst of replies or feed events is written once instead of once per host task. `persist.delay` sets the wait, and `0` keeps saving on the next host task. `dispose()` still saves what is waiting.
+- a5e5561: `createDataHandler` throws when it is given a `secret` shorter than 16 bytes, or an empty one such as a blank environment variable gives, instead of signing form tokens with a guessable key or failing on every form. The `data` template says how long `FORMS_SECRET` must be.
+- 982a289: `octane/data` feed frames travel as JSON where JSON keeps them exactly, as replies do. `serverListener` and `webSocketListener` ask for it, so a listener from an earlier version keeps getting devalue, and both still read devalue from an earlier server.
+- 30118d4: `octane/data` replies travel as JSON where JSON keeps them exactly, which encodes on the server about four times faster, parses in the client's data worker faster, and compresses to less than half the size on a large list. `httpTransport` and `serverTransport` ask for it with a field in the request, so a client from an earlier version keeps getting devalue, and both still read devalue from an earlier server.
+- db8fc90: `octane/data`'s data owner keeps a newer reply to a read beside an older one still waiting to be saved, so a tab that refreshes a read before its last value was saved no longer sends the whole value back to the worker.
+- fe1b69f: `octane/data`'s data worker checks that a validated list survives the trip to a tab about twice as fast. The encrypted cache encodes saved values with the engine's native base64 where it has one, and several times faster where it doesn't.
+- 9d65ec9: A universal renderer module that reads signals no longer imports `nativePuMemo` from `octane/internal/client` for its memoized creations. A `use()` creation or a `useMemo` with omitted dependencies now uses the renderer's own `useMemo`, so the DOM runtime stays out of non-DOM bundles. A DOM signals module whose warm plan only warms child components also stops importing the unused `nativeWarmMemo`.
+- 63e8007: Universal signal bindings for local signals and style objects. `useSignal$` works in universal renderer modules: the universal compiler routes `octane/signals/client` (and `/server`) to the new `octane/signals/universal` entry, whose `useSignal$` keeps its signal in a component-local cell of the universal owner (created once, disposed on unmount, kept while an Activity hides the component), so a module with a local signal never reaches the DOM runtime. A `style` object whose values include signal handles binds as one source: a write to any of them sends one `update` with the whole style, without rendering the component again, and in template programs the style stays a structured program value. A signal handle passed as a host event handler now fails with an error that names the function to write instead.
+- 7eeec80: A universal renderer module that reads signals and renders a child component no longer imports DOM client helpers into its warm plan. The warm plan used `beginNativeReadWitness`, `finishNativeReadWitness`, and `nativeWarmMemo` from `octane/internal/client`, which pulled the DOM runtime into non-DOM bundles; it now uses the universal `warmChild` and `warmMemo` without the DOM read witness, since the universal core tracks reads while the owner renders.
+
 ## 0.27.0
 
 ### Minor Changes
