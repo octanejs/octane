@@ -65,6 +65,7 @@ import {
 	type FormSeed,
 } from './form.js';
 import {
+	checkCacheKey,
 	createPersistence,
 	persistedRead,
 	type Persistence,
@@ -650,6 +651,7 @@ export function selections(read: Read<any, any>, value: unknown): EntitySelectio
 }
 
 export function createDataStore(options: DataStoreOptions): DataStore {
+	if (options.persist) checkCacheKey(options.persist.key);
 	const { transport } = options;
 	const entries = new Map<string, Entry>();
 	const seeds = new Map<string, SeedEntry>();

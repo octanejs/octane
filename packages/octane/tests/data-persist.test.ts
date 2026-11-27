@@ -2289,6 +2289,45 @@ describe('octane/data live updates and cache lifecycle', () => {
 		await saved();
 	});
 
+	it.each([
+		['an empty key', ''],
+		['a key shorter than 16 bytes', 'fifteen bytes!!'],
+		['8 random bytes', crypto.getRandomValues(new Uint8Array(8))],
+	])('refuses %s when the store is made', (_, key) => {
+		const persist = { ...cache(memoryStorage(), 'ada'), key };
+		const transport = server(books()).transport;
+		expect(() => createDataStore({ transport, persist })).toThrow(/at least 16 bytes/);
+		// A tab with an owner, which keeps no cache of its own until it has to.
+		const { port1, port2 } = new MessageChannel();
+		expect(() => createReplica(port2, { transport, persist, contracts: [shelf] })).toThrow(
+			/at least 16 bytes/,
+		);
+		port1.close();
+		port2.close();
+	});
+
+	it('saves with a key of 16 random bytes', async () => {
+		const storage = memoryStorage();
+		const persist = { ...cache(storage, 'ada'), key: crypto.getRandomValues(new Uint8Array(16)) };
+		const before = createDataStore({ transport: server(books()).transport, persist });
+		await before.prefetch(shelf, undefined);
+		await before.dispose();
+		const remote = server(books());
+		const after = createDataStore({ transport: remote.transport, persist });
+		expect((await value<Book[]>(after, shelf)).value).toEqual(books());
+		expect(remote.log).toEqual([]);
+	});
+
+	it('keeps values in memory only when a key from a function is too short', async () => {
+		const storage = memoryStorage();
+		const persist = { ...cache(storage, 'ada'), key: async () => 'short' };
+		const before = createDataStore({ transport: server(books()).transport, persist });
+		await value(before, shelf);
+		await saved();
+		await before.dispose();
+		expect(listPartitions(storage)).toEqual([]);
+	});
+
 	it('derives its keys from a non-exportable CryptoKey, which only the same key opens', async () => {
 		const opaque = () =>
 			crypto.subtle.importKey('raw', crypto.getRandomValues(new Uint8Array(32)), 'HKDF', false, [

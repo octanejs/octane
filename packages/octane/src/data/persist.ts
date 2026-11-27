@@ -276,11 +276,29 @@ function fromBase64(text: string): Uint8Array<ArrayBuffer> {
 	return bytes;
 }
 
+/**
+ * Refuse key material shorter than 16 bytes (128 bits), which an attacker who
+ * reads the cache could guess. A `CryptoKey` is taken as it is, and a key from
+ * a function is checked once it resolves.
+ */
+export function checkCacheKey(key: PersistOptions['key']): void {
+	if (typeof key === 'function' || (typeof CryptoKey === 'function' && key instanceof CryptoKey))
+		return;
+	const bytes =
+		typeof key === 'string' ? encoder.encode(key).length : (key as BufferSource).byteLength;
+	if (!(bytes >= 16))
+		throw new Error(
+			'octane/data: persist.key needs at least 16 bytes (128 bits) of random key material',
+		);
+}
+
 /** AES-GCM for values and HMAC for names, both derived from the session's key with HKDF. */
 async function createCipher(source: PersistOptions['key']) {
 	// Name the getter's type: under bun-types, `CryptoKey` survives a `typeof` function check.
 	const secret =
 		typeof source === 'function' ? await (source as () => CacheKey | Promise<CacheKey>)() : source;
+	// A short key leaves the cache in memory only, as an unreadable one does: nothing is sealed with it.
+	checkCacheKey(secret);
 	const base =
 		secret instanceof CryptoKey
 			? secret
