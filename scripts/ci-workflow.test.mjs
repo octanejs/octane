@@ -309,6 +309,26 @@ describe('CI workflow aggregation', () => {
 		assert.doesNotMatch(provenance, /Lynx compatibility \(\$\{lane\}\)/);
 	});
 
+	test('checks the downstream @ui-sdk/octane adapter at one pinned commit, advisory', () => {
+		const downstream = jobSource('ui_sdk_downstream');
+		const provenance = stepScript(workflow, 'Verify full-suite provenance');
+		const script = readFileSync(path.join(REPO, 'scripts/ui-sdk-downstream.mjs'), 'utf8');
+
+		assert.match(downstream, /^    name: UI SDK downstream$/m);
+		assert.equal([...downstream.matchAll(/pnpm install --frozen-lockfile/g)].length, 1);
+		assert.match(
+			downstream,
+			/run: node scripts\/ui-sdk-downstream\.mjs --dir "\$RUNNER_TEMP\/octane-ui-sdk"\n/,
+		);
+		assert.match(downstream, /run: git diff --exit-code -- pnpm-lock\.yaml/);
+		assert.match(script, /^\trevision: '[0-9a-f]{40}',$/m);
+		// Advisory until the adapter lives in vercel-labs/ui: its failure fails
+		// neither the run, which publishing requires, nor CI provenance.
+		assert.match(downstream, /^    continue-on-error: true$/m);
+		assert.doesNotMatch(provenance, /UI SDK downstream/);
+		assert.doesNotMatch(jobSource('provenance'), /ui_sdk_downstream|UI_SDK_DOWNSTREAM/);
+	});
+
 	test('skips expensive jobs only after the committed scope classifier opts out', () => {
 		assert.match(
 			jobSource('release_change'),
@@ -328,6 +348,7 @@ describe('CI workflow aggregation', () => {
 			'example_shard',
 			'three_compat',
 			'lynx_compat',
+			'ui_sdk_downstream',
 			'package',
 		]) {
 			assert.match(

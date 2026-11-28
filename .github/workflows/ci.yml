@@ -1309,6 +1309,59 @@ jobs:
       - name: Verify the repository lockfile stayed immutable
         run: git diff --exit-code -- pnpm-lock.yaml
 
+  # Advisory while the adapter lives on a fork: a failure fails neither the run
+  # nor CI provenance, so it blocks no merge or publish. It becomes required
+  # once the adapter lives in vercel-labs/ui.
+  ui_sdk_downstream:
+    name: UI SDK downstream
+    needs: release_change
+    if: ${{ always() && !cancelled() && github.event.action != 'closed' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release_pr != 'true' && needs.release_change.outputs.full_ci != 'false' }}
+    runs-on: ${{ github.repository == 'openai-oss-forks/octane' && 'ubuntu-24.04' || 'blacksmith-4vcpu-ubuntu-2404' }}
+    timeout-minutes: 30
+    continue-on-error: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@d9184bf108216479bc5a137cc391f4d7b14c870b # v6.1.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # UI SDK pins its own Playwright, so the script downloads that Chromium.
+      # Only the system libraries come from here.
+      - name: Install Chromium system dependencies
+        run: |
+          bash scripts/ci-apt-https.sh
+          pnpm exec playwright install-deps chromium
+
+      # Packs this checkout's octane into UI SDK at the commit the script pins,
+      # builds @ui-sdk/core and @ui-sdk/octane, server-renders its .tsrx
+      # consumer, and runs a slice of its specs on the octane and octane-tsrx
+      # projects. The script prints how to reproduce a failure locally.
+      - name: Check the @ui-sdk/octane adapter against this octane
+        run: node scripts/ui-sdk-downstream.mjs --dir "$RUNNER_TEMP/octane-ui-sdk"
+
+      - name: Upload failed UI SDK test results
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ui-sdk-downstream-test-results
+          path: ${{ runner.temp }}/octane-ui-sdk/ui/tests/test-results
+          if-no-files-found: ignore
+          retention-days: 1
+
+      - name: Verify the repository lockfile stayed immutable
+        run: git diff --exit-code -- pnpm-lock.yaml
+
   package:
     name: validate publishable packages
     needs: release_change
