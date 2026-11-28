@@ -60,76 +60,43 @@ tab shows all `ROWS` rows. `BENCH_JSON=<file>` writes the results as JSON.
 ## Results
 
 Apple M5 Max, Node 24.18 and Chromium 149, 8 rounds × 20 iterations, at
-#3183 (`fe1b69f860`).
+#3206 (`036063e75f`).
 
 | Rows | Step | Lane | Node: tab busy (ms) | Node: wall (ms) | Chromium: tab busy (ms) | Chromium: wall (ms) |
 | ---: | --- | --- | ---: | ---: | ---: | ---: |
-| 5,000 | reply | page | 2.67 | 5.47 | 2.34 | 7.90 |
-| 5,000 | reply | worker | 2.31 | 7.89 | 1.88 | 8.62 |
-| 5,000 | restore | page | 2.01 | 5.43 | 1.83 | 4.05 |
-| 5,000 | restore | worker | 1.61 | 5.95 | 1.52 | 4.75 |
-| 20,000 | reply | page | 11.39 | 20.92 | 9.74 | 34.38 |
-| 20,000 | reply | worker | 10.55 | 31.29 | 7.62 | 37.00 |
-| 20,000 | restore | page | 7.66 | 21.15 | 6.43 | 16.20 |
-| 20,000 | restore | worker | 6.22 | 23.64 | 5.15 | 18.12 |
+| 5,000 | reply | page | 2.28 | 4.55 | 1.97 | 3.90 |
+| 5,000 | reply | worker | 0.91 | 4.31 | 0.76 | 3.62 |
+| 5,000 | restore | page | 1.34 | 4.30 | 1.22 | 2.75 |
+| 5,000 | restore | worker | 1.00 | 4.57 | 0.83 | 2.90 |
+| 20,000 | reply | page | 9.40 | 19.16 | 8.56 | 16.80 |
+| 20,000 | reply | worker | 3.59 | 17.19 | 2.93 | 14.60 |
+| 20,000 | restore | page | 4.72 | 15.47 | 4.12 | 10.15 |
+| 20,000 | restore | worker | 3.55 | 16.98 | 2.69 | 11.18 |
 
 Tab schema calls are 1 for `page` and 0 for `worker` throughout.
 
-- Validating in the worker saves the tab 14–20% of its busy time in Node and
-  17–22% in Chromium: in Chromium, about 0.5 ms per 5,000-row reply and 2.1 ms
-  per 20,000-row reply. Most of the tab's time goes to receiving the value from
-  the worker (structured-clone deserialization) and to the store's own work,
-  and moving validation leaves both alone.
-- Validation adds its own cost to each reply in the worker: Zod's parse, and
-  `cloneable()`, the walk that checks the value survives the trip to a tab.
-  In Node at 5,000 rows they took 0.35 ms and 0.8 ms; at 20,000, 1.7 ms and
-  3.5 ms. In Chromium, a 20,000-row reply reached the tab 2.6 ms later when
-  the worker validated. Since then, the walk records the objects it has seen
-  only for a value deep or large enough to need it, which cut its share at
-  5,000 rows to about 0.33 ms (a CPU profile of the worker).
+- Validating in the worker saves the tab 60–66% of its busy time on a reply
+  and 25–35% on a restore. Since #3204 the worker sends a value JSON keeps
+  exactly as JSON text, which the tab parses, and since #3206 it checks a
+  value it validated for that only once.
+- What a 5,000-row reply costs, each part timed alone in Node:
+  - in the worker: Zod's parse 0.18 ms, checking that JSON keeps the value
+    0.61 ms, and writing its text 0.50 ms;
+  - in the tab: parsing the text 0.69 ms.
+  Together these are about half of the reply's wall time. The rest is the
+  messages between the tab and the worker and the store's own work, which the
+  bench does not split.
+- A reply waits for no cache write. The worker saves a value once 50 ms pass
+  without another change, so each lane wrote one value per round, after its
+  burst of replies: 8 writes for 160 replies, in both runtimes.
+- In the page lane the tab sends the worker the value it validated, for the
+  worker to save. That is a structured clone, 0.92 ms to write and 1.46 ms to
+  read at 5,000 rows, and most of the difference in tab busy time between the
+  lanes. In the worker lane the tab says the value is unchanged and sends none.
 - Zod builds its output lists holey, as `new Array(n)` does, and V8 copies a
-  holey list item by item, with each index. So a value the worker validated is
-  slower to post and to receive than the same rows decoded from JSON or the
-  cache: at 5,000 rows, 1.11 ms against 0.79 ms to serialize, 1.52 ms against
-  1.18 ms to deserialize, and 7% more bytes. That is why a restore costs the
-  tab as much in the worker lane as in the page lane, where the tab runs Zod
-  itself. Copying the lists into packed ones in the worker costs what it saves
-  there.
-- Since then, the worker sends a message that JSON keeps exactly as JSON text,
-  to a tab that reads text, and the tab parses it. A string crosses to a tab as
-  one copy, and the tab's `JSON.parse` builds its lists packed, whoever made
-  them. Main against that change, 8 rounds × 20 iterations, tab busy (ms):
-
-  | Rows | Runtime | Step | Page lane | Worker lane |
-  | ---: | --- | --- | ---: | ---: |
-  | 5,000 | Node | reply | 2.58 → 2.35 | 1.49 → 0.95 |
-  | 5,000 | Node | restore | 1.62 → 1.36 | 1.60 → 1.01 |
-  | 5,000 | Chromium | reply | 2.30 → 2.02 | 1.36 → 0.71 |
-  | 5,000 | Chromium | restore | 1.46 → 1.26 | 1.46 → 0.92 |
-  | 20,000 | Node | reply | 11.51 → 9.37 | 6.08 → 3.53 |
-  | 20,000 | Node | restore | 6.30 → 4.75 | 6.14 → 3.55 |
-  | 20,000 | Chromium | reply | 9.65 → 8.67 | 5.54 → 3.07 |
-  | 20,000 | Chromium | restore | 5.20 → 4.24 | 5.27 → 2.91 |
-
-  Worker-lane wall time fell too, by 0.3–3.6 ms. Page-lane replies, which the
-  worker does not validate, reached the tab up to 0.55 ms later (Chromium, 20,000
-  rows): the worker now checks that JSON keeps the value and writes it.
-- Since then, a worker that validates a read's reply or a feed event checks
-  once that JSON keeps it, which also shows it survives a structured clone, so
-  the message sending it, which holds no other object, needs no second walk. On
-  this bench's Zod output, those checks went from 1.05 ms to 0.67 ms at 5,000
-  rows, and from 4.45 ms to 2.86 ms at 20,000 (a Node microbench of the two).
-  Worker-lane replies reached the tab 0.27–0.38 ms sooner at 5,000 rows and
-  about 1.6 ms sooner at 20,000; restores and the tab's busy time did not
-  move. A restore, a write and a reply told to the other tabs keep the old
-  walk: their messages hold other objects, such as the read's input or the
-  cache's tags, which could share an object with the value.
-- Most of the rest of a reply's wall time is the cache. The worker saves each
-  reply, and a refresh that arrives during a save waits for it. Both lanes ask
-  for one save per reply. In Node, where base64 is slow, how many share a
-  write depends on timing, so which lane's requests wait varies from run to
-  run. In Chromium every reply was written on its own (168 of 168 in both
-  lanes). The bench prints the writes but doesn't check them.
+  holey list item by item, with each index: slower to clone, and 7% more
+  bytes, than the same rows from `JSON.parse`. Text does not have the problem,
+  since `JSON.parse` in the tab builds its lists packed.
 - Neither step includes network time, which in an app usually dwarfs both.
 
 ## Over the wire
